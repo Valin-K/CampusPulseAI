@@ -8,7 +8,10 @@
         "coursemanagement.backend": "StartDebugging",
         "campushousing.backend": "StartDebugging",
         "financialaidbilling.backend": "StartDebugging",
-        "eventscheduling.backend": "StartDebugging"
+        "eventscheduling.backend": "StartDebugging",
+        "mcpserver": "StartDebugging",
+        "multiagentserver": "StartDebugging",
+        "ragserver": "StartDebugging"
       }
     }
   }

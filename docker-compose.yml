@@ -32,3 +32,24 @@ services:
       context: .
       dockerfile: student-5/backend/EventScheduling.Backend/Dockerfile
 
+
+  mcpserver:
+    image: ${DOCKER_REGISTRY-}mcpserver
+    build:
+      context: .
+      dockerfile: ai-services/mcp-server/McpServer/Dockerfile
+
+
+  multiagentserver:
+    image: ${DOCKER_REGISTRY-}multiagentserver
+    build:
+      context: .
+      dockerfile: ai-services/multi-agent-server/MultiAgentServer/Dockerfile
+
+
+  ragserver:
+    image: ${DOCKER_REGISTRY-}ragserver
+    build:
+      context: .
+      dockerfile: ai-services/rag-server/RagServer/Dockerfile
+
