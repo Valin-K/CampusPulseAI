@@ -1,4 +1,9 @@
 <Solution>
+  <Folder Name="/ai-services/">
+    <Project Path="ai-services/mcp-server/McpServer/McpServer.csproj" Id="4751f458-f0fa-4f3d-8e53-aae8d8fb249d" />
+    <Project Path="ai-services/multi-agent-server/MultiAgentServer/MultiAgentServer.csproj" Id="3db1fd65-d870-413c-9343-850bbdbdac96" />
+    <Project Path="ai-services/rag-server/RagServer/RagServer.csproj" Id="9255b6b6-ec32-43df-b3be-e16b83c11585" />
+  </Folder>
   <Folder Name="/Shared/" />
   <Folder Name="/Shared/configuration/">
     <File Path="shared/configuration/.env.template" />
@@ -16,22 +21,29 @@
   <Folder Name="/Shared/frontend/js/">
     <File Path="shared/frontend/js/common.js" />
   </Folder>
-  <Project Path="ai-services/mcp-server/McpServer/McpServer.csproj" Id="4751f458-f0fa-4f3d-8e53-aae8d8fb249d" />
-  <Project Path="ai-services/multi-agent-server/MultiAgentServer/MultiAgentServer.csproj" Id="3db1fd65-d870-413c-9343-850bbdbdac96" />
-  <Project Path="ai-services/rag-server/RagServer/RagServer.csproj" Id="9255b6b6-ec32-43df-b3be-e16b83c11585" />
-  <Project Path="student-1/backend/AcademicRecords.Backend/AcademicRecords.Backend.csproj" Id="0c465280-c664-4f66-b19e-4b02426e7d58" />
-  <Project Path="student-1/frontend/AcademicRecords.Frontend/AcademicRecords.Frontend.csproj" Id="7cbc512d-38c0-49d9-8247-aa5504ae1333" />
-  <Project Path="student-1/tests/AcademicRecords.Tests/AcademicRecords.Tests.csproj" Id="b9e4fc4e-8977-4783-a5b9-4c8051210c2e" />
-  <Project Path="student-2/backend/CourseManagement.Backend/CourseManagement.Backend.csproj" Id="b02f1002-9a07-4914-8a47-3bd83fd2aab0" />
-  <Project Path="student-2/frontend/CourseManagement.Frontend/CourseManagement.Frontend.csproj" Id="efdddfe6-7ce1-402f-acfe-cabd4add9ca4" />
-  <Project Path="student-2/tests/CourseManagement.Tests/CourseManagement.Tests.csproj" Id="e36b9bdf-7a17-4ee7-ad35-f2aa9b24a6ea" />
-  <Project Path="student-3/backend/CampusHousing.Backend/CampusHousing.Backend.csproj" Id="c73d1fd3-b078-422d-a233-374c3eb8fd85" />
-  <Project Path="student-3/frontend/CampusHousing.Frontend/CampusHousing.Frontend.csproj" Id="a7b200b9-1ae6-4411-84db-0fca722877e5" />
-  <Project Path="student-3/tests/CampusHousing.Tests/CampusHousing.Tests.csproj" Id="548dbd8a-3660-4844-ae9b-e3c7ce231bb2" />
-  <Project Path="student-4/backend/FinancialAidBilling.Backend/FinancialAidBilling.Backend.csproj" Id="b4ec84b1-13f2-4540-903d-a644f108712d" />
-  <Project Path="student-4/frontend/FinancialAidBilling.Frontend/FinancialAidBilling.Frontend.csproj" Id="d2888499-7b6a-495d-8bc3-def0d4ab638b" />
-  <Project Path="student-4/tests/FinancialAidBilling.Tests/FinancialAidBilling.Tests.csproj" Id="dad1812b-6b61-4ad8-8511-53865a9ef2dc" />
-  <Project Path="student-5/backend/EventScheduling.Backend/EventScheduling.Backend.csproj" Id="d1177922-bc9a-4897-b9b4-77ec917361c9" />
-  <Project Path="student-5/frontend/EventScheduling.Frontend/EventScheduling.Frontend.csproj" Id="008d8d16-c414-49eb-b57e-91c643e705f7" />
-  <Project Path="student-5/tests/EventScheduling.Tests/EventScheduling.Tests.csproj" Id="36555928-768e-4e01-a471-124c18bdf32e" />
+  <Folder Name="/student-1/">
+    <Project Path="student-1/backend/AcademicRecords.Backend/AcademicRecords.Backend.csproj" Id="0c465280-c664-4f66-b19e-4b02426e7d58" />
+    <Project Path="student-1/frontend/AcademicRecords.Frontend/AcademicRecords.Frontend.csproj" Id="7cbc512d-38c0-49d9-8247-aa5504ae1333" />
+    <Project Path="student-1/tests/AcademicRecords.Tests/AcademicRecords.Tests.csproj" Id="b9e4fc4e-8977-4783-a5b9-4c8051210c2e" />
+  </Folder>
+  <Folder Name="/student-2/">
+    <Project Path="student-2/backend/CourseManagement.Backend/CourseManagement.Backend.csproj" Id="b02f1002-9a07-4914-8a47-3bd83fd2aab0" />
+    <Project Path="student-2/frontend/CourseManagement.Frontend/CourseManagement.Frontend.csproj" Id="efdddfe6-7ce1-402f-acfe-cabd4add9ca4" />
+    <Project Path="student-2/tests/CourseManagement.Tests/CourseManagement.Tests.csproj" Id="e36b9bdf-7a17-4ee7-ad35-f2aa9b24a6ea" />
+  </Folder>
+  <Folder Name="/student-3/">
+    <Project Path="student-3/backend/CampusHousing.Backend/CampusHousing.Backend.csproj" Id="c73d1fd3-b078-422d-a233-374c3eb8fd85" />
+    <Project Path="student-3/frontend/CampusHousing.Frontend/CampusHousing.Frontend.csproj" Id="a7b200b9-1ae6-4411-84db-0fca722877e5" />
+    <Project Path="student-3/tests/CampusHousing.Tests/CampusHousing.Tests.csproj" Id="548dbd8a-3660-4844-ae9b-e3c7ce231bb2" />
+  </Folder>
+  <Folder Name="/student-4/">
+    <Project Path="student-4/backend/FinancialAidBilling.Backend/FinancialAidBilling.Backend.csproj" Id="b4ec84b1-13f2-4540-903d-a644f108712d" />
+    <Project Path="student-4/frontend/FinancialAidBilling.Frontend/FinancialAidBilling.Frontend.csproj" Id="d2888499-7b6a-495d-8bc3-def0d4ab638b" />
+    <Project Path="student-4/tests/FinancialAidBilling.Tests/FinancialAidBilling.Tests.csproj" Id="dad1812b-6b61-4ad8-8511-53865a9ef2dc" />
+  </Folder>
+  <Folder Name="/student-5/">
+    <Project Path="student-5/backend/EventScheduling.Backend/EventScheduling.Backend.csproj" Id="d1177922-bc9a-4897-b9b4-77ec917361c9" />
+    <Project Path="student-5/frontend/EventScheduling.Frontend/EventScheduling.Frontend.csproj" Id="008d8d16-c414-49eb-b57e-91c643e705f7" />
+    <Project Path="student-5/tests/EventScheduling.Tests/EventScheduling.Tests.csproj" Id="36555928-768e-4e01-a471-124c18bdf32e" />
+  </Folder>
 </Solution>
