@@ -5,4 +5,7 @@
   <Project Path="student-2/backend/CourseManagement.Backend/CourseManagement.Backend.csproj" Id="b02f1002-9a07-4914-8a47-3bd83fd2aab0" />
   <Project Path="student-2/frontend/CourseManagement.Frontend/CourseManagement.Frontend.csproj" Id="efdddfe6-7ce1-402f-acfe-cabd4add9ca4" />
   <Project Path="student-2/tests/CourseManagement.Tests/CourseManagement.Tests.csproj" Id="e36b9bdf-7a17-4ee7-ad35-f2aa9b24a6ea" />
+  <Project Path="student-3/backend/CampusHousing.Backend/CampusHousing.Backend.csproj" Id="c73d1fd3-b078-422d-a233-374c3eb8fd85" />
+  <Project Path="student-3/frontend/CampusHousing.Frontend/CampusHousing.Frontend.csproj" Id="a7b200b9-1ae6-4411-84db-0fca722877e5" />
+  <Project Path="student-3/tests/CampusHousing.Tests/CampusHousing.Tests.csproj" Id="548dbd8a-3660-4844-ae9b-e3c7ce231bb2" />
 </Solution>
