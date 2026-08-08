@@ -1,5 +1,7 @@
 <Solution>
   <Project Path="student-1/backend/AcademicRecords.Backend/AcademicRecords.Backend.csproj" Id="0c465280-c664-4f66-b19e-4b02426e7d58" />
-  <Project Path="student-1/frontend/FinancialAidBilling.Frontend/FinancialAidBilling.Frontend.csproj" Id="b532543e-f6a7-459c-a264-c8c2b31a398e" />
   <Project Path="student-1/tests/AcademicRecords.Tests/AcademicRecords.Tests.csproj" Id="b9e4fc4e-8977-4783-a5b9-4c8051210c2e" />
+  <Project Path="student-2/backend/CourseManagement.Backend/CourseManagement.Backend.csproj" Id="b02f1002-9a07-4914-8a47-3bd83fd2aab0" />
+  <Project Path="student-2/frontend/CourseManagement.Frontend/CourseManagement.Frontend.csproj" Id="efdddfe6-7ce1-402f-acfe-cabd4add9ca4" />
+  <Project Path="student-2/tests/CourseManagement.Tests/CourseManagement.Tests.csproj" Id="e36b9bdf-7a17-4ee7-ad35-f2aa9b24a6ea" />
 </Solution>
