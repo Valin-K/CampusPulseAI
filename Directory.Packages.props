@@ -1,0 +1,33 @@
+<Project>
+
+  <PropertyGroup>
+	<ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+	<CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+  </PropertyGroup>
+
+  <ItemGroup>
+	<PackageVersion Include="coverlet.collector" Version="6.0.4" />
+	<PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.9" />
+	<PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="10.0.9" />
+	<PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="10.0.9" />
+	<PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.14.0" />
+	<PackageVersion Include="NUnit" Version="4.3.2" />
+	<PackageVersion Include="NUnit.Analyzers" Version="4.7.0" />
+	<PackageVersion Include="NUnit3TestAdapter" Version="5.0.0" />
+  </ItemGroup>
+
+  <!--
+	The Blazor WebAssembly SDK implicitly references these packages with a Version attribute,
+	which conflicts with Central Package Management. Remove the inline version from implicit
+	references only, so CPM can resolve it from the PackageVersion items above while still
+	failing the build if a project explicitly defines a version.
+  -->
+  <Target Name="RemoveImplicitBlazorWebAssemblyPackageVersions" AfterTargets="ProcessFrameworkReferences" BeforeTargets="CollectPackageReferences">
+	<ItemGroup>
+	  <PackageReference Update="Microsoft.AspNetCore.Components.WebAssembly" Version="" Condition="'%(PackageReference.IsImplicitlyDefined)' == 'true'" />
+	  <PackageReference Update="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="" Condition="'%(PackageReference.IsImplicitlyDefined)' == 'true'" />
+	  <PackageReference Update="Microsoft.NET.ILLink.Tasks" Version="" Condition="'%(PackageReference.IsImplicitlyDefined)' == 'true'" />
+	</ItemGroup>
+  </Target>
+
+</Project>
