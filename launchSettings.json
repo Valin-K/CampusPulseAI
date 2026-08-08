@@ -4,7 +4,11 @@
       "commandName": "DockerCompose",
       "commandVersion": "1.0",
       "serviceActions": {
-        "academicrecords.backend": "StartDebugging"
+        "academicrecords.backend": "StartDebugging",
+        "coursemanagement.backend": "StartDebugging",
+        "campushousing.backend": "StartDebugging",
+        "financialaidbilling.backend": "StartDebugging",
+        "eventscheduling.backend": "StartDebugging"
       }
     }
   }

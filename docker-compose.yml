@@ -4,3 +4,31 @@ services:
     build:
       context: .
       dockerfile: student-1/backend/AcademicRecords.Backend/Dockerfile
+
+  coursemanagement.backend:
+    image: ${DOCKER_REGISTRY-}coursemanagementbackend
+    build:
+      context: .
+      dockerfile: student-2/backend/CourseManagement.Backend/Dockerfile
+
+
+  campushousing.backend:
+    image: ${DOCKER_REGISTRY-}campushousingbackend
+    build:
+      context: .
+      dockerfile: student-3/backend/CampusHousing.Backend/Dockerfile
+
+
+  financialaidbilling.backend:
+    image: ${DOCKER_REGISTRY-}financialaidbillingbackend
+    build:
+      context: .
+      dockerfile: student-4/backend/FinancialAidBilling.Backend/Dockerfile
+
+
+  eventscheduling.backend:
+    image: ${DOCKER_REGISTRY-}eventschedulingbackend
+    build:
+      context: .
+      dockerfile: student-5/backend/EventScheduling.Backend/Dockerfile
+
