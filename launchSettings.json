@@ -11,7 +11,12 @@
         "eventscheduling.backend": "StartDebugging",
         "mcpserver": "StartDebugging",
         "multiagentserver": "StartDebugging",
-        "ragserver": "StartDebugging"
+        "ragserver": "StartDebugging",
+        "academicrecords.frontend": "StartDebugging",
+        "coursemanagement.frontend": "StartDebugging",
+        "campushousing.frontend": "StartDebugging",
+        "financialaidbilling.frontend": "StartDebugging",
+        "eventscheduling.frontend": "StartDebugging"
       }
     }
   }

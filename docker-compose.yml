@@ -53,3 +53,38 @@ services:
       context: .
       dockerfile: ai-services/rag-server/RagServer/Dockerfile
 
+
+  academicrecords.frontend:
+    image: ${DOCKER_REGISTRY-}academicrecordsfrontend
+    build:
+      context: .
+      dockerfile: student-1/frontend/AcademicRecords.Frontend/Dockerfile
+
+
+  coursemanagement.frontend:
+    image: ${DOCKER_REGISTRY-}coursemanagementfrontend
+    build:
+      context: .
+      dockerfile: student-2/frontend/CourseManagement.Frontend/Dockerfile
+
+
+  campushousing.frontend:
+    image: ${DOCKER_REGISTRY-}campushousingfrontend
+    build:
+      context: .
+      dockerfile: student-3/frontend/CampusHousing.Frontend/Dockerfile
+
+
+  financialaidbilling.frontend:
+    image: ${DOCKER_REGISTRY-}financialaidbillingfrontend
+    build:
+      context: .
+      dockerfile: student-4/frontend/FinancialAidBilling.Frontend/Dockerfile
+
+
+  eventscheduling.frontend:
+    image: ${DOCKER_REGISTRY-}eventschedulingfrontend
+    build:
+      context: .
+      dockerfile: student-5/frontend/EventScheduling.Frontend/Dockerfile
+
