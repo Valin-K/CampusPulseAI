@@ -11,4 +11,7 @@
   <Project Path="student-4/backend/FinancialAidBilling.Backend/FinancialAidBilling.Backend.csproj" Id="b4ec84b1-13f2-4540-903d-a644f108712d" />
   <Project Path="student-4/frontend/FinancialAidBilling.Frontend/FinancialAidBilling.Frontend.csproj" Id="d2888499-7b6a-495d-8bc3-def0d4ab638b" />
   <Project Path="student-4/tests/FinancialAidBilling.Tests/FinancialAidBilling.Tests.csproj" Id="dad1812b-6b61-4ad8-8511-53865a9ef2dc" />
+  <Project Path="student-5/backend/EventScheduling.Backend/EventScheduling.Backend.csproj" Id="d1177922-bc9a-4897-b9b4-77ec917361c9" />
+  <Project Path="student-5/frontend/EventScheduling.Frontend/EventScheduling.Frontend.csproj" Id="008d8d16-c414-49eb-b57e-91c643e705f7" />
+  <Project Path="student-5/tests/EventScheduling.Tests/EventScheduling.Tests.csproj" Id="36555928-768e-4e01-a471-124c18bdf32e" />
 </Solution>
