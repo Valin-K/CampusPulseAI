@@ -8,4 +8,7 @@
   <Project Path="student-3/backend/CampusHousing.Backend/CampusHousing.Backend.csproj" Id="c73d1fd3-b078-422d-a233-374c3eb8fd85" />
   <Project Path="student-3/frontend/CampusHousing.Frontend/CampusHousing.Frontend.csproj" Id="a7b200b9-1ae6-4411-84db-0fca722877e5" />
   <Project Path="student-3/tests/CampusHousing.Tests/CampusHousing.Tests.csproj" Id="548dbd8a-3660-4844-ae9b-e3c7ce231bb2" />
+  <Project Path="student-4/backend/FinancialAidBilling.Backend/FinancialAidBilling.Backend.csproj" Id="b4ec84b1-13f2-4540-903d-a644f108712d" />
+  <Project Path="student-4/frontend/FinancialAidBilling.Frontend/FinancialAidBilling.Frontend.csproj" Id="d2888499-7b6a-495d-8bc3-def0d4ab638b" />
+  <Project Path="student-4/tests/FinancialAidBilling.Tests/FinancialAidBilling.Tests.csproj" Id="dad1812b-6b61-4ad8-8511-53865a9ef2dc" />
 </Solution>
