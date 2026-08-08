@@ -16,6 +16,9 @@
   <Folder Name="/Shared/frontend/js/">
     <File Path="shared/frontend/js/common.js" />
   </Folder>
+  <Project Path="ai-services/mcp-server/McpServer/McpServer.csproj" Id="4751f458-f0fa-4f3d-8e53-aae8d8fb249d" />
+  <Project Path="ai-services/multi-agent-server/MultiAgentServer/MultiAgentServer.csproj" Id="3db1fd65-d870-413c-9343-850bbdbdac96" />
+  <Project Path="ai-services/rag-server/RagServer/RagServer.csproj" Id="9255b6b6-ec32-43df-b3be-e16b83c11585" />
   <Project Path="student-1/backend/AcademicRecords.Backend/AcademicRecords.Backend.csproj" Id="0c465280-c664-4f66-b19e-4b02426e7d58" />
   <Project Path="student-1/frontend/AcademicRecords.Frontend/AcademicRecords.Frontend.csproj" Id="7cbc512d-38c0-49d9-8247-aa5504ae1333" />
   <Project Path="student-1/tests/AcademicRecords.Tests/AcademicRecords.Tests.csproj" Id="b9e4fc4e-8977-4783-a5b9-4c8051210c2e" />
