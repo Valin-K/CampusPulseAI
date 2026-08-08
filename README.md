@@ -1,1 +1,204 @@
 # CampusPulseAI
+
+CampusPulseAI is a .NET 10 campus-services solution containing five student applications, shared frontend assets, backend APIs, and AI services. The repository includes a Visual Studio Docker Compose project for running the complete environment.
+
+## Prerequisites
+
+Install the following on Windows before opening the solution:
+
+1. **Visual Studio Community 2026** (18.9 or later)
+   - Install the **ASP.NET and web development** workload.
+   - In the Visual Studio Installer, also ensure **Container Development Tools** is installed. This provides Visual Studio Container Tools and the Docker Compose integration.
+   - Sign in to Visual Studio if your Community license requires it.
+
+2. **.NET SDK 10.0.302**
+   - The repository pins this SDK in `global.json`.
+   - Install the Windows x64 SDK from the [.NET 10 download page](https://dotnet.microsoft.com/download/dotnet/10.0).
+   - The installed SDK must be `10.0.302`; the repository allows only the latest patch for that SDK feature band.
+
+3. **WSL 2**
+   - Open Windows Terminal or PowerShell as Administrator and run:
+
+     ```powershell
+     wsl --install
+     ```
+
+   - Restart Windows when prompted, then complete the Linux distribution setup.
+   - Confirm WSL 2 is active:
+
+     ```powershell
+     wsl --status
+     wsl --update
+     ```
+
+   - If an existing distribution is using WSL 1, convert it with `wsl --set-version <DistributionName> 2`.
+
+4. **Docker Desktop for Windows**
+   - Install [Docker Desktop](https://www.docker.com/products/docker-desktop/).
+   - In Docker Desktop, enable **Use the WSL 2 based engine** under **Settings > General**.
+   - Under **Settings > Resources > WSL Integration**, enable integration for the distribution used by the project.
+   - Start Docker Desktop and wait until it reports that Docker is running.
+
+5. **Git**
+   - Install [Git for Windows](https://git-scm.com/download/win) and make sure `git` is available in a new terminal.
+
+### Verify the installation
+
+Open a new PowerShell window and run:
+
+```powershell
+dotnet --version
+wsl --status
+docker version
+docker compose version
+git --version
+```
+
+`dotnet --version` must print `10.0.302`. If it does not, install that SDK or open the repository from a terminal where the correct SDK is available.
+
+## Clone and open the solution
+
+```powershell
+git clone https://github.com/Valin-K/CampusPulseAI.git
+cd CampusPulseAI
+```
+
+Open `CampusPulseAI.slnx` in Visual Studio 2026. The solution includes the `docker-compose.dcproj` project and the five student applications, their tests, and the AI services.
+
+When the solution is first opened, allow Visual Studio to restore NuGet packages. Package versions are managed centrally in `Directory.Packages.props`.
+
+## Run the complete environment in Visual Studio
+
+1. Start Docker Desktop and confirm it is running.
+2. Open `CampusPulseAI.slnx`.
+3. In **Solution Explorer**, right-click the solution and choose **Set Startup Projects**.
+4. Select **Multiple startup projects** if necessary and set `docker-compose` to **Start**. Alternatively, select the `docker-compose` project directly and choose **Set as Startup Project**.
+5. In the Visual Studio debug target selector, choose **Docker Compose**.
+6. Press **F5** to build the images, start the services, attach the debugger, and launch the configured browser target. Use **Ctrl+F5** to run without the debugger.
+
+The Compose configuration starts the backend APIs, MCP server, multi-agent server, RAG server, and all frontend containers. The frontend URLs are:
+
+| Application | URL |
+| --- | --- |
+| Academic Records | `http://localhost:8081` |
+| Course Management | `http://localhost:8082` |
+| Campus Housing | `http://localhost:8083` |
+| Financial Aid and Billing | `http://localhost:8084` |
+| Event Scheduling | `http://localhost:8085` |
+| Shared UI | `http://localhost:8080` |
+
+Backend containers expose port `8080` inside the Compose network. Visual Studio may assign host ports dynamically for services that do not have an explicit host-port mapping. Use the **Containers** window to see the actual host ports and service status.
+
+## Use the Visual Studio Containers window
+
+Visual Studio provides a graphical view of the Docker resources used by the solution:
+
+1. Start Docker Desktop.
+2. Open **View > Other Windows > Containers**.
+3. Select the **Containers** tab and expand the Compose application.
+4. Select a container to inspect its state, image, ports, environment variables, volumes, and logs.
+5. Use the container toolbar to stop, start, restart, or remove containers. Use the **Logs** view when a service does not start.
+6. Open a mapped port from the container details to navigate to that service in a browser.
+
+Do not remove running containers while Visual Studio is debugging unless you intend to stop the current Compose session. Stop debugging first, then restart the Compose profile to recreate the environment.
+
+## Run with Docker Compose from a terminal
+
+The same environment can be started without Visual Studio:
+
+```powershell
+docker compose up --build
+```
+
+Run in the background with:
+
+```powershell
+docker compose up --build -d
+```
+
+View running services and logs:
+
+```powershell
+docker compose ps
+docker compose logs -f
+```
+
+Stop the environment:
+
+```powershell
+docker compose down
+```
+
+To rebuild after Dockerfile or project changes:
+
+```powershell
+docker compose down
+docker compose build --no-cache
+docker compose up
+```
+
+The Docker build context must be the repository root because the Dockerfiles copy `Directory.Packages.props` and project files from the root-level directory structure.
+
+## Run and test .NET projects locally
+
+To restore, build, and test the solution without containers:
+
+```powershell
+dotnet restore .\CampusPulseAI.slnx
+dotnet build .\CampusPulseAI.slnx
+dotnet test .\CampusPulseAI.slnx
+```
+
+Individual projects can be run with `dotnet run --project`, for example:
+
+```powershell
+dotnet run --project .\student-5\backend\EventScheduling.Backend\EventScheduling.Backend.csproj
+```
+
+The local Event Scheduling backend uses `http://localhost:5021` when started with its `http` launch profile. Frontend projects are Blazor WebAssembly applications and are normally easiest to run through Visual Studio or their project launch profile.
+
+## GitHub Actions files in Visual Studio
+
+The workflow definitions are stored in `.github/workflows/`. This repository currently contains workflows for each student project, integration, and cloud deployment.
+
+To view and work with these files inside Visual Studio:
+
+1. Open **Extensions > Manage Extensions**.
+2. Search for **.GitHub + MCP**.
+3. Install the extensionb and restart Visual Studio when prompted.
+4. In **Solution Explorer**, enable **Show All Files** if `.github` is not visible, then expand `.github > workflows`.
+
+The workflows execute on GitHub, not inside Docker Desktop. Use the **GitHub Actions** view or the repository's **Actions** tab on GitHub to inspect hosted-run logs and results.
+
+## Repository layout
+
+- `student-1` through `student-5`: backend, Blazor WebAssembly frontend, tests, and database scripts for each campus service.
+- `ai-services`: MCP, multi-agent, and RAG servers.
+- `shared`: shared configuration and frontend assets.
+- `docker-compose.yml`: image/build definitions and explicit frontend port mappings.
+- `docker-compose.override.yml`: development environment variables, ports, and local certificate/user-secret mounts.
+- `global.json`: required .NET SDK version.
+- `Directory.Packages.props`: centrally managed NuGet package versions.
+- `.github/workflows`: GitHub Actions CI and deployment workflows.
+
+## Troubleshooting
+
+### Docker Compose is unavailable in Visual Studio
+
+Verify that Docker Desktop is running and that **Container Development Tools** is installed in the Visual Studio Installer. Close and reopen Visual Studio after installing the workload or extension.
+
+### WSL or Docker cannot start
+
+Run `wsl --update`, restart Docker Desktop, and confirm **Use the WSL 2 based engine** and the required distribution integration are enabled. Do not run Docker Desktop and another Docker daemon at the same time.
+
+### SDK version errors
+
+Run `dotnet --list-sdks` and confirm `10.0.302` is installed. Because `global.json` pins this version, installing only an older .NET 10 SDK is not sufficient.
+
+### A frontend port is already in use
+
+Stop the process using the port or change the host-side port in `docker-compose.yml`. The container continues to listen on port `80`; only the host-side value needs to change.
+
+### A container exits immediately
+
+Open **View > Other Windows > Containers**, select the stopped container, and inspect its logs. From a terminal, use `docker compose logs <service-name>` and confirm that the image built successfully from the repository root.
