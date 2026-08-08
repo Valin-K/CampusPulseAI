@@ -1,0 +1,6 @@
+services:
+  academicrecords.backend:
+    image: ${DOCKER_REGISTRY-}academicrecordsbackend
+    build:
+      context: .
+      dockerfile: student-1/backend/AcademicRecords.Backend/Dockerfile

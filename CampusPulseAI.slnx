@@ -46,4 +46,7 @@
     <Project Path="student-5/frontend/EventScheduling.Frontend/EventScheduling.Frontend.csproj" Id="008d8d16-c414-49eb-b57e-91c643e705f7" />
     <Project Path="student-5/tests/EventScheduling.Tests/EventScheduling.Tests.csproj" Id="36555928-768e-4e01-a471-124c18bdf32e" />
   </Folder>
+  <Project Path="docker-compose.dcproj">
+    <Build />
+  </Project>
 </Solution>
