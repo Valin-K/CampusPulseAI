@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CampusPulse AI</title>
+    <link rel="stylesheet" href="css/theme.css">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: #f4f6f8;
+            color: #333;
+        }
+        .container {
+            max-width: 900px;
+            margin: 3rem auto;
+            padding: 2rem;
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        header img {
+            height: 64px;
+        }
+        h1 {
+            margin: 0;
+            font-size: 2rem;
+            color: #1a237e;
+        }
+        p {
+            font-size: 1.1rem;
+            line-height: 1.6;
+        }
+        .tabs {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 1rem;
+            margin-top: 2rem;
+        }
+        .tab {
+            display: block;
+            padding: 1rem;
+            text-align: center;
+            text-decoration: none;
+            color: #fff;
+            background: #3949ab;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: background 0.2s, transform 0.1s;
+        }
+        .tab:hover {
+            background: #303f9f;
+            transform: translateY(-2px);
+        }
+        .tab span {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: 400;
+            margin-top: 0.25rem;
+            opacity: 0.9;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <img src="assets/campus-logo.png" alt="CampusPulse AI logo">
+            <h1>CampusPulse AI</h1>
+        </header>
+        <p>Welcome to the CampusPulse AI portal. Select a module below to view each student's Blazor frontend.</p>
+        <nav class="tabs">
+            <a class="tab" href="http://localhost:8081">Academic Records<span>Alec</span></a>
+            <a class="tab" href="http://localhost:8082">Course Management<span>Joyce</span></a>
+            <a class="tab" href="http://localhost:8083">Campus Housing<span>Jack</span></a>
+            <a class="tab" href="http://localhost:8084">Financial Aid &amp; Billing<span>Valin</span></a>
+            <a class="tab" href="http://localhost:8085">Event Scheduling<span>Ryan</span></a>
+        </nav>
+    </div>
+</body>
+</html>
