@@ -1,0 +1,16 @@
+services:
+  academicrecords.frontend:
+    entrypoint: null
+    command: null
+  coursemanagement.frontend:
+    entrypoint: null
+    command: null
+  campushousing.frontend:
+    entrypoint: null
+    command: null
+  financialaidbilling.frontend:
+    entrypoint: null
+    command: null
+  eventscheduling.frontend:
+    entrypoint: null
+    command: null
