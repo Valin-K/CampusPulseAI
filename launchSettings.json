@@ -4,9 +4,8 @@
       "commandName": "DockerCompose",
       "commandVersion": "1.0",
       "composeLaunchServiceName": "academicrecords.frontend",
-      "composeLaunchAction": "LaunchBrowser",
+      "composeLaunchAction": "None",
       "composeLaunchUrl": "http://localhost:8081",
-      "launchBrowserTimeout": 1,
       "serviceActions": {
         "academicrecords.backend": "StartWithoutDebugging",
         "coursemanagement.backend": "StartWithoutDebugging",

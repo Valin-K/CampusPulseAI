@@ -15,4 +15,9 @@
     <None Include="docker-compose.yml" />
     <None Include=".dockerignore" />
   </ItemGroup>
+  <Target Name="OpenAcademicRecordsFrontend"
+          AfterTargets="DockerPrepareForLaunch"
+      Condition="'$(BuildingInsideVisualStudio)' == 'true'">
+    <Exec Command="&quot;$(SystemRoot)\System32\WindowsPowerShell\v1.0\powershell.exe&quot; -NoProfile -NonInteractive -Command &quot;Start-Process -WindowStyle Hidden -FilePath '$(SystemRoot)\System32\WindowsPowerShell\v1.0\powershell.exe' -ArgumentList '-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File','$(MSBuildProjectDirectory)\scripts\launch-compose-browser.ps1'&quot;" />
+  </Target>
 </Project>
