@@ -58,7 +58,7 @@ services:
     image: ${DOCKER_REGISTRY-}academicrecordsfrontend
     build:
       context: .
-      dockerfile: student-1/frontend/AcademicRecords.Frontend/Dockerfile
+      dockerfile: docker/frontend/AcademicRecords.Dockerfile
     ports:
       - "8081:80"
 
@@ -67,7 +67,7 @@ services:
     image: ${DOCKER_REGISTRY-}coursemanagementfrontend
     build:
       context: .
-      dockerfile: student-2/frontend/CourseManagement.Frontend/Dockerfile
+      dockerfile: docker/frontend/CourseManagement.Dockerfile
     ports:
       - "8082:80"
 
@@ -76,7 +76,7 @@ services:
     image: ${DOCKER_REGISTRY-}campushousingfrontend
     build:
       context: .
-      dockerfile: student-3/frontend/CampusHousing.Frontend/Dockerfile
+      dockerfile: docker/frontend/CampusHousing.Dockerfile
     ports:
       - "8083:80"
 
@@ -85,7 +85,7 @@ services:
     image: ${DOCKER_REGISTRY-}financialaidbillingfrontend
     build:
       context: .
-      dockerfile: student-4/frontend/FinancialAidBilling.Frontend/Dockerfile
+      dockerfile: docker/frontend/FinancialAidBilling.Dockerfile
     ports:
       - "8084:80"
 
@@ -94,7 +94,7 @@ services:
     image: ${DOCKER_REGISTRY-}eventschedulingfrontend
     build:
       context: .
-      dockerfile: student-5/frontend/EventScheduling.Frontend/Dockerfile
+      dockerfile: docker/frontend/EventScheduling.Dockerfile
     ports:
       - "8085:80"
 

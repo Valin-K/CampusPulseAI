@@ -5,7 +5,7 @@
     <DockerTargetOS>Linux</DockerTargetOS>
     <ProjectGuid>81dded9d-158b-e303-5f62-77a2896d2a5a</ProjectGuid>
     <DockerLaunchAction>LaunchBrowser</DockerLaunchAction>
-    <DockerServiceUrl>{Scheme}://localhost:{ServicePort}</DockerServiceUrl>
+    <DockerServiceUrl>http://localhost:8081</DockerServiceUrl>
     <DockerServiceName>academicrecords.frontend</DockerServiceName>
   </PropertyGroup>
   <ItemGroup>
@@ -15,4 +15,9 @@
     <None Include="docker-compose.yml" />
     <None Include=".dockerignore" />
   </ItemGroup>
+  <Target Name="OpenAcademicRecordsFrontend"
+          AfterTargets="DockerPrepareForLaunch"
+      Condition="'$(BuildingInsideVisualStudio)' == 'true'">
+    <Exec Command="&quot;$(SystemRoot)\System32\WindowsPowerShell\v1.0\powershell.exe&quot; -NoProfile -NonInteractive -Command &quot;Start-Process -WindowStyle Hidden -FilePath '$(SystemRoot)\System32\WindowsPowerShell\v1.0\powershell.exe' -ArgumentList '-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File','$(MSBuildProjectDirectory)\scripts\launch-compose-browser.ps1'&quot;" />
+  </Target>
 </Project>
