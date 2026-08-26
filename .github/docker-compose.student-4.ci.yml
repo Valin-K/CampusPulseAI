@@ -1,0 +1,8 @@
+services:
+  financialaidbilling.backend:
+    ports:
+      - "18080:8080"
+
+  financialaidbilling.frontend:
+    ports:
+      - "18084:80"
