@@ -2,6 +2,8 @@ name: Student 4 - Financial Aid Billing CI
 
 on:
   push:
+    branches:
+      - main
     paths:
       - 'student-4/**'
       - 'docker-compose.yml'
