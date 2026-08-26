@@ -22,7 +22,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
@@ -33,13 +33,6 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@v4
-
-      - name: Set up .NET
-        uses: actions/setup-dotnet@v5
-        env:
-          DOTNET_INSTALL_DIR: /home/runner/.dotnet
-        with:
-          global-json-file: global.json
 
       - name: Restore Student 4 projects
         run: |
