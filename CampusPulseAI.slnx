@@ -27,7 +27,7 @@
     <Project Path="student-1/tests/AcademicRecords.Tests/AcademicRecords.Tests.csproj" Id="b9e4fc4e-8977-4783-a5b9-4c8051210c2e" />
   </Folder>
   <Folder Name="/student-1/database/">
-    <File Path="student-1/database/init-academic.sql" />
+    <Project Path="student-1/database/AcademicRecords.Database/AcademicRecords.Database.csproj" Id="31e5ca4a-1f72-4850-91ad-b0edb748d5c1" />
   </Folder>
   <Folder Name="/student-2/">
     <Project Path="student-2/backend/CourseManagement.Backend/CourseManagement.Backend.csproj" Id="b02f1002-9a07-4914-8a47-3bd83fd2aab0" />
@@ -35,7 +35,7 @@
     <Project Path="student-2/tests/CourseManagement.Tests/CourseManagement.Tests.csproj" Id="e36b9bdf-7a17-4ee7-ad35-f2aa9b24a6ea" />
   </Folder>
   <Folder Name="/student-2/database/">
-    <File Path="student-2/database/init-course.sql" />
+    <Project Path="student-2/database/CourseManagement.Database/CourseManagement.Database.csproj" Id="3c8145ff-838c-4bca-bfbd-a523459409ea" />
   </Folder>
   <Folder Name="/student-3/">
     <Project Path="student-3/backend/CampusHousing.Backend/CampusHousing.Backend.csproj" Id="c73d1fd3-b078-422d-a233-374c3eb8fd85" />
@@ -43,7 +43,7 @@
     <Project Path="student-3/tests/CampusHousing.Tests/CampusHousing.Tests.csproj" Id="548dbd8a-3660-4844-ae9b-e3c7ce231bb2" />
   </Folder>
   <Folder Name="/student-3/database/">
-    <File Path="student-3/database/init-housing.sql" />
+    <Project Path="student-3/database/CampusHousing.Database/CampusHousing.Database.csproj" Id="6d4d1dc3-dbf1-437a-9583-0a021a0f9edf" />
   </Folder>
   <Folder Name="/student-4/">
     <Project Path="student-4/backend/FinancialAidBilling.Backend/FinancialAidBilling.Backend.csproj" Id="b4ec84b1-13f2-4540-903d-a644f108712d" />
@@ -51,7 +51,7 @@
     <Project Path="student-4/tests/FinancialAidBilling.Tests/FinancialAidBilling.Tests.csproj" Id="dad1812b-6b61-4ad8-8511-53865a9ef2dc" />
   </Folder>
   <Folder Name="/student-4/database/">
-    <File Path="student-4/database/init-bursar.sql" />
+    <Project Path="student-4/database/FinancialAidBilling.Database/FinancialAidBilling.Database.csproj" Id="2bd66541-5270-40b3-9689-e4121387439a" />
   </Folder>
   <Folder Name="/student-5/">
     <Project Path="student-5/backend/EventScheduling.Backend/EventScheduling.Backend.csproj" Id="d1177922-bc9a-4897-b9b4-77ec917361c9" />
@@ -59,7 +59,7 @@
     <Project Path="student-5/tests/EventScheduling.Tests/EventScheduling.Tests.csproj" Id="36555928-768e-4e01-a471-124c18bdf32e" />
   </Folder>
   <Folder Name="/student-5/database/">
-    <File Path="student-5/database/init-events.sql" />
+    <Project Path="student-5/database/EventScheduling.Database/EventScheduling.Database.csproj" Id="66e13f06-3e44-46e1-8e13-dd97d33c4839" />
   </Folder>
   <Project Path="docker-compose.dcproj">
     <Build />

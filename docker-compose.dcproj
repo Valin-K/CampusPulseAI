@@ -15,6 +15,16 @@
     </None>
     <None Include="docker-compose.yml" />
     <None Include=".dockerignore" />
+    <None Include="student-1\database\AcademicRecords.Database\AcademicRecords.Database.csproj" />
+    <None Include="student-1\database\AcademicRecords.Database\Dockerfile" />
+    <None Include="student-2\database\CourseManagement.Database\CourseManagement.Database.csproj" />
+    <None Include="student-2\database\CourseManagement.Database\Dockerfile" />
+    <None Include="student-3\database\CampusHousing.Database\CampusHousing.Database.csproj" />
+    <None Include="student-3\database\CampusHousing.Database\Dockerfile" />
+    <None Include="student-4\database\FinancialAidBilling.Database\Dockerfile" />
+    <None Include="student-4\database\FinancialAidBilling.Database\FinancialAidBilling.Database.csproj" />
+    <None Include="student-5\database\EventScheduling.Database\Dockerfile" />
+    <None Include="student-5\database\EventScheduling.Database\EventScheduling.Database.csproj" />
   </ItemGroup>
   <Target Name="OpenAcademicRecordsFrontend" AfterTargets="DockerPrepareForLaunch" Condition="'$(BuildingInsideVisualStudio)' == 'true'">
     <Exec Command="&quot;$(SystemRoot)\System32\WindowsPowerShell\v1.0\powershell.exe&quot; -NoProfile -NonInteractive -Command &quot;Start-Process -WindowStyle Hidden -FilePath '$(SystemRoot)\System32\WindowsPowerShell\v1.0\powershell.exe' -ArgumentList '-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File','$(MSBuildProjectDirectory)\scripts\launch-compose-browser.ps1'&quot;" />
