@@ -1,0 +1,43 @@
+name: Student 1 - Academic Records CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  detect-student-1-changes:
+    name: Detect Student 1 changes
+    runs-on: campuspulse-runners
+    outputs:
+      student1: ${{ steps.filter.outputs.student1 }}
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect changed paths
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            student1:
+              - 'student-1/**'
+
+  student-1-validation:
+    name: Student 1 validation
+    runs-on: campuspulse-runners
+    needs: detect-student-1-changes
+    if: github.event_name == 'workflow_dispatch' || needs.detect-student-1-changes.outputs.student1 == 'true'
+
+    steps:
+      - name: Placeholder validation
+        run: echo "Student 1 validation is not implemented yet."

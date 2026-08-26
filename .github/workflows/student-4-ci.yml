@@ -4,23 +4,7 @@ on:
   push:
     branches:
       - main
-    paths:
-      - 'student-4/**'
-      - 'docker-compose.yml'
-      - 'docker/frontend/FinancialAidBilling.Dockerfile'
-      - 'Directory.Packages.props'
-      - 'global.json'
-      - '.github/docker-compose.student-4.ci.yml'
-      - '.github/workflows/student-4-ci.yml'
   pull_request:
-    paths:
-      - 'student-4/**'
-      - 'docker-compose.yml'
-      - 'docker/frontend/FinancialAidBilling.Dockerfile'
-      - 'Directory.Packages.props'
-      - 'global.json'
-      - '.github/docker-compose.student-4.ci.yml'
-      - '.github/workflows/student-4-ci.yml'
   workflow_dispatch:
 
 concurrency:
@@ -28,9 +12,31 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  detect-student-4-changes:
+    name: Detect Student 4 changes
+    runs-on: campuspulse-runners
+    outputs:
+      student4: ${{ steps.filter.outputs.student4 }}
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect changed paths
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            student4:
+              - 'student-4/**'
+
   build-test-and-smoke-test:
     name: Build, test, and validate containers
     runs-on: campuspulse-runners
+    needs: detect-student-4-changes
+    if: github.event_name == 'workflow_dispatch' || needs.detect-student-4-changes.outputs.student4 == 'true'
 
     steps:
       - name: Check out source

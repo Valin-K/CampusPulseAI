@@ -1,0 +1,43 @@
+name: Student 3 - Campus Housing CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  detect-student-3-changes:
+    name: Detect Student 3 changes
+    runs-on: campuspulse-runners
+    outputs:
+      student3: ${{ steps.filter.outputs.student3 }}
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect changed paths
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            student3:
+              - 'student-3/**'
+
+  student-3-validation:
+    name: Student 3 validation
+    runs-on: campuspulse-runners
+    needs: detect-student-3-changes
+    if: github.event_name == 'workflow_dispatch' || needs.detect-student-3-changes.outputs.student3 == 'true'
+
+    steps:
+      - name: Placeholder validation
+        run: echo "Student 3 validation is not implemented yet."

@@ -1,0 +1,43 @@
+name: Student 5 - Event Scheduling CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  detect-student-5-changes:
+    name: Detect Student 5 changes
+    runs-on: campuspulse-runners
+    outputs:
+      student5: ${{ steps.filter.outputs.student5 }}
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect changed paths
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            student5:
+              - 'student-5/**'
+
+  student-5-validation:
+    name: Student 5 validation
+    runs-on: campuspulse-runners
+    needs: detect-student-5-changes
+    if: github.event_name == 'workflow_dispatch' || needs.detect-student-5-changes.outputs.student5 == 'true'
+
+    steps:
+      - name: Placeholder validation
+        run: echo "Student 5 validation is not implemented yet."
