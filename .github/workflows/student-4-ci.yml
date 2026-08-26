@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   build-test-and-smoke-test:
-    name: Build, test, and validate containers
+    name: Student 4 validation
     runs-on: campuspulse-runners
 
     steps:
