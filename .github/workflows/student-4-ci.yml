@@ -1,5 +1,4 @@
 name: Student 4 - Financial Aid Billing CI
-
 on:
   push:
     paths:
@@ -36,9 +35,9 @@ jobs:
           global-json-file: global.json
 
       - name: Restore Student 4 projects
-        run: >
-          dotnet restore student-4/backend/FinancialAidBilling.Backend/FinancialAidBilling.Backend.csproj;
-          dotnet restore student-4/frontend/FinancialAidBilling.Frontend/FinancialAidBilling.Frontend.csproj;
+        run: |
+          dotnet restore student-4/backend/FinancialAidBilling.Backend/FinancialAidBilling.Backend.csproj
+          dotnet restore student-4/frontend/FinancialAidBilling.Frontend/FinancialAidBilling.Frontend.csproj
           dotnet restore student-4/tests/FinancialAidBilling.Tests/FinancialAidBilling.Tests.csproj
 
       - name: Build backend
@@ -51,18 +50,33 @@ jobs:
         run: dotnet test student-4/tests/FinancialAidBilling.Tests/FinancialAidBilling.Tests.csproj --configuration Release --no-restore
 
       - name: Build and start Student 4 containers
-        shell: pwsh
-        run: >
-          docker compose -p student-4-ci -f docker-compose.yml -f .github/docker-compose.student-4.ci.yml build financialaidbilling.backend financialaidbilling.frontend;
+        shell: bash
+        run: |
+          docker compose -p student-4-ci -f docker-compose.yml -f .github/docker-compose.student-4.ci.yml build financialaidbilling.backend financialaidbilling.frontend
           docker compose -p student-4-ci -f docker-compose.yml -f .github/docker-compose.student-4.ci.yml up --detach --no-build financialaidbilling.backend financialaidbilling.frontend
 
       - name: Smoke test Student 4 containers
-        shell: pwsh
-        run: >
-          $endpoints = @('http://localhost:18080/weatherforecast', 'http://localhost:18084/');
-          foreach ($endpoint in $endpoints) { $reachable = $false; for ($attempt = 1; $attempt -le 30; $attempt++) { try { $response = Invoke-WebRequest -Uri $endpoint -UseBasicParsing -TimeoutSec 5; if ($response.StatusCode -eq 200) { $reachable = $true; break } } catch { } Start-Sleep -Seconds 2 }; if (-not $reachable) { docker compose -p student-4-ci -f docker-compose.yml -f .github/docker-compose.student-4.ci.yml ps; docker compose -p student-4-ci -f docker-compose.yml -f .github/docker-compose.student-4.ci.yml logs --no-color financialaidbilling.backend financialaidbilling.frontend; throw "Container did not respond successfully: $endpoint" } }
+        shell: bash
+        run: |
+          endpoints=("http://localhost:18080/weatherforecast" "http://localhost:18084/")
+          for endpoint in "${endpoints[@]}"; do
+            reachable=false
+            for attempt in {1..30}; do
+              if curl -s -f -m 5 "$endpoint" > /dev/null; then
+                reachable=true
+                break
+              fi
+              sleep 2
+            done
+            if [ "$reachable" = false ]; then
+              docker compose -p student-4-ci -f docker-compose.yml -f .github/docker-compose.student-4.ci.yml ps
+              docker compose -p student-4-ci -f docker-compose.yml -f .github/docker-compose.student-4.ci.yml logs --no-color financialaidbilling.backend financialaidbilling.frontend
+              echo "Container did not respond successfully: $endpoint"
+              exit 1
+            fi
+          done
 
       - name: Remove Student 4 containers
         if: always()
-        shell: pwsh
+        shell: bash
         run: docker compose -p student-4-ci -f docker-compose.yml -f .github/docker-compose.student-4.ci.yml down --volumes --remove-orphans
