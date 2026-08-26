@@ -26,9 +26,15 @@ public enum InvoiceStatus
     Overdue
 }
 
-public sealed record OllamaGenerateRequest(string Model, string Prompt, bool Stream);
+public sealed record GeminiGenerateRequest(IReadOnlyList<GeminiContent> Contents);
 
-public sealed record OllamaGenerateResponse(string? Response);
+public sealed record GeminiContent(IReadOnlyList<GeminiPart> Parts);
+
+public sealed record GeminiPart(string Text);
+
+public sealed record GeminiGenerateResponse(IReadOnlyList<GeminiCandidate>? Candidates);
+
+public sealed record GeminiCandidate(GeminiContent? Content);
 
 public sealed record InvoiceExplanationResponse(int InvoiceId, string Explanation);
 

@@ -28,6 +28,8 @@ services:
       ASPNETCORE_HTTP_PORTS: 8080
       Services__InvoiceDatabase: http://financialaidbilling.database:8080
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+    ports:
+      - "8089:8080"
     depends_on:
       financialaidbilling.database:
         condition: service_started
