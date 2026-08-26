@@ -9,15 +9,14 @@
     <DockerServiceName>academicrecords.frontend</DockerServiceName>
   </PropertyGroup>
   <ItemGroup>
+    <None Include=".github\docker-compose.student-4.ci.yml" />
     <None Include="docker-compose.override.yml">
       <DependentUpon>docker-compose.yml</DependentUpon>
     </None>
     <None Include="docker-compose.yml" />
     <None Include=".dockerignore" />
   </ItemGroup>
-  <Target Name="OpenAcademicRecordsFrontend"
-          AfterTargets="DockerPrepareForLaunch"
-      Condition="'$(BuildingInsideVisualStudio)' == 'true'">
+  <Target Name="OpenAcademicRecordsFrontend" AfterTargets="DockerPrepareForLaunch" Condition="'$(BuildingInsideVisualStudio)' == 'true'">
     <Exec Command="&quot;$(SystemRoot)\System32\WindowsPowerShell\v1.0\powershell.exe&quot; -NoProfile -NonInteractive -Command &quot;Start-Process -WindowStyle Hidden -FilePath '$(SystemRoot)\System32\WindowsPowerShell\v1.0\powershell.exe' -ArgumentList '-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File','$(MSBuildProjectDirectory)\scripts\launch-compose-browser.ps1'&quot;" />
   </Target>
 </Project>
