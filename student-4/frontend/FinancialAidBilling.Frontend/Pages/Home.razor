@@ -1,7 +1,264 @@
 ﻿@page "/"
+@using System.Net.Http.Json
+@using FinancialAidBilling.Frontend.Models
+@inject HttpClient Http
 
-<PageTitle>Financial Aid & Billing</PageTitle>
+<PageTitle>Tuition Invoices</PageTitle>
 
-<h1>Financial Aid & Billing</h1>
+<h1>Tuition &amp; Fee Invoices</h1>
+<p>Manage student tuition and fee invoices, then request a plain-language invoice explanation.</p>
 
-<p>This is Valin's page. Under construction!</p>
+@if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <div class="alert alert-danger" role="alert">@errorMessage</div>
+}
+
+@if (!string.IsNullOrWhiteSpace(successMessage))
+{
+    <div class="alert alert-success" role="alert">@successMessage</div>
+}
+
+<div class="invoice-layout">
+    <section class="invoice-panel">
+        <h2>@(editingInvoiceId is null ? "Create invoice" : $"Edit invoice #{editingInvoiceId}")</h2>
+        <form @onsubmit="SaveInvoiceAsync" @onsubmit:preventDefault="true">
+            <div class="mb-3">
+                <label for="studentId" class="form-label">Student ID</label>
+                <input id="studentId" class="form-control" @bind="draft.StudentId" required maxlength="32" />
+            </div>
+            <div class="mb-3">
+                <label for="description" class="form-label">Description</label>
+                <input id="description" class="form-control" @bind="draft.Description" required maxlength="200" />
+            </div>
+            <div class="mb-3">
+                <label for="amount" class="form-label">Amount</label>
+                <input id="amount" class="form-control" type="number" min="0.01" step="0.01" @bind="draft.Amount" required />
+            </div>
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label for="issueDate" class="form-label">Issue date</label>
+                    <input id="issueDate" class="form-control" type="date" @bind="draft.IssueDate" required />
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label for="dueDate" class="form-label">Due date</label>
+                    <input id="dueDate" class="form-control" type="date" @bind="draft.DueDate" required />
+                </div>
+            </div>
+            <div class="mb-3">
+                <label for="status" class="form-label">Status</label>
+                <select id="status" class="form-select" @bind="draft.Status">
+                    @foreach (var status in Enum.GetValues<InvoiceStatus>())
+                    {
+                        <option value="@status">@status</option>
+                    }
+                </select>
+            </div>
+            <button class="btn btn-primary me-2" type="submit" disabled="@isSaving">@(isSaving ? "Saving..." : editingInvoiceId is null ? "Create invoice" : "Save changes")</button>
+            @if (editingInvoiceId is not null)
+            {
+                <button class="btn btn-outline-secondary" type="button" @onclick="CancelEdit">Cancel</button>
+            }
+        </form>
+    </section>
+
+    <section class="invoice-panel invoice-list-panel">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h2>Invoices</h2>
+            <button class="btn btn-outline-primary" type="button" @onclick="LoadInvoicesAsync" disabled="@isLoading">Refresh</button>
+        </div>
+        @if (isLoading)
+        {
+            <p>Loading invoices...</p>
+        }
+        else if (invoices.Count == 0)
+        {
+            <p>No invoices have been created.</p>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table align-middle">
+                    <thead>
+                        <tr>
+                            <th>Student</th>
+                            <th>Invoice</th>
+                            <th>Amount</th>
+                            <th>Due</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var invoice in invoices)
+                        {
+                            <tr>
+                                <td>@invoice.StudentId</td>
+                                <td>@invoice.Description</td>
+                                <td>@invoice.Amount.ToString("C")</td>
+                                <td>@invoice.DueDate.ToString("d")</td>
+                                <td><span class="status-badge @invoice.Status.ToString().ToLowerInvariant()">@invoice.Status</span></td>
+                                <td class="invoice-actions">
+                                    <button class="btn btn-sm btn-outline-primary" type="button" @onclick="() => BeginEdit(invoice)">Edit</button>
+                                    <button class="btn btn-sm btn-outline-danger" type="button" @onclick="() => DeleteInvoiceAsync(invoice)">Delete</button>
+                                    <button class="btn btn-sm btn-outline-success" type="button" @onclick="() => ExplainInvoiceAsync(invoice)">Explain</button>
+                                </td>
+                            </tr>
+                            @if (explanations.TryGetValue(invoice.Id, out var explanation))
+                            {
+                                <tr class="explanation-row">
+                                    <td colspan="6"><strong>AI explanation:</strong> @explanation</td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </section>
+</div>
+
+@code {
+    private readonly List<InvoiceResponse> invoices = [];
+    private readonly Dictionary<int, string> explanations = [];
+    private InvoiceInput draft = new();
+    private int? editingInvoiceId;
+    private string? errorMessage;
+    private string? successMessage;
+    private bool isLoading;
+    private bool isSaving;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadInvoicesAsync();
+    }
+
+    private async Task LoadInvoicesAsync()
+    {
+        isLoading = true;
+        errorMessage = null;
+
+        try
+        {
+            var result = await Http.GetFromJsonAsync<List<InvoiceResponse>>("/api/invoices");
+            invoices.Clear();
+            invoices.AddRange(result ?? []);
+        }
+        catch (HttpRequestException)
+        {
+            errorMessage = "The Financial Aid & Billing service is unavailable.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task SaveInvoiceAsync()
+    {
+        errorMessage = null;
+        successMessage = null;
+
+        if (draft.Amount <= 0 || draft.DueDate < draft.IssueDate || string.IsNullOrWhiteSpace(draft.StudentId) || string.IsNullOrWhiteSpace(draft.Description))
+        {
+            errorMessage = "Enter a student ID, description, a positive amount, and a due date on or after the issue date.";
+            return;
+        }
+
+        isSaving = true;
+        try
+        {
+            HttpResponseMessage response;
+            if (editingInvoiceId is null)
+            {
+                response = await Http.PostAsJsonAsync("/api/invoices", draft.ToRequest());
+                successMessage = "Invoice created.";
+            }
+            else
+            {
+                response = await Http.PutAsJsonAsync($"/api/invoices/{editingInvoiceId}", draft.ToRequest());
+                successMessage = "Invoice updated.";
+            }
+
+            if (!response.IsSuccessStatusCode)
+            {
+                successMessage = null;
+                errorMessage = await response.Content.ReadAsStringAsync();
+                return;
+            }
+
+            CancelEdit();
+            await LoadInvoicesAsync();
+        }
+        catch (HttpRequestException)
+        {
+            errorMessage = "The Financial Aid & Billing service is unavailable.";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private void BeginEdit(InvoiceResponse invoice)
+    {
+        editingInvoiceId = invoice.Id;
+        draft = InvoiceInput.From(invoice);
+        errorMessage = null;
+        successMessage = null;
+    }
+
+    private void CancelEdit()
+    {
+        editingInvoiceId = null;
+        draft = new InvoiceInput();
+    }
+
+    private async Task DeleteInvoiceAsync(InvoiceResponse invoice)
+    {
+        errorMessage = null;
+        successMessage = null;
+
+        try
+        {
+            var response = await Http.DeleteAsync($"/api/invoices/{invoice.Id}");
+            if (!response.IsSuccessStatusCode)
+            {
+                errorMessage = "The invoice could not be deleted.";
+                return;
+            }
+
+            explanations.Remove(invoice.Id);
+            successMessage = $"Invoice #{invoice.Id} deleted.";
+            await LoadInvoicesAsync();
+        }
+        catch (HttpRequestException)
+        {
+            errorMessage = "The Financial Aid & Billing service is unavailable.";
+        }
+    }
+
+    private async Task ExplainInvoiceAsync(InvoiceResponse invoice)
+    {
+        errorMessage = null;
+
+        try
+        {
+            var response = await Http.PostAsync($"/api/invoices/{invoice.Id}/explanation", null);
+            if (!response.IsSuccessStatusCode)
+            {
+                errorMessage = await response.Content.ReadAsStringAsync();
+                return;
+            }
+
+            var result = await response.Content.ReadFromJsonAsync<InvoiceExplanationResponse>();
+            if (result is not null)
+            {
+                explanations[invoice.Id] = result.Explanation;
+            }
+        }
+        catch (HttpRequestException)
+        {
+            errorMessage = "The AI service is unavailable. Start Ollama and pull the configured model.";
+        }
+    }
+}

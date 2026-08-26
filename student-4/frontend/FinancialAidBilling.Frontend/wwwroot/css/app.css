@@ -105,6 +105,65 @@ code {
     color: #c02d76;
 }
 
+.invoice-layout {
+    display: grid;
+    grid-template-columns: minmax(280px, 0.8fr) minmax(0, 1.8fr);
+    gap: 1.5rem;
+}
+
+.invoice-panel {
+    padding: 1.5rem;
+    border: 1px solid #d9e2ec;
+    border-radius: 0.75rem;
+    background: #fff;
+    box-shadow: 0 0.2rem 0.7rem rgba(15, 23, 42, 0.08);
+}
+
+.invoice-panel h2 {
+    font-size: 1.25rem;
+    margin-bottom: 1rem;
+}
+
+.invoice-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+}
+
+.status-badge {
+    display: inline-block;
+    padding: 0.25rem 0.55rem;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.status-badge.outstanding {
+    color: #7c4a03;
+    background: #fef3c7;
+}
+
+.status-badge.paid {
+    color: #166534;
+    background: #dcfce7;
+}
+
+.status-badge.overdue {
+    color: #991b1b;
+    background: #fee2e2;
+}
+
+.explanation-row td {
+    color: #0f3d5e;
+    background: #eff6ff;
+}
+
+@media (max-width: 991px) {
+    .invoice-layout {
+        grid-template-columns: 1fr;
+    }
+}
+
 .form-floating > .form-control-plaintext::placeholder, .form-floating > .form-control::placeholder {
     color: var(--bs-secondary-color);
     text-align: end;
