@@ -1,0 +1,84 @@
+name: Student 4 - Financial Aid Billing CI
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'student-4/**'
+      - 'docker-compose.yml'
+      - 'docker/frontend/FinancialAidBilling.Dockerfile'
+      - 'Directory.Packages.props'
+      - 'global.json'
+      - '.github/docker-compose.student-4.ci.yml'
+      - '.github/workflows/student-4-ci.yml'
+  pull_request:
+    paths:
+      - 'student-4/**'
+      - 'docker-compose.yml'
+      - 'docker/frontend/FinancialAidBilling.Dockerfile'
+      - 'Directory.Packages.props'
+      - 'global.json'
+      - '.github/docker-compose.student-4.ci.yml'
+      - '.github/workflows/student-4-ci.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  build-test-and-smoke-test:
+    name: Build, test, and validate containers
+    runs-on: campuspulse-runners
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Restore Student 4 projects
+        run: |
+          dotnet restore student-4/backend/FinancialAidBilling.Backend/FinancialAidBilling.Backend.csproj
+          dotnet restore student-4/frontend/FinancialAidBilling.Frontend/FinancialAidBilling.Frontend.csproj
+          dotnet restore student-4/tests/FinancialAidBilling.Tests/FinancialAidBilling.Tests.csproj
+
+      - name: Build backend
+        run: dotnet build student-4/backend/FinancialAidBilling.Backend/FinancialAidBilling.Backend.csproj --configuration Release --no-restore
+
+      - name: Build frontend
+        run: dotnet build student-4/frontend/FinancialAidBilling.Frontend/FinancialAidBilling.Frontend.csproj --configuration Release --no-restore
+
+      - name: Run NUnit tests
+        run: dotnet test student-4/tests/FinancialAidBilling.Tests/FinancialAidBilling.Tests.csproj --configuration Release --no-restore
+
+      - name: Build and start Student 4 containers
+        shell: bash
+        run: |
+          docker compose -p student-4-ci -f docker-compose.yml -f .github/docker-compose.student-4.ci.yml build financialaidbilling.backend financialaidbilling.frontend
+          docker compose -p student-4-ci -f docker-compose.yml -f .github/docker-compose.student-4.ci.yml up --detach --no-build financialaidbilling.backend financialaidbilling.frontend
+
+      - name: Smoke test Student 4 containers
+        shell: bash
+        run: |
+          endpoints=("http://localhost:18080/weatherforecast" "http://localhost:18084/")
+          for endpoint in "${endpoints[@]}"; do
+            reachable=false
+            for attempt in {1..30}; do
+              if curl -s -f -m 5 "$endpoint" > /dev/null; then
+                reachable=true
+                break
+              fi
+              sleep 2
+            done
+            if [ "$reachable" = false ]; then
+              docker compose -p student-4-ci -f docker-compose.yml -f .github/docker-compose.student-4.ci.yml ps
+              docker compose -p student-4-ci -f docker-compose.yml -f .github/docker-compose.student-4.ci.yml logs --no-color financialaidbilling.backend financialaidbilling.frontend
+              echo "Container did not respond successfully: $endpoint"
+              exit 1
+            fi
+          done
+
+      - name: Remove Student 4 containers
+        if: always()
+        shell: bash
+        run: docker compose -p student-4-ci -f docker-compose.yml -f .github/docker-compose.student-4.ci.yml down --volumes --remove-orphans
