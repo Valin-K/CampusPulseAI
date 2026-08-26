@@ -21,7 +21,6 @@ on:
       - '.github/workflows/student-4-ci.yml'
   workflow_dispatch:
 
-# This ensures only one run happens per branch/PR, and cancels older runs automatically
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
