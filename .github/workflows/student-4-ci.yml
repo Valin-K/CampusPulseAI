@@ -36,7 +36,7 @@ jobs:
 
       - name: No Student 4 changes
         if: github.event_name != 'workflow_dispatch' && steps.filter.outputs.student4 != 'true'
-        run: echo "No Student 4 changes detected."
+        run: echo "No Student 4 changes detected..."
 
       - name: Restore Student 4 projects
         if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.student4 == 'true'
