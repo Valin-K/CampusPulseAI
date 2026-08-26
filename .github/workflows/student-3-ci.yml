@@ -16,11 +16,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  detect-student-3-changes:
-    name: Detect Student 3 changes
+  student-3-validation:
+    name: Student 3 validation
     runs-on: campuspulse-runners
-    outputs:
-      student3: ${{ steps.filter.outputs.student3 }}
 
     steps:
       - name: Check out source
@@ -36,12 +34,6 @@ jobs:
             student3:
               - 'student-3/**'
 
-  student-3-validation:
-    name: Student 3 validation
-    runs-on: campuspulse-runners
-    needs: detect-student-3-changes
-    if: github.event_name == 'workflow_dispatch' || needs.detect-student-3-changes.outputs.student3 == 'true'
-
-    steps:
       - name: Placeholder validation
+        if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.student3 == 'true'
         run: echo "Student 3 validation is not implemented yet."
