@@ -1,0 +1,61 @@
+name: CampusPulse Integration CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-validate-containers:
+    name: Build solution and validate containers
+    runs-on: campuspulse-runners
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Restore solution
+        run: dotnet restore CampusPulseAI.slnx
+
+      - name: Build solution
+        run: dotnet build CampusPulseAI.slnx --configuration Release --no-restore
+
+      - name: Build and start all containers
+        shell: bash
+        run: docker compose -p campuspulse-integration-ci up --detach --build
+
+      - name: Verify all containers are running
+        shell: bash
+        run: |
+          mapfile -t expected_services < <(docker compose -p campuspulse-integration-ci config --services)
+          for attempt in {1..30}; do
+            mapfile -t running_services < <(docker compose -p campuspulse-integration-ci ps --status running --services)
+            missing_services=()
+            for service in "${expected_services[@]}"; do
+              if [[ ! " ${running_services[*]} " =~ " ${service} " ]]; then
+                missing_services+=("$service")
+              fi
+            done
+
+            if [ "${#missing_services[@]}" -eq 0 ]; then
+              exit 0
+            fi
+
+            sleep 2
+          done
+
+          docker compose -p campuspulse-integration-ci ps
+          docker compose -p campuspulse-integration-ci logs --no-color
+          echo "The following containers did not reach the running state: ${missing_services[*]}"
+          exit 1
+
+      - name: Remove integration containers
+        if: always()
+        shell: bash
+        run: docker compose -p campuspulse-integration-ci down --volumes --remove-orphans
