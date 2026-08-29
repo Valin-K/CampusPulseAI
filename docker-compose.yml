@@ -67,7 +67,9 @@ services:
     image: ${DOCKER_REGISTRY-}coursemanagementfrontend
     build:
       context: .
-      dockerfile: docker/frontend/CourseManagement.Dockerfile
+      dockerfile: student-2/frontend/CourseManagement.Frontend/Dockerfile
+    depends_on:
+      - coursemanagement.backend
     ports:
       - "8082:80"
 

@@ -1,7 +1,85 @@
 ﻿@page "/"
+@using System.Net.Http.Json
+@using System.Text.Json
+@using CourseManagement.Frontend.Models
+@inject HttpClient HttpClient
 
 <PageTitle>Course Management</PageTitle>
 
 <h1>Course Management</h1>
 
-<p>This is Joyce's page. Under construction!</p>
+@if (isLoading)
+{
+    <p role="status">Loading Courses...</p>
+}
+else if (errorMessage is not null)
+{
+    <div class="alert alert-danger" role="alert">@errorMessage</div>
+}
+else if (courses.Count == 0)
+{
+    <div class="alert alert-info" role="status">No Courses are available.</div>
+}
+else
+{
+    <p>Showing @courses.Count Courses loaded from the Course Management API.</p>
+
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th scope="col">Code</th>
+                <th scope="col">Name</th>
+                <th scope="col">Level</th>
+                <th scope="col">Credit points</th>
+                <th scope="col">Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var course in courses)
+            {
+                <tr>
+                    <td>@course.Code</td>
+                    <td>@course.Name</td>
+                    <td>@course.Level</td>
+                    <td>@course.CreditPoints</td>
+                    <td>
+                        @if (course.IsActive)
+                        {
+                            <span class="badge bg-success">Active</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-secondary">Inactive</span>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    IReadOnlyList<CourseSummary> courses = [];
+    string? errorMessage;
+    bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            courses = await HttpClient.GetFromJsonAsync<List<CourseSummary>>("api/courses") ?? [];
+        }
+        catch (HttpRequestException)
+        {
+            errorMessage = "Course data could not be loaded. Check that the Course Management API is running.";
+        }
+        catch (JsonException)
+        {
+            errorMessage = "Course data was returned in an unexpected format.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+}
