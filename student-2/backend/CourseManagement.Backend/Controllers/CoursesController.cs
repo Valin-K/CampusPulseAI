@@ -107,6 +107,34 @@ public sealed class CoursesController(CourseManagementDbContext database) : Cont
         return Ok(ToResponse(course));
     }
 
+    [HttpPut("{id:int}/status")]
+    public async Task<ActionResult<CourseResponse>> SetStatus(
+        int id,
+        CourseStatusRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (request.IsActive is null)
+        {
+            ModelState.AddModelError(nameof(request.IsActive), "Course status is required.");
+            return BadRequest(new ValidationProblemDetails(ModelState)
+            {
+                Status = StatusCodes.Status400BadRequest,
+                Title = "One or more validation errors occurred."
+            });
+        }
+
+        var course = await database.Courses.FindAsync([id], cancellationToken);
+        if (course is null)
+        {
+            return NotFoundProblem(id);
+        }
+
+        course.IsActive = request.IsActive.Value;
+        await database.SaveChangesAsync(cancellationToken);
+
+        return Ok(ToResponse(course));
+    }
+
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> Delete(int id, CancellationToken cancellationToken)
     {
