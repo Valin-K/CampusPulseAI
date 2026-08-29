@@ -1,0 +1,179 @@
+@page "/courses/{Id:int}"
+@inject CourseApiClient CourseApi
+@inject NavigationManager Navigation
+@inject IJSRuntime JavaScript
+
+<PageTitle>Course details</PageTitle>
+
+@if (isLoading)
+{
+    <p role="status">Loading Course details...</p>
+}
+else if (errorMessage is not null)
+{
+    <div class="alert alert-danger" role="alert">@errorMessage</div>
+    <NavLink class="btn btn-outline-secondary" href="courses">Back to Courses</NavLink>
+}
+else if (course is not null)
+{
+    <div class="d-flex justify-content-between align-items-start mb-3">
+        <div>
+            <h1>@course.Code - @course.Name</h1>
+            @if (course.IsActive)
+            {
+                <span class="badge bg-success">Active</span>
+            }
+            else
+            {
+                <span class="badge bg-secondary">Inactive</span>
+            }
+        </div>
+        <NavLink class="btn btn-outline-secondary" href="courses">Back to Courses</NavLink>
+    </div>
+
+    @if (statusMessage is not null)
+    {
+        <div class="alert alert-success" role="status">@statusMessage</div>
+    }
+
+    <dl class="row">
+        <dt class="col-sm-3">Description</dt>
+        <dd class="col-sm-9">@course.Description</dd>
+
+        <dt class="col-sm-3">Level</dt>
+        <dd class="col-sm-9">@course.Level</dd>
+
+        <dt class="col-sm-3">Credit points</dt>
+        <dd class="col-sm-9">@course.CreditPoints</dd>
+
+        <dt class="col-sm-3">Syllabus</dt>
+        <dd class="col-sm-9">@(course.SyllabusFileName ?? "No syllabus uploaded")</dd>
+    </dl>
+
+    <div class="d-flex gap-2">
+        <NavLink class="btn btn-primary" href="@($"courses/{course.Id}/edit")">Edit Course</NavLink>
+        <button class="btn btn-outline-warning" disabled="@isSaving" @onclick="ToggleStatusAsync">
+            @(course.IsActive ? "Deactivate" : "Reactivate")
+        </button>
+        <button class="btn btn-outline-danger" disabled="@isSaving" @onclick="DeleteAsync">
+            Delete Course
+        </button>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    [SupplyParameterFromQuery]
+    public string? Message { get; set; }
+
+    private CourseSummary? course;
+    private string? errorMessage;
+    private string? statusMessage;
+    private bool isLoading = true;
+    private bool isSaving;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        isLoading = true;
+        errorMessage = null;
+        statusMessage = Message switch
+        {
+            "created" => "Course created successfully.",
+            "updated" => "Course updated successfully.",
+            _ => null
+        };
+
+        try
+        {
+            course = await CourseApi.GetByIdAsync(Id);
+        }
+        catch (CourseApiException exception)
+        {
+            errorMessage = exception.Message;
+        }
+        catch (HttpRequestException)
+        {
+            errorMessage = "Course details could not be loaded. Check that the Course Management API is running.";
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            errorMessage = "Course details were returned in an unexpected format.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task ToggleStatusAsync()
+    {
+        if (course is null)
+        {
+            return;
+        }
+
+        isSaving = true;
+        errorMessage = null;
+        statusMessage = null;
+
+        try
+        {
+            course = await CourseApi.SetStatusAsync(course.Id, !course.IsActive);
+            statusMessage = course.IsActive
+                ? "Course reactivated successfully."
+                : "Course deactivated successfully.";
+        }
+        catch (CourseApiException exception)
+        {
+            errorMessage = exception.Message;
+        }
+        catch (HttpRequestException)
+        {
+            errorMessage = "The Course status could not be updated. Check that the API is running.";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task DeleteAsync()
+    {
+        if (course is null)
+        {
+            return;
+        }
+
+        var confirmed = await JavaScript.InvokeAsync<bool>(
+            "confirm",
+            $"Delete {course.Code} - {course.Name}? This cannot be undone.");
+        if (!confirmed)
+        {
+            return;
+        }
+
+        isSaving = true;
+        errorMessage = null;
+        statusMessage = null;
+
+        try
+        {
+            await CourseApi.DeleteAsync(course.Id);
+            Navigation.NavigateTo("/courses?message=deleted");
+        }
+        catch (CourseApiException exception)
+        {
+            errorMessage = exception.Message;
+        }
+        catch (HttpRequestException)
+        {
+            errorMessage = "The Course could not be deleted. Check that the API is running.";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+}
