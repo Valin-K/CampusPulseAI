@@ -4,15 +4,15 @@ namespace CourseManagement.Backend.Contracts.Courses;
 
 public sealed class CourseRequest
 {
-    [Required]
+    [Required(ErrorMessage = "Course code is required.")]
     [StringLength(20)]
     public required string Code { get; set; }
 
-    [Required]
+    [Required(ErrorMessage = "Course name is required.")]
     [StringLength(200)]
     public required string Name { get; set; }
 
-    [Required]
+    [Required(ErrorMessage = "Course description is required.")]
     [StringLength(2000)]
     public required string Description { get; set; }
 

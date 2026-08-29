@@ -1,4 +1,5 @@
 using CourseManagement.Frontend;
+using CourseManagement.Frontend.Services;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 
@@ -12,5 +13,6 @@ builder.Services.AddScoped(_ => new HttpClient
 {
     BaseAddress = new Uri(apiBaseAddress, UriKind.Absolute)
 });
+builder.Services.AddScoped<CourseApiClient>();
 
 await builder.Build().RunAsync();

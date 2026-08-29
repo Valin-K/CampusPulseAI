@@ -105,6 +105,11 @@ code {
     color: #c02d76;
 }
 
+.course-inactive {
+    color: var(--bs-secondary-color);
+    opacity: 0.75;
+}
+
 .form-floating > .form-control-plaintext::placeholder, .form-floating > .form-control::placeholder {
     color: var(--bs-secondary-color);
     text-align: end;
