@@ -10,6 +10,10 @@ services:
     build:
       context: .
       dockerfile: student-2/backend/CourseManagement.Backend/Dockerfile
+    environment:
+      - ConnectionStrings__CourseManagementDatabase=Data Source=/app/data/course-management.db;Foreign Keys=True
+    volumes:
+      - coursemanagement-data:/app/data
 
 
   campushousing.backend:
@@ -106,3 +110,6 @@ services:
       - "8080:80"
     volumes:
       - ./shared/frontend:/usr/share/nginx/html:ro
+
+volumes:
+  coursemanagement-data:
