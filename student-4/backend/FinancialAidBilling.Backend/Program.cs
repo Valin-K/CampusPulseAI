@@ -11,10 +11,11 @@ builder.Services.AddCors(options => options.AddDefaultPolicy(policy => policy
     .AllowAnyOrigin()
     .AllowAnyHeader()
     .AllowAnyMethod()));
+builder.Services.AddTransient<DatabaseStartupRetryHandler>();
 builder.Services.AddHttpClient("billingDatabase", client =>
 {
     client.BaseAddress = new Uri(builder.Configuration["Services:InvoiceDatabase"] ?? "http://financialaidbilling.database:8080");
-});
+}).AddHttpMessageHandler<DatabaseStartupRetryHandler>();
 builder.Services.AddScoped<GeminiScholarshipService>();
 var geminiApiKey = builder.Configuration["GEMINI_API_KEY"];
 

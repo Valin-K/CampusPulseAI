@@ -1,0 +1,24 @@
+<nav class="campus-tabs" aria-label="@AriaLabel">
+    @foreach (var item in Items)
+    {
+        <button type="button" class="@(item.Key == ActiveKey ? "active" : null)" aria-current="@(item.Key == ActiveKey ? "page" : null)" @onclick="() => SelectAsync(item.Key)">
+            <span>@item.Label</span>
+            <small>@item.Description</small>
+        </button>
+    }
+</nav>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<CampusTabItem> Items { get; set; } = [];
+    [Parameter, EditorRequired] public string ActiveKey { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public EventCallback<string> ActiveKeyChanged { get; set; }
+    [Parameter] public string AriaLabel { get; set; } = "Sections";
+
+    private async Task SelectAsync(string key)
+    {
+        if (key != ActiveKey)
+        {
+            await ActiveKeyChanged.InvokeAsync(key);
+        }
+    }
+}

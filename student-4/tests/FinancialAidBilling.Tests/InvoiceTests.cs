@@ -6,27 +6,27 @@ namespace FinancialAidBilling.Tests;
 
 public sealed class InvoiceTests
 {
-    [Fact]
+    [Test]
     public void Validate_ReturnsError_WhenDueDateIsBeforeIssueDate()
     {
         var request = new InvoiceRequest(4, "Tuition fees", 2500m, new DateOnly(2026, 8, 10), new DateOnly(2026, 8, 9), InvoiceStatus.Outstanding);
 
         var error = request.Validate();
 
-        Assert.Equal("Due date cannot be before issue date.", error);
+        Assert.That(error, Is.EqualTo("Due date cannot be before issue date."));
     }
 
-    [Fact]
+    [Test]
     public void Validate_ReturnsError_WhenAmountIsNotPositive()
     {
         var request = new InvoiceRequest(4, "Tuition fees", 0m, new DateOnly(2026, 8, 1), new DateOnly(2026, 8, 15), InvoiceStatus.Outstanding);
 
         var error = request.Validate();
 
-        Assert.Equal("Amount must be greater than zero.", error);
+        Assert.That(error, Is.EqualTo("Amount must be greater than zero."));
     }
 
-    [Fact]
+    [Test]
     public async Task GetInvoicesAsync_ReturnsTenSeededRecordsForStudentFour()
     {
         await using var database = CreateDatabase();
@@ -35,11 +35,11 @@ public sealed class InvoiceTests
 
         var invoices = await database.Invoices.AsNoTracking().Where(invoice => invoice.StudentId == 4).ToListAsync();
 
-        Assert.Equal(10, invoices.Count);
-        Assert.All(invoices, invoice => Assert.Equal(4, invoice.StudentId));
+        Assert.That(invoices, Has.Count.EqualTo(10));
+        Assert.That(invoices, Has.All.Property(nameof(Invoice.StudentId)).EqualTo(4));
     }
 
-    [Fact]
+    [Test]
     public async Task GetPaymentsAsync_ReturnsTenSeededRecordsForStudentFour()
     {
         await using var database = CreateDatabase();
@@ -48,11 +48,11 @@ public sealed class InvoiceTests
 
         var payments = await database.Payments.AsNoTracking().Where(payment => payment.StudentId == 4).ToListAsync();
 
-        Assert.Equal(10, payments.Count);
-        Assert.All(payments, payment => Assert.Equal(4, payment.StudentId));
+        Assert.That(payments, Has.Count.EqualTo(10));
+        Assert.That(payments, Has.All.Property(nameof(Payment.StudentId)).EqualTo(4));
     }
 
-    [Fact]
+    [Test]
     public async Task GetScholarshipsAsync_ReturnsTenSeededRecords()
     {
         await using var database = CreateDatabase();
@@ -61,11 +61,11 @@ public sealed class InvoiceTests
 
         var scholarships = await database.Scholarships.AsNoTracking().ToListAsync();
 
-        Assert.Equal(10, scholarships.Count);
-        Assert.Contains(scholarships, scholarship => scholarship.Name == "Future Engineers Merit Award");
+        Assert.That(scholarships, Has.Count.EqualTo(10));
+        Assert.That(scholarships, Has.Some.Property(nameof(Scholarship.Name)).EqualTo("Future Engineers Merit Award"));
     }
 
-    [Fact]
+    [Test]
     public async Task InitializeAsync_DoesNotDuplicateSeededRecords()
     {
         await using var database = CreateDatabase();
@@ -73,9 +73,9 @@ public sealed class InvoiceTests
         await InvoiceSeedData.InitializeAsync(database);
         await InvoiceSeedData.InitializeAsync(database);
 
-        Assert.Equal(10, await database.Invoices.CountAsync());
-        Assert.Equal(10, await database.Payments.CountAsync());
-        Assert.Equal(10, await database.Scholarships.CountAsync());
+        Assert.That(await database.Invoices.CountAsync(), Is.EqualTo(10));
+        Assert.That(await database.Payments.CountAsync(), Is.EqualTo(10));
+        Assert.That(await database.Scholarships.CountAsync(), Is.EqualTo(10));
     }
 
     private static FinancialAidBillingDbContext CreateDatabase()

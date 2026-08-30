@@ -6,13 +6,17 @@
 
 <PageTitle>Financial Aid & Billing</PageTitle>
 
-<header class="hero-card">
+<header class="dashboard-hero">
     <div>
-        <span class="eyebrow">CampusPulse University · Student 4</span>
-        <h1>Financial Aid &amp; Billing</h1>
-        <p>Review charges, make secure dummy payments, and discover scholarship opportunities.</p>
+        <span class="eyebrow">Your financial workspace</span>
+        <h1>Plan today. Stay ahead.</h1>
+        <p>Track university charges, review payment activity, and discover funding opportunities in one focused dashboard.</p>
     </div>
-    <div class="profile-chip"><strong>Avery Morgan</strong><span>Engineering · GPA 3.62 · Year 3</span></div>
+    <div class="term-summary">
+        <span>Current study profile</span>
+        <strong>Engineering · Year 3</strong>
+        <small>GPA 3.62 · Student ID 4</small>
+    </div>
 </header>
 
 @if (!string.IsNullOrWhiteSpace(errorMessage))
@@ -25,16 +29,12 @@
 }
 
 <section class="metric-grid" aria-label="Account summary">
-    <article class="metric-card"><span>Outstanding balance</span><strong>@OutstandingBalance.ToString("C")</strong><small>@OutstandingCount open invoices</small></article>
-    <article class="metric-card"><span>Payments recorded</span><strong>@payments.Count</strong><small>@payments.Sum(payment => payment.Amount).ToString("C") total</small></article>
-    <article class="metric-card"><span>Active scholarships</span><strong>@scholarships.Count(item => item.IsActive)</strong><small>Updated from the aid database</small></article>
+    <CampusMetricCard Label="Outstanding balance" Value="@OutstandingBalance.ToString("C")" Detail="@($"{OutstandingCount} open invoices")" />
+    <CampusMetricCard Label="Payments recorded" Value="@payments.Count.ToString()" Detail="@($"{payments.Sum(payment => payment.Amount):C} total")" Tone="green" />
+    <CampusMetricCard Label="Active scholarships" Value="@scholarships.Count(item => item.IsActive).ToString()" Detail="Updated from the aid database" Tone="gold" />
 </section>
 
-<nav class="tab-list" aria-label="Financial aid sections">
-    <button class="tab-button @(activeTab == "billing" ? "active" : null)" @onclick='() => activeTab = "billing"'>Billing</button>
-    <button class="tab-button @(activeTab == "scholarships" ? "active" : null)" @onclick='() => activeTab = "scholarships"'>Scholarships</button>
-    <button class="tab-button @(activeTab == "payments" ? "active" : null)" @onclick='() => activeTab = "payments"'>Payment history</button>
-</nav>
+<CampusSectionTabs Items="sections" @bind-ActiveKey="activeTab" AriaLabel="Financial aid sections" />
 
 @if (activeTab == "billing")
 {
@@ -155,6 +155,13 @@ else
 
 @code {
     private const int StudentId = 4;
+    private static readonly IReadOnlyList<CampusTabItem> sections =
+    [
+        new("billing", "Billing", "Invoices and account charges"),
+        new("scholarships", "Scholarships", "Funding matches and awards"),
+        new("payments", "Payment history", "Receipts and transactions")
+    ];
+
     private readonly List<InvoiceResponse> invoices = [];
     private readonly List<PaymentResponse> payments = [];
     private readonly List<ScholarshipResponse> scholarships = [];
