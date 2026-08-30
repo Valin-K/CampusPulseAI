@@ -1,4 +1,15 @@
 services:
+  academicrecords.database:
+    image: ${DOCKER_REGISTRY-}academicrecords.database
+    build:
+      context: .
+      dockerfile: student-1/database/AcademicRecords.Database/Dockerfile
+    environment:
+      ASPNETCORE_HTTP_PORTS: 8080
+      ConnectionStrings__AcademicRecords: Data Source=/app/data/academic-records.db
+    volumes:
+      - academicrecords-data:/app/data
+
   academicrecords.backend:
     image: ${DOCKER_REGISTRY-}academicrecordsbackend
     build:
@@ -6,11 +17,11 @@ services:
       dockerfile: student-1/backend/AcademicRecords.Backend/Dockerfile
     environment:
       ASPNETCORE_HTTP_PORTS: 8080
-      ConnectionStrings__AcademicRecords: Data Source=/app/data/academic-records.db
-    volumes:
-      - academicrecords-data:/app/data
+      Services__AcademicRecordsDatabase: http://academicrecords.database:8080
     ports:
       - "5020:8080"
+    depends_on:
+      - academicrecords.database
 
   coursemanagement.backend:
     image: ${DOCKER_REGISTRY-}coursemanagementbackend
