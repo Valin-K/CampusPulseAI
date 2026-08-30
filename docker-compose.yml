@@ -42,8 +42,6 @@ services:
     environment:
       ASPNETCORE_HTTP_PORTS: 8080
       ConnectionStrings__FinancialAidBilling: Data Source=/app/data/financial-aid-billing.db
-    volumes:
-      - financialaidbilling-data:/app/data
 
 
   eventscheduling.backend:
@@ -126,6 +124,3 @@ services:
       - "8080:80"
     volumes:
       - ./shared/frontend:/usr/share/nginx/html:ro
-
-volumes:
-  financialaidbilling-data:

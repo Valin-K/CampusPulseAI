@@ -2,7 +2,7 @@ namespace FinancialAidBilling.Frontend.Models;
 
 public sealed class InvoiceInput
 {
-    public string StudentId { get; set; } = string.Empty;
+    public int StudentId { get; set; } = 4;
     public string Description { get; set; } = string.Empty;
     public decimal Amount { get; set; }
     public DateOnly IssueDate { get; set; } = DateOnly.FromDateTime(DateTime.Today);
@@ -22,15 +22,67 @@ public sealed class InvoiceInput
     };
 }
 
-public sealed record InvoiceRequest(string StudentId, string Description, decimal Amount, DateOnly IssueDate, DateOnly DueDate, InvoiceStatus Status);
+public sealed record InvoiceRequest(int StudentId, string Description, decimal Amount, DateOnly IssueDate, DateOnly DueDate, InvoiceStatus Status);
 
-public sealed record InvoiceResponse(int Id, string StudentId, string Description, decimal Amount, DateOnly IssueDate, DateOnly DueDate, InvoiceStatus Status);
+public sealed record InvoiceResponse(int Id, int StudentId, string Description, decimal Amount, DateOnly IssueDate, DateOnly DueDate, InvoiceStatus Status);
 
-public sealed record InvoiceExplanationResponse(int InvoiceId, string Explanation);
+public sealed class PaymentInput
+{
+    public int InvoiceId { get; set; }
+    public int StudentId { get; set; } = 4;
+    public decimal Amount { get; set; }
+    public PaymentMethod Method { get; set; } = PaymentMethod.Card;
+    public string Reference { get; set; } = $"PAY-{DateTime.UtcNow:yyyyMMddHHmm}";
+
+    public PaymentRequest ToRequest() => new(InvoiceId, StudentId, Amount, DateTime.UtcNow, Method, Reference);
+}
+
+public sealed record PaymentRequest(int InvoiceId, int StudentId, decimal Amount, DateTime PaidAtUtc, PaymentMethod Method, string Reference);
+
+public sealed record PaymentResponse(int Id, int InvoiceId, int StudentId, decimal Amount, DateTime PaidAtUtc, PaymentMethod Method, string Reference);
+
+public sealed class ScholarshipInput
+{
+    public string Name { get; set; } = string.Empty;
+    public string Description { get; set; } = string.Empty;
+    public decimal AwardAmount { get; set; }
+    public decimal MinimumGpa { get; set; } = 3m;
+    public string EligibleMajor { get; set; } = "Any";
+    public int MinimumYearLevel { get; set; } = 1;
+    public DateOnly ApplicationDeadline { get; set; } = DateOnly.FromDateTime(DateTime.Today.AddMonths(3));
+    public bool IsActive { get; set; } = true;
+
+    public ScholarshipRequest ToRequest() => new(Name, Description, AwardAmount, MinimumGpa, EligibleMajor, MinimumYearLevel, ApplicationDeadline, IsActive);
+
+    public static ScholarshipInput From(ScholarshipResponse scholarship) => new()
+    {
+        Name = scholarship.Name,
+        Description = scholarship.Description,
+        AwardAmount = scholarship.AwardAmount,
+        MinimumGpa = scholarship.MinimumGpa,
+        EligibleMajor = scholarship.EligibleMajor,
+        MinimumYearLevel = scholarship.MinimumYearLevel,
+        ApplicationDeadline = scholarship.ApplicationDeadline,
+        IsActive = scholarship.IsActive
+    };
+}
+
+public sealed record ScholarshipRequest(string Name, string Description, decimal AwardAmount, decimal MinimumGpa, string EligibleMajor, int MinimumYearLevel, DateOnly ApplicationDeadline, bool IsActive);
+
+public sealed record ScholarshipResponse(int Id, string Name, string Description, decimal AwardAmount, decimal MinimumGpa, string EligibleMajor, int MinimumYearLevel, DateOnly ApplicationDeadline, bool IsActive);
+
+public sealed record ScholarshipRecommendationResponse(int StudentId, int MatchCount, string Recommendation);
 
 public enum InvoiceStatus
 {
     Outstanding,
     Paid,
     Overdue
+}
+
+public enum PaymentMethod
+{
+    Card,
+    BankTransfer,
+    FinancialAid
 }

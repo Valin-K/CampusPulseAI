@@ -3,7 +3,7 @@ namespace FinancialAidBilling.Database.Models;
 public sealed class Invoice
 {
     public int Id { get; set; }
-    public string StudentId { get; set; } = string.Empty;
+    public int StudentId { get; set; }
     public string Description { get; set; } = string.Empty;
     public decimal Amount { get; set; }
     public DateOnly IssueDate { get; set; }
@@ -12,7 +12,7 @@ public sealed class Invoice
 
     public void UpdateFrom(InvoiceRequest request)
     {
-        StudentId = request.StudentId.Trim();
+        StudentId = request.StudentId;
         Description = request.Description.Trim();
         Amount = request.Amount;
         IssueDate = request.IssueDate;
@@ -31,7 +31,7 @@ public enum InvoiceStatus
 }
 
 public sealed record InvoiceRequest(
-    string StudentId,
+    int StudentId,
     string Description,
     decimal Amount,
     DateOnly IssueDate,
@@ -40,9 +40,9 @@ public sealed record InvoiceRequest(
 {
     public string? Validate()
     {
-        if (string.IsNullOrWhiteSpace(StudentId) || StudentId.Trim().Length > 32)
+        if (StudentId <= 0)
         {
-            return "Student ID is required and must be 32 characters or fewer.";
+            return "Student ID must be greater than zero.";
         }
 
         if (string.IsNullOrWhiteSpace(Description) || Description.Trim().Length > 200)
@@ -65,7 +65,7 @@ public sealed record InvoiceRequest(
 
     public Invoice ToInvoice() => new()
     {
-        StudentId = StudentId.Trim(),
+        StudentId = StudentId,
         Description = Description.Trim(),
         Amount = Amount,
         IssueDate = IssueDate,
@@ -76,7 +76,7 @@ public sealed record InvoiceRequest(
 
 public sealed record InvoiceResponse(
     int Id,
-    string StudentId,
+    int StudentId,
     string Description,
     decimal Amount,
     DateOnly IssueDate,

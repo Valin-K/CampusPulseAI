@@ -6,66 +6,76 @@ namespace FinancialAidBilling.Tests;
 
 public sealed class InvoiceTests
 {
-    [Test]
+    [Fact]
     public void Validate_ReturnsError_WhenDueDateIsBeforeIssueDate()
     {
-        var request = new InvoiceRequest("S10001", "Tuition fees", 2500m, new DateOnly(2026, 8, 10), new DateOnly(2026, 8, 9), InvoiceStatus.Outstanding);
+        var request = new InvoiceRequest(4, "Tuition fees", 2500m, new DateOnly(2026, 8, 10), new DateOnly(2026, 8, 9), InvoiceStatus.Outstanding);
 
         var error = request.Validate();
 
-        Assert.That(error, Is.EqualTo("Due date cannot be before issue date."));
+        Assert.Equal("Due date cannot be before issue date.", error);
     }
 
-    [Test]
+    [Fact]
     public void Validate_ReturnsError_WhenAmountIsNotPositive()
     {
-        var request = new InvoiceRequest("S10001", "Tuition fees", 0m, new DateOnly(2026, 8, 1), new DateOnly(2026, 8, 15), InvoiceStatus.Outstanding);
+        var request = new InvoiceRequest(4, "Tuition fees", 0m, new DateOnly(2026, 8, 1), new DateOnly(2026, 8, 15), InvoiceStatus.Outstanding);
 
         var error = request.Validate();
 
-        Assert.That(error, Is.EqualTo("Amount must be greater than zero."));
+        Assert.Equal("Amount must be greater than zero.", error);
     }
 
-    [Test]
-    public async Task InitializeAsync_AddsSeedInvoicesOnlyOnce()
+    [Fact]
+    public async Task GetInvoicesAsync_ReturnsTenSeededRecordsForStudentFour()
     {
         await using var database = CreateDatabase();
         await database.Database.EnsureCreatedAsync();
-
-        await InvoiceSeedData.InitializeAsync(database);
         await InvoiceSeedData.InitializeAsync(database);
 
-        Assert.That(await database.Invoices.CountAsync(), Is.EqualTo(2));
+        var invoices = await database.Invoices.AsNoTracking().Where(invoice => invoice.StudentId == 4).ToListAsync();
+
+        Assert.Equal(10, invoices.Count);
+        Assert.All(invoices, invoice => Assert.Equal(4, invoice.StudentId));
     }
 
-    [Test]
-    public async Task UpdateFrom_UpdatesPersistedInvoiceFields()
+    [Fact]
+    public async Task GetPaymentsAsync_ReturnsTenSeededRecordsForStudentFour()
     {
         await using var database = CreateDatabase();
         await database.Database.EnsureCreatedAsync();
-        var invoice = new Invoice
-        {
-            StudentId = "S10001",
-            Description = "Original fee",
-            Amount = 100m,
-            IssueDate = new DateOnly(2026, 7, 1),
-            DueDate = new DateOnly(2026, 7, 15),
-            Status = InvoiceStatus.Outstanding
-        };
-        database.Invoices.Add(invoice);
-        await database.SaveChangesAsync();
+        await InvoiceSeedData.InitializeAsync(database);
 
-        invoice.UpdateFrom(new InvoiceRequest("S10002", "Updated tuition fee", 1250m, new DateOnly(2026, 8, 1), new DateOnly(2026, 8, 31), InvoiceStatus.Paid));
-        await database.SaveChangesAsync();
+        var payments = await database.Payments.AsNoTracking().Where(payment => payment.StudentId == 4).ToListAsync();
 
-        var savedInvoice = await database.Invoices.SingleAsync();
-        Assert.Multiple(() =>
-        {
-            Assert.That(savedInvoice.StudentId, Is.EqualTo("S10002"));
-            Assert.That(savedInvoice.Description, Is.EqualTo("Updated tuition fee"));
-            Assert.That(savedInvoice.Amount, Is.EqualTo(1250m));
-            Assert.That(savedInvoice.Status, Is.EqualTo(InvoiceStatus.Paid));
-        });
+        Assert.Equal(10, payments.Count);
+        Assert.All(payments, payment => Assert.Equal(4, payment.StudentId));
+    }
+
+    [Fact]
+    public async Task GetScholarshipsAsync_ReturnsTenSeededRecords()
+    {
+        await using var database = CreateDatabase();
+        await database.Database.EnsureCreatedAsync();
+        await InvoiceSeedData.InitializeAsync(database);
+
+        var scholarships = await database.Scholarships.AsNoTracking().ToListAsync();
+
+        Assert.Equal(10, scholarships.Count);
+        Assert.Contains(scholarships, scholarship => scholarship.Name == "Future Engineers Merit Award");
+    }
+
+    [Fact]
+    public async Task InitializeAsync_DoesNotDuplicateSeededRecords()
+    {
+        await using var database = CreateDatabase();
+        await database.Database.EnsureCreatedAsync();
+        await InvoiceSeedData.InitializeAsync(database);
+        await InvoiceSeedData.InitializeAsync(database);
+
+        Assert.Equal(10, await database.Invoices.CountAsync());
+        Assert.Equal(10, await database.Payments.CountAsync());
+        Assert.Equal(10, await database.Scholarships.CountAsync());
     }
 
     private static FinancialAidBillingDbContext CreateDatabase()

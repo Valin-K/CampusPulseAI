@@ -15,6 +15,8 @@
     </None>
     <None Include="docker-compose.yml" />
     <None Include=".dockerignore" />
+    <None Include="shared\frontend\css\university-theme.css" />
+    <None Include="shared\frontend\js\university-ui.js" />
     <None Include="student-1\database\AcademicRecords.Database\AcademicRecords.Database.csproj" />
     <None Include="student-1\database\AcademicRecords.Database\Dockerfile" />
     <None Include="student-2\database\CourseManagement.Database\CourseManagement.Database.csproj" />

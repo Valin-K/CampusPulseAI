@@ -2,263 +2,285 @@
 @using System.Net.Http.Json
 @using FinancialAidBilling.Frontend.Models
 @inject HttpClient Http
+@inject IJSRuntime JS
 
-<PageTitle>Tuition Invoices</PageTitle>
+<PageTitle>Financial Aid & Billing</PageTitle>
 
-<h1>Tuition &amp; Fee Invoices</h1>
-<p>Manage student tuition and fee invoices, then request a plain-language invoice explanation.</p>
+<header class="hero-card">
+    <div>
+        <span class="eyebrow">CampusPulse University · Student 4</span>
+        <h1>Financial Aid &amp; Billing</h1>
+        <p>Review charges, make secure dummy payments, and discover scholarship opportunities.</p>
+    </div>
+    <div class="profile-chip"><strong>Avery Morgan</strong><span>Engineering · GPA 3.62 · Year 3</span></div>
+</header>
 
 @if (!string.IsNullOrWhiteSpace(errorMessage))
 {
-    <div class="alert alert-danger" role="alert">@errorMessage</div>
+    <div class="notice notice-error" role="alert">@errorMessage</div>
 }
-
 @if (!string.IsNullOrWhiteSpace(successMessage))
 {
-    <div class="alert alert-success" role="alert">@successMessage</div>
+    <div class="notice notice-success" role="status">@successMessage</div>
 }
 
-<div class="invoice-layout">
-    <section class="invoice-panel">
-        <h2>@(editingInvoiceId is null ? "Create invoice" : $"Edit invoice #{editingInvoiceId}")</h2>
-        <form @onsubmit="SaveInvoiceAsync" @onsubmit:preventDefault="true">
-            <div class="mb-3">
-                <label for="studentId" class="form-label">Student ID</label>
-                <input id="studentId" class="form-control" @bind="draft.StudentId" required maxlength="32" />
-            </div>
-            <div class="mb-3">
-                <label for="description" class="form-label">Description</label>
-                <input id="description" class="form-control" @bind="draft.Description" required maxlength="200" />
-            </div>
-            <div class="mb-3">
-                <label for="amount" class="form-label">Amount</label>
-                <input id="amount" class="form-control" type="number" min="0.01" step="0.01" @bind="draft.Amount" required />
-            </div>
-            <div class="row">
-                <div class="col-md-6 mb-3">
-                    <label for="issueDate" class="form-label">Issue date</label>
-                    <input id="issueDate" class="form-control" type="date" @bind="draft.IssueDate" required />
-                </div>
-                <div class="col-md-6 mb-3">
-                    <label for="dueDate" class="form-label">Due date</label>
-                    <input id="dueDate" class="form-control" type="date" @bind="draft.DueDate" required />
-                </div>
-            </div>
-            <div class="mb-3">
-                <label for="status" class="form-label">Status</label>
-                <select id="status" class="form-select" @bind="draft.Status">
-                    @foreach (var status in Enum.GetValues<InvoiceStatus>())
-                    {
-                        <option value="@status">@status</option>
-                    }
-                </select>
-            </div>
-            <button class="btn btn-primary me-2" type="submit" disabled="@isSaving">@(isSaving ? "Saving..." : editingInvoiceId is null ? "Create invoice" : "Save changes")</button>
-            @if (editingInvoiceId is not null)
-            {
-                <button class="btn btn-outline-secondary" type="button" @onclick="CancelEdit">Cancel</button>
-            }
-        </form>
-    </section>
+<section class="metric-grid" aria-label="Account summary">
+    <article class="metric-card"><span>Outstanding balance</span><strong>@OutstandingBalance.ToString("C")</strong><small>@OutstandingCount open invoices</small></article>
+    <article class="metric-card"><span>Payments recorded</span><strong>@payments.Count</strong><small>@payments.Sum(payment => payment.Amount).ToString("C") total</small></article>
+    <article class="metric-card"><span>Active scholarships</span><strong>@scholarships.Count(item => item.IsActive)</strong><small>Updated from the aid database</small></article>
+</section>
 
-    <section class="invoice-panel invoice-list-panel">
-        <div class="d-flex justify-content-between align-items-center mb-3">
-            <h2>Invoices</h2>
-            <button class="btn btn-outline-primary" type="button" @onclick="LoadInvoicesAsync" disabled="@isLoading">Refresh</button>
-        </div>
-        @if (isLoading)
-        {
-            <p>Loading invoices...</p>
-        }
-        else if (invoices.Count == 0)
-        {
-            <p>No invoices have been created.</p>
-        }
-        else
-        {
-            <div class="table-responsive">
-                <table class="table align-middle">
-                    <thead>
-                        <tr>
-                            <th>Student</th>
-                            <th>Invoice</th>
-                            <th>Amount</th>
-                            <th>Due</th>
-                            <th>Status</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var invoice in invoices)
-                        {
-                            <tr>
-                                <td>@invoice.StudentId</td>
-                                <td>@invoice.Description</td>
-                                <td>@invoice.Amount.ToString("C")</td>
-                                <td>@invoice.DueDate.ToString("d")</td>
-                                <td><span class="status-badge @invoice.Status.ToString().ToLowerInvariant()">@invoice.Status</span></td>
-                                <td class="invoice-actions">
-                                    <button class="btn btn-sm btn-outline-primary" type="button" @onclick="() => BeginEdit(invoice)">Edit</button>
-                                    <button class="btn btn-sm btn-outline-danger" type="button" @onclick="() => DeleteInvoiceAsync(invoice)">Delete</button>
-                                    <button class="btn btn-sm btn-outline-success" type="button" @onclick="() => ExplainInvoiceAsync(invoice)">Explain</button>
-                                </td>
-                            </tr>
-                            @if (explanations.TryGetValue(invoice.Id, out var explanation))
+<nav class="tab-list" aria-label="Financial aid sections">
+    <button class="tab-button @(activeTab == "billing" ? "active" : null)" @onclick='() => activeTab = "billing"'>Billing</button>
+    <button class="tab-button @(activeTab == "scholarships" ? "active" : null)" @onclick='() => activeTab = "scholarships"'>Scholarships</button>
+    <button class="tab-button @(activeTab == "payments" ? "active" : null)" @onclick='() => activeTab = "payments"'>Payment history</button>
+</nav>
+
+@if (activeTab == "billing")
+{
+    <div class="content-grid">
+        <section class="surface-card">
+            <div class="section-heading"><div><span class="eyebrow">Account activity</span><h2>Student 4 invoices</h2></div><button class="button button-secondary" @onclick="LoadAllAsync">Refresh</button></div>
+            @if (isLoading)
+            {
+                <div class="skeleton-stack"><span></span><span></span><span></span></div>
+            }
+            else
+            {
+                <div class="responsive-table">
+                    <table>
+                        <thead><tr><th>Description</th><th>Due</th><th>Amount</th><th>Status</th><th>Actions</th></tr></thead>
+                        <tbody>
+                            @foreach (var invoice in invoices.Where(item => item.StudentId == StudentId))
                             {
-                                <tr class="explanation-row">
-                                    <td colspan="6"><strong>AI explanation:</strong> @explanation</td>
+                                <tr>
+                                    <td><strong>@invoice.Description</strong><small>Invoice #@invoice.Id</small></td>
+                                    <td>@invoice.DueDate.ToString("MMM d, yyyy")</td>
+                                    <td>@invoice.Amount.ToString("C")</td>
+                                    <td><span class="status-badge @invoice.Status.ToString().ToLowerInvariant()">@invoice.Status</span></td>
+                                    <td><div class="button-row">
+                                        @if (invoice.Status != InvoiceStatus.Paid)
+                                        {
+                                            <button class="button button-small button-primary" @onclick="() => OpenPayment(invoice)">Pay</button>
+                                        }
+                                        <button class="button button-small button-secondary" @onclick="() => BeginInvoiceEdit(invoice)">Edit</button>
+                                        <button class="button button-small button-danger" @onclick="() => DeleteInvoiceAsync(invoice)">Delete</button>
+                                    </div></td>
                                 </tr>
                             }
-                        }
-                    </tbody>
-                </table>
-            </div>
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </section>
+
+        <section class="surface-card">
+            <div class="section-heading"><div><span class="eyebrow">Staff demo</span><h2>@(editingInvoiceId is null ? "Create invoice" : $"Edit invoice #{editingInvoiceId}")</h2></div></div>
+            <form class="form-stack" @onsubmit="SaveInvoiceAsync" @onsubmit:preventDefault="true">
+                <label class="field"><span>Description</span><input @bind="invoiceDraft.Description" required maxlength="200" /></label>
+                <label class="field"><span>Amount</span><input type="number" min="0.01" step="0.01" @bind="invoiceDraft.Amount" required /></label>
+                <div class="form-grid"><label class="field"><span>Issue date</span><input type="date" @bind="invoiceDraft.IssueDate" /></label><label class="field"><span>Due date</span><input type="date" @bind="invoiceDraft.DueDate" /></label></div>
+                <label class="field"><span>Status</span><select @bind="invoiceDraft.Status">@foreach (var status in Enum.GetValues<InvoiceStatus>()) { <option value="@status">@status</option> }</select></label>
+                <div class="button-row"><button class="button button-primary" type="submit" disabled="@isSaving">@(isSaving ? "Saving…" : "Save invoice")</button>@if (editingInvoiceId is not null) { <button class="button button-secondary" type="button" @onclick="CancelInvoiceEdit">Cancel</button> }</div>
+            </form>
+        </section>
+    </div>
+}
+else if (activeTab == "scholarships")
+{
+    <section class="ai-card">
+        <div><span class="eyebrow">Gemini-powered guidance</span><h2>Find scholarships for Avery</h2><p>Uses the mocked student 4 profile and only the scholarships stored in this service.</p></div>
+        <button class="button button-accent" @onclick="GetRecommendationsAsync" disabled="@isRecommending">@(isRecommending ? "Matching…" : "Find my matches")</button>
+        @if (!string.IsNullOrWhiteSpace(aiRecommendation))
+        {
+            <div id="ai-recommendation" class="ai-response" tabindex="-1"><strong>@recommendationMatchCount database matches</strong><p>@aiRecommendation</p></div>
         }
     </section>
-</div>
+
+    <div class="content-grid">
+        <section class="surface-card">
+            <div class="section-heading"><div><span class="eyebrow">Available funding</span><h2>Scholarships</h2></div></div>
+            <div class="card-grid">
+                @foreach (var scholarship in scholarships)
+                {
+                    <article class="scholarship-card">
+                        <div class="card-topline"><span class="status-badge @(scholarship.IsActive ? "paid" : "overdue")">@(scholarship.IsActive ? "Active" : "Closed")</span><strong>@scholarship.AwardAmount.ToString("C0")</strong></div>
+                        <h3>@scholarship.Name</h3><p>@scholarship.Description</p>
+                        <ul class="detail-list"><li>GPA @scholarship.MinimumGpa.ToString("F2")+</li><li>@scholarship.EligibleMajor</li><li>Due @scholarship.ApplicationDeadline.ToString("MMM d, yyyy")</li></ul>
+                        <div class="button-row"><button class="button button-small button-secondary" @onclick="() => BeginScholarshipEdit(scholarship)">Edit</button><button class="button button-small button-danger" @onclick="() => DeleteScholarshipAsync(scholarship)">Delete</button></div>
+                    </article>
+                }
+            </div>
+        </section>
+
+        <section class="surface-card">
+            <div class="section-heading"><div><span class="eyebrow">Aid office demo</span><h2>@(editingScholarshipId is null ? "Add scholarship" : "Edit scholarship")</h2></div></div>
+            <form class="form-stack" @onsubmit="SaveScholarshipAsync" @onsubmit:preventDefault="true">
+                <label class="field"><span>Name</span><input @bind="scholarshipDraft.Name" required maxlength="120" /></label>
+                <label class="field"><span>Description</span><textarea @bind="scholarshipDraft.Description" required maxlength="500"></textarea></label>
+                <div class="form-grid"><label class="field"><span>Award</span><input type="number" min="1" step="0.01" @bind="scholarshipDraft.AwardAmount" /></label><label class="field"><span>Minimum GPA</span><input type="number" min="0" max="4" step="0.01" @bind="scholarshipDraft.MinimumGpa" /></label></div>
+                <div class="form-grid"><label class="field"><span>Eligible major</span><input @bind="scholarshipDraft.EligibleMajor" /></label><label class="field"><span>Minimum year</span><input type="number" min="1" max="8" @bind="scholarshipDraft.MinimumYearLevel" /></label></div>
+                <label class="field"><span>Application deadline</span><input type="date" @bind="scholarshipDraft.ApplicationDeadline" /></label>
+                <label class="check-field"><input type="checkbox" @bind="scholarshipDraft.IsActive" /><span>Accepting applications</span></label>
+                <div class="button-row"><button class="button button-primary" type="submit">Save scholarship</button>@if (editingScholarshipId is not null) { <button class="button button-secondary" type="button" @onclick="CancelScholarshipEdit">Cancel</button> }</div>
+            </form>
+        </section>
+    </div>
+}
+else
+{
+    <section class="surface-card">
+        <div class="section-heading"><div><span class="eyebrow">Receipts</span><h2>Payment history</h2></div></div>
+        <div class="responsive-table"><table><thead><tr><th>Reference</th><th>Invoice</th><th>Date</th><th>Method</th><th>Amount</th><th></th></tr></thead><tbody>
+            @foreach (var payment in payments.Where(item => item.StudentId == StudentId))
+            {
+                <tr><td><strong>@payment.Reference</strong></td><td>#@payment.InvoiceId</td><td>@payment.PaidAtUtc.ToLocalTime().ToString("MMM d, yyyy")</td><td>@payment.Method</td><td>@payment.Amount.ToString("C")</td><td><button class="button button-small button-danger" @onclick="() => DeletePaymentAsync(payment)">Delete</button></td></tr>
+            }
+        </tbody></table></div>
+    </section>
+}
+
+@if (paymentInvoice is not null)
+{
+    <div class="modal-backdrop" @onclick="ClosePayment"><section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="payment-title" @onclick:stopPropagation="true">
+        <button class="modal-close" aria-label="Close" @onclick="ClosePayment">×</button><span class="eyebrow">Dummy transaction</span><h2 id="payment-title">Pay invoice #@paymentInvoice.Id</h2><p>@paymentInvoice.Description · @paymentInvoice.Amount.ToString("C")</p>
+        <form class="form-stack" @onsubmit="SubmitPaymentAsync" @onsubmit:preventDefault="true">
+            <label class="field"><span>Payment amount</span><input type="number" min="0.01" max="@paymentInvoice.Amount" step="0.01" @bind="paymentDraft.Amount" /></label>
+            <label class="field"><span>Method</span><select @bind="paymentDraft.Method">@foreach (var method in Enum.GetValues<PaymentMethod>()) { <option value="@method">@method</option> }</select></label>
+            <label class="field"><span>Reference</span><input @bind="paymentDraft.Reference" maxlength="64" /></label>
+            <button class="button button-primary" type="submit">Submit dummy payment</button>
+        </form>
+    </section></div>
+}
 
 @code {
+    private const int StudentId = 4;
     private readonly List<InvoiceResponse> invoices = [];
-    private readonly Dictionary<int, string> explanations = [];
-    private InvoiceInput draft = new();
+    private readonly List<PaymentResponse> payments = [];
+    private readonly List<ScholarshipResponse> scholarships = [];
+    private InvoiceInput invoiceDraft = new();
+    private ScholarshipInput scholarshipDraft = new();
+    private PaymentInput paymentDraft = new();
+    private InvoiceResponse? paymentInvoice;
     private int? editingInvoiceId;
+    private int? editingScholarshipId;
+    private string activeTab = "billing";
     private string? errorMessage;
     private string? successMessage;
+    private string? aiRecommendation;
+    private int recommendationMatchCount;
     private bool isLoading;
     private bool isSaving;
+    private bool isRecommending;
 
-    protected override async Task OnInitializedAsync()
-    {
-        await LoadInvoicesAsync();
-    }
+    private decimal OutstandingBalance => invoices.Where(item => item.StudentId == StudentId && item.Status != InvoiceStatus.Paid).Sum(item => item.Amount);
+    private int OutstandingCount => invoices.Count(item => item.StudentId == StudentId && item.Status != InvoiceStatus.Paid);
 
-    private async Task LoadInvoicesAsync()
+    protected override Task OnInitializedAsync() => LoadAllAsync();
+
+    private async Task LoadAllAsync()
     {
         isLoading = true;
         errorMessage = null;
-
         try
         {
-            var result = await Http.GetFromJsonAsync<List<InvoiceResponse>>("/api/invoices");
-            invoices.Clear();
-            invoices.AddRange(result ?? []);
+            var invoiceTask = Http.GetFromJsonAsync<List<InvoiceResponse>>("/api/invoices");
+            var paymentTask = Http.GetFromJsonAsync<List<PaymentResponse>>("/api/payments");
+            var scholarshipTask = Http.GetFromJsonAsync<List<ScholarshipResponse>>("/api/scholarships");
+            await Task.WhenAll(invoiceTask, paymentTask, scholarshipTask);
+            invoices.Clear(); invoices.AddRange(await invoiceTask ?? []);
+            payments.Clear(); payments.AddRange(await paymentTask ?? []);
+            scholarships.Clear(); scholarships.AddRange(await scholarshipTask ?? []);
         }
-        catch (HttpRequestException)
-        {
-            errorMessage = "The Financial Aid & Billing service is unavailable.";
-        }
-        finally
-        {
-            isLoading = false;
-        }
+        catch (HttpRequestException) { errorMessage = "The Financial Aid & Billing service is unavailable."; }
+        finally { isLoading = false; }
     }
 
     private async Task SaveInvoiceAsync()
     {
-        errorMessage = null;
-        successMessage = null;
-
-        if (draft.Amount <= 0 || draft.DueDate < draft.IssueDate || string.IsNullOrWhiteSpace(draft.StudentId) || string.IsNullOrWhiteSpace(draft.Description))
-        {
-            errorMessage = "Enter a student ID, description, a positive amount, and a due date on or after the issue date.";
-            return;
-        }
-
         isSaving = true;
+        await SaveAsync(editingInvoiceId is null
+            ? Http.PostAsJsonAsync("/api/invoices", invoiceDraft.ToRequest())
+            : Http.PutAsJsonAsync($"/api/invoices/{editingInvoiceId}", invoiceDraft.ToRequest()), "Invoice saved.");
+        if (errorMessage is null) CancelInvoiceEdit();
+        isSaving = false;
+    }
+
+    private void BeginInvoiceEdit(InvoiceResponse invoice) { editingInvoiceId = invoice.Id; invoiceDraft = InvoiceInput.From(invoice); }
+    private void CancelInvoiceEdit() { editingInvoiceId = null; invoiceDraft = new(); }
+
+    private async Task DeleteInvoiceAsync(InvoiceResponse invoice) => await DeleteAsync($"/api/invoices/{invoice.Id}", $"Invoice #{invoice.Id} deleted.");
+
+    private void OpenPayment(InvoiceResponse invoice)
+    {
+        paymentInvoice = invoice;
+        var paid = payments.Where(item => item.InvoiceId == invoice.Id).Sum(item => item.Amount);
+        paymentDraft = new() { InvoiceId = invoice.Id, Amount = invoice.Amount - paid };
+    }
+
+    private void ClosePayment() => paymentInvoice = null;
+
+    private async Task SubmitPaymentAsync()
+    {
+        await SaveAsync(Http.PostAsJsonAsync("/api/payments", paymentDraft.ToRequest()), "Dummy payment recorded.");
+        if (errorMessage is null) ClosePayment();
+    }
+
+    private async Task DeletePaymentAsync(PaymentResponse payment) => await DeleteAsync($"/api/payments/{payment.Id}", $"Payment {payment.Reference} deleted.");
+
+    private async Task SaveScholarshipAsync()
+    {
+        await SaveAsync(editingScholarshipId is null
+            ? Http.PostAsJsonAsync("/api/scholarships", scholarshipDraft.ToRequest())
+            : Http.PutAsJsonAsync($"/api/scholarships/{editingScholarshipId}", scholarshipDraft.ToRequest()), "Scholarship saved.");
+        if (errorMessage is null) CancelScholarshipEdit();
+    }
+
+    private void BeginScholarshipEdit(ScholarshipResponse scholarship) { editingScholarshipId = scholarship.Id; scholarshipDraft = ScholarshipInput.From(scholarship); }
+    private void CancelScholarshipEdit() { editingScholarshipId = null; scholarshipDraft = new(); }
+    private async Task DeleteScholarshipAsync(ScholarshipResponse scholarship) => await DeleteAsync($"/api/scholarships/{scholarship.Id}", $"{scholarship.Name} deleted.");
+
+    private async Task GetRecommendationsAsync()
+    {
+        isRecommending = true; errorMessage = null;
         try
         {
-            HttpResponseMessage response;
-            if (editingInvoiceId is null)
-            {
-                response = await Http.PostAsJsonAsync("/api/invoices", draft.ToRequest());
-                successMessage = "Invoice created.";
-            }
-            else
-            {
-                response = await Http.PutAsJsonAsync($"/api/invoices/{editingInvoiceId}", draft.ToRequest());
-                successMessage = "Invoice updated.";
-            }
-
-            if (!response.IsSuccessStatusCode)
-            {
-                successMessage = null;
-                errorMessage = await response.Content.ReadAsStringAsync();
-                return;
-            }
-
-            CancelEdit();
-            await LoadInvoicesAsync();
+            using var response = await Http.PostAsync("/api/scholarships/recommendations/student/4", null);
+            if (!response.IsSuccessStatusCode) { errorMessage = await response.Content.ReadAsStringAsync(); return; }
+            var result = await response.Content.ReadFromJsonAsync<ScholarshipRecommendationResponse>();
+            aiRecommendation = result?.Recommendation;
+            recommendationMatchCount = result?.MatchCount ?? 0;
+            await JS.InvokeVoidAsync("UniversityUI.reveal", "ai-recommendation");
         }
-        catch (HttpRequestException)
-        {
-            errorMessage = "The Financial Aid & Billing service is unavailable.";
-        }
-        finally
-        {
-            isSaving = false;
-        }
+        catch (HttpRequestException) { errorMessage = "Gemini is currently unavailable."; }
+        finally { isRecommending = false; }
     }
 
-    private void BeginEdit(InvoiceResponse invoice)
+    private async Task SaveAsync(Task<HttpResponseMessage> request, string message)
     {
-        editingInvoiceId = invoice.Id;
-        draft = InvoiceInput.From(invoice);
-        errorMessage = null;
-        successMessage = null;
-    }
-
-    private void CancelEdit()
-    {
-        editingInvoiceId = null;
-        draft = new InvoiceInput();
-    }
-
-    private async Task DeleteInvoiceAsync(InvoiceResponse invoice)
-    {
-        errorMessage = null;
-        successMessage = null;
-
+        errorMessage = null; successMessage = null;
         try
         {
-            var response = await Http.DeleteAsync($"/api/invoices/{invoice.Id}");
-            if (!response.IsSuccessStatusCode)
-            {
-                errorMessage = "The invoice could not be deleted.";
-                return;
-            }
-
-            explanations.Remove(invoice.Id);
-            successMessage = $"Invoice #{invoice.Id} deleted.";
-            await LoadInvoicesAsync();
+            using var response = await request;
+            if (!response.IsSuccessStatusCode) { errorMessage = await response.Content.ReadAsStringAsync(); return; }
+            successMessage = message;
+            await LoadAllAsync();
+            await JS.InvokeVoidAsync("UniversityUI.toast", message);
         }
-        catch (HttpRequestException)
-        {
-            errorMessage = "The Financial Aid & Billing service is unavailable.";
-        }
+        catch (HttpRequestException) { errorMessage = "The Financial Aid & Billing service is unavailable."; }
     }
 
-    private async Task ExplainInvoiceAsync(InvoiceResponse invoice)
+    private async Task DeleteAsync(string url, string message)
     {
-        errorMessage = null;
-
+        errorMessage = null; successMessage = null;
         try
         {
-            var response = await Http.PostAsync($"/api/invoices/{invoice.Id}/explanation", null);
-            if (!response.IsSuccessStatusCode)
-            {
-                errorMessage = await response.Content.ReadAsStringAsync();
-                return;
-            }
-
-            var result = await response.Content.ReadFromJsonAsync<InvoiceExplanationResponse>();
-            if (result is not null)
-            {
-                explanations[invoice.Id] = result.Explanation;
-            }
+            using var response = await Http.DeleteAsync(url);
+            if (!response.IsSuccessStatusCode) { errorMessage = await response.Content.ReadAsStringAsync(); return; }
+            successMessage = message;
+            await LoadAllAsync();
+            await JS.InvokeVoidAsync("UniversityUI.toast", message);
         }
-        catch (HttpRequestException)
-        {
-            errorMessage = "The AI service is unavailable. Start Ollama and pull the configured model.";
-        }
+        catch (HttpRequestException) { errorMessage = "The requested record could not be deleted."; }
     }
 }

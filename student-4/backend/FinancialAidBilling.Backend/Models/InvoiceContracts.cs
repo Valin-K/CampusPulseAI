@@ -3,7 +3,7 @@ using System.Net.Http.Json;
 namespace FinancialAidBilling.Backend.Models;
 
 public sealed record InvoiceRequest(
-    string StudentId,
+    int StudentId,
     string Description,
     decimal Amount,
     DateOnly IssueDate,
@@ -12,7 +12,7 @@ public sealed record InvoiceRequest(
 
 public sealed record InvoiceResponse(
     int Id,
-    string StudentId,
+    int StudentId,
     string Description,
     decimal Amount,
     DateOnly IssueDate,
@@ -26,6 +26,60 @@ public enum InvoiceStatus
     Overdue
 }
 
+public sealed record PaymentRequest(
+    int InvoiceId,
+    int StudentId,
+    decimal Amount,
+    DateTime PaidAtUtc,
+    PaymentMethod Method,
+    string Reference);
+
+public sealed record PaymentResponse(
+    int Id,
+    int InvoiceId,
+    int StudentId,
+    decimal Amount,
+    DateTime PaidAtUtc,
+    PaymentMethod Method,
+    string Reference);
+
+public enum PaymentMethod
+{
+    Card,
+    BankTransfer,
+    FinancialAid
+}
+
+public sealed record ScholarshipRequest(
+    string Name,
+    string Description,
+    decimal AwardAmount,
+    decimal MinimumGpa,
+    string EligibleMajor,
+    int MinimumYearLevel,
+    DateOnly ApplicationDeadline,
+    bool IsActive);
+
+public sealed record ScholarshipResponse(
+    int Id,
+    string Name,
+    string Description,
+    decimal AwardAmount,
+    decimal MinimumGpa,
+    string EligibleMajor,
+    int MinimumYearLevel,
+    DateOnly ApplicationDeadline,
+    bool IsActive);
+
+public sealed record StudentProfile(
+    int StudentId,
+    string Name,
+    string Major,
+    decimal Gpa,
+    int YearLevel,
+    bool IsFirstGeneration,
+    IReadOnlyList<string> Interests);
+
 public sealed record GeminiGenerateRequest(IReadOnlyList<GeminiContent> Contents);
 
 public sealed record GeminiContent(IReadOnlyList<GeminiPart> Parts);
@@ -36,7 +90,7 @@ public sealed record GeminiGenerateResponse(IReadOnlyList<GeminiCandidate>? Cand
 
 public sealed record GeminiCandidate(GeminiContent? Content);
 
-public sealed record InvoiceExplanationResponse(int InvoiceId, string Explanation);
+public sealed record ScholarshipRecommendationResponse(int StudentId, int MatchCount, string Recommendation);
 
 public static class HttpResponseMessageExtensions
 {
