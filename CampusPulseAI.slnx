@@ -11,6 +11,7 @@
   </Folder>
   <Folder Name="/Shared/frontend/">
     <File Path="shared/frontend/index.html" />
+    <Project Path="shared/frontend/CampusPulse.Shared.Components/CampusPulse.Shared.Components.csproj" />
   </Folder>
   <Folder Name="/Shared/frontend/assets/">
     <File Path="shared/frontend/assets/campus-logo.png" />

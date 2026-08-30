@@ -1,0 +1,12 @@
+<article class="campus-metric @Tone">
+    <span>@Label</span>
+    <strong>@Value</strong>
+    <small>@Detail</small>
+</article>
+
+@code {
+    [Parameter, EditorRequired] public string Label { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string Value { get; set; } = string.Empty;
+    [Parameter] public string Detail { get; set; } = string.Empty;
+    [Parameter] public string Tone { get; set; } = "blue";
+}

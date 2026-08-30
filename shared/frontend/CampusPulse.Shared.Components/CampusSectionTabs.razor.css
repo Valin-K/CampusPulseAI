@@ -1,0 +1,36 @@
+.campus-tabs {
+    margin: 1.5rem 0;
+    padding: .4rem;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: .4rem;
+    border: 1px solid #d9e2ec;
+    border-radius: 1rem;
+    background: rgba(255, 255, 255, .8);
+    box-shadow: 0 5px 18px rgba(16, 42, 67, .06);
+}
+
+button {
+    min-width: 0;
+    padding: .8rem 1rem;
+    display: grid;
+    gap: .18rem;
+    border: 0;
+    border-radius: .7rem;
+    color: #627d98;
+    background: transparent;
+    text-align: left;
+    font: inherit;
+    cursor: pointer;
+    transition: color .15s ease, background .15s ease, transform .15s ease;
+}
+button:hover { color: #102a43; background: #edf6fb; }
+button.active { color: #fff; background: #102a43; box-shadow: 0 5px 14px rgba(16, 42, 67, .2); }
+button:focus-visible { outline: 3px solid rgba(23, 105, 170, .28); outline-offset: 2px; }
+span { font-size: .84rem; font-weight: 800; }
+small { overflow: hidden; font-size: .68rem; text-overflow: ellipsis; white-space: nowrap; }
+button.active small { color: #b9d1e2; }
+
+@media (max-width: 620px) {
+    .campus-tabs { grid-template-columns: 1fr; }
+}

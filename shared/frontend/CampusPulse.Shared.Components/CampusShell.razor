@@ -1,0 +1,29 @@
+<div class="campus-shell">
+    <CampusNavBar PageName="@PageName"
+                  SectionLabel="@SectionLabel"
+                  UserName="@UserName"
+                  UserDetails="@UserDetails"
+                  UserInitials="@UserInitials"
+                  HomeHref="@HomeHref"
+                  PortalHref="@PortalHref" />
+
+    <main class="campus-workspace">
+        @ChildContent
+    </main>
+
+    <footer class="campus-footer">
+        <span>CampusPulse University</span>
+        <span>@PageName</span>
+    </footer>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string PageName { get; set; } = string.Empty;
+    [Parameter] public string SectionLabel { get; set; } = "Student services";
+    [Parameter] public string UserName { get; set; } = "Student";
+    [Parameter] public string UserDetails { get; set; } = string.Empty;
+    [Parameter] public string UserInitials { get; set; } = "ST";
+    [Parameter] public string HomeHref { get; set; } = "/";
+    [Parameter] public string PortalHref { get; set; } = "http://localhost:8080";
+    [Parameter, EditorRequired] public RenderFragment? ChildContent { get; set; }
+}

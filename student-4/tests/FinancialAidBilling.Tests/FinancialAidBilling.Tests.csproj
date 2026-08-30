@@ -19,6 +19,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../../backend/FinancialAidBilling.Backend/FinancialAidBilling.Backend.csproj" />
+    <ProjectReference Include="../../database/FinancialAidBilling.Database/FinancialAidBilling.Database.csproj" />
   </ItemGroup>
 
   <ItemGroup>

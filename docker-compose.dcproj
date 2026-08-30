@@ -15,6 +15,19 @@
     </None>
     <None Include="docker-compose.yml" />
     <None Include=".dockerignore" />
+    <None Include="shared\frontend\CampusPulse.Shared.Components\CampusMetricCard.razor" />
+    <None Include="shared\frontend\CampusPulse.Shared.Components\CampusMetricCard.razor.css" />
+    <None Include="shared\frontend\CampusPulse.Shared.Components\CampusNavBar.razor" />
+    <None Include="shared\frontend\CampusPulse.Shared.Components\CampusNavBar.razor.css" />
+    <None Include="shared\frontend\CampusPulse.Shared.Components\CampusPulse.Shared.Components.csproj" />
+    <None Include="shared\frontend\CampusPulse.Shared.Components\CampusSectionTabs.razor" />
+    <None Include="shared\frontend\CampusPulse.Shared.Components\CampusSectionTabs.razor.css" />
+    <None Include="shared\frontend\CampusPulse.Shared.Components\CampusShell.razor" />
+    <None Include="shared\frontend\CampusPulse.Shared.Components\CampusShell.razor.css" />
+    <None Include="shared\frontend\CampusPulse.Shared.Components\Models\CampusTabItem.cs" />
+    <None Include="shared\frontend\CampusPulse.Shared.Components\_Imports.razor" />
+    <None Include="shared\frontend\css\university-theme.css" />
+    <None Include="shared\frontend\js\university-ui.js" />
     <None Include="student-1\database\AcademicRecords.Database\AcademicRecords.Database.csproj" />
     <None Include="student-1\database\AcademicRecords.Database\Dockerfile" />
     <None Include="student-2\database\CourseManagement.Database\CourseManagement.Database.csproj" />
