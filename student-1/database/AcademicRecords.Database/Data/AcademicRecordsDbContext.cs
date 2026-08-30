@@ -1,0 +1,96 @@
+using AcademicRecords.Database.Models;
+using Microsoft.EntityFrameworkCore;
+
+namespace AcademicRecords.Database.Data;
+
+public sealed class AcademicRecordsDbContext(DbContextOptions<AcademicRecordsDbContext> options) : DbContext(options)
+{
+    public DbSet<User> Users => Set<User>();
+    public DbSet<AcademicTerm> AcademicTerms => Set<AcademicTerm>();
+    public DbSet<Enrollment> Enrollments => Set<Enrollment>();
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<User>(entity =>
+        {
+            entity.ToTable("Users");
+            entity.ToTable("Users", table => table.HasCheckConstraint(
+                "CK_Users_ExactlyOneRole",
+                "(student_id IS NOT NULL AND staff_id IS NULL) OR (student_id IS NULL AND staff_id IS NOT NULL)"));
+            entity.HasDiscriminator<string>("user_type")
+                .HasValue<Student>("Student")
+                .HasValue<Staff>("Staff");
+            entity.HasKey(user => user.UserId);
+            entity.Property(user => user.UserId).HasColumnName("user_id").ValueGeneratedOnAdd();
+            entity.Property(user => user.FirstName).HasColumnName("first_name").HasMaxLength(100).IsRequired();
+            entity.Property(user => user.LastName).HasColumnName("last_name").HasMaxLength(100).IsRequired();
+            entity.Property(user => user.Email).HasColumnName("email").HasMaxLength(255).IsRequired();
+            entity.Property(user => user.DateOfBirth).HasColumnName("date_of_birth").HasColumnType("DATE");
+            entity.Property(user => user.EnrollmentDate).HasColumnName("enrollment_date").HasColumnType("DATE");
+            entity.Property(user => user.Status).HasColumnName("status").HasMaxLength(3).IsRequired();
+            entity.Property(user => user.PhoneNumber).HasColumnName("phone_number").HasMaxLength(10);
+            entity.Property(user => user.Degree).HasColumnName("degree").HasMaxLength(100);
+            entity.Property(user => user.Major).HasColumnName("major").HasMaxLength(100);
+            entity.Property(user => user.SubMajor).HasColumnName("sub_major").HasMaxLength(100);
+        });
+
+        modelBuilder.Entity<Student>(entity =>
+        {
+            entity.Property(student => student.StudentId).HasColumnName("student_id").HasMaxLength(20).IsRequired();
+        });
+
+        modelBuilder.Entity<Staff>(entity =>
+        {
+            entity.Property(staff => staff.StaffId).HasColumnName("staff_id").HasMaxLength(20).IsRequired();
+        });
+
+        modelBuilder.Entity<AcademicTerm>(entity =>
+        {
+            entity.ToTable("AcademicTerms");
+            entity.HasKey(term => term.TermId);
+            entity.Property(term => term.TermId).HasColumnName("term_id").ValueGeneratedOnAdd();
+            entity.Property(term => term.TermCode).HasColumnName("term_code").HasMaxLength(20).IsRequired();
+            entity.Property(term => term.StartWeekOfYear).HasColumnName("start_week_of_year").IsRequired();
+            entity.Property(term => term.EndWeekOfYear).HasColumnName("end_week_of_year").IsRequired();
+            entity.Property(term => term.TermName).HasColumnName("term_name").HasMaxLength(100).IsRequired();
+            entity.Property(term => term.IsActive).HasColumnName("is_active").IsRequired();
+            entity.HasIndex(term => term.TermCode).IsUnique();
+            entity.ToTable("AcademicTerms", table => table.HasCheckConstraint(
+                "CK_AcademicTerms_WeekRange",
+                "start_week_of_year BETWEEN 1 AND 53 AND end_week_of_year BETWEEN 1 AND 53"));
+        });
+
+        modelBuilder.Entity<Enrollment>(entity =>
+        {
+            entity.ToTable("Enrollments");
+            entity.HasKey(enrollment => enrollment.EnrollmentId);
+            entity.Property(enrollment => enrollment.EnrollmentId).HasColumnName("enrollment_id").ValueGeneratedOnAdd();
+            entity.Property(enrollment => enrollment.StudentId).HasColumnName("student_id");
+            entity.Property(enrollment => enrollment.CourseCode).HasColumnName("course_code").HasMaxLength(20).IsRequired();
+            entity.Property(enrollment => enrollment.AcademicTermId).HasColumnName("academic_term_id");
+            entity.Property(enrollment => enrollment.AcademicYear).HasColumnName("academic_year").IsRequired();
+            entity.Property(enrollment => enrollment.Status).HasColumnName("status").HasMaxLength(20).IsRequired();
+            entity.Property(enrollment => enrollment.GradeValue).HasColumnName("grade_value").HasPrecision(4, 2);
+            entity.Property(enrollment => enrollment.Credits).HasColumnName("credits").HasPrecision(4, 1);
+            entity.Property(enrollment => enrollment.GradeDate).HasColumnName("grade_date").HasColumnType("DATE");
+            entity.Property(enrollment => enrollment.IsFinalized).HasColumnName("is_finalized").IsRequired();
+
+            entity.HasOne(enrollment => enrollment.Student)
+                .WithMany(user => user.Enrollments)
+                .HasForeignKey(enrollment => enrollment.StudentId)
+                .HasPrincipalKey(user => user.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(enrollment => enrollment.AcademicTerm)
+                .WithMany(term => term.Enrollments)
+                .HasForeignKey(enrollment => enrollment.AcademicTermId)
+                .HasPrincipalKey(term => term.TermId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<Student>().HasData(AcademicRecordsSeedData.Students);
+        modelBuilder.Entity<Staff>().HasData(AcademicRecordsSeedData.StaffMembers);
+        modelBuilder.Entity<AcademicTerm>().HasData(AcademicRecordsSeedData.AcademicTerms);
+        modelBuilder.Entity<Enrollment>().HasData(AcademicRecordsSeedData.Enrollments);
+    }
+}
