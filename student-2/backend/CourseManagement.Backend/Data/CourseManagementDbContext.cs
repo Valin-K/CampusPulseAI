@@ -14,6 +14,16 @@ public sealed class CourseManagementDbContext(
     {
         modelBuilder.Entity<Course>(entity =>
         {
+            entity.ToTable(table =>
+            {
+                table.HasCheckConstraint(
+                    "CK_Courses_CreditPoints",
+                    "\"CreditPoints\" BETWEEN 1 AND 48");
+                table.HasCheckConstraint(
+                    "CK_Courses_Level",
+                    "\"Level\" BETWEEN 1 AND 10");
+            });
+
             entity.HasKey(course => course.Id);
             entity.HasIndex(course => course.Code).IsUnique();
 
@@ -25,6 +35,11 @@ public sealed class CourseManagementDbContext(
 
         modelBuilder.Entity<Prerequisite>(entity =>
         {
+            entity.ToTable(table =>
+                table.HasCheckConstraint(
+                    "CK_Prerequisites_DifferentCourses",
+                    "\"CourseId\" <> \"RequiredCourseId\""));
+
             entity.HasKey(prerequisite => prerequisite.Id);
             entity.HasIndex(prerequisite =>
                 new { prerequisite.CourseId, prerequisite.RequiredCourseId }).IsUnique();

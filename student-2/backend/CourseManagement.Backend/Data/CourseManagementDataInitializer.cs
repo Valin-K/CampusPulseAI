@@ -7,7 +7,7 @@ public static class CourseManagementDataInitializer
 {
     public static async Task InitializeAsync(CourseManagementDbContext database)
     {
-        await database.Database.EnsureCreatedAsync();
+        await CourseManagementDatabaseMigrator.MigrateAsync(database);
 
         if (await database.Courses.AnyAsync()
             || await database.Prerequisites.AnyAsync()
