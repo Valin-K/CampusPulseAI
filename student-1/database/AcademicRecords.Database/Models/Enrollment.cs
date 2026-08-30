@@ -6,6 +6,7 @@ public sealed class Enrollment
     public int? StudentId { get; set; }
     public string CourseCode { get; set; } = string.Empty;
     public int? AcademicTermId { get; set; }
+    public int AcademicYear { get; set; }
     public string Status { get; set; } = string.Empty;
     public decimal? GradeValue { get; set; }
     public decimal? Credits { get; set; }
