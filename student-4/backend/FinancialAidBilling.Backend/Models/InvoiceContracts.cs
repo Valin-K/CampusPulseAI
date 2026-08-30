@@ -96,7 +96,15 @@ public static class HttpResponseMessageExtensions
 {
     public static async Task<IResult> ToResultAsync(this HttpResponseMessage response, CancellationToken cancellationToken)
     {
-        var content = await response.Content.ReadAsStringAsync(cancellationToken);
-        return Results.Content(content, response.Content.Headers.ContentType?.MediaType ?? "application/json", statusCode: (int)response.StatusCode);
+        using (response)
+        {
+            var content = await response.Content.ReadAsStringAsync(cancellationToken);
+            if (string.IsNullOrEmpty(content))
+            {
+                return Results.StatusCode((int)response.StatusCode);
+            }
+
+            return Results.Content(content, response.Content.Headers.ContentType?.MediaType ?? "application/json", statusCode: (int)response.StatusCode);
+        }
     }
 }

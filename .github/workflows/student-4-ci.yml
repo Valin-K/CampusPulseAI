@@ -91,8 +91,8 @@ jobs:
               exit 1
             fi
           done
-          curl -s -f -X POST http://localhost:18080/api/invoices -H 'Content-Type: application/json' -d '{"studentId":"S90001","description":"CI tuition fee","amount":1250.00,"issueDate":"2026-07-01","dueDate":"2026-08-01","status":0}' > /dev/null
-          curl -s -f -X PUT http://localhost:18080/api/invoices/1 -H 'Content-Type: application/json' -d '{"studentId":"S10001","description":"Updated CI tuition fee","amount":4500.00,"issueDate":"2026-07-01","dueDate":"2026-08-15","status":1}' > /dev/null
+          curl -s -f -X POST http://localhost:18080/api/invoices -H 'Content-Type: application/json' -d '{"studentId":4,"description":"CI tuition fee","amount":1250.00,"issueDate":"2026-07-01","dueDate":"2026-08-01","status":0}' > /dev/null
+          curl -s -f -X PUT http://localhost:18080/api/invoices/1 -H 'Content-Type: application/json' -d '{"studentId":4,"description":"Updated CI tuition fee","amount":4500.00,"issueDate":"2026-07-01","dueDate":"2026-08-15","status":1}' > /dev/null
           curl -s -f -X DELETE http://localhost:18080/api/invoices/2 > /dev/null
 
       - name: Remove Student 4 containers
