@@ -4,6 +4,13 @@ services:
     build:
       context: .
       dockerfile: student-1/backend/AcademicRecords.Backend/Dockerfile
+    environment:
+      ASPNETCORE_HTTP_PORTS: 8080
+      ConnectionStrings__AcademicRecords: Data Source=/app/data/academic-records.db
+    volumes:
+      - academicrecords-data:/app/data
+    ports:
+      - "5020:8080"
 
   coursemanagement.backend:
     image: ${DOCKER_REGISTRY-}coursemanagementbackend
@@ -82,6 +89,8 @@ services:
       dockerfile: docker/frontend/AcademicRecords.Dockerfile
     ports:
       - "8081:80"
+    depends_on:
+      - academicrecords.backend
 
 
   coursemanagement.frontend:
@@ -132,4 +141,5 @@ services:
       - ./shared/frontend:/usr/share/nginx/html:ro
 
 volumes:
+  academicrecords-data:
   coursemanagement-data:
