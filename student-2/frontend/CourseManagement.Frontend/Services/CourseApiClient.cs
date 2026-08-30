@@ -17,12 +17,15 @@ public sealed class CourseApiClient(HttpClient httpClient)
             ?? [];
     }
 
-    public async Task<CourseSummary> GetByIdAsync(
+    public async Task<CourseDetail> GetByIdAsync(
         int id,
         CancellationToken cancellationToken = default)
     {
         using var response = await httpClient.GetAsync($"api/courses/{id}", cancellationToken);
-        return await ReadCourseAsync(response, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+
+        return await response.Content.ReadFromJsonAsync<CourseDetail>(cancellationToken)
+            ?? throw new JsonException("The Course API returned an empty response.");
     }
 
     public async Task<CourseSummary> CreateAsync(
@@ -68,6 +71,65 @@ public sealed class CourseApiClient(HttpClient httpClient)
         await EnsureSuccessAsync(response, cancellationToken);
     }
 
+    public async Task<PrerequisiteSummary> GetPrerequisiteAsync(
+        int id,
+        CancellationToken cancellationToken = default)
+    {
+        using var response = await httpClient.GetAsync(
+            $"api/prerequisites/{id}",
+            cancellationToken);
+        return await ReadPrerequisiteAsync(response, cancellationToken);
+    }
+
+    public async Task<PrerequisiteSummary> CreatePrerequisiteAsync(
+        PrerequisiteFormModel prerequisite,
+        CancellationToken cancellationToken = default)
+    {
+        using var response = await httpClient.PostAsJsonAsync(
+            "api/prerequisites",
+            prerequisite,
+            cancellationToken);
+        return await ReadPrerequisiteAsync(response, cancellationToken);
+    }
+
+    public async Task<PrerequisiteSummary> UpdatePrerequisiteAsync(
+        int id,
+        PrerequisiteFormModel prerequisite,
+        CancellationToken cancellationToken = default)
+    {
+        using var response = await httpClient.PutAsJsonAsync(
+            $"api/prerequisites/{id}",
+            prerequisite,
+            cancellationToken);
+        return await ReadPrerequisiteAsync(response, cancellationToken);
+    }
+
+    public async Task DeletePrerequisiteAsync(
+        int id,
+        CancellationToken cancellationToken = default)
+    {
+        using var response = await httpClient.DeleteAsync(
+            $"api/prerequisites/{id}",
+            cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public async Task<PrerequisiteEligibilityResult> CheckPrerequisiteEligibilityAsync(
+        int courseId,
+        PrerequisiteEligibilityRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        using var response = await httpClient.PostAsJsonAsync(
+            $"api/courses/{courseId}/prerequisite-eligibility",
+            request,
+            cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+
+        return await response.Content.ReadFromJsonAsync<PrerequisiteEligibilityResult>(
+                cancellationToken)
+            ?? throw new JsonException("The prerequisite eligibility API returned an empty response.");
+    }
+
     static async Task<CourseSummary> ReadCourseAsync(
         HttpResponseMessage response,
         CancellationToken cancellationToken)
@@ -76,6 +138,16 @@ public sealed class CourseApiClient(HttpClient httpClient)
 
         return await response.Content.ReadFromJsonAsync<CourseSummary>(cancellationToken)
             ?? throw new JsonException("The Course API returned an empty response.");
+    }
+
+    static async Task<PrerequisiteSummary> ReadPrerequisiteAsync(
+        HttpResponseMessage response,
+        CancellationToken cancellationToken)
+    {
+        await EnsureSuccessAsync(response, cancellationToken);
+
+        return await response.Content.ReadFromJsonAsync<PrerequisiteSummary>(cancellationToken)
+            ?? throw new JsonException("The prerequisite API returned an empty response.");
     }
 
     static async Task EnsureSuccessAsync(

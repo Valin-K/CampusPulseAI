@@ -24,7 +24,7 @@ public sealed class CourseFormModel
 
     public bool IsActive { get; set; } = true;
 
-    public static CourseFormModel FromCourse(CourseSummary course)
+    public static CourseFormModel FromCourse(CourseDetail course)
     {
         return new CourseFormModel
         {

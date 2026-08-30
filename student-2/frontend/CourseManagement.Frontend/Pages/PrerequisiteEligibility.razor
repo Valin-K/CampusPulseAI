@@ -1,0 +1,224 @@
+@page "/courses/{CourseId:int}/eligibility"
+@inject CourseApiClient CourseApi
+
+<PageTitle>Check prerequisite eligibility</PageTitle>
+
+<h1>Check prerequisite eligibility</h1>
+
+@if (isLoading)
+{
+    <p role="status">Loading prerequisite requirements...</p>
+}
+else if (loadFailed)
+{
+    <div class="alert alert-danger" role="alert">@errorMessage</div>
+    <NavLink class="btn btn-outline-secondary" href="@CourseUrl">Back to Course</NavLink>
+}
+else if (course is not null)
+{
+    <p class="text-muted">
+        Enter completed Courses and grades to check eligibility for
+        <strong>@course.Code - @course.Name</strong>.
+    </p>
+
+    @if (errorMessage is not null)
+    {
+        <div class="alert alert-danger" role="alert">@errorMessage</div>
+    }
+
+    @if (selections.Count == 0)
+    {
+        <div class="alert alert-success" role="status">
+            This Course has no prerequisites. Eligibility requirements are met.
+        </div>
+    }
+    else
+    {
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th scope="col">Completed</th>
+                    <th scope="col">Course</th>
+                    <th scope="col">Minimum grade</th>
+                    <th scope="col">Achieved grade</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var selection in selections)
+                {
+                    var prerequisite = course.Prerequisites.Single(
+                        item => item.RequiredCourseId == selection.CourseId);
+
+                    <tr>
+                        <td>
+                            <input type="checkbox"
+                                   aria-label="@($"Completed {selection.CourseCode}")"
+                                   disabled="@isChecking"
+                                   @bind="selection.IsCompleted"
+                                   @bind:after="ClearResult" />
+                        </td>
+                        <td>@selection.CourseCode - @selection.CourseName</td>
+                        <td>@(prerequisite.MinimumGrade ?? "Pass")</td>
+                        <td>
+                            <select class="form-select"
+                                    aria-label="@($"Grade for {selection.CourseCode}")"
+                                    disabled="@(!selection.IsCompleted || isChecking)"
+                                    @bind="selection.Grade"
+                                    @bind:after="ClearResult">
+                                @foreach (var grade in GradeOptions.Values)
+                                {
+                                    <option value="@grade">@grade</option>
+                                }
+                            </select>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+
+        <button class="btn btn-primary" disabled="@isChecking" @onclick="CheckEligibilityAsync">
+            @(isChecking ? "Checking..." : "Check eligibility")
+        </button>
+    }
+
+    @if (result is not null)
+    {
+        <div class="alert @(result.IsEligible ? "alert-success" : "alert-warning") mt-3"
+             role="status">
+            @(result.IsEligible
+                ? "All prerequisite requirements are met."
+                : "One or more prerequisite requirements are not met.")
+        </div>
+
+        <table class="table">
+            <thead>
+                <tr>
+                    <th scope="col">Required Course</th>
+                    <th scope="col">Minimum</th>
+                    <th scope="col">Achieved</th>
+                    <th scope="col">Result</th>
+                    <th scope="col">Reason</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var requirement in result.Requirements)
+                {
+                    <tr>
+                        <td>@requirement.RequiredCourseCode</td>
+                        <td>@requirement.MinimumGrade</td>
+                        <td>@(requirement.AchievedGrade ?? "Not completed")</td>
+                        <td>
+                            <span class="badge @(requirement.IsMet ? "bg-success" : "bg-warning text-dark")">
+                                @(requirement.IsMet ? "Met" : "Not met")
+                            </span>
+                        </td>
+                        <td>@requirement.Reason</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+
+    <NavLink class="btn btn-outline-secondary mt-3" href="@CourseUrl">Back to Course</NavLink>
+}
+
+@code {
+    [Parameter]
+    public int CourseId { get; set; }
+
+    private CourseDetail? course;
+    private List<CompletedCourseSelection> selections = [];
+    private PrerequisiteEligibilityResult? result;
+    private string? errorMessage;
+    private bool isLoading = true;
+    private bool isChecking;
+    private bool loadFailed;
+
+    private string CourseUrl => $"/courses/{CourseId}";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        isLoading = true;
+        loadFailed = false;
+        errorMessage = null;
+        result = null;
+
+        try
+        {
+            course = await CourseApi.GetByIdAsync(CourseId);
+            var courses = await CourseApi.GetAllAsync();
+            var coursesById = courses.ToDictionary(item => item.Id);
+
+            selections = course.Prerequisites
+                .OrderBy(item => item.RequiredCourseCode)
+                .Select(prerequisite =>
+                {
+                    var prerequisiteCourse = coursesById[prerequisite.RequiredCourseId];
+                    return new CompletedCourseSelection
+                    {
+                        CourseId = prerequisiteCourse.Id,
+                        CourseCode = prerequisiteCourse.Code,
+                        CourseName = prerequisiteCourse.Name
+                    };
+                })
+                .ToList();
+        }
+        catch (CourseApiException exception)
+        {
+            errorMessage = exception.Message;
+            loadFailed = true;
+        }
+        catch (HttpRequestException)
+        {
+            errorMessage = "Eligibility requirements could not be loaded. Check that the API is running.";
+            loadFailed = true;
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            errorMessage = "Eligibility data was returned in an unexpected format.";
+            loadFailed = true;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task CheckEligibilityAsync()
+    {
+        isChecking = true;
+        errorMessage = null;
+        result = null;
+
+        try
+        {
+            var completedCourses = selections
+                .Where(selection => selection.IsCompleted)
+                .Select(selection => new CompletedCourseRequest(
+                    selection.CourseCode,
+                    selection.Grade))
+                .ToList();
+
+            result = await CourseApi.CheckPrerequisiteEligibilityAsync(
+                CourseId,
+                new PrerequisiteEligibilityRequest(completedCourses));
+        }
+        catch (CourseApiException exception)
+        {
+            errorMessage = exception.Message;
+        }
+        catch (HttpRequestException)
+        {
+            errorMessage = "Eligibility could not be checked. Check that the API is running.";
+        }
+        finally
+        {
+            isChecking = false;
+        }
+    }
+
+    private void ClearResult()
+    {
+        result = null;
+    }
+}
