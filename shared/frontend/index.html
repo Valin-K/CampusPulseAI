@@ -3,87 +3,159 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CampusPulse AI</title>
-    <link rel="stylesheet" href="css/theme.css">
+    <meta name="description" content="CampusPulse student services portal">
+    <title>CampusPulse | Student Services</title>
     <link rel="stylesheet" href="css/university-theme.css">
+    <script src="js/campus-nav-bar.js" defer></script>
     <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            margin: 0;
-            padding: 0;
-            background: #f4f6f8;
-            color: #333;
-        }
-        .container {
-            max-width: 900px;
-            margin: 3rem auto;
-            padding: 2rem;
-            background: #fff;
-            border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-        }
-        header {
+        .portal-shell {
+            min-height: 100vh;
             display: flex;
-            align-items: center;
-            gap: 1rem;
-            margin-bottom: 2rem;
+            flex-direction: column;
+            background:
+                radial-gradient(circle at 8% 0%, rgba(54, 140, 183, .13), transparent 28rem),
+                linear-gradient(180deg, #f8fbfd 0, #f3f7fa 24rem, #eef3f7 100%);
         }
-        header img {
-            height: 64px;
+
+        .portal-workspace {
+            width: min(94rem, 100%);
+            flex: 1;
+            margin: 0 auto;
+            padding: clamp(1.25rem, 3vw, 2.5rem);
         }
-        h1 {
-            margin: 0;
-            font-size: 2rem;
-            color: #1a237e;
+
+        .portal-hero { margin-bottom: clamp(2rem, 4vw, 3.5rem); }
+        .portal-hero h1 { margin: .4rem 0 .7rem; }
+
+        .portal-directory-heading {
+            display: flex;
+            align-items: end;
+            justify-content: space-between;
+            gap: 2rem;
+            margin-bottom: 1rem;
         }
-        p {
-            font-size: 1.1rem;
-            line-height: 1.6;
-        }
-        .tabs {
+
+        .portal-directory-heading h2 { margin: .25rem 0 0; font-size: clamp(1.5rem, 3vw, 2rem); }
+        .portal-directory-heading p { max-width: 35rem; margin: 0; color: var(--university-muted); line-height: 1.6; }
+
+        .service-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            grid-template-columns: repeat(6, minmax(0, 1fr));
             gap: 1rem;
-            margin-top: 2rem;
         }
-        .tab {
-            display: block;
-            padding: 1rem;
-            text-align: center;
+
+        .service-card {
+            grid-column: span 2;
+            min-height: 15rem;
+            padding: 1.35rem;
+            display: flex;
+            flex-direction: column;
+            border: 1px solid var(--university-border);
+            border-radius: var(--radius-lg);
+            color: inherit;
+            background: var(--university-surface);
+            box-shadow: var(--shadow-sm);
             text-decoration: none;
-            color: #fff;
-            background: #3949ab;
-            border-radius: 8px;
-            font-weight: 600;
-            transition: background 0.2s, transform 0.1s;
+            transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
         }
-        .tab:hover {
-            background: #303f9f;
-            transform: translateY(-2px);
+
+        .service-card:nth-child(4),
+        .service-card:nth-child(5) { grid-column: span 3; }
+        .service-card:hover { transform: translateY(-3px); border-color: #9ec9e2; box-shadow: var(--shadow-md); }
+        .service-card:focus-visible { outline: 3px solid rgba(23, 105, 170, .28); outline-offset: 3px; }
+
+        .service-card-top { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+        .service-number { color: var(--university-blue); font-size: .72rem; font-weight: 850; letter-spacing: .12em; }
+        .service-owner { padding: .28rem .52rem; border-radius: 999px; color: var(--university-blue); background: var(--university-sky); font-size: .7rem; font-weight: 750; }
+        .service-card h3 { margin: 2rem 0 .65rem; font-size: 1.2rem; }
+        .service-card p { margin-bottom: 1.4rem; color: var(--university-muted); font-size: .9rem; line-height: 1.6; }
+        .service-link { margin-top: auto; color: var(--university-blue); font-size: .82rem; font-weight: 800; }
+
+        .portal-footer {
+            padding: .8rem clamp(1rem, 4vw, 4rem);
+            display: flex;
+            justify-content: space-between;
+            color: var(--university-muted);
+            background: rgba(255, 255, 255, .72);
+            border-top: 1px solid var(--university-border);
+            font-size: .72rem;
+            font-weight: 700;
         }
-        .tab span {
-            display: block;
-            font-size: 0.85rem;
-            font-weight: 400;
-            margin-top: 0.25rem;
-            opacity: 0.9;
+
+        @media (max-width: 900px) {
+            .service-card, .service-card:nth-child(4), .service-card:nth-child(5) { grid-column: span 3; }
+            .portal-directory-heading { align-items: start; flex-direction: column; gap: .5rem; }
+        }
+
+        @media (max-width: 620px) {
+            .service-card, .service-card:nth-child(4), .service-card:nth-child(5) { grid-column: 1 / -1; min-height: 13rem; }
+            .portal-footer { gap: .5rem; flex-direction: column; }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <header>
-            <img src="assets/campus-logo.png" alt="CampusPulse AI logo">
-            <h1>CampusPulse AI</h1>
-        </header>
-        <p>Welcome to the CampusPulse AI portal. Select a module below to view each student's Blazor frontend.</p>
-        <nav class="tabs">
-            <a class="tab" href="http://localhost:8081">Academic Records<span>Alec</span></a>
-            <a class="tab" href="http://localhost:8082">Course Management<span>Joyce</span></a>
-            <a class="tab" href="http://localhost:8083">Campus Housing<span>Jack</span></a>
-            <a class="tab" href="http://localhost:8084">Financial Aid &amp; Billing<span>Valin</span></a>
-            <a class="tab" href="http://localhost:8085">Event Scheduling<span>Ryan</span></a>
-        </nav>
+    <div class="portal-shell">
+        <campus-nav-bar page-name="Service directory" section-label="Student services" service-count="5 services"></campus-nav-bar>
+
+        <main class="portal-workspace">
+            <section class="dashboard-hero portal-hero">
+                <div>
+                    <span class="eyebrow">Campus digital services</span>
+                    <h1>Everything campus, one place.</h1>
+                    <p>Move between your academic, campus life, financial, and scheduling tools from one focused student workspace.</p>
+                </div>
+                <div class="term-summary">
+                    <span>Available now</span>
+                    <strong>Five student services</strong>
+                    <small>CampusPulse team workspace</small>
+                </div>
+            </section>
+
+            <section aria-labelledby="services-title">
+                <div class="portal-directory-heading">
+                    <div>
+                        <span class="eyebrow">Explore CampusPulse</span>
+                        <h2 id="services-title">Choose a service</h2>
+                    </div>
+                    <p>Each area provides a dedicated view of the tools and information you need throughout the university year.</p>
+                </div>
+
+                <nav class="service-grid" aria-label="CampusPulse services">
+                    <a class="service-card" href="http://localhost:8081">
+                        <span class="service-card-top"><span class="service-number">01</span><span class="service-owner">Alec</span></span>
+                        <h3>Academic Records</h3>
+                        <p>Review student details, academic progress, and university record information.</p>
+                        <span class="service-link">Open Academic Records &rarr;</span>
+                    </a>
+                    <a class="service-card" href="http://localhost:8082">
+                        <span class="service-card-top"><span class="service-number">02</span><span class="service-owner">Joyce</span></span>
+                        <h3>Course Management</h3>
+                        <p>Explore courses, manage enrolment activity, and keep study plans organised.</p>
+                        <span class="service-link">Open Course Management &rarr;</span>
+                    </a>
+                    <a class="service-card" href="http://localhost:8083">
+                        <span class="service-card-top"><span class="service-number">03</span><span class="service-owner">Jack</span></span>
+                        <h3>Campus Housing</h3>
+                        <p>Access accommodation information and manage the campus housing experience.</p>
+                        <span class="service-link">Open Campus Housing &rarr;</span>
+                    </a>
+                    <a class="service-card" href="http://localhost:8084">
+                        <span class="service-card-top"><span class="service-number">04</span><span class="service-owner">Valin</span></span>
+                        <h3>Financial Aid &amp; Billing</h3>
+                        <p>Track charges and payments, then discover scholarship opportunities matched to your studies.</p>
+                        <span class="service-link">Open Financial Aid &amp; Billing &rarr;</span>
+                    </a>
+                    <a class="service-card" href="http://localhost:8085">
+                        <span class="service-card-top"><span class="service-number">05</span><span class="service-owner">Ryan</span></span>
+                        <h3>Event Scheduling</h3>
+                        <p>Find university events and organise activities around your academic calendar.</p>
+                        <span class="service-link">Open Event Scheduling &rarr;</span>
+                    </a>
+                </nav>
+            </section>
+        </main>
+
+        <footer class="portal-footer"><span>CampusPulse University</span><span>Student service directory</span></footer>
     </div>
     <script src="js/university-ui.js"></script>
 </body>

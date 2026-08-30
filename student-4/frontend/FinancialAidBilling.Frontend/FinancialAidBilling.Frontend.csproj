@@ -16,6 +16,7 @@
 
   <ItemGroup>
     <Content Include="..\..\..\shared\frontend\css\university-theme.css" Link="wwwroot\css\university-theme.css" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="..\..\..\shared\frontend\js\campus-nav-bar.js" Link="wwwroot\js\campus-nav-bar.js" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="..\..\..\shared\frontend\js\university-ui.js" Link="wwwroot\js\university-ui.js" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
