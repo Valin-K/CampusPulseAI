@@ -4,7 +4,7 @@ namespace AcademicRecords.Database.Data;
 
 public static class AcademicRecordsSeedData
 {
-    public static User[] Users =>
+    public static Student[] Students =>
     [
         new() { UserId = 1, StudentId = "STU001", FirstName = "Alec", LastName = "Steele", Email = "alec.steele@example.edu", DateOfBirth = new(2001, 3, 12), EnrollmentDate = new(2023, 2, 20), Status = "ACT", PhoneNumber = "0400000001", Degree = "Bachelor of Computer Science", Major = "Software Engineering", SubMajor = "Artificial Intelligence" },
         new() { UserId = 2, StudentId = "STU002", FirstName = "Valin", LastName = "Kennedy", Email = "valin.kennedy@example.edu", DateOfBirth = new(2000, 7, 8), EnrollmentDate = new(2022, 8, 15), Status = "ACT", PhoneNumber = "0400000002", Degree = "Bachelor of Information Technology", Major = "Cybersecurity" },
@@ -13,6 +13,10 @@ public static class AcademicRecordsSeedData
         new() { UserId = 5, StudentId = "STU005", FirstName = "Jack", LastName = "Wang", Email = "jack.wang@example.edu", DateOfBirth = new(2000, 5, 17), EnrollmentDate = new(2022, 2, 21), Status = "ACT", PhoneNumber = "0400000005", Degree = "Bachelor of Business", Major = "Business Analytics" },
         new() { UserId = 6, StudentId = "STU006", FirstName = "Mia", LastName = "Chen", Email = "mia.chen@example.edu", DateOfBirth = new(2002, 9, 30), EnrollmentDate = new(2024, 8, 12), Status = "ACT", PhoneNumber = "0400000006", Degree = "Bachelor of Engineering", Major = "Software Engineering" },
         new() { UserId = 7, StudentId = "STU007", FirstName = "Noah", LastName = "Patel", Email = "noah.patel@example.edu", DateOfBirth = new(2001, 12, 6), EnrollmentDate = new(2023, 2, 20), Status = "ACT", PhoneNumber = "0400000007", Degree = "Bachelor of Science", Major = "Applied Mathematics" },
+    ];
+
+    public static Staff[] StaffMembers =>
+    [
         new() { UserId = 8, StaffId = "STF001", FirstName = "Grace", LastName = "Brillis", Email = "grace.brillis@example.edu", Status = "ACT", PhoneNumber = "0400000008", Degree = "Academic Staff" },
         new() { UserId = 9, StaffId = "STF002", FirstName = "Georges", LastName = "Bou Ghantous", Email = "georges.boughantous@example.edu", Status = "ACT", PhoneNumber = "0400000009", Degree = "Academic Staff" },
         new() { UserId = 10, StaffId = "STF003", FirstName = "Olivia", LastName = "Davis", Email = "olivia.davis@example.edu", Status = "ACT", PhoneNumber = "0400000010", Degree = "Academic Staff" }

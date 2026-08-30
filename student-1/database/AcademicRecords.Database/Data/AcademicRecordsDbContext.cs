@@ -17,10 +17,11 @@ public sealed class AcademicRecordsDbContext(DbContextOptions<AcademicRecordsDbC
             entity.ToTable("Users", table => table.HasCheckConstraint(
                 "CK_Users_ExactlyOneRole",
                 "(student_id IS NOT NULL AND staff_id IS NULL) OR (student_id IS NULL AND staff_id IS NOT NULL)"));
+            entity.HasDiscriminator<string>("user_type")
+                .HasValue<Student>("Student")
+                .HasValue<Staff>("Staff");
             entity.HasKey(user => user.UserId);
             entity.Property(user => user.UserId).HasColumnName("user_id").ValueGeneratedOnAdd();
-            entity.Property(user => user.StudentId).HasColumnName("student_id").HasMaxLength(20);
-            entity.Property(user => user.StaffId).HasColumnName("staff_id").HasMaxLength(20);
             entity.Property(user => user.FirstName).HasColumnName("first_name").HasMaxLength(100).IsRequired();
             entity.Property(user => user.LastName).HasColumnName("last_name").HasMaxLength(100).IsRequired();
             entity.Property(user => user.Email).HasColumnName("email").HasMaxLength(255).IsRequired();
@@ -31,6 +32,16 @@ public sealed class AcademicRecordsDbContext(DbContextOptions<AcademicRecordsDbC
             entity.Property(user => user.Degree).HasColumnName("degree").HasMaxLength(100);
             entity.Property(user => user.Major).HasColumnName("major").HasMaxLength(100);
             entity.Property(user => user.SubMajor).HasColumnName("sub_major").HasMaxLength(100);
+        });
+
+        modelBuilder.Entity<Student>(entity =>
+        {
+            entity.Property(student => student.StudentId).HasColumnName("student_id").HasMaxLength(20).IsRequired();
+        });
+
+        modelBuilder.Entity<Staff>(entity =>
+        {
+            entity.Property(staff => staff.StaffId).HasColumnName("staff_id").HasMaxLength(20).IsRequired();
         });
 
         modelBuilder.Entity<AcademicTerm>(entity =>
@@ -77,7 +88,8 @@ public sealed class AcademicRecordsDbContext(DbContextOptions<AcademicRecordsDbC
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
-        modelBuilder.Entity<User>().HasData(AcademicRecordsSeedData.Users);
+        modelBuilder.Entity<Student>().HasData(AcademicRecordsSeedData.Students);
+        modelBuilder.Entity<Staff>().HasData(AcademicRecordsSeedData.StaffMembers);
         modelBuilder.Entity<AcademicTerm>().HasData(AcademicRecordsSeedData.AcademicTerms);
         modelBuilder.Entity<Enrollment>().HasData(AcademicRecordsSeedData.Enrollments);
     }

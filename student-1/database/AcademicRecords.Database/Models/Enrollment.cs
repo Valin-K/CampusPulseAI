@@ -13,6 +13,6 @@ public sealed class Enrollment
     public DateOnly? GradeDate { get; set; }
     public bool IsFinalized { get; set; }
 
-    public User? Student { get; set; }
+    public Student? Student { get; set; }
     public AcademicTerm? AcademicTerm { get; set; }
 }
