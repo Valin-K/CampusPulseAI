@@ -1,6 +1,43 @@
-@CourseManagement.Backend_HostAddress = http://localhost:5118
+@CourseManagement.Backend_HostAddress = https://localhost:7147
 
-GET {{CourseManagement.Backend_HostAddress}}/weatherforecast/
+GET {{CourseManagement.Backend_HostAddress}}/api/courses
 Accept: application/json
+
+###
+
+GET {{CourseManagement.Backend_HostAddress}}/api/courses/10
+Accept: application/json
+
+###
+
+POST {{CourseManagement.Backend_HostAddress}}/api/courses
+Content-Type: application/json
+
+{
+  "code": "CPAI4999",
+  "name": "Course API Test",
+  "description": "Temporary course created from the HTTP request file.",
+  "creditPoints": 6,
+  "level": 4,
+  "isActive": true
+}
+
+###
+
+POST {{CourseManagement.Backend_HostAddress}}/api/courses/10/prerequisite-eligibility
+Content-Type: application/json
+
+{
+  "completedCourses": [
+    {
+      "courseCode": "CPAI3001",
+      "grade": "Distinction"
+    },
+    {
+      "courseCode": "CPAI3003",
+      "grade": "Credit"
+    }
+  ]
+}
 
 ###

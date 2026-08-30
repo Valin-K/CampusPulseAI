@@ -1,0 +1,20 @@
+.campus-shell {
+    min-height: 100vh;
+    background:
+        radial-gradient(circle at 8% 0%, rgba(54, 140, 183, .13), transparent 28rem),
+        linear-gradient(180deg, #f8fbfd 0, #f3f7fa 24rem, #eef3f7 100%);
+}
+
+.campus-workspace { width: min(94rem, 100%); min-height: calc(100vh - 10.5rem); margin: 0 auto; padding: clamp(1.25rem, 3vw, 2.5rem); }
+
+.campus-footer {
+    padding: .65rem clamp(1rem, 4vw, 4rem);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    color: #627d98;
+    background: rgba(255, 255, 255, .72);
+    border-top: 1px solid #d9e2ec;
+    font-size: .72rem;
+    font-weight: 700;
+}

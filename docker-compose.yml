@@ -10,6 +10,10 @@ services:
     build:
       context: .
       dockerfile: student-2/backend/CourseManagement.Backend/Dockerfile
+    environment:
+      - ConnectionStrings__CourseManagementDatabase=Data Source=/app/data/course-management.db;Foreign Keys=True
+    volumes:
+      - coursemanagement-data:/app/data
 
 
   campushousing.backend:
@@ -24,6 +28,24 @@ services:
     build:
       context: .
       dockerfile: student-4/backend/FinancialAidBilling.Backend/Dockerfile
+    environment:
+      ASPNETCORE_HTTP_PORTS: 8080
+      Services__InvoiceDatabase: http://financialaidbilling.database:8080
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+    ports:
+      - "8089:8080"
+    depends_on:
+      financialaidbilling.database:
+        condition: service_started
+
+  financialaidbilling.database:
+    image: ${DOCKER_REGISTRY-}financialaidbillingdatabase
+    build:
+      context: .
+      dockerfile: student-4/database/FinancialAidBilling.Database/Dockerfile
+    environment:
+      ASPNETCORE_HTTP_PORTS: 8080
+      ConnectionStrings__FinancialAidBilling: Data Source=/app/data/financial-aid-billing.db
 
 
   eventscheduling.backend:
@@ -53,7 +75,6 @@ services:
       context: .
       dockerfile: ai-services/rag-server/RagServer/Dockerfile
 
-
   academicrecords.frontend:
     image: ${DOCKER_REGISTRY-}academicrecordsfrontend
     build:
@@ -67,7 +88,9 @@ services:
     image: ${DOCKER_REGISTRY-}coursemanagementfrontend
     build:
       context: .
-      dockerfile: docker/frontend/CourseManagement.Dockerfile
+      dockerfile: student-2/frontend/CourseManagement.Frontend/Dockerfile
+    depends_on:
+      - coursemanagement.backend
     ports:
       - "8082:80"
 
@@ -88,6 +111,9 @@ services:
       dockerfile: docker/frontend/FinancialAidBilling.Dockerfile
     ports:
       - "8084:80"
+    depends_on:
+      financialaidbilling.backend:
+        condition: service_started
 
 
   eventscheduling.frontend:
@@ -104,3 +130,6 @@ services:
       - "8080:80"
     volumes:
       - ./shared/frontend:/usr/share/nginx/html:ro
+
+volumes:
+  coursemanagement-data:

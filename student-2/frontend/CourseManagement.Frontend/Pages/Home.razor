@@ -1,7 +1,121 @@
 ﻿@page "/"
+@page "/courses"
+@inject CourseApiClient CourseApi
 
 <PageTitle>Course Management</PageTitle>
 
-<h1>Course Management</h1>
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h1>Course Management</h1>
+        <p class="text-muted mb-0">Browse and manage the Course catalogue.</p>
+    </div>
+    <NavLink class="btn btn-primary" href="courses/new">Create Course</NavLink>
+</div>
 
-<p>This is Joyce's page. Under construction!</p>
+@if (Message == "deleted")
+{
+    <div class="alert alert-success" role="status">Course deleted successfully.</div>
+}
+
+@if (isLoading)
+{
+    <p role="status">Loading Courses...</p>
+}
+else if (errorMessage is not null)
+{
+    <div class="alert alert-danger" role="alert">@errorMessage</div>
+    <button class="btn btn-outline-primary" @onclick="LoadCoursesAsync">Try again</button>
+}
+else if (courses.Count == 0)
+{
+    <div class="alert alert-info" role="status">No Courses are available.</div>
+}
+else
+{
+    <p>Showing @courses.Count Courses loaded from the Course Management API.</p>
+
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th scope="col">Code</th>
+                <th scope="col">Name</th>
+                <th scope="col">Level</th>
+                <th scope="col">Credit points</th>
+                <th scope="col">Status</th>
+                <th scope="col">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var course in courses)
+            {
+                <tr class="@(!course.IsActive ? "course-inactive" : null)">
+                    <td>@course.Code</td>
+                    <td>@course.Name</td>
+                    <td>@course.Level</td>
+                    <td>@course.CreditPoints</td>
+                    <td>
+                        @if (course.IsActive)
+                        {
+                            <span class="badge bg-success">Active</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-secondary">Inactive</span>
+                        }
+                    </td>
+                    <td class="text-nowrap">
+                        <NavLink class="btn btn-sm btn-outline-primary me-2"
+                                 href="@($"courses/{course.Id}")">
+                            View
+                        </NavLink>
+                        <NavLink class="btn btn-sm btn-outline-secondary"
+                                 href="@($"courses/{course.Id}/edit")">
+                            Edit
+                        </NavLink>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    [SupplyParameterFromQuery]
+    public string? Message { get; set; }
+
+    private IReadOnlyList<CourseSummary> courses = [];
+    private string? errorMessage;
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCoursesAsync();
+    }
+
+    private async Task LoadCoursesAsync()
+    {
+        isLoading = true;
+        errorMessage = null;
+
+        try
+        {
+            courses = await CourseApi.GetAllAsync();
+        }
+        catch (CourseApiException exception)
+        {
+            errorMessage = exception.Message;
+        }
+        catch (HttpRequestException)
+        {
+            errorMessage = "Course data could not be loaded. Check that the Course Management API is running.";
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            errorMessage = "Course data was returned in an unexpected format.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+}
