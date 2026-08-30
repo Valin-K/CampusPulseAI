@@ -2,8 +2,8 @@ using CourseManagement.Backend.BusinessRules;
 using CourseManagement.Backend.Contracts.Courses;
 using CourseManagement.Backend.Contracts.FacultyAssignments;
 using CourseManagement.Backend.Contracts.Prerequisites;
-using CourseManagement.Backend.Data;
-using CourseManagement.Backend.Models;
+using CourseManagement.Database.Data;
+using CourseManagement.Database.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -197,7 +197,10 @@ public sealed class CoursesController(CourseManagementDbContext database) : Cont
 
         foreach (var completedCourse in request.CompletedCourses)
         {
-            if (!GradeScale.TryGetRank(completedCourse.Grade, out var rank))
+            if (!GradeScale.TryNormalize(
+                    completedCourse.Grade,
+                    out var canonicalGrade,
+                    out var rank))
             {
                 return BadRequestProblem(
                     $"Grade '{completedCourse.Grade}' is not supported. " +
@@ -206,7 +209,7 @@ public sealed class CoursesController(CourseManagementDbContext database) : Cont
 
             completedCourses.Add(
                 NormalizeCode(completedCourse.CourseCode),
-                (completedCourse.Grade.Trim(), rank));
+                (canonicalGrade, rank));
         }
 
         var requirements = new List<PrerequisiteRequirementResponse>();
@@ -216,7 +219,10 @@ public sealed class CoursesController(CourseManagementDbContext database) : Cont
                 ? "Pass"
                 : prerequisite.MinimumGrade;
 
-            if (!GradeScale.TryGetRank(minimumGrade, out var minimumRank))
+            if (!GradeScale.TryNormalize(
+                    minimumGrade,
+                    out var canonicalMinimumGrade,
+                    out var minimumRank))
             {
                 return Problem(
                     statusCode: StatusCodes.Status500InternalServerError,
@@ -228,13 +234,19 @@ public sealed class CoursesController(CourseManagementDbContext database) : Cont
                 prerequisite.RequiredCourse.Code,
                 out var completedCourse);
             var isMet = hasCompletedCourse && completedCourse.Rank >= minimumRank;
+            var reason = !hasCompletedCourse
+                ? $"{prerequisite.RequiredCourse.Code} has not been completed."
+                : isMet
+                    ? $"Achieved {completedCourse.Grade}; minimum grade {canonicalMinimumGrade} is met."
+                    : $"Achieved {completedCourse.Grade}; minimum grade {canonicalMinimumGrade} is required.";
 
             requirements.Add(new PrerequisiteRequirementResponse(
                 prerequisite.RequiredCourseId,
                 prerequisite.RequiredCourse.Code,
-                minimumGrade,
+                canonicalMinimumGrade,
                 hasCompletedCourse ? completedCourse.Grade : null,
-                isMet));
+                isMet,
+                reason));
         }
 
         return Ok(new PrerequisiteEligibilityResponse(

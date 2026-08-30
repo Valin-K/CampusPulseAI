@@ -1,7 +1,7 @@
-using CourseManagement.Backend.Models;
+using CourseManagement.Database.Models;
 using Microsoft.EntityFrameworkCore;
 
-namespace CourseManagement.Backend.Data;
+namespace CourseManagement.Database.Data;
 
 public sealed class CourseManagementDbContext(
     DbContextOptions<CourseManagementDbContext> options) : DbContext(options)

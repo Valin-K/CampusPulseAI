@@ -1,4 +1,4 @@
-namespace CourseManagement.Backend.Models;
+namespace CourseManagement.Database.Models;
 
 public sealed class Course
 {

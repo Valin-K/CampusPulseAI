@@ -1,6 +1,6 @@
 using CourseManagement.Backend.Contracts.FacultyAssignments;
-using CourseManagement.Backend.Data;
-using CourseManagement.Backend.Models;
+using CourseManagement.Database.Data;
+using CourseManagement.Database.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 

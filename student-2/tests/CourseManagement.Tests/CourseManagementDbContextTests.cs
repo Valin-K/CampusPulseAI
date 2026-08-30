@@ -1,5 +1,5 @@
-using CourseManagement.Backend.Data;
-using CourseManagement.Backend.Models;
+using CourseManagement.Database.Data;
+using CourseManagement.Database.Models;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
