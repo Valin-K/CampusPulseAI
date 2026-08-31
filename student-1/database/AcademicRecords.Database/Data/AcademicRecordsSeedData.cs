@@ -20,11 +20,28 @@ public static class AcademicRecordsSeedData
         if (!await database.AcademicTerms.AnyAsync())
         {
             database.AcademicTerms.AddRange(AcademicTerms);
+            await database.SaveChangesAsync();
         }
 
-        if (!await database.Enrollments.AnyAsync())
+        var seededEnrollments = Enrollments;
+        var existingSeedEnrollments = await database.Enrollments
+            .Where(enrollment => enrollment.EnrollmentId >= 1 && enrollment.EnrollmentId <= seededEnrollments.Length)
+            .ToListAsync();
+
+        if (existingSeedEnrollments.Count == 0)
         {
-            database.Enrollments.AddRange(Enrollments);
+            database.Enrollments.AddRange(seededEnrollments);
+        }
+        else
+        {
+            foreach (var existing in existingSeedEnrollments)
+            {
+                var expected = seededEnrollments[existing.EnrollmentId - 1];
+                existing.Status = expected.Status;
+                existing.GradeValue = expected.GradeValue;
+                existing.GradeDate = expected.GradeDate;
+                existing.IsFinalized = expected.IsFinalized;
+            }
         }
 
         await database.SaveChangesAsync();
@@ -79,18 +96,30 @@ public static class AcademicRecordsSeedData
 
     public static Enrollment[] Enrollments =>
     [
-        .. Enumerable.Range(0, 10).SelectMany(studentIndex => Enumerable.Range(0, 5).Select(courseIndex => new Enrollment
+        .. Enumerable.Range(0, 10).SelectMany(studentIndex => Enumerable.Range(0, 5).Select(courseIndex =>
         {
-            EnrollmentId = studentIndex * 5 + courseIndex + 1,
-            StudentId = studentIndex + 1,
-            CourseCode = $"CS{101 + courseIndex:D3}",
-            AcademicTermId = (studentIndex + courseIndex) % 3 + 13,
-            AcademicYear = 2026,
-            Status = courseIndex < 3 ? "Completed" : "Enrolled",
-            GradeValue = courseIndex < 3 ? 65m + studentIndex + courseIndex * 5 : null,
-            Credits = 3.0m,
-            GradeDate = courseIndex < 3 ? new DateOnly(2026, 12, 20) : null,
-            IsFinalized = courseIndex < 3
+            var academicTermId = (studentIndex + courseIndex) % 3 + 13;
+            var academicYear = 2026;
+            var term = AcademicTerms.Single(value => value.TermId == academicTermId);
+            var (startDate, endDate) = EnrollmentStatusRules.GetSessionDates(academicYear, term.StartWeekOfYear, term.EndWeekOfYear);
+            var today = DateOnly.FromDateTime(DateTime.UtcNow);
+            var status = EnrollmentStatusRules.GetStatus(startDate, endDate, today);
+            var isCompleted = status == EnrollmentStatusRules.Completed;
+
+            return new Enrollment
+            {
+                EnrollmentId = studentIndex * 5 + courseIndex + 1,
+                StudentId = studentIndex + 1,
+                CourseCode = $"CS{101 + courseIndex:D3}",
+                AcademicTermId = academicTermId,
+                AcademicYear = academicYear,
+                Status = status,
+                GradeValue = isCompleted ? 65m + studentIndex + courseIndex * 5 : null,
+                Credits = 3.0m,
+                GradeDate = isCompleted ? endDate : null,
+                IsFinalized = isCompleted
+            };
         }))
     ];
+
 }

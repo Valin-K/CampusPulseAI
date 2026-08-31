@@ -2,6 +2,7 @@
 using AcademicRecords.Database.Models;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using System.Globalization;
 
 namespace AcademicRecords.Tests
 {
@@ -274,6 +275,65 @@ namespace AcademicRecords.Tests
 
             Assert.That(staff, Has.Count.EqualTo(2));
             Assert.That(staff.Select(value => value.StaffId), Is.EquivalentTo(new[] { "STA-ALL-1", "STA-ALL-2" }));
+        }
+
+        [Test]
+        public void SeedEnrollmentsHaveStatusesConsistentWithTheirSessionDates()
+        {
+            var today = DateOnly.FromDateTime(DateTime.UtcNow);
+            var terms = AcademicRecordsSeedData.AcademicTerms.ToDictionary(term => term.TermId);
+
+            foreach (var enrollment in AcademicRecordsSeedData.Enrollments)
+            {
+                var term = terms[enrollment.AcademicTermId!.Value];
+                var startDate = DateOnly.FromDateTime(ISOWeek.ToDateTime(enrollment.AcademicYear, term.StartWeekOfYear, DayOfWeek.Monday));
+                var endYear = term.EndWeekOfYear < term.StartWeekOfYear ? enrollment.AcademicYear + 1 : enrollment.AcademicYear;
+                var endDate = DateOnly.FromDateTime(ISOWeek.ToDateTime(endYear, term.EndWeekOfYear, DayOfWeek.Sunday));
+
+                var expectedStatus = endDate < today ? "Completed" : startDate > today ? "Enrolled" : "In Progress";
+                Assert.That(enrollment.Status, Is.EqualTo(expectedStatus));
+                Assert.That(enrollment.IsFinalized, Is.EqualTo(expectedStatus == "Completed"));
+                Assert.That(enrollment.GradeDate is null || enrollment.GradeDate <= today, Is.True);
+            }
+
+            var summer = terms[15];
+            var summerEnd = ISOWeek.ToDateTime(2027, summer.EndWeekOfYear, DayOfWeek.Sunday);
+            Assert.That(summerEnd.Year, Is.EqualTo(2027));
+        }
+
+        [Test]
+        public async Task InvalidEnrollmentStatusAndGradeStateIsRejected()
+        {
+            await using var connection = new SqliteConnection("Data Source=:memory:");
+            await connection.OpenAsync();
+            await using var database = CreateDatabase(connection);
+            await database.Database.EnsureCreatedAsync();
+
+            var student = new Student
+            {
+                StudentId = "STU-CONSTRAINT-1",
+                FirstName = "Constraint",
+                LastName = "Test",
+                Email = "constraint.test@example.edu",
+                DateOfBirth = new(2000, 1, 1),
+                Status = "ACT",
+                MailingAddress = "1 Campus Way",
+                EmergencyContactName = "Contact Person",
+                EmergencyContactPhone = "0400000000"
+            };
+            database.Students.Add(student);
+            await database.SaveChangesAsync();
+
+            database.Enrollments.Add(new Enrollment
+            {
+                StudentId = student.UserId,
+                CourseCode = "CS999",
+                AcademicYear = 2026,
+                Status = "Completed",
+                IsFinalized = false
+            });
+
+            Assert.ThrowsAsync<DbUpdateException>(async () => await database.SaveChangesAsync());
         }
 
         private static AcademicRecordsDbContext CreateDatabase(SqliteConnection connection) =>

@@ -67,7 +67,18 @@ public sealed class AcademicRecordsDbContext(DbContextOptions<AcademicRecordsDbC
 
         modelBuilder.Entity<Enrollment>(entity =>
         {
-            entity.ToTable("Enrollments");
+            entity.ToTable("Enrollments", table =>
+            {
+                table.HasCheckConstraint(
+                    "CK_Enrollments_Status",
+                    "status IN ('Enrolled', 'In Progress', 'Completed')");
+                table.HasCheckConstraint(
+                    "CK_Enrollments_StatusGradeState",
+                    "(status = 'Completed' AND is_finalized = 1 AND grade_value IS NOT NULL AND grade_date IS NOT NULL) OR " +
+                    "(status IN ('Enrolled', 'In Progress') AND is_finalized = 0 AND grade_value IS NULL AND grade_date IS NULL)");
+                table.HasCheckConstraint("CK_Enrollments_GradeRange", "grade_value IS NULL OR grade_value BETWEEN 0 AND 100");
+                table.HasCheckConstraint("CK_Enrollments_Credits", "credits IS NULL OR credits > 0");
+            });
             entity.HasKey(enrollment => enrollment.EnrollmentId);
             entity.Property(enrollment => enrollment.EnrollmentId).HasColumnName("enrollment_id").ValueGeneratedOnAdd();
             entity.Property(enrollment => enrollment.StudentId).HasColumnName("student_id");

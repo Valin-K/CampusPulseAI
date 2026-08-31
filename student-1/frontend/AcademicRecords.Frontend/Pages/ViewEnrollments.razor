@@ -16,7 +16,7 @@ else if (loadError is not null)
 }
 else
 {
-    <h2>Current Enrollments</h2>
+    <h2>Current and Future Enrollments</h2>
     @if (currentEnrollments.Count == 0)
     {
         <p>No current enrollments.</p>
@@ -117,8 +117,9 @@ else
 
             foreach (var enrollment in student.Enrollments)
             {
-                var endDate = GetTermEndDate(enrollment.AcademicYear, enrollment.EndWeekOfYear);
-                if (endDate is null || today <= endDate)
+                var startDate = GetTermStartDate(enrollment.AcademicYear, enrollment.StartWeekOfYear);
+                var endDate = GetTermEndDate(enrollment.AcademicYear, enrollment.StartWeekOfYear, enrollment.EndWeekOfYear);
+                if (startDate is not null && (endDate is null || today <= endDate))
                 {
                     currentEnrollments.Add(enrollment);
                 }
@@ -127,6 +128,15 @@ else
                     pastEnrollments.Add(enrollment);
                 }
             }
+
+            currentEnrollments = currentEnrollments
+                .OrderBy(enrollment => GetTermStartDate(enrollment.AcademicYear, enrollment.StartWeekOfYear))
+                .ThenBy(enrollment => enrollment.CourseCode)
+                .ToList();
+            pastEnrollments = pastEnrollments
+                .OrderBy(enrollment => GetTermStartDate(enrollment.AcademicYear, enrollment.StartWeekOfYear))
+                .ThenBy(enrollment => enrollment.CourseCode)
+                .ToList();
         }
         catch (HttpRequestException exception)
         {
@@ -138,16 +148,27 @@ else
         }
     }
 
-    private static DateOnly? GetTermEndDate(int academicYear, int endWeekOfYear)
+    private static DateOnly? GetTermStartDate(int academicYear, int startWeekOfYear)
     {
-        if (endWeekOfYear <= 0)
+        if (startWeekOfYear <= 0 || startWeekOfYear > ISOWeek.GetWeeksInYear(academicYear))
         {
             return null;
         }
 
-        var weeksInYear = ISOWeek.GetWeeksInYear(academicYear);
+        return DateOnly.FromDateTime(ISOWeek.ToDateTime(academicYear, startWeekOfYear, DayOfWeek.Monday));
+    }
+
+    private static DateOnly? GetTermEndDate(int academicYear, int startWeekOfYear, int endWeekOfYear)
+    {
+        if (endWeekOfYear <= 0 || endWeekOfYear > 53)
+        {
+            return null;
+        }
+
+        var endYear = endWeekOfYear < startWeekOfYear ? academicYear + 1 : academicYear;
+        var weeksInYear = ISOWeek.GetWeeksInYear(endYear);
         var week = Math.Min(endWeekOfYear, weeksInYear);
-        var endOfWeek = ISOWeek.ToDateTime(academicYear, week, DayOfWeek.Sunday);
+        var endOfWeek = ISOWeek.ToDateTime(endYear, week, DayOfWeek.Sunday);
         return DateOnly.FromDateTime(endOfWeek);
     }
 
@@ -157,5 +178,5 @@ else
         List<TermEnrollmentResponse> Enrollments);
 
     private sealed record TermEnrollmentResponse(int EnrollmentId, string CourseCode, int? AcademicTermId, string? TermCode,
-        string? TermName, int EndWeekOfYear, int AcademicYear, string Status, decimal? Credits, decimal? GradeValue, bool IsFinalized);
+        string? TermName, int StartWeekOfYear, int EndWeekOfYear, int AcademicYear, string Status, decimal? Credits, decimal? GradeValue, bool IsFinalized);
 }
