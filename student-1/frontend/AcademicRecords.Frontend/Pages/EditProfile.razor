@@ -1,4 +1,5 @@
 @page "/profile/{Role}/{UserId:int}"
+@using System.Net.Http.Json
 
 <PageTitle>Profile</PageTitle>
 
@@ -14,6 +15,14 @@ else if (loadError is not null)
 }
 else if (profile is not null)
 {
+    @if (saveError is not null)
+    {
+        <div class="alert alert-danger">@saveError</div>
+    }
+    @if (saveSuccess)
+    {
+        <div class="alert alert-success">Profile updated successfully.</div>
+    }
     <div class="row g-3">
         <div class="col-md-6"><label class="form-label">First name</label><input class="form-control" value="@profile.FirstName" readonly /></div>
         <div class="col-md-6"><label class="form-label">Last name</label><input class="form-control" value="@profile.LastName" readonly /></div>
@@ -28,9 +37,17 @@ else if (profile is not null)
             <div class="col-md-6"><label class="form-label">Emergency contact name</label><input class="form-control" value="@profile.EmergencyContactName" readonly /></div>
             <div class="col-md-6"><label class="form-label">Emergency contact phone</label><input class="form-control" value="@profile.EmergencyContactPhone" readonly /></div>
             <div class="col-md-6"><label class="form-label">Enrollment date</label><input class="form-control" value="@profile.EnrollmentDate" readonly /></div>
-            <div class="col-md-6"><label class="form-label">Degree</label><input class="form-control" value="@profile.Degree" readonly /></div>
-            <div class="col-md-6"><label class="form-label">Major</label><input class="form-control" value="@profile.Major" readonly /></div>
-            <div class="col-md-6"><label class="form-label">Minor (SubMajor)</label><input class="form-control" value="@profile.SubMajor" readonly /></div>
+            <div class="col-md-6"><label class="form-label">Degree</label><input class="form-control" @bind="editDegree" /></div>
+            <div class="col-md-6"><label class="form-label">Major</label><input class="form-control" @bind="editMajor" /></div>
+            <div class="col-md-6"><label class="form-label">Minor (SubMajor)</label><input class="form-control" @bind="editSubMajor" /></div>
+        }
+    </div>
+
+    <div class="mt-4">
+        @if (profile.StudentId is not null)
+        {
+            <button class="btn btn-primary" @onclick="SaveAsync" disabled="@isSaving">Save changes</button>
+            <a href="/profile/@Role/@UserId/enrollments" class="btn btn-outline-secondary ms-2">View enrollments</a>
         }
     </div>
 }
@@ -50,9 +67,22 @@ else if (profile is not null)
     private UserProfileResponse? profile;
     private bool isLoading = true;
     private string? loadError;
+    private bool isSaving;
+    private string? saveError;
+    private bool saveSuccess;
+
+    private string? editDegree;
+    private string? editMajor;
+    private string? editSubMajor;
 
     protected override async Task OnInitializedAsync()
     {
+        await LoadProfileAsync();
+    }
+
+    private async Task LoadProfileAsync()
+    {
+        isLoading = true;
         try
         {
             if (string.Equals(Role, "student", StringComparison.OrdinalIgnoreCase))
@@ -62,6 +92,13 @@ else if (profile is not null)
                     student.FirstName, student.LastName, student.Email, "Student", student.DateOfBirth, student.PhoneNumber,
                     student.MailingAddress, student.EmergencyContactName, student.EmergencyContactPhone, student.EnrollmentDate,
                     student.Degree, student.Major, student.SubMajor, student.Enrollments);
+
+                if (profile is not null)
+                {
+                    editDegree = profile.Degree;
+                    editMajor = profile.Major;
+                    editSubMajor = profile.SubMajor;
+                }
             }
             else if (string.Equals(Role, "staff", StringComparison.OrdinalIgnoreCase))
             {
@@ -90,6 +127,44 @@ else if (profile is not null)
         }
     }
 
+    private async Task SaveAsync()
+    {
+        if (profile is null || profile.StudentId is null)
+        {
+            return;
+        }
+
+        isSaving = true;
+        saveError = null;
+        saveSuccess = false;
+        try
+        {
+            var request = new UpdateStudentRequest(profile.FirstName, profile.LastName, profile.Email, profile.DateOfBirth,
+                profile.MailingAddress ?? string.Empty, profile.EmergencyContactName ?? string.Empty,
+                profile.EmergencyContactPhone ?? string.Empty, profile.PhoneNumber,
+                editDegree, editMajor, editSubMajor);
+
+            var response = await Http.PutAsJsonAsync($"api/students/{profile.StudentId}", request);
+            if (response.IsSuccessStatusCode)
+            {
+                saveSuccess = true;
+                await LoadProfileAsync();
+            }
+            else
+            {
+                saveError = await response.Content.ReadAsStringAsync();
+            }
+        }
+        catch (HttpRequestException exception)
+        {
+            saveError = exception.Message;
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
     private sealed record UserProfileResponse(int UserId, string? StudentId, string? StaffId, string FirstName, string LastName,
         string Email, string Role, DateOnly? DateOfBirth, string? PhoneNumber, string? MailingAddress,
         string? EmergencyContactName, string? EmergencyContactPhone, DateOnly? EnrollmentDate, string? Degree,
@@ -103,5 +178,10 @@ else if (profile is not null)
     private sealed record StaffProfileResponse(int UserId, string StaffId, string FirstName, string LastName,
         string Email, DateOnly? DateOfBirth, string? PhoneNumber);
 
-    private sealed record TermEnrollmentResponse(int EnrollmentId, string CourseCode, int? AcademicTermId, int AcademicYear, string Status);
+    private sealed record TermEnrollmentResponse(int EnrollmentId, string CourseCode, int? AcademicTermId, string? TermCode,
+        string? TermName, int EndWeekOfYear, int AcademicYear, string Status, decimal? Credits, decimal? GradeValue, bool IsFinalized);
+
+    private sealed record UpdateStudentRequest(string FirstName, string LastName, string Email, DateOnly? DateOfBirth,
+        string MailingAddress, string EmergencyContactName, string EmergencyContactPhone, string? PhoneNumber,
+        string? Degree, string? Major, string? SubMajor);
 }
