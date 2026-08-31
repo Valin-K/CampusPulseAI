@@ -23,7 +23,7 @@ else if (loadFailed)
     <FeedbackPanel Kind="FeedbackKind.Error"
                    Title="Course form could not be loaded"
                    Message="@(errorMessage ?? "The Course form could not be loaded.")">
-        <NavLink class="btn btn-outline-danger" href="courses">Back to Courses</NavLink>
+    <NavLink class="btn btn-outline-danger" href="@CancelUrl">Back</NavLink>
     </FeedbackPanel>
 }
 else
@@ -113,6 +113,9 @@ else
     [Parameter]
     public int Id { get; set; }
 
+    [SupplyParameterFromQuery]
+    public string? ReturnUrl { get; set; }
+
     private CourseFormModel courseForm = new();
     private string? errorMessage;
     private bool isLoading;
@@ -120,7 +123,10 @@ else
     private bool loadFailed;
 
     private bool IsEdit => Id > 0;
-    private string CancelUrl => IsEdit ? $"/courses/{Id}" : "/courses";
+    private string DefaultCancelUrl => IsEdit ? $"/courses/{Id}" : "/courses";
+    private string CancelUrl => CourseNavigation.LocalReturnUrl(
+        ReturnUrl,
+        DefaultCancelUrl);
 
     protected override async Task OnParametersSetAsync()
     {
@@ -180,7 +186,22 @@ else
                 : await CourseApi.CreateAsync(courseForm);
 
             var message = IsEdit ? "updated" : "created";
-            Navigation.NavigateTo($"/courses/{course.Id}?message={message}");
+            if (CourseNavigation.IsLocalReturnUrl(ReturnUrl))
+            {
+                Navigation.NavigateTo(
+                    CourseNavigation.AddQueryParameter(
+                        CancelUrl,
+                        "message",
+                        message));
+            }
+            else
+            {
+                Navigation.NavigateTo(
+                    CourseNavigation.AddQueryParameter(
+                        $"/courses/{course.Id}",
+                        "message",
+                        message));
+            }
         }
         catch (CourseApiException exception)
         {
