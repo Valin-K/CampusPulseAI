@@ -29,9 +29,11 @@ services:
     environment:
       - ConnectionStrings__CourseManagementDatabase=Data Source=/app/data/course-management.db;Foreign Keys=True
       - SyllabusStorage__RootPath=/app/data/syllabi
+      - Services__AcademicRecordsApi=http://academicrecords.backend:8080
     volumes:
       - coursemanagement-data:/app/data
-
+    depends_on:
+      - academicrecords.backend
 
   campushousing.backend:
     image: ${DOCKER_REGISTRY-}campushousingbackend
