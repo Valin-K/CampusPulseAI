@@ -1,20 +1,27 @@
 ﻿@page "/"
 @page "/courses"
+@using CampusPulse.Shared.Components.Models
 @inject CourseApiClient CourseApi
 @inject CourseUserContext UserContext
 
 <PageTitle>Course Management</PageTitle>
 
-<div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3">
+<header class="dashboard-hero">
     <div>
-        <h1>Course Management</h1>
-        <p class="text-muted mb-0">Browse and manage the Course catalogue.</p>
+        <span class="eyebrow">@HeroEyebrow</span>
+        <h1>@HeroTitle</h1>
+        <p>@HeroDescription</p>
     </div>
-    @if (UserContext.IsCourseAdministrator)
+
+    @if (UserContext.CurrentUser is not null)
     {
-        <NavLink class="btn btn-primary" href="courses/new">Create Course</NavLink>
+        <div class="term-summary">
+            <span>Current demo user</span>
+            <strong>@UserContext.CurrentUser.DisplayName</strong>
+            <small>@UserContext.CurrentUser.ExternalId | @RoleLabel</small>
+        </div>
     }
-</div>
+</header>
 
 @if (UserContext.IsCourseAdministrator && Message == "deleted")
 {
@@ -49,68 +56,261 @@ else if (courses.Count == 0)
 }
 else
 {
-    <p>Showing @courses.Count Courses loaded from the Course Management API.</p>
+    <section class="metric-grid" aria-label="@MetricAriaLabel">
+        @if (UserContext.IsCourseAdministrator)
+        {
+            <CampusMetricCard Label="Total Courses"
+                              Value="@courses.Count.ToString()"
+                              Detail="Across the curriculum catalogue" />
+            <CampusMetricCard Label="Active Courses"
+                              Value="@ActiveCourseCount.ToString()"
+                              Detail="Available to Students"
+                              Tone="green" />
+            <CampusMetricCard Label="Inactive Courses"
+                              Value="@InactiveCourseCount.ToString()"
+                              Detail="Hidden from Students"
+                              Tone="gold" />
+        }
+        else
+        {
+            <CampusMetricCard Label="Available Courses"
+                              Value="@ActiveCourseCount.ToString()"
+                              Detail="Active Courses in the catalogue" />
+            <CampusMetricCard Label="Credit points"
+                              Value="@ActiveCreditPoints.ToString()"
+                              Detail="Across available Courses"
+                              Tone="green" />
+            <CampusMetricCard Label="Course syllabi"
+                              Value="@CoursesWithSyllabi.ToString()"
+                              Detail="PDF syllabi ready to view"
+                              Tone="gold" />
+        }
+    </section>
 
-    <div class="table-responsive">
-        <table class="table table-striped">
-            <thead>
-                <tr>
-                    <th scope="col">Code</th>
-                    <th scope="col">Name</th>
-                    <th scope="col">Level</th>
-                    <th scope="col">Credit points</th>
-                    <th scope="col">Status</th>
-                    <th scope="col">Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var course in courses)
+    <CampusSectionTabs Items="Sections"
+                       @bind-ActiveKey="activeTab"
+                       AriaLabel="@SectionAriaLabel" />
+
+    <section class="surface-card">
+        <div class="section-heading">
+            <div>
+                <span class="eyebrow">@SectionEyebrow</span>
+                <h2>@SectionTitle</h2>
+            </div>
+
+            @if (UserContext.IsCourseAdministrator)
+            {
+                <NavLink class="button button-primary" href="courses/new">
+                    Create Course
+                </NavLink>
+            }
+        </div>
+
+        <p>@SectionDescription</p>
+
+        @if (DisplayedCourses.Count == 0)
+        {
+            <FeedbackPanel Kind="FeedbackKind.Empty"
+                           Title="@EmptyStateTitle"
+                           Message="@EmptyStateMessage">
+                @if (UserContext.IsCourseAdministrator)
                 {
-                    <tr class="@(!course.IsActive ? "course-inactive" : null)">
-                        <td>@course.Code</td>
-                        <td>@course.Name</td>
-                        <td>@course.Level</td>
-                        <td>@course.CreditPoints</td>
-                        <td>
-                            @if (course.IsActive)
-                            {
-                                <span class="badge bg-success">Active</span>
-                            }
-                            else
-                            {
-                                <span class="badge bg-secondary">Inactive</span>
-                            }
-                        </td>
-                        <td class="text-nowrap">
-                            <NavLink class="btn btn-sm btn-outline-primary me-2"
-                                     href="@($"courses/{course.Id}")">
-                                View
-                            </NavLink>
-                            @if (UserContext.IsCourseAdministrator)
-                            {
-                                <NavLink class="btn btn-sm btn-outline-secondary"
-                                         href="@($"courses/{course.Id}/edit")">
-                                    Edit
-                                </NavLink>
-                            }
-                        </td>
-                    </tr>
+                    <NavLink class="button button-primary" href="courses/new">
+                        Create Course
+                    </NavLink>
                 }
-            </tbody>
-        </table>
-    </div>
+            </FeedbackPanel>
+        }
+        else
+        {
+            <div class="responsive-table">
+                <table>
+                    <thead>
+                        <tr>
+                            <th scope="col">Code</th>
+                            <th scope="col">Course</th>
+                            <th scope="col">Level</th>
+                            <th scope="col">Credit points</th>
+                            @if (activeTab == "syllabi")
+                            {
+                                <th scope="col">Syllabus</th>
+                            }
+                            <th scope="col">Status</th>
+                            <th scope="col">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var course in DisplayedCourses)
+                        {
+                            <tr class="@(!course.IsActive ? "course-inactive" : null)">
+                                <td><strong>@course.Code</strong></td>
+                                <td>
+                                    <strong>@course.Name</strong>
+                                    <small>@course.Description</small>
+                                </td>
+                                <td>@course.Level</td>
+                                <td>@course.CreditPoints</td>
+                                @if (activeTab == "syllabi")
+                                {
+                                    <td>@course.SyllabusFileName</td>
+                                }
+                                <td>
+                                    <span class="status-badge @(course.IsActive ? "paid" : "overdue")">
+                                        @(course.IsActive ? "Active" : "Inactive")
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="button-row">
+                                        <NavLink class="button button-small button-secondary"
+                                                 href="@($"courses/{course.Id}")">
+                                            @(activeTab == "syllabi" ? "Open syllabus" : "View")
+                                        </NavLink>
+
+                                        @if (!UserContext.IsCourseAdministrator && activeTab == "eligibility")
+                                        {
+                                            <NavLink class="button button-small button-primary"
+                                                     href="@($"courses/{course.Id}/eligibility")">
+                                                Check eligibility
+                                            </NavLink>
+                                        }
+
+                                        @if (UserContext.IsCourseAdministrator)
+                                        {
+                                            <NavLink class="button button-small button-primary"
+                                                     href="@($"courses/{course.Id}/edit")">
+                                                Edit
+                                            </NavLink>
+                                        }
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </section>
 }
 
 @code {
+    static readonly IReadOnlyList<CampusTabItem> StudentSections =
+    [
+        new("catalogue", "Course catalogue", "Browse active Courses"),
+        new("eligibility", "Eligibility", "Check Course prerequisites"),
+        new("syllabi", "Course syllabi", "Open available PDF syllabi")
+    ];
+
+    static readonly IReadOnlyList<CampusTabItem> StaffSections =
+    [
+        new("all", "All Courses", "Manage the complete catalogue"),
+        new("active", "Active Courses", "Courses available to Students"),
+        new("inactive", "Inactive Courses", "Courses hidden from Students")
+    ];
+
     [SupplyParameterFromQuery]
     public string? Message { get; set; }
 
     private IReadOnlyList<CourseSummary> courses = [];
     private string? errorMessage;
+    private string activeTab = string.Empty;
     private bool isLoading = true;
+
+    IReadOnlyList<CampusTabItem> Sections =>
+        UserContext.IsCourseAdministrator ? StaffSections : StudentSections;
+
+    IReadOnlyList<CourseSummary> DisplayedCourses => activeTab switch
+    {
+        "active" => courses.Where(course => course.IsActive).ToList(),
+        "inactive" => courses.Where(course => !course.IsActive).ToList(),
+        "syllabi" => courses
+            .Where(course => course.IsActive && !string.IsNullOrWhiteSpace(course.SyllabusFileName))
+            .ToList(),
+        _ when !UserContext.IsCourseAdministrator =>
+            courses.Where(course => course.IsActive).ToList(),
+        _ => courses
+    };
+
+    int ActiveCourseCount => courses.Count(course => course.IsActive);
+    int InactiveCourseCount => courses.Count(course => !course.IsActive);
+    int ActiveCreditPoints => courses
+        .Where(course => course.IsActive)
+        .Sum(course => course.CreditPoints);
+    int CoursesWithSyllabi => courses.Count(course =>
+        course.IsActive && !string.IsNullOrWhiteSpace(course.SyllabusFileName));
+
+    string RoleLabel => UserContext.IsCourseAdministrator ? "Staff" : "Student";
+    string HeroEyebrow => UserContext.IsCourseAdministrator
+        ? "Your curriculum workspace"
+        : "Your Course workspace";
+    string HeroTitle => UserContext.IsCourseAdministrator
+        ? "Shape the Course catalogue."
+        : "Explore your study options.";
+    string HeroDescription => UserContext.IsCourseAdministrator
+        ? "Review Course availability, maintain curriculum records, and open the tools needed to keep Course information current."
+        : "Browse available Courses, review syllabus information, and check whether you meet each Course's prerequisites.";
+    string MetricAriaLabel => UserContext.IsCourseAdministrator
+        ? "Curriculum summary"
+        : "Course catalogue summary";
+    string SectionAriaLabel => UserContext.IsCourseAdministrator
+        ? "Staff Course sections"
+        : "Student Course sections";
+
+    string SectionEyebrow => activeTab switch
+    {
+        "eligibility" => "Prerequisite guidance",
+        "syllabi" => "Course documents",
+        "active" => "Published curriculum",
+        "inactive" => "Curriculum review",
+        _ => "Course catalogue"
+    };
+
+    string SectionTitle => activeTab switch
+    {
+        "eligibility" => "Check Course eligibility",
+        "syllabi" => "Available Course syllabi",
+        "active" => "Active Courses",
+        "inactive" => "Inactive Courses",
+        "all" => "All Courses",
+        _ => "Available Courses"
+    };
+
+    string SectionDescription => activeTab switch
+    {
+        "eligibility" =>
+            "Choose a Course to compare its prerequisites with a demonstration academic record.",
+        "syllabi" =>
+            "Open a Course to view or download its available syllabus PDF.",
+        "active" =>
+            "These Courses are visible to Students in the Course catalogue.",
+        "inactive" =>
+            "These Courses remain available to Staff but are hidden from Student users.",
+        "all" =>
+            "Review every active and inactive Course maintained by Course Management.",
+        _ =>
+            "Review active Courses and open a Course for its prerequisites, teaching staff, and syllabus."
+    };
+
+    string EmptyStateTitle => activeTab switch
+    {
+        "syllabi" => "No Course syllabi available",
+        "inactive" => "No inactive Courses",
+        "active" => "No active Courses",
+        _ => "No Courses available"
+    };
+
+    string EmptyStateMessage => activeTab switch
+    {
+        "syllabi" => "No active Courses currently have an uploaded syllabus PDF.",
+        "inactive" => "Every Course in the catalogue is currently active.",
+        "active" => "Activate a Course before it can be displayed to Students.",
+        _ when UserContext.IsCourseAdministrator =>
+            "Create a Course to begin building the Course catalogue.",
+        _ => "There are no active Courses available to browse."
+    };
 
     protected override async Task OnInitializedAsync()
     {
+        activeTab = UserContext.IsCourseAdministrator ? "all" : "catalogue";
         await LoadCoursesAsync();
     }
 
@@ -121,10 +321,7 @@ else
 
         try
         {
-            var loadedCourses = await CourseApi.GetAllAsync();
-            courses = UserContext.IsCourseAdministrator
-                ? loadedCourses
-                : loadedCourses.Where(course => course.IsActive).ToList();
+            courses = await CourseApi.GetAllAsync();
         }
         catch (CourseApiException exception)
         {
