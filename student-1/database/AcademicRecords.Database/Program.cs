@@ -31,6 +31,31 @@ app.MapGet("/api/users", async (AcademicRecordsDbContext database, CancellationT
             user is Staff ? ((Staff)user).StaffId : null))
         .ToListAsync(cancellationToken));
 
+app.MapGet("/api/students/by-user/{userId:int}", async (int userId, AcademicRecordsDbContext database, CancellationToken cancellationToken) =>
+{
+    var student = await database.Students.AsNoTracking()
+        .Where(value => value.UserId == userId)
+        .Select(value => new StudentProfileResponse(value.UserId, value.StudentId, value.FirstName, value.LastName, value.Email,
+            value.DateOfBirth, value.PhoneNumber, value.MailingAddress, value.EmergencyContactName, value.EmergencyContactPhone,
+            value.EnrollmentDate, value.Degree, value.Major, value.SubMajor,
+            value.Enrollments.Select(enrollment => new TermEnrollmentResponse(enrollment.EnrollmentId, enrollment.CourseCode,
+                enrollment.AcademicTermId, enrollment.AcademicYear, enrollment.Status)).ToList()))
+        .SingleOrDefaultAsync(cancellationToken);
+
+    return student is null ? Results.NotFound() : Results.Ok(student);
+});
+
+app.MapGet("/api/staff/by-user/{userId:int}", async (int userId, AcademicRecordsDbContext database, CancellationToken cancellationToken) =>
+{
+    var staff = await database.Set<Staff>().AsNoTracking()
+        .Where(value => value.UserId == userId)
+        .Select(value => new StaffProfileResponse(value.UserId, value.StaffId, value.FirstName, value.LastName,
+            value.Email, value.DateOfBirth, value.PhoneNumber))
+        .SingleOrDefaultAsync(cancellationToken);
+
+    return staff is null ? Results.NotFound() : Results.Ok(staff);
+});
+
 app.MapPost("/api/students/enroll", async (EnrollStudentRequest request, AcademicRecordsDbContext database, CancellationToken cancellationToken) =>
 {
     if (string.IsNullOrWhiteSpace(request.FirstName) || string.IsNullOrWhiteSpace(request.LastName) ||
@@ -214,6 +239,9 @@ public sealed record AddEnrollmentRequest(string CourseCode, int AcademicTermId,
 public sealed record StudentProfileResponse(int UserId, string StudentId, string FirstName, string LastName, string Email,
     DateOnly? DateOfBirth, string? PhoneNumber, string MailingAddress, string EmergencyContactName, string EmergencyContactPhone,
     DateOnly? EnrollmentDate, string? Degree, string? Major, string? SubMajor, List<TermEnrollmentResponse> Enrollments);
+
+public sealed record StaffProfileResponse(int UserId, string StaffId, string FirstName, string LastName, string Email,
+    DateOnly? DateOfBirth, string? PhoneNumber);
 
 public sealed record TermEnrollmentResponse(int EnrollmentId, string CourseCode, int? AcademicTermId, int AcademicYear, string Status);
 

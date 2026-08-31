@@ -24,10 +24,28 @@ if (app.Environment.IsDevelopment())
 app.UseAuthorization();
 app.UseCors("Frontend");
 
+app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
+
 app.MapGet("/api/users", async (IHttpClientFactory clients, CancellationToken cancellationToken) =>
 {
     using var response = await clients.CreateClient("academicRecordsDatabase")
         .GetAsync("/api/users", cancellationToken);
+    var content = await response.Content.ReadAsStringAsync(cancellationToken);
+    return Results.Content(content, response.Content.Headers.ContentType?.MediaType ?? "application/json", statusCode: (int)response.StatusCode);
+});
+
+app.MapGet("/api/students/by-user/{userId:int}", async (int userId, IHttpClientFactory clients, CancellationToken cancellationToken) =>
+{
+    using var response = await clients.CreateClient("academicRecordsDatabase")
+        .GetAsync($"/api/students/by-user/{userId}", cancellationToken);
+    var content = await response.Content.ReadAsStringAsync(cancellationToken);
+    return Results.Content(content, response.Content.Headers.ContentType?.MediaType ?? "application/json", statusCode: (int)response.StatusCode);
+});
+
+app.MapGet("/api/staff/by-user/{userId:int}", async (int userId, IHttpClientFactory clients, CancellationToken cancellationToken) =>
+{
+    using var response = await clients.CreateClient("academicRecordsDatabase")
+        .GetAsync($"/api/staff/by-user/{userId}", cancellationToken);
     var content = await response.Content.ReadAsStringAsync(cancellationToken);
     return Results.Content(content, response.Content.Headers.ContentType?.MediaType ?? "application/json", statusCode: (int)response.StatusCode);
 });
