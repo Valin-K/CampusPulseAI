@@ -14,6 +14,7 @@ using (var scope = app.Services.CreateScope())
 {
     var database = scope.ServiceProvider.GetRequiredService<AcademicRecordsDbContext>();
     await database.Database.EnsureCreatedAsync();
+    await AcademicRecordsSeedData.InitializeAsync(database);
 }
 
 app.MapGet("/api/users", async (AcademicRecordsDbContext database, CancellationToken cancellationToken) =>

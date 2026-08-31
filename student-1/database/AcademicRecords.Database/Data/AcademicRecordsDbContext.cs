@@ -94,9 +94,5 @@ public sealed class AcademicRecordsDbContext(DbContextOptions<AcademicRecordsDbC
             entity.HasIndex(enrollment => new { enrollment.StudentId, enrollment.AcademicTermId, enrollment.CourseCode }).IsUnique();
         });
 
-        modelBuilder.Entity<Student>().HasData(AcademicRecordsSeedData.Students);
-        modelBuilder.Entity<Staff>().HasData(AcademicRecordsSeedData.StaffMembers);
-        modelBuilder.Entity<AcademicTerm>().HasData(AcademicRecordsSeedData.AcademicTerms);
-        modelBuilder.Entity<Enrollment>().HasData(AcademicRecordsSeedData.Enrollments);
     }
 }

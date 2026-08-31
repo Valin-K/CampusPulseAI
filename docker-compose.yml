@@ -7,8 +7,6 @@ services:
     environment:
       ASPNETCORE_HTTP_PORTS: 8080
       ConnectionStrings__AcademicRecords: Data Source=/app/data/academic-records.db
-    volumes:
-      - academicrecords-data:/app/data
 
   academicrecords.backend:
     image: ${DOCKER_REGISTRY-}academicrecordsbackend
@@ -152,5 +150,4 @@ services:
       - ./shared/frontend:/usr/share/nginx/html:ro
 
 volumes:
-  academicrecords-data:
   coursemanagement-data:
