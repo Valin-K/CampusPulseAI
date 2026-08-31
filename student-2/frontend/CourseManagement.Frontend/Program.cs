@@ -14,5 +14,6 @@ builder.Services.AddScoped(_ => new HttpClient
     BaseAddress = new Uri(apiBaseAddress, UriKind.Absolute)
 });
 builder.Services.AddScoped<CourseApiClient>();
+builder.Services.AddScoped<CourseUserContext>();
 
 await builder.Build().RunAsync();

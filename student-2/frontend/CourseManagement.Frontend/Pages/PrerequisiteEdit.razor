@@ -2,9 +2,16 @@
 @page "/courses/{CourseId:int}/prerequisites/{PrerequisiteId:int}/edit"
 @inject CourseApiClient CourseApi
 @inject NavigationManager Navigation
+@inject CourseUserContext UserContext
 
 <PageTitle>@(IsEdit ? "Edit prerequisite" : "Add prerequisite")</PageTitle>
 
+@if (!UserContext.IsCourseAdministrator)
+{
+    <StaffAccessRequired />
+}
+else
+{
 <h1>@(IsEdit ? "Edit prerequisite" : "Add prerequisite")</h1>
 
 @if (isLoading)
@@ -92,6 +99,7 @@ else if (course is not null)
         </EditForm>
     }
 }
+}
 
 @code {
     [Parameter]
@@ -113,6 +121,12 @@ else if (course is not null)
 
     protected override async Task OnParametersSetAsync()
     {
+        if (!UserContext.IsCourseAdministrator)
+        {
+            isLoading = false;
+            return;
+        }
+
         isLoading = true;
         loadFailed = false;
         errorMessage = null;

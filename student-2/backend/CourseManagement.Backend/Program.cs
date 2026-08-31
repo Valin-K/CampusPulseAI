@@ -1,3 +1,4 @@
+using CourseManagement.Backend.Clients;
 using CourseManagement.Database.Data;
 using CourseManagement.Backend.Services;
 using Microsoft.EntityFrameworkCore;
@@ -47,6 +48,23 @@ var maxSyllabusFileSize = builder.Configuration.GetValue<long?>(
 builder.WebHost.ConfigureKestrel(options =>
     options.Limits.MaxRequestBodySize = maxSyllabusFileSize + (1024 * 1024));
 builder.Services.AddSingleton<ISyllabusStorage, FileSystemSyllabusStorage>();
+builder.Services
+    .AddOptions<CourseAccessOptions>()
+    .Bind(builder.Configuration.GetSection(CourseAccessOptions.SectionName))
+    .Validate(
+        options => !string.IsNullOrWhiteSpace(options.DemoStudentId),
+        "The Course access demonstration Student ID is required.")
+    .Validate(
+        options => !string.IsNullOrWhiteSpace(options.DemoStaffId),
+        "The Course access demonstration Staff ID is required.")
+    .ValidateOnStart();
+var academicRecordsApiAddress = builder.Configuration["Services:AcademicRecordsApi"]
+    ?? throw new InvalidOperationException("The Academic Records API address is not configured.");
+builder.Services.AddHttpClient<IAcademicRecordsClient, AcademicRecordsClient>(client =>
+{
+    client.BaseAddress = new Uri(academicRecordsApiAddress, UriKind.Absolute);
+    client.Timeout = TimeSpan.FromSeconds(5);
+});
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 

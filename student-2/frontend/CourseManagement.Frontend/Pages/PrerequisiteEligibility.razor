@@ -1,5 +1,6 @@
 @page "/courses/{CourseId:int}/eligibility"
 @inject CourseApiClient CourseApi
+@inject CourseUserContext UserContext
 
 <PageTitle>Check prerequisite eligibility</PageTitle>
 
@@ -15,6 +16,14 @@ else if (loadFailed)
                    Title="Eligibility requirements could not be loaded"
                    Message="@(errorMessage ?? "Eligibility requirements could not be loaded.")">
         <NavLink class="btn btn-outline-danger" href="@CourseUrl">Back to Course</NavLink>
+    </FeedbackPanel>
+}
+else if (accessDenied)
+{
+    <FeedbackPanel Kind="FeedbackKind.Warning"
+                   Title="Course unavailable"
+                   Message="Students can check eligibility only for active Courses.">
+        <NavLink class="btn btn-outline-secondary" href="courses">Back to Courses</NavLink>
     </FeedbackPanel>
 }
 else if (course is not null)
@@ -148,6 +157,7 @@ else if (course is not null)
     private bool isLoading = true;
     private bool isChecking;
     private bool loadFailed;
+    private bool accessDenied;
 
     private string CourseUrl => $"/courses/{CourseId}";
 
@@ -155,12 +165,20 @@ else if (course is not null)
     {
         isLoading = true;
         loadFailed = false;
+        accessDenied = false;
         errorMessage = null;
         result = null;
 
         try
         {
             course = await CourseApi.GetByIdAsync(CourseId);
+            if (!UserContext.IsCourseAdministrator && !course.IsActive)
+            {
+                accessDenied = true;
+                course = null;
+                return;
+            }
+
             var courses = await CourseApi.GetAllAsync();
             var coursesById = courses.ToDictionary(item => item.Id);
 
