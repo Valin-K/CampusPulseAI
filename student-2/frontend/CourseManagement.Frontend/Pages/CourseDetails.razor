@@ -2,21 +2,33 @@
 @inject CourseApiClient CourseApi
 @inject NavigationManager Navigation
 @inject IJSRuntime JavaScript
+@inject CourseUserContext UserContext
 
 <PageTitle>Course details</PageTitle>
 
 @if (isLoading)
 {
-    <p role="status">Loading Course details...</p>
+    <LoadingIndicator Message="Loading Course details..." />
 }
-else if (errorMessage is not null)
+else if (loadFailed)
 {
-    <div class="alert alert-danger" role="alert">@errorMessage</div>
-    <NavLink class="btn btn-outline-secondary" href="courses">Back to Courses</NavLink>
+    <FeedbackPanel Kind="FeedbackKind.Error"
+                   Title="Course details could not be loaded"
+                   Message="@(errorMessage ?? "Course details could not be loaded.")">
+        <NavLink class="btn btn-outline-danger" href="courses">Back to Courses</NavLink>
+    </FeedbackPanel>
+}
+else if (accessDenied)
+{
+    <FeedbackPanel Kind="FeedbackKind.Warning"
+                   Title="Course unavailable"
+                   Message="Students can view details only for active Courses.">
+        <NavLink class="btn btn-outline-secondary" href="courses">Back to Courses</NavLink>
+    </FeedbackPanel>
 }
 else if (course is not null)
 {
-    <div class="d-flex justify-content-between align-items-start mb-3">
+    <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
         <div>
             <h1>@course.Code - @course.Name</h1>
             @if (course.IsActive)
@@ -33,7 +45,20 @@ else if (course is not null)
 
     @if (statusMessage is not null)
     {
-        <div class="alert alert-success" role="status">@statusMessage</div>
+        <FeedbackPanel Kind="FeedbackKind.Success"
+                       Message="@statusMessage" />
+    }
+
+    @if (errorMessage is not null)
+    {
+        <FeedbackPanel Kind="FeedbackKind.Error"
+                       Title="The action could not be completed"
+                       Message="@errorMessage" />
+    }
+
+    @if (operationMessage is not null)
+    {
+        <LoadingIndicator Message="@operationMessage" />
     }
 
     <dl class="row">
@@ -45,20 +70,251 @@ else if (course is not null)
 
         <dt class="col-sm-3">Credit points</dt>
         <dd class="col-sm-9">@course.CreditPoints</dd>
-
-        <dt class="col-sm-3">Syllabus</dt>
-        <dd class="col-sm-9">@(course.SyllabusFileName ?? "No syllabus uploaded")</dd>
     </dl>
 
-    <div class="d-flex gap-2">
-        <NavLink class="btn btn-primary" href="@($"courses/{course.Id}/edit")">Edit Course</NavLink>
-        <button class="btn btn-outline-warning" disabled="@isSaving" @onclick="ToggleStatusAsync">
-            @(course.IsActive ? "Deactivate" : "Reactivate")
-        </button>
-        <button class="btn btn-outline-danger" disabled="@isSaving" @onclick="DeleteAsync">
-            Delete Course
-        </button>
-    </div>
+    <section class="mt-4" aria-labelledby="syllabus-heading">
+        <div class="mb-3">
+            <h2 id="syllabus-heading" class="h4 mb-1">Syllabus</h2>
+            <p class="text-muted mb-0">
+                @(UserContext.IsCourseAdministrator
+                    ? "Upload one PDF syllabus for this Course. The maximum file size is 10 MiB."
+                    : "View or download the published PDF syllabus for this Course.")
+            </p>
+        </div>
+
+        @if (string.IsNullOrWhiteSpace(course.SyllabusFileName))
+        {
+            <FeedbackPanel Kind="FeedbackKind.Empty"
+                           Title="No syllabus uploaded"
+                           Message="@(UserContext.IsCourseAdministrator
+                               ? "Select a PDF to add the syllabus for this Course."
+                               : "A syllabus is not currently available for this Course.")" />
+        }
+        else
+        {
+            <div class="card mb-3">
+                <div class="card-body">
+                    <h3 class="h6 card-title">Current syllabus</h3>
+                    <p class="card-text mb-3">@course.SyllabusFileName</p>
+                    <div class="d-flex flex-wrap gap-2">
+                        <a class="btn btn-sm btn-outline-primary"
+                           href="@CourseApi.GetSyllabusUrl(course.Id)"
+                           target="_blank"
+                           rel="noopener">
+                            View syllabus (opens in new tab)
+                        </a>
+                        <a class="btn btn-sm btn-outline-secondary"
+                           href="@CourseApi.GetSyllabusUrl(course.Id, download: true)">
+                            Download syllabus
+                        </a>
+                        @if (UserContext.IsCourseAdministrator)
+                        {
+                            <button type="button"
+                                    class="btn btn-sm btn-outline-danger"
+                                    disabled="@isSaving"
+                                    @onclick="RemoveSyllabusAsync">
+                                Remove syllabus
+                            </button>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+
+        @if (UserContext.IsCourseAdministrator)
+        {
+            <div class="mb-3">
+                <label class="form-label" for="syllabus-file">
+                    @(string.IsNullOrWhiteSpace(course.SyllabusFileName)
+                        ? "Syllabus PDF"
+                        : "Replacement syllabus PDF")
+                </label>
+                <InputFile @key="syllabusInputKey"
+                           id="syllabus-file"
+                           class="form-control"
+                           accept=".pdf,application/pdf"
+                           aria-describedby="syllabus-file-help"
+                           disabled="@isSaving"
+                           OnChange="SelectSyllabus" />
+                <div id="syllabus-file-help" class="form-text">
+                    PDF files only, up to 10 MiB. Selecting a file does not upload it until you
+                    choose the button below.
+                </div>
+            </div>
+
+            @if (selectedSyllabus is not null)
+            {
+                <p class="mb-3">
+                    Selected: <strong>@selectedSyllabus.Name</strong>
+                    (@FormatFileSize(selectedSyllabus.Size))
+                </p>
+            }
+
+            <button type="button"
+                    class="btn btn-primary"
+                    disabled="@(isSaving || selectedSyllabus is null)"
+                    @onclick="UploadSyllabusAsync">
+                @(string.IsNullOrWhiteSpace(course.SyllabusFileName)
+                    ? "Upload syllabus"
+                    : "Replace syllabus")
+            </button>
+        }
+    </section>
+
+    <section class="mt-4" aria-labelledby="prerequisites-heading">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3">
+            <div>
+                <h2 id="prerequisites-heading" class="h4 mb-1">Prerequisites</h2>
+                <p class="text-muted mb-0">Courses and minimum grades required before enrolment.</p>
+            </div>
+            <div class="d-flex flex-wrap gap-2">
+                <NavLink class="btn btn-outline-primary"
+                         href="@($"courses/{course.Id}/eligibility")">
+                    Check eligibility
+                </NavLink>
+                @if (UserContext.IsCourseAdministrator)
+                {
+                    <NavLink class="btn btn-primary"
+                             href="@($"courses/{course.Id}/prerequisites/new")">
+                        Add prerequisite
+                    </NavLink>
+                }
+            </div>
+        </div>
+
+        @if (course.Prerequisites.Count == 0)
+        {
+            <FeedbackPanel Kind="FeedbackKind.Empty"
+                           Title="No prerequisites"
+                           Message="This Course has no prerequisite requirements." />
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th scope="col">Required Course</th>
+                            <th scope="col">Minimum grade</th>
+                            @if (UserContext.IsCourseAdministrator)
+                            {
+                                <th scope="col">Actions</th>
+                            }
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var prerequisite in course.Prerequisites)
+                        {
+                            <tr>
+                                <td>@prerequisite.RequiredCourseCode</td>
+                                <td>@(prerequisite.MinimumGrade ?? "Pass")</td>
+                                @if (UserContext.IsCourseAdministrator)
+                                {
+                                    <td class="text-nowrap">
+                                        <NavLink class="btn btn-sm btn-outline-secondary me-2"
+                                                 href="@($"courses/{course.Id}/prerequisites/{prerequisite.Id}/edit")">
+                                            Edit
+                                        </NavLink>
+                                        <button class="btn btn-sm btn-outline-danger"
+                                                disabled="@isSaving"
+                                                @onclick="() => DeletePrerequisiteAsync(prerequisite)">
+                                            Remove
+                                        </button>
+                                    </td>
+                                }
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </section>
+
+    <section class="mt-4" aria-labelledby="faculty-assignments-heading">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3">
+            <div>
+                <h2 id="faculty-assignments-heading" class="h4 mb-1">Faculty assignments</h2>
+                <p class="text-muted mb-0">
+                    Staff assigned to teach this Course during each teaching period.
+                </p>
+            </div>
+            @if (UserContext.IsCourseAdministrator)
+            {
+                <NavLink class="btn btn-primary"
+                         href="@($"courses/{course.Id}/faculty-assignments/new")">
+                    Add assignment
+                </NavLink>
+            }
+        </div>
+
+        @if (course.FacultyAssignments.Count == 0)
+        {
+            <FeedbackPanel Kind="FeedbackKind.Empty"
+                           Title="No faculty assignments"
+                           Message="No staff members are assigned to this Course." />
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th scope="col">Staff member</th>
+                            <th scope="col">Email</th>
+                            <th scope="col">Role</th>
+                            <th scope="col">Teaching period</th>
+                            @if (UserContext.IsCourseAdministrator)
+                            {
+                                <th scope="col">Actions</th>
+                            }
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var assignment in course.FacultyAssignments)
+                        {
+                            <tr>
+                                <td>@assignment.StaffName</td>
+                                <td>
+                                    <a href="@($"mailto:{assignment.StaffEmail}")">
+                                        @assignment.StaffEmail
+                                    </a>
+                                </td>
+                                <td>@assignment.Role</td>
+                                <td>@assignment.TeachingPeriod</td>
+                                @if (UserContext.IsCourseAdministrator)
+                                {
+                                    <td class="text-nowrap">
+                                        <NavLink class="btn btn-sm btn-outline-secondary me-2"
+                                                 href="@($"courses/{course.Id}/faculty-assignments/{assignment.Id}/edit")">
+                                            Edit
+                                        </NavLink>
+                                        <button class="btn btn-sm btn-outline-danger"
+                                                disabled="@isSaving"
+                                                @onclick="() => DeleteFacultyAssignmentAsync(assignment)">
+                                            Remove
+                                        </button>
+                                    </td>
+                                }
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </section>
+
+    @if (UserContext.IsCourseAdministrator)
+    {
+        <div class="d-flex flex-wrap gap-2">
+            <NavLink class="btn btn-primary" href="@($"courses/{course.Id}/edit")">Edit Course</NavLink>
+            <button class="btn btn-outline-warning" disabled="@isSaving" @onclick="ToggleStatusAsync">
+                @(course.IsActive ? "Deactivate" : "Reactivate")
+            </button>
+            <button class="btn btn-outline-danger" disabled="@isSaving" @onclick="DeleteAsync">
+                Delete Course
+            </button>
+        </div>
+    }
 }
 
 @code {
@@ -68,38 +324,58 @@ else if (course is not null)
     [SupplyParameterFromQuery]
     public string? Message { get; set; }
 
-    private CourseSummary? course;
+    private CourseDetail? course;
     private string? errorMessage;
     private string? statusMessage;
+    private string? operationMessage;
+    private IBrowserFile? selectedSyllabus;
+    private int syllabusInputKey;
     private bool isLoading = true;
     private bool isSaving;
+    private bool loadFailed;
+    private bool accessDenied;
 
     protected override async Task OnParametersSetAsync()
     {
         isLoading = true;
+        loadFailed = false;
+        accessDenied = false;
         errorMessage = null;
+        operationMessage = null;
         statusMessage = Message switch
         {
             "created" => "Course created successfully.",
             "updated" => "Course updated successfully.",
+            "prerequisite-created" => "Prerequisite added successfully.",
+            "prerequisite-updated" => "Prerequisite updated successfully.",
+            "faculty-assignment-created" => "Faculty assignment added successfully.",
+            "faculty-assignment-updated" => "Faculty assignment updated successfully.",
             _ => null
         };
 
         try
         {
             course = await CourseApi.GetByIdAsync(Id);
+            if (!UserContext.IsCourseAdministrator && !course.IsActive)
+            {
+                accessDenied = true;
+                course = null;
+            }
         }
         catch (CourseApiException exception)
         {
             errorMessage = exception.Message;
+            loadFailed = true;
         }
         catch (HttpRequestException)
         {
             errorMessage = "Course details could not be loaded. Check that the Course Management API is running.";
+            loadFailed = true;
         }
         catch (System.Text.Json.JsonException)
         {
             errorMessage = "Course details were returned in an unexpected format.";
+            loadFailed = true;
         }
         finally
         {
@@ -117,10 +393,14 @@ else if (course is not null)
         isSaving = true;
         errorMessage = null;
         statusMessage = null;
+        operationMessage = course.IsActive
+            ? "Deactivating Course..."
+            : "Reactivating Course...";
 
         try
         {
-            course = await CourseApi.SetStatusAsync(course.Id, !course.IsActive);
+            var updatedCourse = await CourseApi.SetStatusAsync(course.Id, !course.IsActive);
+            course = course with { IsActive = updatedCourse.IsActive };
             statusMessage = course.IsActive
                 ? "Course reactivated successfully."
                 : "Course deactivated successfully.";
@@ -133,11 +413,268 @@ else if (course is not null)
         {
             errorMessage = "The Course status could not be updated. Check that the API is running.";
         }
+        catch (System.Text.Json.JsonException)
+        {
+            errorMessage = "The Course API returned an unexpected status response.";
+        }
         finally
         {
             isSaving = false;
+            operationMessage = null;
         }
     }
+
+    private async Task DeletePrerequisiteAsync(PrerequisiteSummary prerequisite)
+    {
+        if (course is null)
+        {
+            return;
+        }
+
+        var confirmed = await JavaScript.InvokeAsync<bool>(
+            "confirm",
+            $"Remove {prerequisite.RequiredCourseCode} as a prerequisite for {course.Code}?");
+        if (!confirmed)
+        {
+            return;
+        }
+
+        isSaving = true;
+        errorMessage = null;
+        statusMessage = null;
+        operationMessage = $"Removing {prerequisite.RequiredCourseCode} prerequisite...";
+
+        try
+        {
+            await CourseApi.DeletePrerequisiteAsync(prerequisite.Id);
+            course = await CourseApi.GetByIdAsync(course.Id);
+            statusMessage = "Prerequisite removed successfully.";
+        }
+        catch (CourseApiException exception)
+        {
+            errorMessage = exception.Message;
+        }
+        catch (HttpRequestException)
+        {
+            errorMessage = "The prerequisite could not be removed. Check that the API is running.";
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            errorMessage = "Course details could not be refreshed after removing the prerequisite.";
+        }
+        finally
+        {
+            isSaving = false;
+            operationMessage = null;
+        }
+    }
+
+    private async Task DeleteFacultyAssignmentAsync(FacultyAssignmentSummary assignment)
+    {
+        if (course is null)
+        {
+            return;
+        }
+
+        var confirmed = await JavaScript.InvokeAsync<bool>(
+            "confirm",
+            $"Remove {assignment.StaffName} from {course.Code} for {assignment.TeachingPeriod}?");
+        if (!confirmed)
+        {
+            return;
+        }
+
+        isSaving = true;
+        errorMessage = null;
+        statusMessage = null;
+        operationMessage = $"Removing {assignment.StaffName} faculty assignment...";
+
+        try
+        {
+            await CourseApi.DeleteFacultyAssignmentAsync(assignment.Id);
+            course = await CourseApi.GetByIdAsync(course.Id);
+            statusMessage = "Faculty assignment removed successfully.";
+        }
+        catch (CourseApiException exception)
+        {
+            errorMessage = exception.Message;
+        }
+        catch (HttpRequestException)
+        {
+            errorMessage = "The faculty assignment could not be removed. Check that the API is running.";
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            errorMessage = "Course details could not be refreshed after removing the faculty assignment.";
+        }
+        finally
+        {
+            isSaving = false;
+            operationMessage = null;
+        }
+    }
+
+    private void SelectSyllabus(InputFileChangeEventArgs args)
+    {
+        selectedSyllabus = null;
+        errorMessage = null;
+        statusMessage = null;
+
+        var file = args.File;
+        if (!string.Equals(
+                Path.GetExtension(file.Name),
+                ".pdf",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            errorMessage = "Select a file that uses the .pdf extension.";
+            ResetSyllabusInput();
+            return;
+        }
+
+        if (!string.Equals(file.ContentType, "application/pdf", StringComparison.OrdinalIgnoreCase))
+        {
+            errorMessage = "Select a file with the application/pdf content type.";
+            ResetSyllabusInput();
+            return;
+        }
+
+        if (file.Size == 0)
+        {
+            errorMessage = "The selected syllabus PDF is empty.";
+            ResetSyllabusInput();
+            return;
+        }
+
+        if (file.Size > SyllabusMaxFileSizeBytes)
+        {
+            errorMessage = "The syllabus PDF must not exceed 10 MiB.";
+            ResetSyllabusInput();
+            return;
+        }
+
+        selectedSyllabus = file;
+    }
+
+    private async Task UploadSyllabusAsync()
+    {
+        if (course is null || selectedSyllabus is null)
+        {
+            return;
+        }
+
+        var isReplacement = !string.IsNullOrWhiteSpace(course.SyllabusFileName);
+        if (isReplacement)
+        {
+            var confirmed = await JavaScript.InvokeAsync<bool>(
+                "confirm",
+                $"Replace {course.SyllabusFileName} with {selectedSyllabus.Name} for {course.Code}?");
+            if (!confirmed)
+            {
+                return;
+            }
+        }
+
+        isSaving = true;
+        errorMessage = null;
+        statusMessage = null;
+        operationMessage = isReplacement
+            ? $"Replacing {course.SyllabusFileName}..."
+            : $"Uploading {selectedSyllabus.Name}...";
+
+        try
+        {
+            await using var stream = selectedSyllabus.OpenReadStream(SyllabusMaxFileSizeBytes);
+            var response = await CourseApi.UploadSyllabusAsync(
+                course.Id,
+                stream,
+                selectedSyllabus.Name,
+                selectedSyllabus.ContentType);
+            course = await CourseApi.GetByIdAsync(course.Id);
+            statusMessage = isReplacement
+                ? $"Syllabus replaced successfully with {response.FileName}."
+                : $"Syllabus {response.FileName} uploaded successfully.";
+            ResetSyllabusInput();
+        }
+        catch (CourseApiException exception)
+        {
+            errorMessage = exception.Message;
+        }
+        catch (HttpRequestException)
+        {
+            errorMessage = "The syllabus could not be uploaded. Check that the Course Management API is running.";
+        }
+        catch (IOException)
+        {
+            errorMessage = "The syllabus file could not be read. Confirm that it is no larger than 10 MiB.";
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            errorMessage = "The syllabus API returned an unexpected response.";
+        }
+        finally
+        {
+            isSaving = false;
+            operationMessage = null;
+        }
+    }
+
+    private async Task RemoveSyllabusAsync()
+    {
+        if (course is null || string.IsNullOrWhiteSpace(course.SyllabusFileName))
+        {
+            return;
+        }
+
+        var removedFileName = course.SyllabusFileName;
+        var confirmed = await JavaScript.InvokeAsync<bool>(
+            "confirm",
+            $"Remove {removedFileName} from {course.Code}?");
+        if (!confirmed)
+        {
+            return;
+        }
+
+        isSaving = true;
+        errorMessage = null;
+        statusMessage = null;
+        operationMessage = $"Removing {removedFileName}...";
+
+        try
+        {
+            await CourseApi.DeleteSyllabusAsync(course.Id);
+            course = await CourseApi.GetByIdAsync(course.Id);
+            statusMessage = $"Syllabus {removedFileName} removed successfully.";
+            ResetSyllabusInput();
+        }
+        catch (CourseApiException exception)
+        {
+            errorMessage = exception.Message;
+        }
+        catch (HttpRequestException)
+        {
+            errorMessage = "The syllabus could not be removed. Check that the Course Management API is running.";
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            errorMessage = "Course details could not be refreshed after removing the syllabus.";
+        }
+        finally
+        {
+            isSaving = false;
+            operationMessage = null;
+        }
+    }
+
+    private void ResetSyllabusInput()
+    {
+        selectedSyllabus = null;
+        syllabusInputKey++;
+    }
+
+    private static string FormatFileSize(long sizeBytes) =>
+        sizeBytes >= 1024 * 1024
+            ? $"{sizeBytes / 1024d / 1024d:0.##} MiB"
+            : $"{Math.Max(1, sizeBytes / 1024d):0.##} KiB";
 
     private async Task DeleteAsync()
     {
@@ -157,6 +694,7 @@ else if (course is not null)
         isSaving = true;
         errorMessage = null;
         statusMessage = null;
+        operationMessage = $"Deleting {course.Code}...";
 
         try
         {
@@ -174,6 +712,9 @@ else if (course is not null)
         finally
         {
             isSaving = false;
+            operationMessage = null;
         }
     }
+
+    private const long SyllabusMaxFileSizeBytes = 10 * 1024 * 1024;
 }

@@ -1,4 +1,6 @@
-using CourseManagement.Backend.Data;
+using CourseManagement.Backend.Clients;
+using CourseManagement.Database.Data;
+using CourseManagement.Backend.Services;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -23,6 +25,46 @@ var connectionString = builder.Configuration.GetConnectionString("CourseManageme
     ?? throw new InvalidOperationException("Course Management database connection string is not configured.");
 builder.Services.AddDbContext<CourseManagementDbContext>(options =>
     options.UseSqlite(connectionString));
+builder.Services
+    .AddOptions<SyllabusStorageOptions>()
+    .Bind(builder.Configuration.GetSection(SyllabusStorageOptions.SectionName))
+    .PostConfigure(options =>
+    {
+        if (!Path.IsPathRooted(options.RootPath))
+        {
+            options.RootPath = Path.GetFullPath(options.RootPath, builder.Environment.ContentRootPath);
+        }
+    })
+    .Validate(
+        options => !string.IsNullOrWhiteSpace(options.RootPath),
+        "The syllabus storage root path is required.")
+    .Validate(
+        options => options.MaxFileSizeBytes > 0,
+        "The syllabus maximum file size must be greater than zero.")
+    .ValidateOnStart();
+var maxSyllabusFileSize = builder.Configuration.GetValue<long?>(
+        $"{SyllabusStorageOptions.SectionName}:MaxFileSizeBytes")
+    ?? SyllabusStorageOptions.DefaultMaxFileSizeBytes;
+builder.WebHost.ConfigureKestrel(options =>
+    options.Limits.MaxRequestBodySize = maxSyllabusFileSize + (1024 * 1024));
+builder.Services.AddSingleton<ISyllabusStorage, FileSystemSyllabusStorage>();
+builder.Services
+    .AddOptions<CourseAccessOptions>()
+    .Bind(builder.Configuration.GetSection(CourseAccessOptions.SectionName))
+    .Validate(
+        options => !string.IsNullOrWhiteSpace(options.DemoStudentId),
+        "The Course access demonstration Student ID is required.")
+    .Validate(
+        options => !string.IsNullOrWhiteSpace(options.DemoStaffId),
+        "The Course access demonstration Staff ID is required.")
+    .ValidateOnStart();
+var academicRecordsApiAddress = builder.Configuration["Services:AcademicRecordsApi"]
+    ?? throw new InvalidOperationException("The Academic Records API address is not configured.");
+builder.Services.AddHttpClient<IAcademicRecordsClient, AcademicRecordsClient>(client =>
+{
+    client.BaseAddress = new Uri(academicRecordsApiAddress, UriKind.Absolute);
+    client.Timeout = TimeSpan.FromSeconds(5);
+});
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 

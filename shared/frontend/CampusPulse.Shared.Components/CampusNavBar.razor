@@ -6,6 +6,12 @@
                 home-href="@HomeHref"
                 portal-href="@PortalHref"
                 context-label="@ContextLabel">
+    @if (UserSelector is not null)
+    {
+        <div slot="user-selector">
+            @UserSelector
+        </div>
+    }
 </campus-nav-bar>
 
 @code {
@@ -17,4 +23,5 @@
     [Parameter] public string HomeHref { get; set; } = "/";
     [Parameter] public string PortalHref { get; set; } = "http://localhost:8080";
     [Parameter] public string ContextLabel { get; set; } = "Student portal";
+    [Parameter] public RenderFragment? UserSelector { get; set; }
 }

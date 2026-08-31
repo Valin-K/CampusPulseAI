@@ -2,28 +2,48 @@
 @page "/courses/{Id:int}/edit"
 @inject CourseApiClient CourseApi
 @inject NavigationManager Navigation
+@inject CourseUserContext UserContext
 
 <PageTitle>@(IsEdit ? "Edit Course" : "Create Course")</PageTitle>
 
+@if (!UserContext.IsCourseAdministrator)
+{
+    <StaffAccessRequired />
+}
+else
+{
 <h1>@(IsEdit ? "Edit Course" : "Create Course")</h1>
 
 @if (isLoading)
 {
-    <p role="status">Loading Course...</p>
+    <LoadingIndicator Message="Loading Course..." />
 }
 else if (loadFailed)
 {
-    <div class="alert alert-danger" role="alert">@errorMessage</div>
-    <NavLink class="btn btn-outline-secondary" href="courses">Back to Courses</NavLink>
+    <FeedbackPanel Kind="FeedbackKind.Error"
+                   Title="Course form could not be loaded"
+                   Message="@(errorMessage ?? "The Course form could not be loaded.")">
+        <NavLink class="btn btn-outline-danger" href="courses">Back to Courses</NavLink>
+    </FeedbackPanel>
 }
 else
 {
     @if (errorMessage is not null)
     {
-        <div class="alert alert-danger" role="alert">@errorMessage</div>
+        <FeedbackPanel Kind="FeedbackKind.Error"
+                       Title="Course could not be saved"
+                       Message="@errorMessage" />
     }
 
-    <EditForm Model="@courseForm" OnValidSubmit="SaveAsync" FormName="course-form">
+    @if (isSaving)
+    {
+        <LoadingIndicator Message="Saving Course..." />
+    }
+
+    <EditForm Model="@courseForm"
+              OnValidSubmit="SaveAsync"
+              FormName="course-form"
+              aria-busy="@isSaving">
         <DataAnnotationsValidator />
         <ValidationSummary />
 
@@ -79,13 +99,14 @@ else
             <label class="form-check-label" for="course-active">Course is active</label>
         </div>
 
-        <div class="d-flex gap-2">
+        <div class="d-flex flex-wrap gap-2">
             <button class="btn btn-primary" type="submit" disabled="@isSaving">
                 @(isSaving ? "Saving..." : "Save Course")
             </button>
             <NavLink class="btn btn-outline-secondary" href="@CancelUrl">Cancel</NavLink>
         </div>
     </EditForm>
+}
 }
 
 @code {
@@ -103,6 +124,12 @@ else
 
     protected override async Task OnParametersSetAsync()
     {
+        if (!UserContext.IsCourseAdministrator)
+        {
+            isLoading = false;
+            return;
+        }
+
         errorMessage = null;
         loadFailed = false;
 

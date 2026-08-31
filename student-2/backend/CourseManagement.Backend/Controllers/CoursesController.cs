@@ -2,8 +2,9 @@ using CourseManagement.Backend.BusinessRules;
 using CourseManagement.Backend.Contracts.Courses;
 using CourseManagement.Backend.Contracts.FacultyAssignments;
 using CourseManagement.Backend.Contracts.Prerequisites;
-using CourseManagement.Backend.Data;
-using CourseManagement.Backend.Models;
+using CourseManagement.Backend.Services;
+using CourseManagement.Database.Data;
+using CourseManagement.Database.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -11,7 +12,9 @@ namespace CourseManagement.Backend.Controllers;
 
 [ApiController]
 [Route("api/courses")]
-public sealed class CoursesController(CourseManagementDbContext database) : ControllerBase
+public sealed class CoursesController(
+    CourseManagementDbContext database,
+    ISyllabusStorage syllabusStorage) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<CourseResponse>>> GetAll(CancellationToken cancellationToken)
@@ -158,9 +161,28 @@ public sealed class CoursesController(CourseManagementDbContext database) : Cont
                 string.Join(", ", dependentCourseCodes));
         }
 
-        database.Courses.Remove(course);
-        await database.SaveChangesAsync(cancellationToken);
-        return NoContent();
+        try
+        {
+            await using var stagedSyllabusDeletion =
+                string.IsNullOrWhiteSpace(course.SyllabusFileName)
+                    ? null
+                    : await syllabusStorage.StageDeletionAsync(id, cancellationToken);
+
+            database.Courses.Remove(course);
+            await database.SaveChangesAsync(cancellationToken);
+
+            if (stagedSyllabusDeletion is not null)
+            {
+                await stagedSyllabusDeletion.CommitAsync();
+            }
+
+            return NoContent();
+        }
+        catch (SyllabusStorageException)
+        {
+            return StorageProblem(
+                "The Course could not be deleted because its syllabus PDF could not be removed safely.");
+        }
     }
 
     [HttpPost("{id:int}/prerequisite-eligibility")]
@@ -197,7 +219,10 @@ public sealed class CoursesController(CourseManagementDbContext database) : Cont
 
         foreach (var completedCourse in request.CompletedCourses)
         {
-            if (!GradeScale.TryGetRank(completedCourse.Grade, out var rank))
+            if (!GradeScale.TryNormalize(
+                    completedCourse.Grade,
+                    out var canonicalGrade,
+                    out var rank))
             {
                 return BadRequestProblem(
                     $"Grade '{completedCourse.Grade}' is not supported. " +
@@ -206,7 +231,7 @@ public sealed class CoursesController(CourseManagementDbContext database) : Cont
 
             completedCourses.Add(
                 NormalizeCode(completedCourse.CourseCode),
-                (completedCourse.Grade.Trim(), rank));
+                (canonicalGrade, rank));
         }
 
         var requirements = new List<PrerequisiteRequirementResponse>();
@@ -216,7 +241,10 @@ public sealed class CoursesController(CourseManagementDbContext database) : Cont
                 ? "Pass"
                 : prerequisite.MinimumGrade;
 
-            if (!GradeScale.TryGetRank(minimumGrade, out var minimumRank))
+            if (!GradeScale.TryNormalize(
+                    minimumGrade,
+                    out var canonicalMinimumGrade,
+                    out var minimumRank))
             {
                 return Problem(
                     statusCode: StatusCodes.Status500InternalServerError,
@@ -228,13 +256,19 @@ public sealed class CoursesController(CourseManagementDbContext database) : Cont
                 prerequisite.RequiredCourse.Code,
                 out var completedCourse);
             var isMet = hasCompletedCourse && completedCourse.Rank >= minimumRank;
+            var reason = !hasCompletedCourse
+                ? $"{prerequisite.RequiredCourse.Code} has not been completed."
+                : isMet
+                    ? $"Achieved {completedCourse.Grade}; minimum grade {canonicalMinimumGrade} is met."
+                    : $"Achieved {completedCourse.Grade}; minimum grade {canonicalMinimumGrade} is required.";
 
             requirements.Add(new PrerequisiteRequirementResponse(
                 prerequisite.RequiredCourseId,
                 prerequisite.RequiredCourse.Code,
-                minimumGrade,
+                canonicalMinimumGrade,
                 hasCompletedCourse ? completedCourse.Grade : null,
-                isMet));
+                isMet,
+                reason));
         }
 
         return Ok(new PrerequisiteEligibilityResponse(
@@ -272,6 +306,14 @@ public sealed class CoursesController(CourseManagementDbContext database) : Cont
             Title = "Invalid prerequisite eligibility request",
             Detail = detail
         });
+    }
+
+    ActionResult StorageProblem(string detail)
+    {
+        return Problem(
+            statusCode: StatusCodes.Status500InternalServerError,
+            title: "Syllabus storage error",
+            detail: detail);
     }
 
     static string NormalizeCode(string code) => code.Trim().ToUpperInvariant();

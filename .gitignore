@@ -72,6 +72,9 @@ artifacts/
 *.sqlite
 *.sqlite3
 
+# Local Course Management syllabus uploads
+/student-2/backend/CourseManagement.Backend/syllabus-files/
+
 # ASP.NET Scaffolding
 ScaffoldingReadMe.txt
 

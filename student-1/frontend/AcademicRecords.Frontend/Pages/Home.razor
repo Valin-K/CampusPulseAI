@@ -2,6 +2,69 @@
 
 <PageTitle>Academic Records</PageTitle>
 
-<h1>Academic Records</h1>
+<h2>People</h2>
 
-<p>This is Alec's page. Under construction!</p>
+@if (people is null && error is null)
+{
+    <p>Loading...</p>
+}
+else if (error is not null)
+{
+    <p class="text-danger">Unable to load people: @error</p>
+}
+else
+{
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>ID</th>
+                <th>Role</th>
+                <th>Email</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var person in people!)
+            {
+                <tr>
+                    <td>@person.FirstName @person.LastName</td>
+                    <td>@(person.StudentId ?? person.StaffId)</td>
+                    <td>@person.Role</td>
+                    <td>@person.Email</td>
+                    <td><a class="btn btn-outline-primary btn-sm" href="profile/@person.Role.ToLowerInvariant()/@person.UserId">Edit profile</a></td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private IReadOnlyList<PersonResponse>? people;
+    private string? error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            people = await Http.GetFromJsonAsync<IReadOnlyList<PersonResponse>>("api/users");
+        }
+        catch (HttpRequestException exception)
+        {
+            error = exception.Message;
+        }
+    }
+
+    [Inject]
+    private HttpClient Http { get; set; } = default!;
+
+    private sealed record PersonResponse(
+        int UserId,
+        string FirstName,
+        string LastName,
+        string Email,
+        string Role,
+        string? StudentId,
+        string? StaffId);
+
+}

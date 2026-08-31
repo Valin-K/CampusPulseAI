@@ -1,0 +1,12 @@
+{
+  "profiles": {
+    "AcademicRecords.Database": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "applicationUrl": "https://localhost:55690;http://localhost:55691"
+    }
+  }
+}

@@ -1,0 +1,212 @@
+@page "/courses/{CourseId:int}/faculty-assignments/new"
+@page "/courses/{CourseId:int}/faculty-assignments/{AssignmentId:int}/edit"
+@inject CourseApiClient CourseApi
+@inject NavigationManager Navigation
+@inject CourseUserContext UserContext
+
+<PageTitle>@(IsEdit ? "Edit faculty assignment" : "Add faculty assignment")</PageTitle>
+
+@if (!UserContext.IsCourseAdministrator)
+{
+    <StaffAccessRequired />
+}
+else
+{
+<h1>@(IsEdit ? "Edit faculty assignment" : "Add faculty assignment")</h1>
+
+@if (isLoading)
+{
+    <LoadingIndicator Message="Loading faculty assignment form..." />
+}
+else if (loadFailed)
+{
+    <FeedbackPanel Kind="FeedbackKind.Error"
+                   Title="Faculty assignment form could not be loaded"
+                   Message="@(errorMessage ?? "The faculty assignment form could not be loaded.")">
+        <NavLink class="btn btn-outline-danger" href="@CourseUrl">Back to Course</NavLink>
+    </FeedbackPanel>
+}
+else if (course is not null)
+{
+    <p class="text-muted">
+        @(IsEdit ? "Update" : "Assign") a staff member for
+        <strong>@course.Code - @course.Name</strong>.
+    </p>
+
+    @if (errorMessage is not null)
+    {
+        <FeedbackPanel Kind="FeedbackKind.Error"
+                       Title="Faculty assignment could not be saved"
+                       Message="@errorMessage" />
+    }
+
+    @if (isSaving)
+    {
+        <LoadingIndicator Message="Saving faculty assignment..." />
+    }
+
+    <EditForm Model="@form"
+              OnValidSubmit="SaveAsync"
+              FormName="faculty-assignment-form"
+              aria-busy="@isSaving">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+
+        <div class="mb-3">
+            <label class="form-label" for="staff-name">Staff name</label>
+            <InputText id="staff-name"
+                       class="form-control"
+                       autocomplete="name"
+                       @bind-Value="form.StaffName" />
+            <ValidationMessage For="@(() => form.StaffName)" />
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label" for="staff-email">Staff email</label>
+            <InputText id="staff-email"
+                       type="email"
+                       class="form-control"
+                       autocomplete="email"
+                       @bind-Value="form.StaffEmail" />
+            <ValidationMessage For="@(() => form.StaffEmail)" />
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label" for="role">Role</label>
+            <InputText id="role"
+                       class="form-control"
+                       placeholder="For example, Course Coordinator"
+                       @bind-Value="form.Role" />
+            <ValidationMessage For="@(() => form.Role)" />
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label" for="teaching-period">Teaching period</label>
+            <InputText id="teaching-period"
+                       class="form-control"
+                       placeholder="For example, Autumn 2026"
+                       @bind-Value="form.TeachingPeriod" />
+            <ValidationMessage For="@(() => form.TeachingPeriod)" />
+        </div>
+
+        <div class="d-flex flex-wrap gap-2">
+            <button class="btn btn-primary" type="submit" disabled="@isSaving">
+                @(isSaving ? "Saving..." : "Save assignment")
+            </button>
+            <NavLink class="btn btn-outline-secondary" href="@CourseUrl">Cancel</NavLink>
+        </div>
+    </EditForm>
+}
+}
+
+@code {
+    [Parameter]
+    public int CourseId { get; set; }
+
+    [Parameter]
+    public int AssignmentId { get; set; }
+
+    private FacultyAssignmentFormModel form = new();
+    private CourseDetail? course;
+    private string? errorMessage;
+    private bool isLoading = true;
+    private bool isSaving;
+    private bool loadFailed;
+
+    private bool IsEdit => AssignmentId > 0;
+    private string CourseUrl => $"/courses/{CourseId}";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!UserContext.IsCourseAdministrator)
+        {
+            isLoading = false;
+            return;
+        }
+
+        isLoading = true;
+        loadFailed = false;
+        errorMessage = null;
+
+        try
+        {
+            course = await CourseApi.GetByIdAsync(CourseId);
+
+            if (IsEdit)
+            {
+                var assignment = await CourseApi.GetFacultyAssignmentAsync(AssignmentId);
+                if (assignment.CourseId != CourseId)
+                {
+                    throw new CourseApiException(
+                        System.Net.HttpStatusCode.BadRequest,
+                        "The faculty assignment does not belong to this Course.");
+                }
+
+                form = FacultyAssignmentFormModel.FromAssignment(assignment);
+            }
+            else
+            {
+                form = new FacultyAssignmentFormModel { CourseId = CourseId };
+            }
+        }
+        catch (CourseApiException exception)
+        {
+            errorMessage = exception.Message;
+            loadFailed = true;
+        }
+        catch (HttpRequestException)
+        {
+            errorMessage = "The faculty assignment form could not be loaded. Check that the API is running.";
+            loadFailed = true;
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            errorMessage = "The faculty assignment data was returned in an unexpected format.";
+            loadFailed = true;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        isSaving = true;
+        errorMessage = null;
+        form.CourseId = CourseId;
+
+        try
+        {
+            if (IsEdit)
+            {
+                await CourseApi.UpdateFacultyAssignmentAsync(AssignmentId, form);
+            }
+            else
+            {
+                await CourseApi.CreateFacultyAssignmentAsync(form);
+            }
+
+            var message = IsEdit
+                ? "faculty-assignment-updated"
+                : "faculty-assignment-created";
+            Navigation.NavigateTo($"{CourseUrl}?message={message}");
+        }
+        catch (CourseApiException exception)
+        {
+            errorMessage = exception.Message;
+        }
+        catch (HttpRequestException)
+        {
+            errorMessage = "The faculty assignment could not be saved. Check that the API is running.";
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            errorMessage = "The faculty assignment API returned an unexpected response.";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+}

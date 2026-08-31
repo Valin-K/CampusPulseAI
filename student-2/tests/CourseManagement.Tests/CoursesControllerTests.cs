@@ -1,8 +1,8 @@
 using System.ComponentModel.DataAnnotations;
 using CourseManagement.Backend.Contracts.Courses;
 using CourseManagement.Backend.Controllers;
-using CourseManagement.Backend.Data;
-using CourseManagement.Backend.Models;
+using CourseManagement.Database.Data;
+using CourseManagement.Database.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -211,10 +211,11 @@ public sealed class CoursesControllerTests
 
     sealed class CourseTestContext(
         SqliteConnection connection,
-        CourseManagementDbContext database) : IAsyncDisposable
+        CourseManagementDbContext database,
+        TestSyllabusStorage syllabusStorage) : IAsyncDisposable
     {
         public CourseManagementDbContext Database { get; } = database;
-        public CoursesController Controller { get; } = new(database);
+        public CoursesController Controller { get; } = new(database, syllabusStorage);
 
         public static async Task<CourseTestContext> CreateAsync()
         {
@@ -227,13 +228,17 @@ public sealed class CoursesControllerTests
             var database = new CourseManagementDbContext(options);
             await database.Database.EnsureCreatedAsync();
 
-            return new CourseTestContext(connection, database);
+            return new CourseTestContext(
+                connection,
+                database,
+                TestSyllabusStorage.Create());
         }
 
         public async ValueTask DisposeAsync()
         {
             await Database.DisposeAsync();
             await connection.DisposeAsync();
+            await syllabusStorage.DisposeAsync();
         }
     }
 }
