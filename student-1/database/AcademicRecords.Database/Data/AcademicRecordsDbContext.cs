@@ -77,7 +77,7 @@ public sealed class AcademicRecordsDbContext(DbContextOptions<AcademicRecordsDbC
                     "(status IN ('Completed', 'Passed', 'Failed') AND is_finalized = 1 AND " +
                     "(status = 'Completed' OR grade_date IS NOT NULL)) OR " +
                     "(status IN ('Enrolled', 'In Progress') AND is_finalized = 0 AND grade_value IS NULL AND grade_date IS NULL)");
-                table.HasCheckConstraint("CK_Enrollments_GradeRange", "grade_value IS NULL OR grade_value BETWEEN 0 AND 100");
+                table.HasCheckConstraint("CK_Enrollments_GradeRange", "grade_value IS NULL OR CAST(grade_value AS REAL) BETWEEN 0 AND 100");
                 table.HasCheckConstraint("CK_Enrollments_Credits", "credits IS NULL OR credits > 0");
             });
             entity.HasKey(enrollment => enrollment.EnrollmentId);
@@ -87,7 +87,7 @@ public sealed class AcademicRecordsDbContext(DbContextOptions<AcademicRecordsDbC
             entity.Property(enrollment => enrollment.AcademicTermId).HasColumnName("academic_term_id");
             entity.Property(enrollment => enrollment.AcademicYear).HasColumnName("academic_year").IsRequired();
             entity.Property(enrollment => enrollment.Status).HasColumnName("status").HasMaxLength(20).IsRequired();
-            entity.Property(enrollment => enrollment.GradeValue).HasColumnName("grade_value").HasPrecision(4, 2);
+            entity.Property(enrollment => enrollment.GradeValue).HasColumnName("grade_value").HasPrecision(5, 2);
             entity.Property(enrollment => enrollment.Credits).HasColumnName("credits").HasPrecision(4, 1);
             entity.Property(enrollment => enrollment.GradeDate).HasColumnName("grade_date").HasColumnType("DATE");
             entity.Property(enrollment => enrollment.IsFinalized).HasColumnName("is_finalized").IsRequired();
