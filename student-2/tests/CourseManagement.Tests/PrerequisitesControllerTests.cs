@@ -311,11 +311,12 @@ public sealed class PrerequisitesControllerTests
 
     sealed class PrerequisiteTestContext(
         SqliteConnection connection,
-        CourseManagementDbContext database) : IAsyncDisposable
+        CourseManagementDbContext database,
+        TestSyllabusStorage syllabusStorage) : IAsyncDisposable
     {
         public CourseManagementDbContext Database { get; } = database;
         public PrerequisitesController Prerequisites { get; } = new(database);
-        public CoursesController Courses { get; } = new(database);
+        public CoursesController Courses { get; } = new(database, syllabusStorage);
 
         public static async Task<PrerequisiteTestContext> CreateAsync()
         {
@@ -329,13 +330,17 @@ public sealed class PrerequisitesControllerTests
             var database = new CourseManagementDbContext(options);
             await database.Database.EnsureCreatedAsync();
 
-            return new PrerequisiteTestContext(connection, database);
+            return new PrerequisiteTestContext(
+                connection,
+                database,
+                TestSyllabusStorage.Create());
         }
 
         public async ValueTask DisposeAsync()
         {
             await Database.DisposeAsync();
             await connection.DisposeAsync();
+            await syllabusStorage.DisposeAsync();
         }
     }
 }

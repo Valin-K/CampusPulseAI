@@ -30,6 +30,7 @@ services:
       dockerfile: student-2/backend/CourseManagement.Backend/Dockerfile
     environment:
       - ConnectionStrings__CourseManagementDatabase=Data Source=/app/data/course-management.db;Foreign Keys=True
+      - SyllabusStorage__RootPath=/app/data/syllabi
     volumes:
       - coursemanagement-data:/app/data
 

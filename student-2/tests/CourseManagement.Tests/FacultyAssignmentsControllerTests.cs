@@ -220,11 +220,12 @@ public sealed class FacultyAssignmentsControllerTests
 
     sealed class FacultyAssignmentTestContext(
         SqliteConnection connection,
-        CourseManagementDbContext database) : IAsyncDisposable
+        CourseManagementDbContext database,
+        TestSyllabusStorage syllabusStorage) : IAsyncDisposable
     {
         public CourseManagementDbContext Database { get; } = database;
         public FacultyAssignmentsController Assignments { get; } = new(database);
-        public CoursesController Courses { get; } = new(database);
+        public CoursesController Courses { get; } = new(database, syllabusStorage);
 
         public static async Task<FacultyAssignmentTestContext> CreateAsync()
         {
@@ -238,13 +239,17 @@ public sealed class FacultyAssignmentsControllerTests
             var database = new CourseManagementDbContext(options);
             await database.Database.EnsureCreatedAsync();
 
-            return new FacultyAssignmentTestContext(connection, database);
+            return new FacultyAssignmentTestContext(
+                connection,
+                database,
+                TestSyllabusStorage.Create());
         }
 
         public async ValueTask DisposeAsync()
         {
             await Database.DisposeAsync();
             await connection.DisposeAsync();
+            await syllabusStorage.DisposeAsync();
         }
     }
 }
