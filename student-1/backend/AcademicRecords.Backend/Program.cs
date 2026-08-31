@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using AcademicRecords.Backend;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -110,6 +111,12 @@ app.MapGet("/api/students/{studentId}", async (string studentId, IHttpClientFact
     return Results.Content(content, response.Content.Headers.ContentType?.MediaType ?? "application/json", statusCode: (int)response.StatusCode);
 });
 
+app.MapGet("/api/students/{studentId}/wam", async (string studentId, IHttpClientFactory clients, CancellationToken cancellationToken) =>
+    await GetStudentStatisticAsync(studentId, false, clients, cancellationToken));
+
+app.MapGet("/api/students/{studentId}/gpa", async (string studentId, IHttpClientFactory clients, CancellationToken cancellationToken) =>
+    await GetStudentStatisticAsync(studentId, true, clients, cancellationToken));
+
 app.MapPut("/api/students/{studentId}", async (string studentId, HttpRequest request, IHttpClientFactory clients, CancellationToken cancellationToken) =>
 {
     using var databaseRequest = new HttpRequestMessage(HttpMethod.Put, $"/api/students/{Uri.EscapeDataString(studentId)}")
@@ -126,6 +133,32 @@ app.MapControllers();
 
 app.Run();
 
+static async Task<IResult> GetStudentStatisticAsync(string studentId, bool gpa, IHttpClientFactory clients, CancellationToken cancellationToken)
+{
+    using var response = await clients.CreateClient("academicRecordsDatabase")
+        .GetAsync($"/api/students/{Uri.EscapeDataString(studentId)}", cancellationToken);
+    if (!response.IsSuccessStatusCode)
+    {
+        var content = await response.Content.ReadAsStringAsync(cancellationToken);
+        return Results.Content(content, response.Content.Headers.ContentType?.MediaType ?? "application/json", statusCode: (int)response.StatusCode);
+    }
+
+    var profile = await response.Content.ReadFromJsonAsync<StudentStatisticsProfile>(cancellationToken);
+    if (profile is null)
+    {
+        return Results.Problem("The student profile response was invalid.");
+    }
+
+    var enrollments = (profile.Enrollments ?? []).Select(enrollment =>
+        new GradedEnrollment(enrollment.GradeValue, enrollment.Credits, enrollment.IsFinalized));
+    var statistic = gpa
+        ? StudentStatisticsCalculator.CalculateGpa(enrollments)
+        : StudentStatisticsCalculator.CalculateWam(enrollments);
+
+    return Results.Ok(new StudentStatisticResponse(profile.StudentId, gpa ? "GPA" : "WAM",
+        statistic.Value, statistic.GradedEnrollmentCount, statistic.TotalCredits));
+}
+
 public sealed record UserResponse(
     int UserId,
     string FirstName,
@@ -134,3 +167,14 @@ public sealed record UserResponse(
     string Role,
     string? StudentId,
     string? StaffId);
+
+public sealed record StudentStatisticsProfile(string StudentId, List<StudentStatisticsEnrollment>? Enrollments);
+
+public sealed record StudentStatisticsEnrollment(decimal? Credits, decimal? GradeValue, bool IsFinalized);
+
+public sealed record StudentStatisticResponse(
+    string StudentId,
+    string Statistic,
+    decimal? Value,
+    int GradedEnrollmentCount,
+    decimal TotalCredits);

@@ -1,4 +1,5 @@
-﻿using AcademicRecords.Database.Data;
+﻿using AcademicRecords.Backend;
+using AcademicRecords.Database.Data;
 using AcademicRecords.Database.Models;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -356,6 +357,46 @@ namespace AcademicRecords.Tests
             });
 
             Assert.ThrowsAsync<DbUpdateException>(async () => await database.SaveChangesAsync());
+        }
+
+        [Test]
+        public void WamIsWeightedByCreditsAndIgnoresUngradedEnrollments()
+        {
+            var enrollments = new[]
+            {
+                new GradedEnrollment(70m, 6m, true),
+                new GradedEnrollment(90m, 3m, true),
+                new GradedEnrollment(100m, 6m, false),
+                new GradedEnrollment(null, 6m, true)
+            };
+
+            var result = StudentStatisticsCalculator.CalculateWam(enrollments);
+
+            Assert.That(result.Value, Is.EqualTo(76.6666666667m).Within(0.000000001m));
+            Assert.That(result.GradedEnrollmentCount, Is.EqualTo(2));
+            Assert.That(result.TotalCredits, Is.EqualTo(9m));
+        }
+
+        [Test]
+        public void GpaUsesTheAustralianSevenPointScale()
+        {
+            var enrollments = new[]
+            {
+                new GradedEnrollment(85m, 6m, true),
+                new GradedEnrollment(75m, 3m, true),
+                new GradedEnrollment(65m, 1m, true),
+                new GradedEnrollment(50m, 1m, true),
+                new GradedEnrollment(49.99m, 1m, true)
+            };
+
+            var result = StudentStatisticsCalculator.CalculateGpa(enrollments);
+
+            Assert.That(result.Value, Is.EqualTo(5.75m).Within(0.000000001m));
+            Assert.That(StudentStatisticsCalculator.GradePoints(85m), Is.EqualTo(7m));
+            Assert.That(StudentStatisticsCalculator.GradePoints(75m), Is.EqualTo(6m));
+            Assert.That(StudentStatisticsCalculator.GradePoints(65m), Is.EqualTo(5m));
+            Assert.That(StudentStatisticsCalculator.GradePoints(50m), Is.EqualTo(4m));
+            Assert.That(StudentStatisticsCalculator.GradePoints(49.99m), Is.EqualTo(0m));
         }
 
         private static AcademicRecordsDbContext CreateDatabase(SqliteConnection connection) =>
