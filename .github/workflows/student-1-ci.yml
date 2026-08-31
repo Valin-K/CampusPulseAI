@@ -19,6 +19,7 @@ jobs:
   student-1-validation:
     name: Student 1 validation
     runs-on: campuspulse-runners
+    timeout-minutes: 20
 
     steps:
       - name: Check out source
@@ -33,7 +34,132 @@ jobs:
           filters: |
             student1:
               - 'student-1/**'
+              - 'docker-compose.yml'
+              - 'docker-compose.override.yml'
+              - 'docker/frontend/AcademicRecords.Dockerfile'
+              - 'Directory.Packages.props'
+              - 'global.json'
+              - '.dockerignore'
+              - '.github/workflows/student-1-ci.yml'
 
-      - name: Placeholder validation
+      - name: Set up .NET SDK
         if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.student1 == 'true'
-        run: echo "Student 1 validation is not implemented yet."
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.400
+
+      - name: Cache NuGet packages
+        if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.student1 == 'true'
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', 'Directory.Packages.props', 'global.json') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: No Student 1 changes
+        if: github.event_name != 'workflow_dispatch' && steps.filter.outputs.student1 != 'true'
+        run: echo "No Student 1 changes detected."
+
+      - name: Restore Student 1 projects
+        if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.student1 == 'true'
+        run: |
+          dotnet restore student-1/backend/AcademicRecords.Backend/AcademicRecords.Backend.csproj
+          dotnet restore student-1/frontend/AcademicRecords.Frontend/AcademicRecords.Frontend.csproj
+          dotnet restore student-1/database/AcademicRecords.Database/AcademicRecords.Database.csproj
+          dotnet restore student-1/tests/AcademicRecords.Tests/AcademicRecords.Tests.csproj
+
+      - name: Build backend
+        if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.student1 == 'true'
+        run: dotnet build student-1/backend/AcademicRecords.Backend/AcademicRecords.Backend.csproj --configuration Release --no-restore
+
+      - name: Build frontend
+        if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.student1 == 'true'
+        run: dotnet build student-1/frontend/AcademicRecords.Frontend/AcademicRecords.Frontend.csproj --configuration Release --no-restore
+
+      - name: Build database API
+        if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.student1 == 'true'
+        run: dotnet build student-1/database/AcademicRecords.Database/AcademicRecords.Database.csproj --configuration Release --no-restore
+
+      - name: Build test project
+        if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.student1 == 'true'
+        run: dotnet build student-1/tests/AcademicRecords.Tests/AcademicRecords.Tests.csproj --configuration Release --no-restore
+
+      - name: Run NUnit tests
+        if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.student1 == 'true'
+        run: dotnet test student-1/tests/AcademicRecords.Tests/AcademicRecords.Tests.csproj --configuration Release --no-build --no-restore --logger "trx;LogFileName=academic-records-tests.trx" --results-directory TestResults
+
+      - name: Upload NUnit test results
+        if: always() && (github.event_name == 'workflow_dispatch' || steps.filter.outputs.student1 == 'true')
+        uses: actions/upload-artifact@v4
+        with:
+          name: student-1-test-results
+          path: TestResults/*.trx
+          if-no-files-found: ignore
+
+      - name: Build and start Student 1 containers
+        if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.student1 == 'true'
+        shell: bash
+        run: |
+          docker compose -f docker-compose.yml -p student-1-ci config --quiet
+          docker compose -f docker-compose.yml -p student-1-ci build academicrecords.database academicrecords.backend academicrecords.frontend
+          docker compose -f docker-compose.yml -p student-1-ci up --detach --wait --no-build academicrecords.database academicrecords.backend academicrecords.frontend
+
+      - name: Smoke test Student 1 endpoints
+        if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.student1 == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          endpoints=(
+            "http://localhost:5020/health"
+            "http://localhost:5020/api/users"
+            "http://localhost:5020/api/students/by-user/1"
+            "http://localhost:8081/"
+          )
+
+          for endpoint in "${endpoints[@]}"; do
+            reachable=0
+            for attempt in {1..30}; do
+              if curl --silent --show-error --fail --max-time 5 "$endpoint" > /dev/null; then
+                reachable=1
+                break
+              fi
+              sleep 2
+            done
+
+            if [ "$reachable" -eq 0 ]; then
+              echo "Container endpoint did not respond successfully: $endpoint"
+              exit 1
+            fi
+          done
+
+          student_response=$(curl --silent --show-error --fail --max-time 5 \
+            -X POST http://localhost:5020/api/students/enroll \
+            -H 'Content-Type: application/json' \
+            -d '{"firstName":"CI","lastName":"Student","email":"ci.student@example.edu","dateOfBirth":"2000-01-01","mailingAddress":"1 CI Way","emergencyContactName":"CI Contact","emergencyContactPhone":"0400000000","phoneNumber":"0400000001","degree":"Bachelor of Testing","major":"Software Engineering","academicTermId":15,"courseCode":"CI999","academicYear":2026}')
+          student_id=$(printf '%s' "$student_response" | jq --raw-output '.studentId')
+          if [ -z "$student_id" ] || [ "$student_id" = "null" ]; then
+            echo "Student enrollment response did not contain a studentId: $student_response"
+            exit 1
+          fi
+
+          curl --silent --show-error --fail --max-time 5 \
+            "http://localhost:5020/api/students/$student_id" > /dev/null
+
+          curl --silent --show-error --fail --max-time 5 \
+            -X PUT "http://localhost:5020/api/students/$student_id" \
+            -H 'Content-Type: application/json' \
+            -d '{"firstName":"Updated CI","lastName":"Student","email":"updated.ci.student@example.edu","dateOfBirth":"2000-01-01","mailingAddress":"2 CI Way","emergencyContactName":"Updated CI Contact","emergencyContactPhone":"0400000000","phoneNumber":"0400000002","degree":"Bachelor of Testing","major":"Quality Engineering"}' > /dev/null
+
+      - name: Show container diagnostics on failure
+        if: failure() && (github.event_name == 'workflow_dispatch' || steps.filter.outputs.student1 == 'true')
+        shell: bash
+        run: |
+          docker compose -f docker-compose.yml -p student-1-ci ps
+          docker compose -f docker-compose.yml -p student-1-ci logs --no-color academicrecords.database academicrecords.backend academicrecords.frontend
+
+      - name: Remove Student 1 containers
+        if: always() && (github.event_name == 'workflow_dispatch' || steps.filter.outputs.student1 == 'true')
+        shell: bash
+        run: docker compose -f docker-compose.yml -p student-1-ci down --volumes --remove-orphans
