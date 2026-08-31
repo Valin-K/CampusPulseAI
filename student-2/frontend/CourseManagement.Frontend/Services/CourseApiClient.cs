@@ -213,7 +213,18 @@ public sealed class CourseApiClient(HttpClient httpClient)
             return;
         }
 
-        var problem = await response.Content.ReadFromJsonAsync<ApiProblemDetails>(cancellationToken);
+        ApiProblemDetails? problem = null;
+        try
+        {
+            problem = await response.Content.ReadFromJsonAsync<ApiProblemDetails>(cancellationToken);
+        }
+        catch (JsonException)
+        {
+        }
+        catch (NotSupportedException)
+        {
+        }
+
         var validationMessages = problem?.Errors?
             .SelectMany(error => error.Value)
             .Where(message => !string.IsNullOrWhiteSpace(message))

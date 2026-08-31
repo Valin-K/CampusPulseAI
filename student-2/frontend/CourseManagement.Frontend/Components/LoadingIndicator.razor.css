@@ -1,0 +1,12 @@
+.loading-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: .65rem;
+    margin-bottom: 1rem;
+    padding: .75rem 1rem;
+    border: 1px solid var(--university-border);
+    border-radius: var(--radius-sm);
+    color: var(--university-navy);
+    background: var(--university-sky);
+    font-weight: 700;
+}

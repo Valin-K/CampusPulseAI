@@ -7,16 +7,19 @@
 
 @if (isLoading)
 {
-    <p role="status">Loading Course details...</p>
+    <LoadingIndicator Message="Loading Course details..." />
 }
-else if (errorMessage is not null)
+else if (loadFailed)
 {
-    <div class="alert alert-danger" role="alert">@errorMessage</div>
-    <NavLink class="btn btn-outline-secondary" href="courses">Back to Courses</NavLink>
+    <FeedbackPanel Kind="FeedbackKind.Error"
+                   Title="Course details could not be loaded"
+                   Message="@(errorMessage ?? "Course details could not be loaded.")">
+        <NavLink class="btn btn-outline-danger" href="courses">Back to Courses</NavLink>
+    </FeedbackPanel>
 }
 else if (course is not null)
 {
-    <div class="d-flex justify-content-between align-items-start mb-3">
+    <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
         <div>
             <h1>@course.Code - @course.Name</h1>
             @if (course.IsActive)
@@ -33,7 +36,20 @@ else if (course is not null)
 
     @if (statusMessage is not null)
     {
-        <div class="alert alert-success" role="status">@statusMessage</div>
+        <FeedbackPanel Kind="FeedbackKind.Success"
+                       Message="@statusMessage" />
+    }
+
+    @if (errorMessage is not null)
+    {
+        <FeedbackPanel Kind="FeedbackKind.Error"
+                       Title="The action could not be completed"
+                       Message="@errorMessage" />
+    }
+
+    @if (operationMessage is not null)
+    {
+        <LoadingIndicator Message="@operationMessage" />
     }
 
     <dl class="row">
@@ -51,12 +67,12 @@ else if (course is not null)
     </dl>
 
     <section class="mt-4" aria-labelledby="prerequisites-heading">
-        <div class="d-flex justify-content-between align-items-center mb-3">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3">
             <div>
                 <h2 id="prerequisites-heading" class="h4 mb-1">Prerequisites</h2>
                 <p class="text-muted mb-0">Courses and minimum grades required before enrolment.</p>
             </div>
-            <div class="d-flex gap-2">
+            <div class="d-flex flex-wrap gap-2">
                 <NavLink class="btn btn-outline-primary"
                          href="@($"courses/{course.Id}/eligibility")">
                     Check eligibility
@@ -70,46 +86,48 @@ else if (course is not null)
 
         @if (course.Prerequisites.Count == 0)
         {
-            <div class="alert alert-info" role="status">
-                This Course has no prerequisites.
-            </div>
+            <FeedbackPanel Kind="FeedbackKind.Empty"
+                           Title="No prerequisites"
+                           Message="This Course has no prerequisite requirements." />
         }
         else
         {
-            <table class="table table-striped">
-                <thead>
-                    <tr>
-                        <th scope="col">Required Course</th>
-                        <th scope="col">Minimum grade</th>
-                        <th scope="col">Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var prerequisite in course.Prerequisites)
-                    {
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
                         <tr>
-                            <td>@prerequisite.RequiredCourseCode</td>
-                            <td>@(prerequisite.MinimumGrade ?? "Pass")</td>
-                            <td class="text-nowrap">
-                                <NavLink class="btn btn-sm btn-outline-secondary me-2"
-                                         href="@($"courses/{course.Id}/prerequisites/{prerequisite.Id}/edit")">
-                                    Edit
-                                </NavLink>
-                                <button class="btn btn-sm btn-outline-danger"
-                                        disabled="@isSaving"
-                                        @onclick="() => DeletePrerequisiteAsync(prerequisite)">
-                                    Remove
-                                </button>
-                            </td>
+                            <th scope="col">Required Course</th>
+                            <th scope="col">Minimum grade</th>
+                            <th scope="col">Actions</th>
                         </tr>
-                    }
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        @foreach (var prerequisite in course.Prerequisites)
+                        {
+                            <tr>
+                                <td>@prerequisite.RequiredCourseCode</td>
+                                <td>@(prerequisite.MinimumGrade ?? "Pass")</td>
+                                <td class="text-nowrap">
+                                    <NavLink class="btn btn-sm btn-outline-secondary me-2"
+                                             href="@($"courses/{course.Id}/prerequisites/{prerequisite.Id}/edit")">
+                                        Edit
+                                    </NavLink>
+                                    <button class="btn btn-sm btn-outline-danger"
+                                            disabled="@isSaving"
+                                            @onclick="() => DeletePrerequisiteAsync(prerequisite)">
+                                        Remove
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
         }
     </section>
 
     <section class="mt-4" aria-labelledby="faculty-assignments-heading">
-        <div class="d-flex justify-content-between align-items-center mb-3">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3">
             <div>
                 <h2 id="faculty-assignments-heading" class="h4 mb-1">Faculty assignments</h2>
                 <p class="text-muted mb-0">
@@ -124,9 +142,9 @@ else if (course is not null)
 
         @if (course.FacultyAssignments.Count == 0)
         {
-            <div class="alert alert-info" role="status">
-                This Course has no faculty assignments.
-            </div>
+            <FeedbackPanel Kind="FeedbackKind.Empty"
+                           Title="No faculty assignments"
+                           Message="No staff members are assigned to this Course." />
         }
         else
         {
@@ -172,7 +190,7 @@ else if (course is not null)
         }
     </section>
 
-    <div class="d-flex gap-2">
+    <div class="d-flex flex-wrap gap-2">
         <NavLink class="btn btn-primary" href="@($"courses/{course.Id}/edit")">Edit Course</NavLink>
         <button class="btn btn-outline-warning" disabled="@isSaving" @onclick="ToggleStatusAsync">
             @(course.IsActive ? "Deactivate" : "Reactivate")
@@ -193,13 +211,17 @@ else if (course is not null)
     private CourseDetail? course;
     private string? errorMessage;
     private string? statusMessage;
+    private string? operationMessage;
     private bool isLoading = true;
     private bool isSaving;
+    private bool loadFailed;
 
     protected override async Task OnParametersSetAsync()
     {
         isLoading = true;
+        loadFailed = false;
         errorMessage = null;
+        operationMessage = null;
         statusMessage = Message switch
         {
             "created" => "Course created successfully.",
@@ -218,14 +240,17 @@ else if (course is not null)
         catch (CourseApiException exception)
         {
             errorMessage = exception.Message;
+            loadFailed = true;
         }
         catch (HttpRequestException)
         {
             errorMessage = "Course details could not be loaded. Check that the Course Management API is running.";
+            loadFailed = true;
         }
         catch (System.Text.Json.JsonException)
         {
             errorMessage = "Course details were returned in an unexpected format.";
+            loadFailed = true;
         }
         finally
         {
@@ -243,6 +268,9 @@ else if (course is not null)
         isSaving = true;
         errorMessage = null;
         statusMessage = null;
+        operationMessage = course.IsActive
+            ? "Deactivating Course..."
+            : "Reactivating Course...";
 
         try
         {
@@ -260,9 +288,14 @@ else if (course is not null)
         {
             errorMessage = "The Course status could not be updated. Check that the API is running.";
         }
+        catch (System.Text.Json.JsonException)
+        {
+            errorMessage = "The Course API returned an unexpected status response.";
+        }
         finally
         {
             isSaving = false;
+            operationMessage = null;
         }
     }
 
@@ -284,6 +317,7 @@ else if (course is not null)
         isSaving = true;
         errorMessage = null;
         statusMessage = null;
+        operationMessage = $"Removing {prerequisite.RequiredCourseCode} prerequisite...";
 
         try
         {
@@ -299,9 +333,14 @@ else if (course is not null)
         {
             errorMessage = "The prerequisite could not be removed. Check that the API is running.";
         }
+        catch (System.Text.Json.JsonException)
+        {
+            errorMessage = "Course details could not be refreshed after removing the prerequisite.";
+        }
         finally
         {
             isSaving = false;
+            operationMessage = null;
         }
     }
 
@@ -323,6 +362,7 @@ else if (course is not null)
         isSaving = true;
         errorMessage = null;
         statusMessage = null;
+        operationMessage = $"Removing {assignment.StaffName} faculty assignment...";
 
         try
         {
@@ -338,9 +378,14 @@ else if (course is not null)
         {
             errorMessage = "The faculty assignment could not be removed. Check that the API is running.";
         }
+        catch (System.Text.Json.JsonException)
+        {
+            errorMessage = "Course details could not be refreshed after removing the faculty assignment.";
+        }
         finally
         {
             isSaving = false;
+            operationMessage = null;
         }
     }
 
@@ -362,6 +407,7 @@ else if (course is not null)
         isSaving = true;
         errorMessage = null;
         statusMessage = null;
+        operationMessage = $"Deleting {course.Code}...";
 
         try
         {
@@ -379,6 +425,7 @@ else if (course is not null)
         finally
         {
             isSaving = false;
+            operationMessage = null;
         }
     }
 }

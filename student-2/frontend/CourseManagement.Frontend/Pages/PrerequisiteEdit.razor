@@ -9,12 +9,15 @@
 
 @if (isLoading)
 {
-    <p role="status">Loading prerequisite form...</p>
+    <LoadingIndicator Message="Loading prerequisite form..." />
 }
 else if (loadFailed)
 {
-    <div class="alert alert-danger" role="alert">@errorMessage</div>
-    <NavLink class="btn btn-outline-secondary" href="@CourseUrl">Back to Course</NavLink>
+    <FeedbackPanel Kind="FeedbackKind.Error"
+                   Title="Prerequisite form could not be loaded"
+                   Message="@(errorMessage ?? "The prerequisite form could not be loaded.")">
+        <NavLink class="btn btn-outline-danger" href="@CourseUrl">Back to Course</NavLink>
+    </FeedbackPanel>
 }
 else if (course is not null)
 {
@@ -25,18 +28,28 @@ else if (course is not null)
 
     @if (errorMessage is not null)
     {
-        <div class="alert alert-danger" role="alert">@errorMessage</div>
+        <FeedbackPanel Kind="FeedbackKind.Error"
+                       Title="Prerequisite could not be saved"
+                       Message="@errorMessage" />
+    }
+
+    @if (isSaving)
+    {
+        <LoadingIndicator Message="Saving prerequisite..." />
     }
 
     @if (availableCourses.Count == 0)
     {
-        <div class="alert alert-info" role="status">
-            No other Courses are available to use as a prerequisite.
-        </div>
+        <FeedbackPanel Kind="FeedbackKind.Empty"
+                       Title="No prerequisite Courses available"
+                       Message="Create another Course before adding a prerequisite relationship." />
     }
     else
     {
-        <EditForm Model="@form" OnValidSubmit="SaveAsync" FormName="prerequisite-form">
+        <EditForm Model="@form"
+                  OnValidSubmit="SaveAsync"
+                  FormName="prerequisite-form"
+                  aria-busy="@isSaving">
             <DataAnnotationsValidator />
             <ValidationSummary />
 
@@ -70,7 +83,7 @@ else if (course is not null)
                 <ValidationMessage For="@(() => form.MinimumGrade)" />
             </div>
 
-            <div class="d-flex gap-2">
+            <div class="d-flex flex-wrap gap-2">
                 <button class="btn btn-primary" type="submit" disabled="@isSaving">
                     @(isSaving ? "Saving..." : "Save prerequisite")
                 </button>
@@ -178,6 +191,10 @@ else if (course is not null)
         catch (HttpRequestException)
         {
             errorMessage = "The prerequisite could not be saved. Check that the API is running.";
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            errorMessage = "The prerequisite API returned an unexpected response.";
         }
         finally
         {
