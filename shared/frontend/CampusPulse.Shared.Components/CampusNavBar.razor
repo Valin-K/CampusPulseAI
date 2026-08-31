@@ -1,29 +1,12 @@
-<header class="campus-topbar">
-    <a class="campus-brand" href="@HomeHref" aria-label="CampusPulse home">
-        <span class="campus-mark" aria-hidden="true">CP</span>
-        <span class="campus-brand-copy"><strong>CampusPulse</strong><small>University services</small></span>
-    </a>
-
-    <span class="campus-divider" aria-hidden="true"></span>
-
-    <div class="campus-app-name">
-        <span>@SectionLabel</span>
-        <strong>@PageName</strong>
-    </div>
-
-    <nav class="campus-global-nav" aria-label="Application navigation">
-        <a href="@PortalHref">All services</a>
-    </nav>
-
-    <div class="campus-user" aria-label="Current student">
-        <span class="campus-avatar" aria-hidden="true">@UserInitials</span>
-        <span><strong>@UserName</strong><small>@UserDetails</small></span>
-    </div>
-</header>
-
-<div class="campus-context-bar">
-    <span><i aria-hidden="true"></i> Student portal</span>
-</div>
+<campus-nav-bar page-name="@PageName"
+                section-label="@SectionLabel"
+                user-name="@UserName"
+                user-details="@UserDetails"
+                user-initials="@UserInitials"
+                home-href="@HomeHref"
+                portal-href="@PortalHref"
+                context-label="@ContextLabel">
+</campus-nav-bar>
 
 @code {
     [Parameter, EditorRequired] public string PageName { get; set; } = string.Empty;
@@ -33,4 +16,5 @@
     [Parameter] public string UserInitials { get; set; } = "ST";
     [Parameter] public string HomeHref { get; set; } = "/";
     [Parameter] public string PortalHref { get; set; } = "http://localhost:8080";
+    [Parameter] public string ContextLabel { get; set; } = "Student portal";
 }

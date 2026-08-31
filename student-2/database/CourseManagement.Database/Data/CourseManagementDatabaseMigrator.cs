@@ -2,7 +2,7 @@ using System.Data;
 using System.Data.Common;
 using Microsoft.EntityFrameworkCore;
 
-namespace CourseManagement.Backend.Data;
+namespace CourseManagement.Database.Data;
 
 public static class CourseManagementDatabaseMigrator
 {

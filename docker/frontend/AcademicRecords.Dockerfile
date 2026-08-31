@@ -11,5 +11,4 @@ RUN dotnet publish "./AcademicRecords.Frontend.csproj" -c $BUILD_CONFIGURATION -
 FROM nginx:alpine AS final
 WORKDIR /usr/share/nginx/html
 COPY --from=build /app/publish/wwwroot .
-COPY --from=build /app/publish/wwwroot/docker-index.html ./index.html
 EXPOSE 80

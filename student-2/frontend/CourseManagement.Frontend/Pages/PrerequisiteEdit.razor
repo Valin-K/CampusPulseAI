@@ -1,0 +1,187 @@
+@page "/courses/{CourseId:int}/prerequisites/new"
+@page "/courses/{CourseId:int}/prerequisites/{PrerequisiteId:int}/edit"
+@inject CourseApiClient CourseApi
+@inject NavigationManager Navigation
+
+<PageTitle>@(IsEdit ? "Edit prerequisite" : "Add prerequisite")</PageTitle>
+
+<h1>@(IsEdit ? "Edit prerequisite" : "Add prerequisite")</h1>
+
+@if (isLoading)
+{
+    <p role="status">Loading prerequisite form...</p>
+}
+else if (loadFailed)
+{
+    <div class="alert alert-danger" role="alert">@errorMessage</div>
+    <NavLink class="btn btn-outline-secondary" href="@CourseUrl">Back to Course</NavLink>
+}
+else if (course is not null)
+{
+    <p class="text-muted">
+        Configure a required Course and minimum grade for
+        <strong>@course.Code - @course.Name</strong>.
+    </p>
+
+    @if (errorMessage is not null)
+    {
+        <div class="alert alert-danger" role="alert">@errorMessage</div>
+    }
+
+    @if (availableCourses.Count == 0)
+    {
+        <div class="alert alert-info" role="status">
+            No other Courses are available to use as a prerequisite.
+        </div>
+    }
+    else
+    {
+        <EditForm Model="@form" OnValidSubmit="SaveAsync" FormName="prerequisite-form">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+
+            <div class="mb-3">
+                <label class="form-label" for="required-course">Required Course</label>
+                <InputSelect id="required-course"
+                             class="form-select"
+                             @bind-Value="form.RequiredCourseId">
+                    <option value="0">Select a Course</option>
+                    @foreach (var candidate in availableCourses)
+                    {
+                        <option value="@candidate.Id">
+                            @candidate.Code - @candidate.Name
+                            @(!candidate.IsActive ? "(Inactive)" : null)
+                        </option>
+                    }
+                </InputSelect>
+                <ValidationMessage For="@(() => form.RequiredCourseId)" />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label" for="minimum-grade">Minimum grade</label>
+                <InputSelect id="minimum-grade"
+                             class="form-select"
+                             @bind-Value="form.MinimumGrade">
+                    @foreach (var grade in GradeOptions.Values)
+                    {
+                        <option value="@grade">@grade</option>
+                    }
+                </InputSelect>
+                <ValidationMessage For="@(() => form.MinimumGrade)" />
+            </div>
+
+            <div class="d-flex gap-2">
+                <button class="btn btn-primary" type="submit" disabled="@isSaving">
+                    @(isSaving ? "Saving..." : "Save prerequisite")
+                </button>
+                <NavLink class="btn btn-outline-secondary" href="@CourseUrl">Cancel</NavLink>
+            </div>
+        </EditForm>
+    }
+}
+
+@code {
+    [Parameter]
+    public int CourseId { get; set; }
+
+    [Parameter]
+    public int PrerequisiteId { get; set; }
+
+    private PrerequisiteFormModel form = new();
+    private CourseDetail? course;
+    private IReadOnlyList<CourseSummary> availableCourses = [];
+    private string? errorMessage;
+    private bool isLoading = true;
+    private bool isSaving;
+    private bool loadFailed;
+
+    private bool IsEdit => PrerequisiteId > 0;
+    private string CourseUrl => $"/courses/{CourseId}";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        isLoading = true;
+        loadFailed = false;
+        errorMessage = null;
+
+        try
+        {
+            course = await CourseApi.GetByIdAsync(CourseId);
+            var courses = await CourseApi.GetAllAsync();
+            availableCourses = courses
+                .Where(candidate => candidate.Id != CourseId)
+                .OrderBy(candidate => candidate.Code)
+                .ToList();
+
+            if (IsEdit)
+            {
+                var prerequisite = await CourseApi.GetPrerequisiteAsync(PrerequisiteId);
+                if (prerequisite.CourseId != CourseId)
+                {
+                    throw new CourseApiException(
+                        System.Net.HttpStatusCode.BadRequest,
+                        "The prerequisite does not belong to this Course.");
+                }
+
+                form = PrerequisiteFormModel.FromPrerequisite(prerequisite);
+            }
+            else
+            {
+                form = new PrerequisiteFormModel { CourseId = CourseId };
+            }
+        }
+        catch (CourseApiException exception)
+        {
+            errorMessage = exception.Message;
+            loadFailed = true;
+        }
+        catch (HttpRequestException)
+        {
+            errorMessage = "The prerequisite form could not be loaded. Check that the API is running.";
+            loadFailed = true;
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            errorMessage = "The prerequisite data was returned in an unexpected format.";
+            loadFailed = true;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        isSaving = true;
+        errorMessage = null;
+        form.CourseId = CourseId;
+
+        try
+        {
+            if (IsEdit)
+            {
+                await CourseApi.UpdatePrerequisiteAsync(PrerequisiteId, form);
+            }
+            else
+            {
+                await CourseApi.CreatePrerequisiteAsync(form);
+            }
+
+            var message = IsEdit ? "prerequisite-updated" : "prerequisite-created";
+            Navigation.NavigateTo($"{CourseUrl}?message={message}");
+        }
+        catch (CourseApiException exception)
+        {
+            errorMessage = exception.Message;
+        }
+        catch (HttpRequestException)
+        {
+            errorMessage = "The prerequisite could not be saved. Check that the API is running.";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+}

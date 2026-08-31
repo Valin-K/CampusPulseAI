@@ -50,6 +50,128 @@ else if (course is not null)
         <dd class="col-sm-9">@(course.SyllabusFileName ?? "No syllabus uploaded")</dd>
     </dl>
 
+    <section class="mt-4" aria-labelledby="prerequisites-heading">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+                <h2 id="prerequisites-heading" class="h4 mb-1">Prerequisites</h2>
+                <p class="text-muted mb-0">Courses and minimum grades required before enrolment.</p>
+            </div>
+            <div class="d-flex gap-2">
+                <NavLink class="btn btn-outline-primary"
+                         href="@($"courses/{course.Id}/eligibility")">
+                    Check eligibility
+                </NavLink>
+                <NavLink class="btn btn-primary"
+                         href="@($"courses/{course.Id}/prerequisites/new")">
+                    Add prerequisite
+                </NavLink>
+            </div>
+        </div>
+
+        @if (course.Prerequisites.Count == 0)
+        {
+            <div class="alert alert-info" role="status">
+                This Course has no prerequisites.
+            </div>
+        }
+        else
+        {
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th scope="col">Required Course</th>
+                        <th scope="col">Minimum grade</th>
+                        <th scope="col">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var prerequisite in course.Prerequisites)
+                    {
+                        <tr>
+                            <td>@prerequisite.RequiredCourseCode</td>
+                            <td>@(prerequisite.MinimumGrade ?? "Pass")</td>
+                            <td class="text-nowrap">
+                                <NavLink class="btn btn-sm btn-outline-secondary me-2"
+                                         href="@($"courses/{course.Id}/prerequisites/{prerequisite.Id}/edit")">
+                                    Edit
+                                </NavLink>
+                                <button class="btn btn-sm btn-outline-danger"
+                                        disabled="@isSaving"
+                                        @onclick="() => DeletePrerequisiteAsync(prerequisite)">
+                                    Remove
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </section>
+
+    <section class="mt-4" aria-labelledby="faculty-assignments-heading">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+                <h2 id="faculty-assignments-heading" class="h4 mb-1">Faculty assignments</h2>
+                <p class="text-muted mb-0">
+                    Staff assigned to teach this Course during each teaching period.
+                </p>
+            </div>
+            <NavLink class="btn btn-primary"
+                     href="@($"courses/{course.Id}/faculty-assignments/new")">
+                Add assignment
+            </NavLink>
+        </div>
+
+        @if (course.FacultyAssignments.Count == 0)
+        {
+            <div class="alert alert-info" role="status">
+                This Course has no faculty assignments.
+            </div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th scope="col">Staff member</th>
+                            <th scope="col">Email</th>
+                            <th scope="col">Role</th>
+                            <th scope="col">Teaching period</th>
+                            <th scope="col">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var assignment in course.FacultyAssignments)
+                        {
+                            <tr>
+                                <td>@assignment.StaffName</td>
+                                <td>
+                                    <a href="@($"mailto:{assignment.StaffEmail}")">
+                                        @assignment.StaffEmail
+                                    </a>
+                                </td>
+                                <td>@assignment.Role</td>
+                                <td>@assignment.TeachingPeriod</td>
+                                <td class="text-nowrap">
+                                    <NavLink class="btn btn-sm btn-outline-secondary me-2"
+                                             href="@($"courses/{course.Id}/faculty-assignments/{assignment.Id}/edit")">
+                                        Edit
+                                    </NavLink>
+                                    <button class="btn btn-sm btn-outline-danger"
+                                            disabled="@isSaving"
+                                            @onclick="() => DeleteFacultyAssignmentAsync(assignment)">
+                                        Remove
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </section>
+
     <div class="d-flex gap-2">
         <NavLink class="btn btn-primary" href="@($"courses/{course.Id}/edit")">Edit Course</NavLink>
         <button class="btn btn-outline-warning" disabled="@isSaving" @onclick="ToggleStatusAsync">
@@ -68,7 +190,7 @@ else if (course is not null)
     [SupplyParameterFromQuery]
     public string? Message { get; set; }
 
-    private CourseSummary? course;
+    private CourseDetail? course;
     private string? errorMessage;
     private string? statusMessage;
     private bool isLoading = true;
@@ -82,6 +204,10 @@ else if (course is not null)
         {
             "created" => "Course created successfully.",
             "updated" => "Course updated successfully.",
+            "prerequisite-created" => "Prerequisite added successfully.",
+            "prerequisite-updated" => "Prerequisite updated successfully.",
+            "faculty-assignment-created" => "Faculty assignment added successfully.",
+            "faculty-assignment-updated" => "Faculty assignment updated successfully.",
             _ => null
         };
 
@@ -120,7 +246,8 @@ else if (course is not null)
 
         try
         {
-            course = await CourseApi.SetStatusAsync(course.Id, !course.IsActive);
+            var updatedCourse = await CourseApi.SetStatusAsync(course.Id, !course.IsActive);
+            course = course with { IsActive = updatedCourse.IsActive };
             statusMessage = course.IsActive
                 ? "Course reactivated successfully."
                 : "Course deactivated successfully.";
@@ -132,6 +259,84 @@ else if (course is not null)
         catch (HttpRequestException)
         {
             errorMessage = "The Course status could not be updated. Check that the API is running.";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task DeletePrerequisiteAsync(PrerequisiteSummary prerequisite)
+    {
+        if (course is null)
+        {
+            return;
+        }
+
+        var confirmed = await JavaScript.InvokeAsync<bool>(
+            "confirm",
+            $"Remove {prerequisite.RequiredCourseCode} as a prerequisite for {course.Code}?");
+        if (!confirmed)
+        {
+            return;
+        }
+
+        isSaving = true;
+        errorMessage = null;
+        statusMessage = null;
+
+        try
+        {
+            await CourseApi.DeletePrerequisiteAsync(prerequisite.Id);
+            course = await CourseApi.GetByIdAsync(course.Id);
+            statusMessage = "Prerequisite removed successfully.";
+        }
+        catch (CourseApiException exception)
+        {
+            errorMessage = exception.Message;
+        }
+        catch (HttpRequestException)
+        {
+            errorMessage = "The prerequisite could not be removed. Check that the API is running.";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task DeleteFacultyAssignmentAsync(FacultyAssignmentSummary assignment)
+    {
+        if (course is null)
+        {
+            return;
+        }
+
+        var confirmed = await JavaScript.InvokeAsync<bool>(
+            "confirm",
+            $"Remove {assignment.StaffName} from {course.Code} for {assignment.TeachingPeriod}?");
+        if (!confirmed)
+        {
+            return;
+        }
+
+        isSaving = true;
+        errorMessage = null;
+        statusMessage = null;
+
+        try
+        {
+            await CourseApi.DeleteFacultyAssignmentAsync(assignment.Id);
+            course = await CourseApi.GetByIdAsync(course.Id);
+            statusMessage = "Faculty assignment removed successfully.";
+        }
+        catch (CourseApiException exception)
+        {
+            errorMessage = exception.Message;
+        }
+        catch (HttpRequestException)
+        {
+            errorMessage = "The faculty assignment could not be removed. Check that the API is running.";
         }
         finally
         {

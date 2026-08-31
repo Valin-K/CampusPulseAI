@@ -2,7 +2,7 @@
 
 #nullable disable
 
-namespace CourseManagement.Backend.Data.Migrations
+namespace CourseManagement.Database.Data.Migrations
 {
     /// <inheritdoc />
     public partial class InitialCourseManagementSchema : Migration

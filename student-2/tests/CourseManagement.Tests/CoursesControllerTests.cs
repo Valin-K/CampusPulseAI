@@ -1,8 +1,8 @@
 using System.ComponentModel.DataAnnotations;
 using CourseManagement.Backend.Contracts.Courses;
 using CourseManagement.Backend.Controllers;
-using CourseManagement.Backend.Data;
-using CourseManagement.Backend.Models;
+using CourseManagement.Database.Data;
+using CourseManagement.Database.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
