@@ -15,7 +15,7 @@ else if (loadFailed)
     <FeedbackPanel Kind="FeedbackKind.Error"
                    Title="Course details could not be loaded"
                    Message="@(errorMessage ?? "Course details could not be loaded.")">
-        <NavLink class="btn btn-outline-danger" href="courses">Back to Courses</NavLink>
+    <NavLink class="btn btn-outline-danger" href="@BackUrl">Back</NavLink>
     </FeedbackPanel>
 }
 else if (accessDenied)
@@ -23,7 +23,7 @@ else if (accessDenied)
     <FeedbackPanel Kind="FeedbackKind.Warning"
                    Title="Course unavailable"
                    Message="Students can view details only for active Courses.">
-        <NavLink class="btn btn-outline-secondary" href="courses">Back to Courses</NavLink>
+    <NavLink class="btn btn-outline-secondary" href="@BackUrl">Back</NavLink>
     </FeedbackPanel>
 }
 else if (course is not null)
@@ -40,7 +40,7 @@ else if (course is not null)
                 <span class="badge bg-secondary">Inactive</span>
             }
         </div>
-        <NavLink class="btn btn-outline-secondary" href="courses">Back to Courses</NavLink>
+        <NavLink class="btn btn-outline-secondary" href="@BackUrl">Back</NavLink>
     </div>
 
     @if (statusMessage is not null)
@@ -169,13 +169,13 @@ else if (course is not null)
             </div>
             <div class="d-flex flex-wrap gap-2">
                 <NavLink class="btn btn-outline-primary"
-                         href="@($"courses/{course.Id}/eligibility")">
+                         href="@ChildPageUrl($"/courses/{course.Id}/eligibility")">
                     Check eligibility
                 </NavLink>
                 @if (UserContext.IsCourseAdministrator)
                 {
                     <NavLink class="btn btn-primary"
-                             href="@($"courses/{course.Id}/prerequisites/new")">
+                             href="@ChildPageUrl($"/courses/{course.Id}/prerequisites/new")">
                         Add prerequisite
                     </NavLink>
                 }
@@ -212,7 +212,8 @@ else if (course is not null)
                                 {
                                     <td class="text-nowrap">
                                         <NavLink class="btn btn-sm btn-outline-secondary me-2"
-                                                 href="@($"courses/{course.Id}/prerequisites/{prerequisite.Id}/edit")">
+                                                 href="@ChildPageUrl(
+                                                     $"/courses/{course.Id}/prerequisites/{prerequisite.Id}/edit")">
                                             Edit
                                         </NavLink>
                                         <button class="btn btn-sm btn-outline-danger"
@@ -241,7 +242,7 @@ else if (course is not null)
             @if (UserContext.IsCourseAdministrator)
             {
                 <NavLink class="btn btn-primary"
-                         href="@($"courses/{course.Id}/faculty-assignments/new")">
+                         href="@ChildPageUrl($"/courses/{course.Id}/faculty-assignments/new")">
                     Add assignment
                 </NavLink>
             }
@@ -285,7 +286,8 @@ else if (course is not null)
                                 {
                                     <td class="text-nowrap">
                                         <NavLink class="btn btn-sm btn-outline-secondary me-2"
-                                                 href="@($"courses/{course.Id}/faculty-assignments/{assignment.Id}/edit")">
+                                                 href="@ChildPageUrl(
+                                                     $"/courses/{course.Id}/faculty-assignments/{assignment.Id}/edit")">
                                             Edit
                                         </NavLink>
                                         <button class="btn btn-sm btn-outline-danger"
@@ -306,7 +308,10 @@ else if (course is not null)
     @if (UserContext.IsCourseAdministrator)
     {
         <div class="d-flex flex-wrap gap-2">
-            <NavLink class="btn btn-primary" href="@($"courses/{course.Id}/edit")">Edit Course</NavLink>
+            <NavLink class="btn btn-primary"
+                     href="@ChildPageUrl($"/courses/{course.Id}/edit")">
+                Edit Course
+            </NavLink>
             <button class="btn btn-outline-warning" disabled="@isSaving" @onclick="ToggleStatusAsync">
                 @(course.IsActive ? "Deactivate" : "Reactivate")
             </button>
@@ -324,6 +329,9 @@ else if (course is not null)
     [SupplyParameterFromQuery]
     public string? Message { get; set; }
 
+    [SupplyParameterFromQuery]
+    public string? ReturnUrl { get; set; }
+
     private CourseDetail? course;
     private string? errorMessage;
     private string? statusMessage;
@@ -334,6 +342,14 @@ else if (course is not null)
     private bool isSaving;
     private bool loadFailed;
     private bool accessDenied;
+
+    string BackUrl => CourseNavigation.LocalReturnUrl(ReturnUrl, "/courses");
+    string CurrentCourseUrl => CourseNavigation.WithReturnUrl(
+        $"/courses/{Id}",
+        BackUrl);
+
+    string ChildPageUrl(string destination) =>
+        CourseNavigation.WithReturnUrl(destination, CurrentCourseUrl);
 
     protected override async Task OnParametersSetAsync()
     {
@@ -699,7 +715,11 @@ else if (course is not null)
         try
         {
             await CourseApi.DeleteAsync(course.Id);
-            Navigation.NavigateTo("/courses?message=deleted");
+            Navigation.NavigateTo(
+                CourseNavigation.AddQueryParameter(
+                    BackUrl,
+                    "message",
+                    "deleted"));
         }
         catch (CourseApiException exception)
         {

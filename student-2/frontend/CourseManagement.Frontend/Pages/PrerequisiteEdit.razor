@@ -108,6 +108,9 @@ else if (course is not null)
     [Parameter]
     public int PrerequisiteId { get; set; }
 
+    [SupplyParameterFromQuery]
+    public string? ReturnUrl { get; set; }
+
     private PrerequisiteFormModel form = new();
     private CourseDetail? course;
     private IReadOnlyList<CourseSummary> availableCourses = [];
@@ -117,7 +120,9 @@ else if (course is not null)
     private bool loadFailed;
 
     private bool IsEdit => PrerequisiteId > 0;
-    private string CourseUrl => $"/courses/{CourseId}";
+    private string CourseUrl => CourseNavigation.LocalReturnUrl(
+        ReturnUrl,
+        $"/courses/{CourseId}");
 
     protected override async Task OnParametersSetAsync()
     {
@@ -196,7 +201,11 @@ else if (course is not null)
             }
 
             var message = IsEdit ? "prerequisite-updated" : "prerequisite-created";
-            Navigation.NavigateTo($"{CourseUrl}?message={message}");
+            Navigation.NavigateTo(
+                CourseNavigation.AddQueryParameter(
+                    CourseUrl,
+                    "message",
+                    message));
         }
         catch (CourseApiException exception)
         {

@@ -23,7 +23,7 @@ else if (accessDenied)
     <FeedbackPanel Kind="FeedbackKind.Warning"
                    Title="Course unavailable"
                    Message="Students can check eligibility only for active Courses.">
-        <NavLink class="btn btn-outline-secondary" href="courses">Back to Courses</NavLink>
+    <NavLink class="btn btn-outline-secondary" href="@CourseUrl">Back</NavLink>
     </FeedbackPanel>
 }
 else if (course is not null)
@@ -150,6 +150,9 @@ else if (course is not null)
     [Parameter]
     public int CourseId { get; set; }
 
+    [SupplyParameterFromQuery]
+    public string? ReturnUrl { get; set; }
+
     private CourseDetail? course;
     private List<CompletedCourseSelection> selections = [];
     private PrerequisiteEligibilityResult? result;
@@ -159,7 +162,9 @@ else if (course is not null)
     private bool loadFailed;
     private bool accessDenied;
 
-    private string CourseUrl => $"/courses/{CourseId}";
+    private string CourseUrl => CourseNavigation.LocalReturnUrl(
+        ReturnUrl,
+        $"/courses/{CourseId}");
 
     protected override async Task OnParametersSetAsync()
     {
