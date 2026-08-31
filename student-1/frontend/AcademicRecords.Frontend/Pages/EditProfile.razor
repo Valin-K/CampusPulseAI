@@ -1,0 +1,177 @@
+@page "/profile/{studentId}"
+@using System.Net.Http.Json
+
+<PageTitle>Edit Profile</PageTitle>
+
+<h1>Edit Profile</h1>
+
+@if (isLoading)
+{
+    <p>Loading profile...</p>
+}
+else if (loadError is not null)
+{
+    <div class="alert alert-danger">Unable to load profile: @loadError</div>
+}
+else if (profile is not null)
+{
+    <EditForm Model="profile" OnValidSubmit="SaveProfile" class="mb-5">
+        <div class="row g-3">
+            <div class="col-md-6">
+                <label class="form-label">First name</label>
+                <InputText class="form-control" @bind-Value="profile.FirstName" required />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Last name</label>
+                <InputText class="form-control" @bind-Value="profile.LastName" required />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Email</label>
+                <InputText type="email" class="form-control" @bind-Value="profile.Email" required />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Date of birth</label>
+                <InputDate class="form-control" @bind-Value="profile.DateOfBirth" />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Phone number</label>
+                <InputText class="form-control" @bind-Value="profile.PhoneNumber" placeholder="0400000000" />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Mailing address</label>
+                <InputText class="form-control" @bind-Value="profile.MailingAddress" required />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Emergency contact name</label>
+                <InputText class="form-control" @bind-Value="profile.EmergencyContactName" required />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Emergency contact phone</label>
+                <InputText class="form-control" @bind-Value="profile.EmergencyContactPhone" placeholder="0400000000" required />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Degree</label>
+                <InputText class="form-control" @bind-Value="profile.Degree" />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Major</label>
+                <InputText class="form-control" @bind-Value="profile.Major" />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Minor (SubMajor)</label>
+                <InputText class="form-control" @bind-Value="profile.SubMajor" />
+            </div>
+        </div>
+        <button type="submit" class="btn btn-primary mt-3" disabled="@isSaving">@(isSaving ? "Saving..." : "Save Changes")</button>
+        <a href="/" class="btn btn-secondary mt-3">Cancel</a>
+    </EditForm>
+
+    @if (saveSuccess)
+    {
+        <div class="alert alert-success">Profile updated successfully!</div>
+    }
+    @if (saveError is not null)
+    {
+        <div class="alert alert-danger">Unable to save profile: @saveError</div>
+    }
+}
+
+@code {
+    [Parameter]
+    public string StudentId { get; set; } = string.Empty;
+
+    [Inject]
+    private HttpClient Http { get; set; } = default!;
+
+    private ProfileEditModel? profile;
+    private bool isLoading = true;
+    private string? loadError;
+    private bool isSaving;
+    private bool saveSuccess;
+    private string? saveError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var response = await Http.GetFromJsonAsync<StudentProfileResponse>($"api/students/{StudentId}");
+            if (response is not null)
+            {
+                profile = new ProfileEditModel
+                {
+                    FirstName = response.FirstName,
+                    LastName = response.LastName,
+                    Email = response.Email,
+                    DateOfBirth = response.DateOfBirth ?? new DateOnly(2000, 1, 1),
+                    PhoneNumber = response.PhoneNumber,
+                    MailingAddress = response.MailingAddress,
+                    EmergencyContactName = response.EmergencyContactName,
+                    EmergencyContactPhone = response.EmergencyContactPhone,
+                    Degree = response.Degree,
+                    Major = response.Major,
+                    SubMajor = response.SubMajor
+                };
+            }
+            else
+            {
+                loadError = "Profile not found.";
+            }
+        }
+        catch (HttpRequestException exception)
+        {
+            loadError = exception.Message;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task SaveProfile()
+    {
+        isSaving = true;
+        saveSuccess = false;
+        saveError = null;
+        try
+        {
+            using var response = await Http.PutAsJsonAsync($"api/students/{StudentId}", profile);
+            if (response.IsSuccessStatusCode)
+            {
+                saveSuccess = true;
+            }
+            else
+            {
+                saveError = await response.Content.ReadAsStringAsync();
+            }
+        }
+        catch (HttpRequestException exception)
+        {
+            saveError = exception.Message;
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private sealed record StudentProfileResponse(int UserId, string StudentId, string FirstName, string LastName, string Email,
+        DateOnly? DateOfBirth, string? PhoneNumber, string MailingAddress, string EmergencyContactName, string EmergencyContactPhone,
+        DateOnly? EnrollmentDate, string? Degree, string? Major, string? SubMajor, List<TermEnrollmentResponse> Enrollments);
+
+    private sealed record TermEnrollmentResponse(int EnrollmentId, string CourseCode, int? AcademicTermId, int AcademicYear, string Status);
+
+    private sealed class ProfileEditModel
+    {
+        public string FirstName { get; set; } = string.Empty;
+        public string LastName { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public DateOnly DateOfBirth { get; set; }
+        public string? PhoneNumber { get; set; }
+        public string MailingAddress { get; set; } = string.Empty;
+        public string EmergencyContactName { get; set; } = string.Empty;
+        public string EmergencyContactPhone { get; set; } = string.Empty;
+        public string? Degree { get; set; }
+        public string? Major { get; set; }
+        public string? SubMajor { get; set; }
+    }
+}

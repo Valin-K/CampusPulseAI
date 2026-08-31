@@ -130,9 +130,79 @@ app.MapGet("/api/students/{studentId}", async (string studentId, AcademicRecords
     return student is null ? Results.NotFound() : Results.Ok(student);
 });
 
+app.MapPut("/api/students/{studentId}", async (string studentId, UpdateStudentRequest request, AcademicRecordsDbContext database, CancellationToken cancellationToken) =>
+{
+    var student = await database.Students.SingleOrDefaultAsync(value => value.StudentId == studentId, cancellationToken);
+    if (student is null)
+    {
+        return Results.NotFound("Student was not found.");
+    }
+
+    if (string.IsNullOrWhiteSpace(request.FirstName) || string.IsNullOrWhiteSpace(request.LastName) ||
+        string.IsNullOrWhiteSpace(request.Email) || request.DateOfBirth is null ||
+        string.IsNullOrWhiteSpace(request.MailingAddress) || string.IsNullOrWhiteSpace(request.EmergencyContactName) ||
+        string.IsNullOrWhiteSpace(request.EmergencyContactPhone))
+    {
+        return Results.BadRequest("First name, last name, email, date of birth, mailing address, and emergency contact details are required.");
+    }
+
+    if (!IsValidEmail(request.Email))
+    {
+        return Results.BadRequest("Email address is not valid.");
+    }
+
+    if (!string.IsNullOrWhiteSpace(request.PhoneNumber) && !IsValidPhoneNumber(request.PhoneNumber))
+    {
+        return Results.BadRequest("Phone number is not valid. Use format: 0400000000 or +61400000000");
+    }
+
+    if (!IsValidPhoneNumber(request.EmergencyContactPhone))
+    {
+        return Results.BadRequest("Emergency contact phone number is not valid. Use format: 0400000000 or +61400000000");
+    }
+
+    student.FirstName = request.FirstName.Trim();
+    student.LastName = request.LastName.Trim();
+    student.Email = request.Email.Trim();
+    student.DateOfBirth = request.DateOfBirth;
+    student.PhoneNumber = request.PhoneNumber?.Trim();
+    student.MailingAddress = request.MailingAddress.Trim();
+    student.EmergencyContactName = request.EmergencyContactName.Trim();
+    student.EmergencyContactPhone = request.EmergencyContactPhone.Trim();
+    student.Degree = request.Degree?.Trim();
+    student.Major = request.Major?.Trim();
+    student.SubMajor = request.SubMajor?.Trim();
+
+    await database.SaveChangesAsync(cancellationToken);
+    return Results.NoContent();
+});
+
 app.Run();
 
 static string CreateStudentId() => $"STU{Guid.NewGuid():N}"[..13].ToUpperInvariant();
+
+static bool IsValidEmail(string email)
+{
+    try
+    {
+        var addr = new System.Net.Mail.MailAddress(email);
+        return addr.Address == email;
+    }
+    catch
+    {
+        return false;
+    }
+}
+
+static bool IsValidPhoneNumber(string phoneNumber)
+{
+    var cleaned = new string(phoneNumber.Where(char.IsDigit).ToArray());
+    if (phoneNumber.StartsWith("+61"))
+    {
+        return cleaned.Length == 11 && cleaned.StartsWith("61");
+    }
+    return cleaned.Length == 10 && cleaned.StartsWith("0");
+}
 
 public sealed record EnrollStudentRequest(string FirstName, string LastName, string Email, DateOnly? DateOfBirth,
     string MailingAddress, string EmergencyContactName, string EmergencyContactPhone, string? PhoneNumber = null,
@@ -146,6 +216,10 @@ public sealed record StudentProfileResponse(int UserId, string StudentId, string
     DateOnly? EnrollmentDate, string? Degree, string? Major, string? SubMajor, List<TermEnrollmentResponse> Enrollments);
 
 public sealed record TermEnrollmentResponse(int EnrollmentId, string CourseCode, int? AcademicTermId, int AcademicYear, string Status);
+
+public sealed record UpdateStudentRequest(string FirstName, string LastName, string Email, DateOnly? DateOfBirth,
+    string MailingAddress, string EmergencyContactName, string EmergencyContactPhone, string? PhoneNumber = null,
+    string? Degree = null, string? Major = null, string? SubMajor = null);
 
 public sealed record UserResponse(
     int UserId,
