@@ -63,6 +63,7 @@ else
                     <th>Academic Year</th>
                     <th>Status</th>
                     <th>Credits</th>
+                    <th>Grade Type</th>
                     <th>Grade</th>
                 </tr>
             </thead>
@@ -75,7 +76,8 @@ else
                         <td>@enrollment.AcademicYear</td>
                         <td>@enrollment.Status</td>
                         <td>@enrollment.Credits</td>
-                        <td>@(enrollment.IsFinalized ? enrollment.GradeValue?.ToString() ?? "-" : "Pending")</td>
+                        <td>@enrollment.GradeType</td>
+                        <td>@GetGradeDisplay(enrollment)</td>
                     </tr>
                 }
             </tbody>
@@ -158,6 +160,11 @@ else
         return DateOnly.FromDateTime(ISOWeek.ToDateTime(academicYear, startWeekOfYear, DayOfWeek.Monday));
     }
 
+    private static string GetGradeDisplay(TermEnrollmentResponse enrollment) =>
+        enrollment.GradeType is "Pass/Fail" or "Ungraded"
+            ? "N/A"
+            : enrollment.IsFinalized ? enrollment.GradeValue?.ToString() ?? "N/A" : "Pending";
+
     private static DateOnly? GetTermEndDate(int academicYear, int startWeekOfYear, int endWeekOfYear)
     {
         if (endWeekOfYear <= 0 || endWeekOfYear > 53)
@@ -178,5 +185,5 @@ else
         List<TermEnrollmentResponse> Enrollments);
 
     private sealed record TermEnrollmentResponse(int EnrollmentId, string CourseCode, int? AcademicTermId, string? TermCode,
-        string? TermName, int StartWeekOfYear, int EndWeekOfYear, int AcademicYear, string Status, decimal? Credits, decimal? GradeValue, bool IsFinalized);
+        string? TermName, int StartWeekOfYear, int EndWeekOfYear, int AcademicYear, string Status, decimal? Credits, string GradeType, decimal? GradeValue, bool IsFinalized);
 }

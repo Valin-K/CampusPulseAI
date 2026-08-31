@@ -7,6 +7,15 @@ public static class EnrollmentStatusRules
     public const string Enrolled = "Enrolled";
     public const string InProgress = "In Progress";
     public const string Completed = "Completed";
+    public const string Passed = "Passed";
+    public const string Failed = "Failed";
+
+    public static class EnrollmentGradeTypes
+    {
+        public const string Mark = "Mark";
+        public const string PassFail = "Pass/Fail";
+        public const string Ungraded = "Ungraded";
+    }
 
     public static (DateOnly StartDate, DateOnly EndDate) GetSessionDates(int academicYear, int startWeekOfYear, int endWeekOfYear)
     {
@@ -18,4 +27,13 @@ public static class EnrollmentStatusRules
 
     public static string GetStatus(DateOnly startDate, DateOnly endDate, DateOnly today) =>
         endDate < today ? Completed : startDate > today ? Enrolled : InProgress;
+
+    public static string GetFinalStatus(string gradeType, decimal? gradeValue) =>
+        gradeType switch
+        {
+            EnrollmentGradeTypes.Mark when gradeValue >= 50m => Passed,
+            EnrollmentGradeTypes.Mark when gradeValue is not null => Failed,
+            EnrollmentGradeTypes.Ungraded => Completed,
+            _ => Completed
+        };
 }

@@ -101,6 +101,12 @@ public static class AcademicRecordsSeedData
             var academicTermId = (studentIndex + courseIndex) % 3 + 13;
             var academicYear = 2026;
             var term = AcademicTerms.Single(value => value.TermId == academicTermId);
+            var gradeType = courseIndex switch
+            {
+                1 or 4 => EnrollmentStatusRules.EnrollmentGradeTypes.PassFail,
+                2 => EnrollmentStatusRules.EnrollmentGradeTypes.Ungraded,
+                _ => EnrollmentStatusRules.EnrollmentGradeTypes.Mark
+            };
             var (startDate, endDate) = EnrollmentStatusRules.GetSessionDates(academicYear, term.StartWeekOfYear, term.EndWeekOfYear);
             var today = DateOnly.FromDateTime(DateTime.UtcNow);
             var status = EnrollmentStatusRules.GetStatus(startDate, endDate, today);
@@ -113,8 +119,16 @@ public static class AcademicRecordsSeedData
                 CourseCode = $"CS{101 + courseIndex:D3}",
                 AcademicTermId = academicTermId,
                 AcademicYear = academicYear,
-                Status = status,
-                GradeValue = isCompleted ? 65m + studentIndex + courseIndex * 5 : null,
+                Status = isCompleted
+                    ? courseIndex switch
+                    {
+                        1 or 4 => studentIndex % 2 == 0 ? EnrollmentStatusRules.Passed : EnrollmentStatusRules.Failed,
+                        2 => EnrollmentStatusRules.Completed,
+                        _ => EnrollmentStatusRules.GetFinalStatus(gradeType,
+                            65m + studentIndex + courseIndex * 5)
+                    }
+                    : status,
+                GradeValue = isCompleted && courseIndex is not (1 or 2 or 4) ? 65m + studentIndex + courseIndex * 5 : null,
                 Credits = 3.0m,
                 GradeDate = isCompleted ? endDate : null,
                 IsFinalized = isCompleted

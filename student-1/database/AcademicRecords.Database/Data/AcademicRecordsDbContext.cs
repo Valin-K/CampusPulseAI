@@ -71,10 +71,11 @@ public sealed class AcademicRecordsDbContext(DbContextOptions<AcademicRecordsDbC
             {
                 table.HasCheckConstraint(
                     "CK_Enrollments_Status",
-                    "status IN ('Enrolled', 'In Progress', 'Completed')");
+                    "status IN ('Enrolled', 'In Progress', 'Completed', 'Passed', 'Failed')");
                 table.HasCheckConstraint(
                     "CK_Enrollments_StatusGradeState",
-                    "(status = 'Completed' AND is_finalized = 1 AND grade_value IS NOT NULL AND grade_date IS NOT NULL) OR " +
+                    "(status IN ('Completed', 'Passed', 'Failed') AND is_finalized = 1 AND " +
+                    "(status = 'Completed' OR grade_date IS NOT NULL)) OR " +
                     "(status IN ('Enrolled', 'In Progress') AND is_finalized = 0 AND grade_value IS NULL AND grade_date IS NULL)");
                 table.HasCheckConstraint("CK_Enrollments_GradeRange", "grade_value IS NULL OR grade_value BETWEEN 0 AND 100");
                 table.HasCheckConstraint("CK_Enrollments_Credits", "credits IS NULL OR credits > 0");

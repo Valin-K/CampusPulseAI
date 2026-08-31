@@ -278,6 +278,15 @@ namespace AcademicRecords.Tests
         }
 
         [Test]
+        public void FinalStatusUsesTheEnrollmentGradeType()
+        {
+            Assert.That(EnrollmentStatusRules.GetFinalStatus(EnrollmentStatusRules.EnrollmentGradeTypes.Mark, 50m), Is.EqualTo(EnrollmentStatusRules.Passed));
+            Assert.That(EnrollmentStatusRules.GetFinalStatus(EnrollmentStatusRules.EnrollmentGradeTypes.Mark, 49.99m), Is.EqualTo(EnrollmentStatusRules.Failed));
+            Assert.That(EnrollmentStatusRules.GetFinalStatus(EnrollmentStatusRules.EnrollmentGradeTypes.Mark, null), Is.EqualTo(EnrollmentStatusRules.Completed));
+            Assert.That(EnrollmentStatusRules.GetFinalStatus(EnrollmentStatusRules.EnrollmentGradeTypes.Ungraded, null), Is.EqualTo(EnrollmentStatusRules.Completed));
+        }
+
+        [Test]
         public void SeedEnrollmentsHaveStatusesConsistentWithTheirSessionDates()
         {
             var today = DateOnly.FromDateTime(DateTime.UtcNow);
@@ -290,9 +299,22 @@ namespace AcademicRecords.Tests
                 var endYear = term.EndWeekOfYear < term.StartWeekOfYear ? enrollment.AcademicYear + 1 : enrollment.AcademicYear;
                 var endDate = DateOnly.FromDateTime(ISOWeek.ToDateTime(endYear, term.EndWeekOfYear, DayOfWeek.Sunday));
 
-                var expectedStatus = endDate < today ? "Completed" : startDate > today ? "Enrolled" : "In Progress";
+                var gradeType = enrollment.CourseCode switch
+                {
+                    "CS102" or "CS105" => EnrollmentStatusRules.EnrollmentGradeTypes.PassFail,
+                    "CS103" => EnrollmentStatusRules.EnrollmentGradeTypes.Ungraded,
+                    _ => EnrollmentStatusRules.EnrollmentGradeTypes.Mark
+                };
+                var expectedStatus = endDate < today
+                    ? gradeType switch
+                    {
+                        EnrollmentStatusRules.EnrollmentGradeTypes.PassFail => enrollment.StudentId % 2 == 1 ? "Passed" : "Failed",
+                        EnrollmentStatusRules.EnrollmentGradeTypes.Ungraded => "Completed",
+                        _ => enrollment.GradeValue >= 50m ? "Passed" : enrollment.GradeValue is null ? "Completed" : "Failed"
+                    }
+                    : startDate > today ? "Enrolled" : "In Progress";
                 Assert.That(enrollment.Status, Is.EqualTo(expectedStatus));
-                Assert.That(enrollment.IsFinalized, Is.EqualTo(expectedStatus == "Completed"));
+                Assert.That(enrollment.IsFinalized, Is.EqualTo(endDate < today));
                 Assert.That(enrollment.GradeDate is null || enrollment.GradeDate <= today, Is.True);
             }
 

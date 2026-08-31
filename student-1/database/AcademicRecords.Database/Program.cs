@@ -42,7 +42,7 @@ app.MapGet("/api/students/by-user/{userId:int}", async (int userId, AcademicReco
             value.Enrollments.Select(enrollment => new TermEnrollmentResponse(enrollment.EnrollmentId, enrollment.CourseCode,
                 enrollment.AcademicTermId, enrollment.AcademicTerm!.TermCode, enrollment.AcademicTerm.TermName,
                 enrollment.AcademicTerm.StartWeekOfYear, enrollment.AcademicTerm.EndWeekOfYear, enrollment.AcademicYear, enrollment.Status, enrollment.Credits,
-                enrollment.GradeValue, enrollment.IsFinalized)).ToList()))
+                GradeTypePlaceholder.Get(enrollment.CourseCode), enrollment.GradeValue, enrollment.IsFinalized)).ToList()))
         .SingleOrDefaultAsync(cancellationToken);
 
     return student is null ? Results.NotFound() : Results.Ok(student);
@@ -111,7 +111,7 @@ app.MapGet("/api/students", async (AcademicRecordsDbContext database, Cancellati
             value.Enrollments.Select(enrollment => new TermEnrollmentResponse(enrollment.EnrollmentId, enrollment.CourseCode,
                 enrollment.AcademicTermId, enrollment.AcademicTerm!.TermCode, enrollment.AcademicTerm.TermName,
                 enrollment.AcademicTerm.StartWeekOfYear, enrollment.AcademicTerm.EndWeekOfYear, enrollment.AcademicYear, enrollment.Status, enrollment.Credits,
-                enrollment.GradeValue, enrollment.IsFinalized)).ToList()))
+                GradeTypePlaceholder.Get(enrollment.CourseCode), enrollment.GradeValue, enrollment.IsFinalized)).ToList()))
         .ToListAsync(cancellationToken));
 
 app.MapPost("/api/students/enroll", async (EnrollStudentRequest request, AcademicRecordsDbContext database, CancellationToken cancellationToken) =>
@@ -227,7 +227,7 @@ app.MapGet("/api/students/{studentId}", async (string studentId, AcademicRecords
             value.Enrollments.Select(enrollment => new TermEnrollmentResponse(enrollment.EnrollmentId, enrollment.CourseCode,
                 enrollment.AcademicTermId, enrollment.AcademicTerm!.TermCode, enrollment.AcademicTerm.TermName,
                 enrollment.AcademicTerm.StartWeekOfYear, enrollment.AcademicTerm.EndWeekOfYear, enrollment.AcademicYear, enrollment.Status, enrollment.Credits,
-                enrollment.GradeValue, enrollment.IsFinalized)).ToList()))
+                GradeTypePlaceholder.Get(enrollment.CourseCode), enrollment.GradeValue, enrollment.IsFinalized)).ToList()))
         .SingleOrDefaultAsync(cancellationToken);
     return student is null ? Results.NotFound() : Results.Ok(student);
 });
@@ -332,6 +332,16 @@ static bool IsValidPhoneNumber(string phoneNumber)
     return cleaned.Length == 10 && cleaned.StartsWith("0");
 }
 
+public static class GradeTypePlaceholder
+{
+    public static string Get(string courseCode) => courseCode switch
+    {
+        "CS102" or "CS105" => EnrollmentStatusRules.EnrollmentGradeTypes.PassFail,
+        "CS103" => EnrollmentStatusRules.EnrollmentGradeTypes.Ungraded,
+        _ => EnrollmentStatusRules.EnrollmentGradeTypes.Mark
+    };
+}
+
 public sealed record EnrollStudentRequest(string FirstName, string LastName, string Email, DateOnly? DateOfBirth,
     string MailingAddress, string EmergencyContactName, string EmergencyContactPhone, string? PhoneNumber = null,
     DateOnly? EnrollmentDate = null, string? Degree = null, string? Major = null, string? SubMajor = null,
@@ -350,7 +360,7 @@ public sealed record StaffProfileResponse(int UserId, string StaffId, string Fir
     DateOnly? DateOfBirth, string? PhoneNumber);
 
 public sealed record TermEnrollmentResponse(int EnrollmentId, string CourseCode, int? AcademicTermId, string? TermCode,
-    string? TermName, int StartWeekOfYear, int EndWeekOfYear, int AcademicYear, string Status, decimal? Credits, decimal? GradeValue, bool IsFinalized);
+    string? TermName, int StartWeekOfYear, int EndWeekOfYear, int AcademicYear, string Status, decimal? Credits, string GradeType, decimal? GradeValue, bool IsFinalized);
 
 public sealed record UpdateStudentRequest(string FirstName, string LastName, string Email, DateOnly? DateOfBirth,
     string MailingAddress, string EmergencyContactName, string EmergencyContactPhone, string? PhoneNumber = null,
