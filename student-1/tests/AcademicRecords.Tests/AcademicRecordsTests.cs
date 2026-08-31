@@ -29,6 +29,9 @@ namespace AcademicRecords.Tests
                 EmergencyContactPhone = "0400000000"
             };
             database.Students.Add(student);
+            database.AcademicTerms.AddRange(
+                new AcademicTerm { TermId = 13, TermCode = "2026-T1", TermName = "2026 Term 1", StartWeekOfYear = 1, EndWeekOfYear = 13, IsActive = true },
+                new AcademicTerm { TermId = 14, TermCode = "2026-T2", TermName = "2026 Term 2", StartWeekOfYear = 14, EndWeekOfYear = 26, IsActive = true });
             await database.SaveChangesAsync();
 
             database.Enrollments.AddRange(
@@ -52,9 +55,25 @@ namespace AcademicRecords.Tests
             await using var database = CreateDatabase(connection);
             await database.Database.EnsureCreatedAsync();
 
-            database.Enrollments.Add(new Enrollment { StudentId = 1, CourseCode = "ZZ999", AcademicTermId = 13, AcademicYear = 2026, Status = "Enrolled" });
+            var student = new Student
+            {
+                StudentId = "STU-DUP-1",
+                FirstName = "Dup",
+                LastName = "Student",
+                Email = "dup.student@example.edu",
+                DateOfBirth = new(2000, 1, 1),
+                Status = "ACT",
+                MailingAddress = "1 Campus Way",
+                EmergencyContactName = "Contact Person",
+                EmergencyContactPhone = "0400000000"
+            };
+            database.Students.Add(student);
+            database.AcademicTerms.Add(new AcademicTerm { TermId = 13, TermCode = "2026-T1", TermName = "2026 Term 1", StartWeekOfYear = 1, EndWeekOfYear = 13, IsActive = true });
             await database.SaveChangesAsync();
-            database.Enrollments.Add(new Enrollment { StudentId = 1, CourseCode = "ZZ999", AcademicTermId = 13, AcademicYear = 2026, Status = "Enrolled" });
+
+            database.Enrollments.Add(new Enrollment { StudentId = student.UserId, CourseCode = "ZZ999", AcademicTermId = 13, AcademicYear = 2026, Status = "Enrolled" });
+            await database.SaveChangesAsync();
+            database.Enrollments.Add(new Enrollment { StudentId = student.UserId, CourseCode = "ZZ999", AcademicTermId = 13, AcademicYear = 2026, Status = "Enrolled" });
 
             Assert.ThrowsAsync<DbUpdateException>(async () => await database.SaveChangesAsync());
         }
