@@ -2,9 +2,16 @@
 @page "/courses/{Id:int}/edit"
 @inject CourseApiClient CourseApi
 @inject NavigationManager Navigation
+@inject CourseUserContext UserContext
 
 <PageTitle>@(IsEdit ? "Edit Course" : "Create Course")</PageTitle>
 
+@if (!UserContext.IsCourseAdministrator)
+{
+    <StaffAccessRequired />
+}
+else
+{
 <h1>@(IsEdit ? "Edit Course" : "Create Course")</h1>
 
 @if (isLoading)
@@ -100,6 +107,7 @@ else
         </div>
     </EditForm>
 }
+}
 
 @code {
     [Parameter]
@@ -116,6 +124,12 @@ else
 
     protected override async Task OnParametersSetAsync()
     {
+        if (!UserContext.IsCourseAdministrator)
+        {
+            isLoading = false;
+            return;
+        }
+
         errorMessage = null;
         loadFailed = false;
 

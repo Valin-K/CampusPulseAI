@@ -1,6 +1,7 @@
 ﻿@page "/"
 @page "/courses"
 @inject CourseApiClient CourseApi
+@inject CourseUserContext UserContext
 
 <PageTitle>Course Management</PageTitle>
 
@@ -9,10 +10,13 @@
         <h1>Course Management</h1>
         <p class="text-muted mb-0">Browse and manage the Course catalogue.</p>
     </div>
-    <NavLink class="btn btn-primary" href="courses/new">Create Course</NavLink>
+    @if (UserContext.IsCourseAdministrator)
+    {
+        <NavLink class="btn btn-primary" href="courses/new">Create Course</NavLink>
+    }
 </div>
 
-@if (Message == "deleted")
+@if (UserContext.IsCourseAdministrator && Message == "deleted")
 {
     <FeedbackPanel Kind="FeedbackKind.Success"
                    Message="Course deleted successfully." />
@@ -34,8 +38,13 @@ else if (courses.Count == 0)
 {
     <FeedbackPanel Kind="FeedbackKind.Empty"
                    Title="No Courses available"
-                   Message="Create a Course to begin building the Course catalogue.">
-        <NavLink class="btn btn-primary" href="courses/new">Create Course</NavLink>
+                   Message="@(UserContext.IsCourseAdministrator
+                       ? "Create a Course to begin building the Course catalogue."
+                       : "There are no active Courses available to browse.")">
+        @if (UserContext.IsCourseAdministrator)
+        {
+            <NavLink class="btn btn-primary" href="courses/new">Create Course</NavLink>
+        }
     </FeedbackPanel>
 }
 else
@@ -77,10 +86,13 @@ else
                                      href="@($"courses/{course.Id}")">
                                 View
                             </NavLink>
-                            <NavLink class="btn btn-sm btn-outline-secondary"
-                                     href="@($"courses/{course.Id}/edit")">
-                                Edit
-                            </NavLink>
+                            @if (UserContext.IsCourseAdministrator)
+                            {
+                                <NavLink class="btn btn-sm btn-outline-secondary"
+                                         href="@($"courses/{course.Id}/edit")">
+                                    Edit
+                                </NavLink>
+                            }
                         </td>
                     </tr>
                 }
@@ -109,7 +121,10 @@ else
 
         try
         {
-            courses = await CourseApi.GetAllAsync();
+            var loadedCourses = await CourseApi.GetAllAsync();
+            courses = UserContext.IsCourseAdministrator
+                ? loadedCourses
+                : loadedCourses.Where(course => course.IsActive).ToList();
         }
         catch (CourseApiException exception)
         {

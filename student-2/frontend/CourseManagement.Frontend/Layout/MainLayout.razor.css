@@ -23,6 +23,30 @@
     box-shadow: var(--shadow-sm);
 }
 
+.course-user-selector {
+    display: grid;
+    gap: .2rem;
+    color: #fff;
+}
+
+.course-user-selector label {
+    color: #b9d1e2;
+    font-size: .68rem;
+    font-weight: 750;
+}
+
+.course-user-selector select {
+    width: 100%;
+    min-height: 2.15rem;
+    padding: .3rem 2rem .3rem .55rem;
+    border: 1px solid rgba(255, 255, 255, .35);
+    border-radius: .45rem;
+    color: #102a43;
+    background: #fff;
+    font-size: .78rem;
+    font-weight: 700;
+}
+
 @media (max-width: 760px) {
     .course-layout {
         grid-template-columns: 1fr;

@@ -22,17 +22,23 @@
                 <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Courses
             </NavLink>
         </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link"
-                     href="courses/new"
-                     @onclick="CloseNavMenu">
-                <span class="bi bi-plus-square-fill-nav-menu" aria-hidden="true"></span> Create Course
-            </NavLink>
-        </div>
+        @if (UserContext.IsCourseAdministrator)
+        {
+            <div class="nav-item px-3">
+                <NavLink class="nav-link"
+                         href="courses/new"
+                         @onclick="CloseNavMenu">
+                    <span class="bi bi-plus-square-fill-nav-menu" aria-hidden="true"></span> Create Course
+                </NavLink>
+            </div>
+        }
     </nav>
 </div>
 
 @code {
+    [Inject]
+    private CourseUserContext UserContext { get; set; } = null!;
+
     private bool collapseNavMenu = true;
 
     private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;

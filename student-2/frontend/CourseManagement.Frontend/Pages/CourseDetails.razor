@@ -2,6 +2,7 @@
 @inject CourseApiClient CourseApi
 @inject NavigationManager Navigation
 @inject IJSRuntime JavaScript
+@inject CourseUserContext UserContext
 
 <PageTitle>Course details</PageTitle>
 
@@ -15,6 +16,14 @@ else if (loadFailed)
                    Title="Course details could not be loaded"
                    Message="@(errorMessage ?? "Course details could not be loaded.")">
         <NavLink class="btn btn-outline-danger" href="courses">Back to Courses</NavLink>
+    </FeedbackPanel>
+}
+else if (accessDenied)
+{
+    <FeedbackPanel Kind="FeedbackKind.Warning"
+                   Title="Course unavailable"
+                   Message="Students can view details only for active Courses.">
+        <NavLink class="btn btn-outline-secondary" href="courses">Back to Courses</NavLink>
     </FeedbackPanel>
 }
 else if (course is not null)
@@ -67,7 +76,9 @@ else if (course is not null)
         <div class="mb-3">
             <h2 id="syllabus-heading" class="h4 mb-1">Syllabus</h2>
             <p class="text-muted mb-0">
-                Upload one PDF syllabus for this Course. The maximum file size is 10 MiB.
+                @(UserContext.IsCourseAdministrator
+                    ? "Upload one PDF syllabus for this Course. The maximum file size is 10 MiB."
+                    : "View or download the published PDF syllabus for this Course.")
             </p>
         </div>
 
@@ -75,7 +86,9 @@ else if (course is not null)
         {
             <FeedbackPanel Kind="FeedbackKind.Empty"
                            Title="No syllabus uploaded"
-                           Message="Select a PDF to add the syllabus for this Course." />
+                           Message="@(UserContext.IsCourseAdministrator
+                               ? "Select a PDF to add the syllabus for this Course."
+                               : "A syllabus is not currently available for this Course.")" />
         }
         else
         {
@@ -94,52 +107,58 @@ else if (course is not null)
                            href="@CourseApi.GetSyllabusUrl(course.Id, download: true)">
                             Download syllabus
                         </a>
-                        <button type="button"
-                                class="btn btn-sm btn-outline-danger"
-                                disabled="@isSaving"
-                                @onclick="RemoveSyllabusAsync">
-                            Remove syllabus
-                        </button>
+                        @if (UserContext.IsCourseAdministrator)
+                        {
+                            <button type="button"
+                                    class="btn btn-sm btn-outline-danger"
+                                    disabled="@isSaving"
+                                    @onclick="RemoveSyllabusAsync">
+                                Remove syllabus
+                            </button>
+                        }
                     </div>
                 </div>
             </div>
         }
 
-        <div class="mb-3">
-            <label class="form-label" for="syllabus-file">
-                @(string.IsNullOrWhiteSpace(course.SyllabusFileName)
-                    ? "Syllabus PDF"
-                    : "Replacement syllabus PDF")
-            </label>
-            <InputFile @key="syllabusInputKey"
-                       id="syllabus-file"
-                       class="form-control"
-                       accept=".pdf,application/pdf"
-                       aria-describedby="syllabus-file-help"
-                       disabled="@isSaving"
-                       OnChange="SelectSyllabus" />
-            <div id="syllabus-file-help" class="form-text">
-                PDF files only, up to 10 MiB. Selecting a file does not upload it until you
-                choose the button below.
-            </div>
-        </div>
-
-        @if (selectedSyllabus is not null)
+        @if (UserContext.IsCourseAdministrator)
         {
-            <p class="mb-3">
-                Selected: <strong>@selectedSyllabus.Name</strong>
-                (@FormatFileSize(selectedSyllabus.Size))
-            </p>
-        }
+            <div class="mb-3">
+                <label class="form-label" for="syllabus-file">
+                    @(string.IsNullOrWhiteSpace(course.SyllabusFileName)
+                        ? "Syllabus PDF"
+                        : "Replacement syllabus PDF")
+                </label>
+                <InputFile @key="syllabusInputKey"
+                           id="syllabus-file"
+                           class="form-control"
+                           accept=".pdf,application/pdf"
+                           aria-describedby="syllabus-file-help"
+                           disabled="@isSaving"
+                           OnChange="SelectSyllabus" />
+                <div id="syllabus-file-help" class="form-text">
+                    PDF files only, up to 10 MiB. Selecting a file does not upload it until you
+                    choose the button below.
+                </div>
+            </div>
 
-        <button type="button"
-                class="btn btn-primary"
-                disabled="@(isSaving || selectedSyllabus is null)"
-                @onclick="UploadSyllabusAsync">
-            @(string.IsNullOrWhiteSpace(course.SyllabusFileName)
-                ? "Upload syllabus"
-                : "Replace syllabus")
-        </button>
+            @if (selectedSyllabus is not null)
+            {
+                <p class="mb-3">
+                    Selected: <strong>@selectedSyllabus.Name</strong>
+                    (@FormatFileSize(selectedSyllabus.Size))
+                </p>
+            }
+
+            <button type="button"
+                    class="btn btn-primary"
+                    disabled="@(isSaving || selectedSyllabus is null)"
+                    @onclick="UploadSyllabusAsync">
+                @(string.IsNullOrWhiteSpace(course.SyllabusFileName)
+                    ? "Upload syllabus"
+                    : "Replace syllabus")
+            </button>
+        }
     </section>
 
     <section class="mt-4" aria-labelledby="prerequisites-heading">
@@ -153,10 +172,13 @@ else if (course is not null)
                          href="@($"courses/{course.Id}/eligibility")">
                     Check eligibility
                 </NavLink>
-                <NavLink class="btn btn-primary"
-                         href="@($"courses/{course.Id}/prerequisites/new")">
-                    Add prerequisite
-                </NavLink>
+                @if (UserContext.IsCourseAdministrator)
+                {
+                    <NavLink class="btn btn-primary"
+                             href="@($"courses/{course.Id}/prerequisites/new")">
+                        Add prerequisite
+                    </NavLink>
+                }
             </div>
         </div>
 
@@ -174,7 +196,10 @@ else if (course is not null)
                         <tr>
                             <th scope="col">Required Course</th>
                             <th scope="col">Minimum grade</th>
-                            <th scope="col">Actions</th>
+                            @if (UserContext.IsCourseAdministrator)
+                            {
+                                <th scope="col">Actions</th>
+                            }
                         </tr>
                     </thead>
                     <tbody>
@@ -183,17 +208,20 @@ else if (course is not null)
                             <tr>
                                 <td>@prerequisite.RequiredCourseCode</td>
                                 <td>@(prerequisite.MinimumGrade ?? "Pass")</td>
-                                <td class="text-nowrap">
-                                    <NavLink class="btn btn-sm btn-outline-secondary me-2"
-                                             href="@($"courses/{course.Id}/prerequisites/{prerequisite.Id}/edit")">
-                                        Edit
-                                    </NavLink>
-                                    <button class="btn btn-sm btn-outline-danger"
-                                            disabled="@isSaving"
-                                            @onclick="() => DeletePrerequisiteAsync(prerequisite)">
-                                        Remove
-                                    </button>
-                                </td>
+                                @if (UserContext.IsCourseAdministrator)
+                                {
+                                    <td class="text-nowrap">
+                                        <NavLink class="btn btn-sm btn-outline-secondary me-2"
+                                                 href="@($"courses/{course.Id}/prerequisites/{prerequisite.Id}/edit")">
+                                            Edit
+                                        </NavLink>
+                                        <button class="btn btn-sm btn-outline-danger"
+                                                disabled="@isSaving"
+                                                @onclick="() => DeletePrerequisiteAsync(prerequisite)">
+                                            Remove
+                                        </button>
+                                    </td>
+                                }
                             </tr>
                         }
                     </tbody>
@@ -210,10 +238,13 @@ else if (course is not null)
                     Staff assigned to teach this Course during each teaching period.
                 </p>
             </div>
-            <NavLink class="btn btn-primary"
-                     href="@($"courses/{course.Id}/faculty-assignments/new")">
-                Add assignment
-            </NavLink>
+            @if (UserContext.IsCourseAdministrator)
+            {
+                <NavLink class="btn btn-primary"
+                         href="@($"courses/{course.Id}/faculty-assignments/new")">
+                    Add assignment
+                </NavLink>
+            }
         </div>
 
         @if (course.FacultyAssignments.Count == 0)
@@ -232,7 +263,10 @@ else if (course is not null)
                             <th scope="col">Email</th>
                             <th scope="col">Role</th>
                             <th scope="col">Teaching period</th>
-                            <th scope="col">Actions</th>
+                            @if (UserContext.IsCourseAdministrator)
+                            {
+                                <th scope="col">Actions</th>
+                            }
                         </tr>
                     </thead>
                     <tbody>
@@ -247,17 +281,20 @@ else if (course is not null)
                                 </td>
                                 <td>@assignment.Role</td>
                                 <td>@assignment.TeachingPeriod</td>
-                                <td class="text-nowrap">
-                                    <NavLink class="btn btn-sm btn-outline-secondary me-2"
-                                             href="@($"courses/{course.Id}/faculty-assignments/{assignment.Id}/edit")">
-                                        Edit
-                                    </NavLink>
-                                    <button class="btn btn-sm btn-outline-danger"
-                                            disabled="@isSaving"
-                                            @onclick="() => DeleteFacultyAssignmentAsync(assignment)">
-                                        Remove
-                                    </button>
-                                </td>
+                                @if (UserContext.IsCourseAdministrator)
+                                {
+                                    <td class="text-nowrap">
+                                        <NavLink class="btn btn-sm btn-outline-secondary me-2"
+                                                 href="@($"courses/{course.Id}/faculty-assignments/{assignment.Id}/edit")">
+                                            Edit
+                                        </NavLink>
+                                        <button class="btn btn-sm btn-outline-danger"
+                                                disabled="@isSaving"
+                                                @onclick="() => DeleteFacultyAssignmentAsync(assignment)">
+                                            Remove
+                                        </button>
+                                    </td>
+                                }
                             </tr>
                         }
                     </tbody>
@@ -266,15 +303,18 @@ else if (course is not null)
         }
     </section>
 
-    <div class="d-flex flex-wrap gap-2">
-        <NavLink class="btn btn-primary" href="@($"courses/{course.Id}/edit")">Edit Course</NavLink>
-        <button class="btn btn-outline-warning" disabled="@isSaving" @onclick="ToggleStatusAsync">
-            @(course.IsActive ? "Deactivate" : "Reactivate")
-        </button>
-        <button class="btn btn-outline-danger" disabled="@isSaving" @onclick="DeleteAsync">
-            Delete Course
-        </button>
-    </div>
+    @if (UserContext.IsCourseAdministrator)
+    {
+        <div class="d-flex flex-wrap gap-2">
+            <NavLink class="btn btn-primary" href="@($"courses/{course.Id}/edit")">Edit Course</NavLink>
+            <button class="btn btn-outline-warning" disabled="@isSaving" @onclick="ToggleStatusAsync">
+                @(course.IsActive ? "Deactivate" : "Reactivate")
+            </button>
+            <button class="btn btn-outline-danger" disabled="@isSaving" @onclick="DeleteAsync">
+                Delete Course
+            </button>
+        </div>
+    }
 }
 
 @code {
@@ -293,11 +333,13 @@ else if (course is not null)
     private bool isLoading = true;
     private bool isSaving;
     private bool loadFailed;
+    private bool accessDenied;
 
     protected override async Task OnParametersSetAsync()
     {
         isLoading = true;
         loadFailed = false;
+        accessDenied = false;
         errorMessage = null;
         operationMessage = null;
         statusMessage = Message switch
@@ -314,6 +356,11 @@ else if (course is not null)
         try
         {
             course = await CourseApi.GetByIdAsync(Id);
+            if (!UserContext.IsCourseAdministrator && !course.IsActive)
+            {
+                accessDenied = true;
+                course = null;
+            }
         }
         catch (CourseApiException exception)
         {
