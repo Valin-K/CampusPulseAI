@@ -78,6 +78,18 @@ app.MapPost("/api/students/enroll", async (HttpRequest request, IHttpClientFacto
     return Results.Content(content, response.Content.Headers.ContentType?.MediaType ?? "application/json", statusCode: (int)response.StatusCode);
 });
 
+app.MapPost("/api/staff/enroll", async (HttpRequest request, IHttpClientFactory clients, CancellationToken cancellationToken) =>
+{
+    using var databaseRequest = new HttpRequestMessage(HttpMethod.Post, "/api/staff/enroll")
+    {
+        Content = new StreamContent(request.Body)
+    };
+    databaseRequest.Content.Headers.ContentType = new("application/json");
+    using var response = await clients.CreateClient("academicRecordsDatabase").SendAsync(databaseRequest, cancellationToken);
+    var content = await response.Content.ReadAsStringAsync(cancellationToken);
+    return Results.Content(content, response.Content.Headers.ContentType?.MediaType ?? "application/json", statusCode: (int)response.StatusCode);
+});
+
 app.MapPost("/api/students/{studentId}/enrollments", async (string studentId, HttpRequest request, IHttpClientFactory clients, CancellationToken cancellationToken) =>
 {
     using var databaseRequest = new HttpRequestMessage(HttpMethod.Post, $"/api/students/{Uri.EscapeDataString(studentId)}/enrollments")

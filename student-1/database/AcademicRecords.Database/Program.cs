@@ -40,7 +40,9 @@ app.MapGet("/api/students/by-user/{userId:int}", async (int userId, AcademicReco
             value.DateOfBirth, value.PhoneNumber, value.MailingAddress, value.EmergencyContactName, value.EmergencyContactPhone,
             value.EnrollmentDate, value.Degree, value.Major, value.SubMajor,
             value.Enrollments.Select(enrollment => new TermEnrollmentResponse(enrollment.EnrollmentId, enrollment.CourseCode,
-                enrollment.AcademicTermId, enrollment.AcademicYear, enrollment.Status)).ToList()))
+                enrollment.AcademicTermId, enrollment.AcademicTerm!.TermCode, enrollment.AcademicTerm.TermName,
+                enrollment.AcademicTerm.EndWeekOfYear, enrollment.AcademicYear, enrollment.Status, enrollment.Credits,
+                enrollment.GradeValue, enrollment.IsFinalized)).ToList()))
         .SingleOrDefaultAsync(cancellationToken);
 
     return student is null ? Results.NotFound() : Results.Ok(student);
@@ -65,6 +67,40 @@ app.MapGet("/api/staff", async (AcademicRecordsDbContext database, CancellationT
             value.Email, value.DateOfBirth, value.PhoneNumber))
         .ToListAsync(cancellationToken));
 
+app.MapPost("/api/staff/enroll", async (EnrollStaffRequest request, AcademicRecordsDbContext database, CancellationToken cancellationToken) =>
+{
+    if (string.IsNullOrWhiteSpace(request.FirstName) || string.IsNullOrWhiteSpace(request.LastName) ||
+        string.IsNullOrWhiteSpace(request.Email) || request.DateOfBirth is null)
+    {
+        return Results.BadRequest("First name, last name, email, and date of birth are required.");
+    }
+
+    if (!IsValidEmail(request.Email))
+    {
+        return Results.BadRequest("Email address is not valid.");
+    }
+
+    if (!string.IsNullOrWhiteSpace(request.PhoneNumber) && !IsValidPhoneNumber(request.PhoneNumber))
+    {
+        return Results.BadRequest("Phone number is not valid. Use format: 0400000000 or +61400000000");
+    }
+
+    var staff = new Staff
+    {
+        StaffId = await CreateStaffIdAsync(database, cancellationToken),
+        FirstName = request.FirstName.Trim(),
+        LastName = request.LastName.Trim(),
+        Email = request.Email.Trim(),
+        DateOfBirth = request.DateOfBirth,
+        Status = "ACT",
+        PhoneNumber = request.PhoneNumber?.Trim()
+    };
+    database.Add(staff);
+
+    await database.SaveChangesAsync(cancellationToken);
+    return Results.Created($"/api/staff/{staff.StaffId}", new { staff.StaffId, staff.UserId });
+});
+
 app.MapGet("/api/students", async (AcademicRecordsDbContext database, CancellationToken cancellationToken) =>
     await database.Students.AsNoTracking()
         .OrderBy(value => value.LastName)
@@ -73,7 +109,9 @@ app.MapGet("/api/students", async (AcademicRecordsDbContext database, Cancellati
             value.DateOfBirth, value.PhoneNumber, value.MailingAddress, value.EmergencyContactName, value.EmergencyContactPhone,
             value.EnrollmentDate, value.Degree, value.Major, value.SubMajor,
             value.Enrollments.Select(enrollment => new TermEnrollmentResponse(enrollment.EnrollmentId, enrollment.CourseCode,
-                enrollment.AcademicTermId, enrollment.AcademicYear, enrollment.Status)).ToList()))
+                enrollment.AcademicTermId, enrollment.AcademicTerm!.TermCode, enrollment.AcademicTerm.TermName,
+                enrollment.AcademicTerm.EndWeekOfYear, enrollment.AcademicYear, enrollment.Status, enrollment.Credits,
+                enrollment.GradeValue, enrollment.IsFinalized)).ToList()))
         .ToListAsync(cancellationToken));
 
 app.MapPost("/api/students/enroll", async (EnrollStudentRequest request, AcademicRecordsDbContext database, CancellationToken cancellationToken) =>
@@ -98,7 +136,7 @@ app.MapPost("/api/students/enroll", async (EnrollStudentRequest request, Academi
 
     var student = new Student
     {
-        StudentId = CreateStudentId(),
+        StudentId = await CreateStudentIdAsync(database, cancellationToken),
         FirstName = request.FirstName.Trim(),
         LastName = request.LastName.Trim(),
         Email = request.Email.Trim(),
@@ -170,7 +208,9 @@ app.MapGet("/api/students/{studentId}", async (string studentId, AcademicRecords
             value.DateOfBirth, value.PhoneNumber, value.MailingAddress, value.EmergencyContactName, value.EmergencyContactPhone,
             value.EnrollmentDate, value.Degree, value.Major, value.SubMajor,
             value.Enrollments.Select(enrollment => new TermEnrollmentResponse(enrollment.EnrollmentId, enrollment.CourseCode,
-                enrollment.AcademicTermId, enrollment.AcademicYear, enrollment.Status)).ToList()))
+                enrollment.AcademicTermId, enrollment.AcademicTerm!.TermCode, enrollment.AcademicTerm.TermName,
+                enrollment.AcademicTerm.EndWeekOfYear, enrollment.AcademicYear, enrollment.Status, enrollment.Credits,
+                enrollment.GradeValue, enrollment.IsFinalized)).ToList()))
         .SingleOrDefaultAsync(cancellationToken);
     return student is null ? Results.NotFound() : Results.Ok(student);
 });
@@ -224,7 +264,33 @@ app.MapPut("/api/students/{studentId}", async (string studentId, UpdateStudentRe
 
 app.Run();
 
-static string CreateStudentId() => $"STU{Guid.NewGuid():N}"[..13].ToUpperInvariant();
+static async Task<string> CreateStudentIdAsync(AcademicRecordsDbContext database, CancellationToken cancellationToken)
+{
+    var maxSequence = await database.Students
+        .Select(student => student.StudentId)
+        .ToListAsync(cancellationToken);
+
+    var nextSequence = maxSequence
+        .Select(studentId => int.TryParse(studentId.AsSpan(3), out var sequence) ? sequence : 0)
+        .DefaultIfEmpty(0)
+        .Max() + 1;
+
+    return $"STU{nextSequence:D3}";
+}
+
+static async Task<string> CreateStaffIdAsync(AcademicRecordsDbContext database, CancellationToken cancellationToken)
+{
+    var existingStaffIds = await database.Set<Staff>()
+        .Select(staff => staff.StaffId)
+        .ToListAsync(cancellationToken);
+
+    var nextSequence = existingStaffIds
+        .Select(staffId => int.TryParse(staffId.AsSpan(3), out var sequence) ? sequence : 0)
+        .DefaultIfEmpty(0)
+        .Max() + 1;
+
+    return $"STF{nextSequence:D3}";
+}
 
 static bool IsValidEmail(string email)
 {
@@ -256,6 +322,9 @@ public sealed record EnrollStudentRequest(string FirstName, string LastName, str
 
 public sealed record AddEnrollmentRequest(string CourseCode, int AcademicTermId, int? AcademicYear = null);
 
+public sealed record EnrollStaffRequest(string FirstName, string LastName, string Email, DateOnly? DateOfBirth,
+    string? PhoneNumber = null);
+
 public sealed record StudentProfileResponse(int UserId, string StudentId, string FirstName, string LastName, string Email,
     DateOnly? DateOfBirth, string? PhoneNumber, string MailingAddress, string EmergencyContactName, string EmergencyContactPhone,
     DateOnly? EnrollmentDate, string? Degree, string? Major, string? SubMajor, List<TermEnrollmentResponse> Enrollments);
@@ -263,7 +332,8 @@ public sealed record StudentProfileResponse(int UserId, string StudentId, string
 public sealed record StaffProfileResponse(int UserId, string StaffId, string FirstName, string LastName, string Email,
     DateOnly? DateOfBirth, string? PhoneNumber);
 
-public sealed record TermEnrollmentResponse(int EnrollmentId, string CourseCode, int? AcademicTermId, int AcademicYear, string Status);
+public sealed record TermEnrollmentResponse(int EnrollmentId, string CourseCode, int? AcademicTermId, string? TermCode,
+    string? TermName, int EndWeekOfYear, int AcademicYear, string Status, decimal? Credits, decimal? GradeValue, bool IsFinalized);
 
 public sealed record UpdateStudentRequest(string FirstName, string LastName, string Email, DateOnly? DateOfBirth,
     string MailingAddress, string EmergencyContactName, string EmergencyContactPhone, string? PhoneNumber = null,
