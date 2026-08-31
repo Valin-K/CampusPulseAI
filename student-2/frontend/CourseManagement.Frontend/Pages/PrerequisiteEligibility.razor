@@ -7,12 +7,15 @@
 
 @if (isLoading)
 {
-    <p role="status">Loading prerequisite requirements...</p>
+    <LoadingIndicator Message="Loading prerequisite requirements..." />
 }
 else if (loadFailed)
 {
-    <div class="alert alert-danger" role="alert">@errorMessage</div>
-    <NavLink class="btn btn-outline-secondary" href="@CourseUrl">Back to Course</NavLink>
+    <FeedbackPanel Kind="FeedbackKind.Error"
+                   Title="Eligibility requirements could not be loaded"
+                   Message="@(errorMessage ?? "Eligibility requirements could not be loaded.")">
+        <NavLink class="btn btn-outline-danger" href="@CourseUrl">Back to Course</NavLink>
+    </FeedbackPanel>
 }
 else if (course is not null)
 {
@@ -23,58 +26,67 @@ else if (course is not null)
 
     @if (errorMessage is not null)
     {
-        <div class="alert alert-danger" role="alert">@errorMessage</div>
+        <FeedbackPanel Kind="FeedbackKind.Error"
+                       Title="Eligibility could not be checked"
+                       Message="@errorMessage" />
+    }
+
+    @if (isChecking)
+    {
+        <LoadingIndicator Message="Checking prerequisite eligibility..." />
     }
 
     @if (selections.Count == 0)
     {
-        <div class="alert alert-success" role="status">
-            This Course has no prerequisites. Eligibility requirements are met.
-        </div>
+        <FeedbackPanel Kind="FeedbackKind.Success"
+                       Title="Eligible"
+                       Message="This Course has no prerequisites. Eligibility requirements are met." />
     }
     else
     {
-        <table class="table table-striped">
-            <thead>
-                <tr>
-                    <th scope="col">Completed</th>
-                    <th scope="col">Course</th>
-                    <th scope="col">Minimum grade</th>
-                    <th scope="col">Achieved grade</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var selection in selections)
-                {
-                    var prerequisite = course.Prerequisites.Single(
-                        item => item.RequiredCourseId == selection.CourseId);
-
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
                     <tr>
-                        <td>
-                            <input type="checkbox"
-                                   aria-label="@($"Completed {selection.CourseCode}")"
-                                   disabled="@isChecking"
-                                   @bind="selection.IsCompleted"
-                                   @bind:after="ClearResult" />
-                        </td>
-                        <td>@selection.CourseCode - @selection.CourseName</td>
-                        <td>@(prerequisite.MinimumGrade ?? "Pass")</td>
-                        <td>
-                            <select class="form-select"
-                                    aria-label="@($"Grade for {selection.CourseCode}")"
-                                    disabled="@(!selection.IsCompleted || isChecking)"
-                                    @bind="selection.Grade"
-                                    @bind:after="ClearResult">
-                                @foreach (var grade in GradeOptions.Values)
-                                {
-                                    <option value="@grade">@grade</option>
-                                }
-                            </select>
-                        </td>
+                        <th scope="col">Completed</th>
+                        <th scope="col">Course</th>
+                        <th scope="col">Minimum grade</th>
+                        <th scope="col">Achieved grade</th>
                     </tr>
-                }
-            </tbody>
-        </table>
+                </thead>
+                <tbody>
+                    @foreach (var selection in selections)
+                    {
+                        var prerequisite = course.Prerequisites.Single(
+                            item => item.RequiredCourseId == selection.CourseId);
+
+                        <tr>
+                            <td>
+                                <input type="checkbox"
+                                       aria-label="@($"Completed {selection.CourseCode}")"
+                                       disabled="@isChecking"
+                                       @bind="selection.IsCompleted"
+                                       @bind:after="ClearResult" />
+                            </td>
+                            <td>@selection.CourseCode - @selection.CourseName</td>
+                            <td>@(prerequisite.MinimumGrade ?? "Pass")</td>
+                            <td>
+                                <select class="form-select"
+                                        aria-label="@($"Grade for {selection.CourseCode}")"
+                                        disabled="@(!selection.IsCompleted || isChecking)"
+                                        @bind="selection.Grade"
+                                        @bind:after="ClearResult">
+                                    @foreach (var grade in GradeOptions.Values)
+                                    {
+                                        <option value="@grade">@grade</option>
+                                    }
+                                </select>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
 
         <button class="btn btn-primary" disabled="@isChecking" @onclick="CheckEligibilityAsync">
             @(isChecking ? "Checking..." : "Check eligibility")
@@ -83,40 +95,43 @@ else if (course is not null)
 
     @if (result is not null)
     {
-        <div class="alert @(result.IsEligible ? "alert-success" : "alert-warning") mt-3"
-             role="status">
-            @(result.IsEligible
-                ? "All prerequisite requirements are met."
-                : "One or more prerequisite requirements are not met.")
+        <div class="mt-3">
+            <FeedbackPanel Kind="@(result.IsEligible ? FeedbackKind.Success : FeedbackKind.Warning)"
+                           Title="@(result.IsEligible ? "Eligible" : "Not eligible")"
+                           Message="@(result.IsEligible
+                               ? "All prerequisite requirements are met."
+                               : "One or more prerequisite requirements are not met.")" />
         </div>
 
-        <table class="table">
-            <thead>
-                <tr>
-                    <th scope="col">Required Course</th>
-                    <th scope="col">Minimum</th>
-                    <th scope="col">Achieved</th>
-                    <th scope="col">Result</th>
-                    <th scope="col">Reason</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var requirement in result.Requirements)
-                {
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
                     <tr>
-                        <td>@requirement.RequiredCourseCode</td>
-                        <td>@requirement.MinimumGrade</td>
-                        <td>@(requirement.AchievedGrade ?? "Not completed")</td>
-                        <td>
-                            <span class="badge @(requirement.IsMet ? "bg-success" : "bg-warning text-dark")">
-                                @(requirement.IsMet ? "Met" : "Not met")
-                            </span>
-                        </td>
-                        <td>@requirement.Reason</td>
+                        <th scope="col">Required Course</th>
+                        <th scope="col">Minimum</th>
+                        <th scope="col">Achieved</th>
+                        <th scope="col">Result</th>
+                        <th scope="col">Reason</th>
                     </tr>
-                }
-            </tbody>
-        </table>
+                </thead>
+                <tbody>
+                    @foreach (var requirement in result.Requirements)
+                    {
+                        <tr>
+                            <td>@requirement.RequiredCourseCode</td>
+                            <td>@requirement.MinimumGrade</td>
+                            <td>@(requirement.AchievedGrade ?? "Not completed")</td>
+                            <td>
+                                <span class="badge @(requirement.IsMet ? "bg-success" : "bg-warning text-dark")">
+                                    @(requirement.IsMet ? "Met" : "Not met")
+                                </span>
+                            </td>
+                            <td>@requirement.Reason</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
     }
 
     <NavLink class="btn btn-outline-secondary mt-3" href="@CourseUrl">Back to Course</NavLink>
@@ -210,6 +225,10 @@ else if (course is not null)
         catch (HttpRequestException)
         {
             errorMessage = "Eligibility could not be checked. Check that the API is running.";
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            errorMessage = "The eligibility API returned an unexpected response.";
         }
         finally
         {

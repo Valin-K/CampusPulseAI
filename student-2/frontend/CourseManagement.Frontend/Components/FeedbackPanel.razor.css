@@ -1,0 +1,12 @@
+.feedback-panel {
+    display: grid;
+    gap: .35rem;
+    border-left-width: 4px;
+}
+
+.feedback-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem;
+    margin-top: .35rem;
+}
