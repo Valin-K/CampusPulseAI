@@ -1,0 +1,87 @@
+@page "/new-user"
+
+<PageTitle>New User</PageTitle>
+
+<h1>New user</h1>
+
+<p class="text-muted">Enroll a new student in Academic Records.</p>
+
+<EditForm Model="enrollment" OnValidSubmit="EnrollStudent" class="mb-5">
+    <div class="row g-3">
+        <div class="col-md-6"><label class="form-label">First name</label><InputText class="form-control" @bind-Value="enrollment.FirstName" required /></div>
+        <div class="col-md-6"><label class="form-label">Last name</label><InputText class="form-control" @bind-Value="enrollment.LastName" required /></div>
+        <div class="col-md-6"><label class="form-label">Email</label><InputText type="email" class="form-control" @bind-Value="enrollment.Email" required /></div>
+        <div class="col-md-6"><label class="form-label">Date of birth</label><InputDate class="form-control" @bind-Value="enrollment.DateOfBirth" /></div>
+        <div class="col-md-6"><label class="form-label">Phone number</label><InputText class="form-control" @bind-Value="enrollment.PhoneNumber" /></div>
+        <div class="col-md-6"><label class="form-label">Mailing address</label><InputText class="form-control" @bind-Value="enrollment.MailingAddress" required /></div>
+        <div class="col-md-6"><label class="form-label">Emergency contact name</label><InputText class="form-control" @bind-Value="enrollment.EmergencyContactName" required /></div>
+        <div class="col-md-6"><label class="form-label">Emergency contact phone</label><InputText class="form-control" @bind-Value="enrollment.EmergencyContactPhone" required /></div>
+        <div class="col-md-6"><label class="form-label">Degree</label><InputText class="form-control" @bind-Value="enrollment.Degree" /></div>
+        <div class="col-md-6"><label class="form-label">Major</label><InputText class="form-control" @bind-Value="enrollment.Major" /></div>
+    </div>
+    <button type="submit" class="btn btn-primary mt-3" disabled="@submitting">@(submitting ? "Enrolling..." : "Enroll student")</button>
+</EditForm>
+
+@if (createdStudentId is not null)
+{
+    <div class="alert alert-success">Student enrolled. Permanent student ID: <strong>@createdStudentId</strong></div>
+}
+@if (enrollmentError is not null)
+{
+    <div class="alert alert-danger">Unable to enroll student: @enrollmentError</div>
+}
+
+@code {
+    private EnrollmentModel enrollment = new();
+    private string? createdStudentId;
+    private string? enrollmentError;
+    private bool submitting;
+
+    [Inject]
+    private HttpClient Http { get; set; } = default!;
+
+    private async Task EnrollStudent()
+    {
+        submitting = true;
+        createdStudentId = null;
+        enrollmentError = null;
+        try
+        {
+            using var response = await Http.PostAsJsonAsync("api/students/enroll", enrollment);
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<EnrollmentResponse>();
+                createdStudentId = result?.StudentId;
+                enrollment = new();
+            }
+            else
+            {
+                enrollmentError = await response.Content.ReadAsStringAsync();
+            }
+        }
+        catch (HttpRequestException exception)
+        {
+            enrollmentError = exception.Message;
+        }
+        finally
+        {
+            submitting = false;
+        }
+    }
+
+    private sealed record EnrollmentResponse(string StudentId, int UserId);
+
+    private sealed class EnrollmentModel
+    {
+        public string FirstName { get; set; } = string.Empty;
+        public string LastName { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public DateOnly DateOfBirth { get; set; } = new(2000, 1, 1);
+        public string MailingAddress { get; set; } = string.Empty;
+        public string EmergencyContactName { get; set; } = string.Empty;
+        public string EmergencyContactPhone { get; set; } = string.Empty;
+        public string? PhoneNumber { get; set; }
+        public string? Degree { get; set; }
+        public string? Major { get; set; }
+    }
+}

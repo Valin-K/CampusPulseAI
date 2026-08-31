@@ -1,25 +1,51 @@
 using AcademicRecords.Database.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace AcademicRecords.Database.Data;
 
 public static class AcademicRecordsSeedData
 {
+    public static async Task InitializeAsync(AcademicRecordsDbContext database)
+    {
+        if (!await database.Students.AnyAsync())
+        {
+            database.Students.AddRange(Students);
+        }
+
+        if (!await database.Set<Staff>().AnyAsync())
+        {
+            database.Set<Staff>().AddRange(StaffMembers);
+        }
+
+        if (!await database.AcademicTerms.AnyAsync())
+        {
+            database.AcademicTerms.AddRange(AcademicTerms);
+        }
+
+        if (!await database.Enrollments.AnyAsync())
+        {
+            database.Enrollments.AddRange(Enrollments);
+        }
+
+        await database.SaveChangesAsync();
+    }
+
     public static Student[] Students =>
     [
-        new() { UserId = 1, StudentId = "STU001", FirstName = "Alec", LastName = "Steele", Email = "alec.steele@example.edu", DateOfBirth = new(2001, 3, 12), EnrollmentDate = new(2023, 2, 20), Status = "ACT", PhoneNumber = "0400000001", Degree = "Bachelor of Computer Science", Major = "Software Engineering", SubMajor = "Artificial Intelligence" },
-        new() { UserId = 2, StudentId = "STU002", FirstName = "Valin", LastName = "Kennedy", Email = "valin.kennedy@example.edu", DateOfBirth = new(2000, 7, 8), EnrollmentDate = new(2022, 8, 15), Status = "ACT", PhoneNumber = "0400000002", Degree = "Bachelor of Information Technology", Major = "Cybersecurity" },
-        new() { UserId = 3, StudentId = "STU003", FirstName = "Joyce", LastName = "Yap", Email = "joyce.yap@example.edu", DateOfBirth = new(2002, 1, 24), EnrollmentDate = new(2024, 2, 19), Status = "ACT", PhoneNumber = "0400000003", Degree = "Bachelor of Data Science", Major = "Data Analytics" },
-        new() { UserId = 4, StudentId = "STU004", FirstName = "Ryan", LastName = "Takayasu", Email = "ryan.takayasu@example.edu", DateOfBirth = new(2001, 11, 2), EnrollmentDate = new(2023, 8, 14), Status = "ACT", PhoneNumber = "0400000004", Degree = "Bachelor of Computer Science", Major = "Computer Science" },
-        new() { UserId = 5, StudentId = "STU005", FirstName = "Jack", LastName = "Wang", Email = "jack.wang@example.edu", DateOfBirth = new(2000, 5, 17), EnrollmentDate = new(2022, 2, 21), Status = "ACT", PhoneNumber = "0400000005", Degree = "Bachelor of Business", Major = "Business Analytics" },
-        new() { UserId = 6, StudentId = "STU006", FirstName = "Mia", LastName = "Chen", Email = "mia.chen@example.edu", DateOfBirth = new(2002, 9, 30), EnrollmentDate = new(2024, 8, 12), Status = "ACT", PhoneNumber = "0400000006", Degree = "Bachelor of Engineering", Major = "Software Engineering" },
-        new() { UserId = 7, StudentId = "STU007", FirstName = "Noah", LastName = "Patel", Email = "noah.patel@example.edu", DateOfBirth = new(2001, 12, 6), EnrollmentDate = new(2023, 2, 20), Status = "ACT", PhoneNumber = "0400000007", Degree = "Bachelor of Science", Major = "Applied Mathematics" },
+        new() { UserId = 1, StudentId = "STU001", FirstName = "Alec", LastName = "Steele", Email = "alec.steele@example.edu", DateOfBirth = new(2001, 3, 12), EnrollmentDate = new(2023, 2, 20), Status = "ACT", PhoneNumber = "0400000001", MailingAddress = "1 Campus Way", EmergencyContactName = "Morgan Steele", EmergencyContactPhone = "0400100001", Degree = "Bachelor of Computer Science", Major = "Software Engineering", SubMajor = "Artificial Intelligence" },
+        new() { UserId = 2, StudentId = "STU002", FirstName = "Valin", LastName = "Kennedy", Email = "valin.kennedy@example.edu", DateOfBirth = new(2000, 7, 8), EnrollmentDate = new(2022, 8, 15), Status = "ACT", PhoneNumber = "0400000002", MailingAddress = "2 Campus Way", EmergencyContactName = "Jordan Kennedy", EmergencyContactPhone = "0400100002", Degree = "Bachelor of Information Technology", Major = "Cybersecurity", SubMajor = "Network Security" },
+        new() { UserId = 3, StudentId = "STU003", FirstName = "Joyce", LastName = "Yap", Email = "joyce.yap@example.edu", DateOfBirth = new(2002, 1, 24), EnrollmentDate = new(2024, 2, 19), Status = "ACT", PhoneNumber = "0400000003", MailingAddress = "3 Campus Way", EmergencyContactName = "Samuel Yap", EmergencyContactPhone = "0400100003", Degree = "Bachelor of Data Science", Major = "Data Analytics", SubMajor = "Statistics" },
+        new() { UserId = 4, StudentId = "STU004", FirstName = "Ryan", LastName = "Takayasu", Email = "ryan.takayasu@example.edu", DateOfBirth = new(2001, 11, 2), EnrollmentDate = new(2023, 8, 14), Status = "ACT", PhoneNumber = "0400000004", MailingAddress = "4 Campus Way", EmergencyContactName = "Taylor Takayasu", EmergencyContactPhone = "0400100004", Degree = "Bachelor of Computer Science", Major = "Computer Science", SubMajor = "Cybersecurity" },
+        new() { UserId = 5, StudentId = "STU005", FirstName = "Jack", LastName = "Wang", Email = "jack.wang@example.edu", DateOfBirth = new(2000, 5, 17), EnrollmentDate = new(2022, 2, 21), Status = "ACT", PhoneNumber = "0400000005", MailingAddress = "5 Campus Way", EmergencyContactName = "Casey Wang", EmergencyContactPhone = "0400100005", Degree = "Bachelor of Business", Major = "Business Analytics", SubMajor = "Finance" },
+        new() { UserId = 6, StudentId = "STU006", FirstName = "Mia", LastName = "Chen", Email = "mia.chen@example.edu", DateOfBirth = new(2002, 9, 30), EnrollmentDate = new(2024, 8, 12), Status = "ACT", PhoneNumber = "0400000006", MailingAddress = "6 Campus Way", EmergencyContactName = "Alex Chen", EmergencyContactPhone = "0400100006", Degree = "Bachelor of Engineering", Major = "Software Engineering", SubMajor = "Embedded Systems" },
+        new() { UserId = 7, StudentId = "STU007", FirstName = "Noah", LastName = "Patel", Email = "noah.patel@example.edu", DateOfBirth = new(2001, 12, 6), EnrollmentDate = new(2023, 2, 20), Status = "ACT", PhoneNumber = "0400000007", MailingAddress = "7 Campus Way", EmergencyContactName = "Riley Patel", EmergencyContactPhone = "0400100007", Degree = "Bachelor of Science", Major = "Applied Mathematics", SubMajor = "Statistics" },
     ];
 
     public static Staff[] StaffMembers =>
     [
-        new() { UserId = 8, StaffId = "STF001", FirstName = "Grace", LastName = "Brillis", Email = "grace.brillis@example.edu", Status = "ACT", PhoneNumber = "0400000008", Degree = "Academic Staff" },
-        new() { UserId = 9, StaffId = "STF002", FirstName = "Georges", LastName = "Bou Ghantous", Email = "georges.boughantous@example.edu", Status = "ACT", PhoneNumber = "0400000009", Degree = "Academic Staff" },
-        new() { UserId = 10, StaffId = "STF003", FirstName = "Olivia", LastName = "Davis", Email = "olivia.davis@example.edu", Status = "ACT", PhoneNumber = "0400000010", Degree = "Academic Staff" }
+        new() { UserId = 8, StaffId = "STF001", FirstName = "Grace", LastName = "Brillis", Email = "grace.brillis@example.edu", DateOfBirth = new(1985, 4, 18), Status = "ACT", PhoneNumber = "0400000008" },
+        new() { UserId = 9, StaffId = "STF002", FirstName = "Georges", LastName = "Bou Ghantous", Email = "georges.boughantous@example.edu", DateOfBirth = new(1979, 9, 7), Status = "ACT", PhoneNumber = "0400000009" },
+        new() { UserId = 10, StaffId = "STF003", FirstName = "Olivia", LastName = "Davis", Email = "olivia.davis@example.edu", DateOfBirth = new(1990, 1, 25), Status = "ACT", PhoneNumber = "0400000010" }
     ];
 
     public static AcademicTerm[] AcademicTerms =>

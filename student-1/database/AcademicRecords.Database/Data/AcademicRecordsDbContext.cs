@@ -6,6 +6,7 @@ namespace AcademicRecords.Database.Data;
 public sealed class AcademicRecordsDbContext(DbContextOptions<AcademicRecordsDbContext> options) : DbContext(options)
 {
     public DbSet<User> Users => Set<User>();
+    public DbSet<Student> Students => Set<Student>();
     public DbSet<AcademicTerm> AcademicTerms => Set<AcademicTerm>();
     public DbSet<Enrollment> Enrollments => Set<Enrollment>();
 
@@ -26,17 +27,21 @@ public sealed class AcademicRecordsDbContext(DbContextOptions<AcademicRecordsDbC
             entity.Property(user => user.LastName).HasColumnName("last_name").HasMaxLength(100).IsRequired();
             entity.Property(user => user.Email).HasColumnName("email").HasMaxLength(255).IsRequired();
             entity.Property(user => user.DateOfBirth).HasColumnName("date_of_birth").HasColumnType("DATE");
-            entity.Property(user => user.EnrollmentDate).HasColumnName("enrollment_date").HasColumnType("DATE");
             entity.Property(user => user.Status).HasColumnName("status").HasMaxLength(3).IsRequired();
             entity.Property(user => user.PhoneNumber).HasColumnName("phone_number").HasMaxLength(10);
-            entity.Property(user => user.Degree).HasColumnName("degree").HasMaxLength(100);
-            entity.Property(user => user.Major).HasColumnName("major").HasMaxLength(100);
-            entity.Property(user => user.SubMajor).HasColumnName("sub_major").HasMaxLength(100);
         });
 
         modelBuilder.Entity<Student>(entity =>
         {
             entity.Property(student => student.StudentId).HasColumnName("student_id").HasMaxLength(20).IsRequired();
+            entity.Property(student => student.MailingAddress).HasColumnName("mailing_address").HasMaxLength(500).IsRequired();
+            entity.Property(student => student.EmergencyContactName).HasColumnName("emergency_contact_name").HasMaxLength(200).IsRequired();
+            entity.Property(student => student.EmergencyContactPhone).HasColumnName("emergency_contact_phone").HasMaxLength(30).IsRequired();
+            entity.Property(student => student.EnrollmentDate).HasColumnName("enrollment_date").HasColumnType("DATE");
+            entity.Property(student => student.Degree).HasColumnName("degree").HasMaxLength(100);
+            entity.Property(student => student.Major).HasColumnName("major").HasMaxLength(100);
+            entity.Property(student => student.SubMajor).HasColumnName("sub_major").HasMaxLength(100);
+            entity.HasIndex(student => student.StudentId).IsUnique();
         });
 
         modelBuilder.Entity<Staff>(entity =>
@@ -86,11 +91,8 @@ public sealed class AcademicRecordsDbContext(DbContextOptions<AcademicRecordsDbC
                 .HasForeignKey(enrollment => enrollment.AcademicTermId)
                 .HasPrincipalKey(term => term.TermId)
                 .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(enrollment => new { enrollment.StudentId, enrollment.AcademicTermId, enrollment.CourseCode }).IsUnique();
         });
 
-        modelBuilder.Entity<Student>().HasData(AcademicRecordsSeedData.Students);
-        modelBuilder.Entity<Staff>().HasData(AcademicRecordsSeedData.StaffMembers);
-        modelBuilder.Entity<AcademicTerm>().HasData(AcademicRecordsSeedData.AcademicTerms);
-        modelBuilder.Entity<Enrollment>().HasData(AcademicRecordsSeedData.Enrollments);
     }
 }

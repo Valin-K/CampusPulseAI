@@ -2,7 +2,7 @@
 
 <PageTitle>Academic Records</PageTitle>
 
-<h1>People</h1>
+<h2>People</h2>
 
 @if (people is null && error is null)
 {
@@ -18,10 +18,10 @@ else
         <thead>
             <tr>
                 <th>Name</th>
+                <th>ID</th>
                 <th>Role</th>
-                <th>Student ID</th>
-                <th>Staff ID</th>
                 <th>Email</th>
+                <th></th>
             </tr>
         </thead>
         <tbody>
@@ -29,10 +29,10 @@ else
             {
                 <tr>
                     <td>@person.FirstName @person.LastName</td>
+                    <td>@(person.StudentId ?? person.StaffId)</td>
                     <td>@person.Role</td>
-                    <td>@person.StudentId</td>
-                    <td>@person.StaffId</td>
                     <td>@person.Email</td>
+                    <td><a class="btn btn-outline-primary btn-sm" href="profile/@person.Role.ToLowerInvariant()/@person.UserId">Edit profile</a></td>
                 </tr>
             }
         </tbody>
@@ -66,4 +66,5 @@ else
         string Role,
         string? StudentId,
         string? StaffId);
+
 }
