@@ -1,0 +1,34 @@
+.resource-tile {
+    display: grid;
+    justify-items: start;
+    gap: .35rem;
+    padding: 1.15rem;
+    border: 1px solid var(--university-border);
+    border-radius: var(--radius-md);
+    background: var(--university-surface);
+    color: var(--university-ink);
+    cursor: pointer;
+    text-align: left;
+    transition: box-shadow .15s ease, border-color .15s ease;
+}
+
+.resource-tile:hover,
+.resource-tile:focus-visible {
+    border-color: var(--university-blue);
+    box-shadow: var(--shadow-sm);
+    outline: none;
+}
+
+.resource-tile svg {
+    color: var(--university-blue);
+}
+
+.resource-tile strong {
+    font-size: 1rem;
+    color: var(--university-navy);
+}
+
+.resource-tile span {
+    font-size: .85rem;
+    color: var(--university-muted);
+}

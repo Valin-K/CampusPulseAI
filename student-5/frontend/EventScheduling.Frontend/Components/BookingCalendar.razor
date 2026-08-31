@@ -1,0 +1,104 @@
+@namespace EventScheduling.Frontend.Components
+
+<div class="booking-calendar">
+    <div class="calendar-toolbar">
+        <button type="button" class="button button-secondary" @onclick="GoToPrevious">&larr; Previous</button>
+        <strong class="calendar-heading">@HeadingText</strong>
+        <button type="button" class="button button-secondary" @onclick="GoToNext">Next &rarr;</button>
+    </div>
+
+    <div class="calendar-weekday-row">
+        @foreach (var dayName in WeekdayNames)
+        {
+            <span>@dayName</span>
+        }
+    </div>
+
+    <div class="calendar-grid @(ViewMode == "week" ? "calendar-grid-week" : "calendar-grid-month")">
+        @foreach (var day in VisibleDays)
+        {
+            var currentDay = day;
+            var isOutsideMonth = ViewMode == "month" && currentDay.Month != AnchorDate.Month;
+            var isToday = currentDay == DateOnly.FromDateTime(DateTime.Today);
+            <div class="calendar-day @(isOutsideMonth ? "outside-month" : null) @(isToday ? "is-today" : null)"
+                 role="button" tabindex="0" @onclick="() => SelectDateAsync(currentDay)">
+                <span class="calendar-day-number">@currentDay.Day</span>
+                <div class="calendar-day-bookings">
+                    @foreach (var booking in BookingsOn(currentDay))
+                    {
+                        <span class="calendar-booking-chip status-@booking.Status.ToString().ToLowerInvariant()">
+                            @booking.StartUtc.ToString("h:mmtt") &middot; @booking.ResourceName
+                        </span>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private static readonly string[] WeekdayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+    [Parameter, EditorRequired] public IReadOnlyList<BookingResponse> Bookings { get; set; } = [];
+    [Parameter, EditorRequired] public DateOnly AnchorDate { get; set; }
+    [Parameter] public string ViewMode { get; set; } = "month";
+    [Parameter] public EventCallback<DateOnly> OnDateSelected { get; set; }
+    [Parameter] public EventCallback<DateOnly> AnchorDateChanged { get; set; }
+
+    private IReadOnlyList<DateOnly> VisibleDays => ViewMode == "week" ? WeekDays : MonthDays;
+
+    private IReadOnlyList<DateOnly> WeekDays
+    {
+        get
+        {
+            var start = AnchorDate.AddDays(-(int)AnchorDate.DayOfWeek);
+            return Enumerable.Range(0, 7).Select(start.AddDays).ToList();
+        }
+    }
+
+    private IReadOnlyList<DateOnly> MonthDays
+    {
+        get
+        {
+            var firstOfMonth = new DateOnly(AnchorDate.Year, AnchorDate.Month, 1);
+            var gridStart = firstOfMonth.AddDays(-(int)firstOfMonth.DayOfWeek);
+            var lastOfMonth = firstOfMonth.AddMonths(1).AddDays(-1);
+            var gridEnd = lastOfMonth.AddDays(6 - (int)lastOfMonth.DayOfWeek);
+            var daysInGrid = gridEnd.DayNumber - gridStart.DayNumber + 1;
+            return Enumerable.Range(0, daysInGrid).Select(gridStart.AddDays).ToList();
+        }
+    }
+
+    private string HeadingText => ViewMode == "week"
+        ? $"{WeekDays[0]:MMM d} – {WeekDays[^1]:MMM d, yyyy}"
+        : AnchorDate.ToString("MMMM yyyy");
+
+    private IEnumerable<BookingResponse> BookingsOn(DateOnly day) =>
+        Bookings.Where(booking => DateOnly.FromDateTime(booking.StartUtc) == day).OrderBy(booking => booking.StartUtc);
+
+    private async Task SelectDateAsync(DateOnly day)
+    {
+        if (OnDateSelected.HasDelegate)
+        {
+            await OnDateSelected.InvokeAsync(day);
+        }
+    }
+
+    private async Task GoToPrevious()
+    {
+        var next = ViewMode == "week" ? AnchorDate.AddDays(-7) : AnchorDate.AddMonths(-1);
+        if (AnchorDateChanged.HasDelegate)
+        {
+            await AnchorDateChanged.InvokeAsync(next);
+        }
+    }
+
+    private async Task GoToNext()
+    {
+        var next = ViewMode == "week" ? AnchorDate.AddDays(7) : AnchorDate.AddMonths(1);
+        if (AnchorDateChanged.HasDelegate)
+        {
+            await AnchorDateChanged.InvokeAsync(next);
+        }
+    }
+}
