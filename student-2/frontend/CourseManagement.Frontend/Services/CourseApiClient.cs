@@ -114,6 +114,49 @@ public sealed class CourseApiClient(HttpClient httpClient)
         await EnsureSuccessAsync(response, cancellationToken);
     }
 
+    public async Task<FacultyAssignmentSummary> GetFacultyAssignmentAsync(
+        int id,
+        CancellationToken cancellationToken = default)
+    {
+        using var response = await httpClient.GetAsync(
+            $"api/faculty-assignments/{id}",
+            cancellationToken);
+        return await ReadFacultyAssignmentAsync(response, cancellationToken);
+    }
+
+    public async Task<FacultyAssignmentSummary> CreateFacultyAssignmentAsync(
+        FacultyAssignmentFormModel assignment,
+        CancellationToken cancellationToken = default)
+    {
+        using var response = await httpClient.PostAsJsonAsync(
+            "api/faculty-assignments",
+            assignment,
+            cancellationToken);
+        return await ReadFacultyAssignmentAsync(response, cancellationToken);
+    }
+
+    public async Task<FacultyAssignmentSummary> UpdateFacultyAssignmentAsync(
+        int id,
+        FacultyAssignmentFormModel assignment,
+        CancellationToken cancellationToken = default)
+    {
+        using var response = await httpClient.PutAsJsonAsync(
+            $"api/faculty-assignments/{id}",
+            assignment,
+            cancellationToken);
+        return await ReadFacultyAssignmentAsync(response, cancellationToken);
+    }
+
+    public async Task DeleteFacultyAssignmentAsync(
+        int id,
+        CancellationToken cancellationToken = default)
+    {
+        using var response = await httpClient.DeleteAsync(
+            $"api/faculty-assignments/{id}",
+            cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
     public async Task<PrerequisiteEligibilityResult> CheckPrerequisiteEligibilityAsync(
         int courseId,
         PrerequisiteEligibilityRequest request,
@@ -148,6 +191,17 @@ public sealed class CourseApiClient(HttpClient httpClient)
 
         return await response.Content.ReadFromJsonAsync<PrerequisiteSummary>(cancellationToken)
             ?? throw new JsonException("The prerequisite API returned an empty response.");
+    }
+
+    static async Task<FacultyAssignmentSummary> ReadFacultyAssignmentAsync(
+        HttpResponseMessage response,
+        CancellationToken cancellationToken)
+    {
+        await EnsureSuccessAsync(response, cancellationToken);
+
+        return await response.Content.ReadFromJsonAsync<FacultyAssignmentSummary>(
+                cancellationToken)
+            ?? throw new JsonException("The faculty assignment API returned an empty response.");
     }
 
     static async Task EnsureSuccessAsync(
