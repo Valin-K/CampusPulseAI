@@ -7,6 +7,8 @@ services:
     environment:
       ASPNETCORE_HTTP_PORTS: 8080
       ConnectionStrings__AcademicRecords: Data Source=/app/data/academic-records.db
+    ports:
+      - "5021:8080"
 
   academicrecords.backend:
     image: ${DOCKER_REGISTRY-}academicrecordsbackend
@@ -27,13 +29,25 @@ services:
       context: .
       dockerfile: student-2/backend/CourseManagement.Backend/Dockerfile
     environment:
+      - Services__AcademicRecordsDatabase=http://academicrecords.database:8080
+      - Services__CourseManagementDatabase=http://coursemanagement.database:8080
+    depends_on:
+      - academicrecords.database
+      - coursemanagement.database
+
+  coursemanagement.database:
+    image: ${DOCKER_REGISTRY-}coursemanagement.database
+    build:
+      context: .
+      dockerfile: student-2/database/CourseManagement.Database/Dockerfile
+    environment:
+      - ASPNETCORE_HTTP_PORTS=8080
       - ConnectionStrings__CourseManagementDatabase=Data Source=/app/data/course-management.db;Foreign Keys=True
       - SyllabusStorage__RootPath=/app/data/syllabi
-      - Services__AcademicRecordsApi=http://academicrecords.backend:8080
+    ports:
+      - "5120:8080"
     volumes:
       - coursemanagement-data:/app/data
-    depends_on:
-      - academicrecords.backend
 
   campushousing.backend:
     image: ${DOCKER_REGISTRY-}campushousingbackend
