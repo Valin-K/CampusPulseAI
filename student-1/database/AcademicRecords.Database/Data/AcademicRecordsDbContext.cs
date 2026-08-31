@@ -6,6 +6,7 @@ namespace AcademicRecords.Database.Data;
 public sealed class AcademicRecordsDbContext(DbContextOptions<AcademicRecordsDbContext> options) : DbContext(options)
 {
     public DbSet<User> Users => Set<User>();
+    public DbSet<Student> Students => Set<Student>();
     public DbSet<AcademicTerm> AcademicTerms => Set<AcademicTerm>();
     public DbSet<Enrollment> Enrollments => Set<Enrollment>();
 
@@ -37,6 +38,10 @@ public sealed class AcademicRecordsDbContext(DbContextOptions<AcademicRecordsDbC
         modelBuilder.Entity<Student>(entity =>
         {
             entity.Property(student => student.StudentId).HasColumnName("student_id").HasMaxLength(20).IsRequired();
+            entity.Property(student => student.MailingAddress).HasColumnName("mailing_address").HasMaxLength(500).IsRequired();
+            entity.Property(student => student.EmergencyContactName).HasColumnName("emergency_contact_name").HasMaxLength(200).IsRequired();
+            entity.Property(student => student.EmergencyContactPhone).HasColumnName("emergency_contact_phone").HasMaxLength(30).IsRequired();
+            entity.HasIndex(student => student.StudentId).IsUnique();
         });
 
         modelBuilder.Entity<Staff>(entity =>
@@ -86,6 +91,7 @@ public sealed class AcademicRecordsDbContext(DbContextOptions<AcademicRecordsDbC
                 .HasForeignKey(enrollment => enrollment.AcademicTermId)
                 .HasPrincipalKey(term => term.TermId)
                 .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(enrollment => new { enrollment.StudentId, enrollment.AcademicTermId, enrollment.CourseCode }).IsUnique();
         });
 
         modelBuilder.Entity<Student>().HasData(AcademicRecordsSeedData.Students);
