@@ -2,6 +2,7 @@ using CourseManagement.Backend.BusinessRules;
 using CourseManagement.Backend.Contracts.Courses;
 using CourseManagement.Backend.Contracts.FacultyAssignments;
 using CourseManagement.Backend.Contracts.Prerequisites;
+using CourseManagement.Backend.Services;
 using CourseManagement.Database.Data;
 using CourseManagement.Database.Models;
 using Microsoft.AspNetCore.Mvc;
@@ -11,7 +12,9 @@ namespace CourseManagement.Backend.Controllers;
 
 [ApiController]
 [Route("api/courses")]
-public sealed class CoursesController(CourseManagementDbContext database) : ControllerBase
+public sealed class CoursesController(
+    CourseManagementDbContext database,
+    ISyllabusStorage syllabusStorage) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<CourseResponse>>> GetAll(CancellationToken cancellationToken)
@@ -158,9 +161,28 @@ public sealed class CoursesController(CourseManagementDbContext database) : Cont
                 string.Join(", ", dependentCourseCodes));
         }
 
-        database.Courses.Remove(course);
-        await database.SaveChangesAsync(cancellationToken);
-        return NoContent();
+        try
+        {
+            await using var stagedSyllabusDeletion =
+                string.IsNullOrWhiteSpace(course.SyllabusFileName)
+                    ? null
+                    : await syllabusStorage.StageDeletionAsync(id, cancellationToken);
+
+            database.Courses.Remove(course);
+            await database.SaveChangesAsync(cancellationToken);
+
+            if (stagedSyllabusDeletion is not null)
+            {
+                await stagedSyllabusDeletion.CommitAsync();
+            }
+
+            return NoContent();
+        }
+        catch (SyllabusStorageException)
+        {
+            return StorageProblem(
+                "The Course could not be deleted because its syllabus PDF could not be removed safely.");
+        }
     }
 
     [HttpPost("{id:int}/prerequisite-eligibility")]
@@ -284,6 +306,14 @@ public sealed class CoursesController(CourseManagementDbContext database) : Cont
             Title = "Invalid prerequisite eligibility request",
             Detail = detail
         });
+    }
+
+    ActionResult StorageProblem(string detail)
+    {
+        return Problem(
+            statusCode: StatusCodes.Status500InternalServerError,
+            title: "Syllabus storage error",
+            detail: detail);
     }
 
     static string NormalizeCode(string code) => code.Trim().ToUpperInvariant();

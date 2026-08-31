@@ -61,10 +61,86 @@ else if (course is not null)
 
         <dt class="col-sm-3">Credit points</dt>
         <dd class="col-sm-9">@course.CreditPoints</dd>
-
-        <dt class="col-sm-3">Syllabus</dt>
-        <dd class="col-sm-9">@(course.SyllabusFileName ?? "No syllabus uploaded")</dd>
     </dl>
+
+    <section class="mt-4" aria-labelledby="syllabus-heading">
+        <div class="mb-3">
+            <h2 id="syllabus-heading" class="h4 mb-1">Syllabus</h2>
+            <p class="text-muted mb-0">
+                Upload one PDF syllabus for this Course. The maximum file size is 10 MiB.
+            </p>
+        </div>
+
+        @if (string.IsNullOrWhiteSpace(course.SyllabusFileName))
+        {
+            <FeedbackPanel Kind="FeedbackKind.Empty"
+                           Title="No syllabus uploaded"
+                           Message="Select a PDF to add the syllabus for this Course." />
+        }
+        else
+        {
+            <div class="card mb-3">
+                <div class="card-body">
+                    <h3 class="h6 card-title">Current syllabus</h3>
+                    <p class="card-text mb-3">@course.SyllabusFileName</p>
+                    <div class="d-flex flex-wrap gap-2">
+                        <a class="btn btn-sm btn-outline-primary"
+                           href="@CourseApi.GetSyllabusUrl(course.Id)"
+                           target="_blank"
+                           rel="noopener">
+                            View syllabus (opens in new tab)
+                        </a>
+                        <a class="btn btn-sm btn-outline-secondary"
+                           href="@CourseApi.GetSyllabusUrl(course.Id, download: true)">
+                            Download syllabus
+                        </a>
+                        <button type="button"
+                                class="btn btn-sm btn-outline-danger"
+                                disabled="@isSaving"
+                                @onclick="RemoveSyllabusAsync">
+                            Remove syllabus
+                        </button>
+                    </div>
+                </div>
+            </div>
+        }
+
+        <div class="mb-3">
+            <label class="form-label" for="syllabus-file">
+                @(string.IsNullOrWhiteSpace(course.SyllabusFileName)
+                    ? "Syllabus PDF"
+                    : "Replacement syllabus PDF")
+            </label>
+            <InputFile @key="syllabusInputKey"
+                       id="syllabus-file"
+                       class="form-control"
+                       accept=".pdf,application/pdf"
+                       aria-describedby="syllabus-file-help"
+                       disabled="@isSaving"
+                       OnChange="SelectSyllabus" />
+            <div id="syllabus-file-help" class="form-text">
+                PDF files only, up to 10 MiB. Selecting a file does not upload it until you
+                choose the button below.
+            </div>
+        </div>
+
+        @if (selectedSyllabus is not null)
+        {
+            <p class="mb-3">
+                Selected: <strong>@selectedSyllabus.Name</strong>
+                (@FormatFileSize(selectedSyllabus.Size))
+            </p>
+        }
+
+        <button type="button"
+                class="btn btn-primary"
+                disabled="@(isSaving || selectedSyllabus is null)"
+                @onclick="UploadSyllabusAsync">
+            @(string.IsNullOrWhiteSpace(course.SyllabusFileName)
+                ? "Upload syllabus"
+                : "Replace syllabus")
+        </button>
+    </section>
 
     <section class="mt-4" aria-labelledby="prerequisites-heading">
         <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3">
@@ -212,6 +288,8 @@ else if (course is not null)
     private string? errorMessage;
     private string? statusMessage;
     private string? operationMessage;
+    private IBrowserFile? selectedSyllabus;
+    private int syllabusInputKey;
     private bool isLoading = true;
     private bool isSaving;
     private bool loadFailed;
@@ -389,6 +467,168 @@ else if (course is not null)
         }
     }
 
+    private void SelectSyllabus(InputFileChangeEventArgs args)
+    {
+        selectedSyllabus = null;
+        errorMessage = null;
+        statusMessage = null;
+
+        var file = args.File;
+        if (!string.Equals(
+                Path.GetExtension(file.Name),
+                ".pdf",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            errorMessage = "Select a file that uses the .pdf extension.";
+            ResetSyllabusInput();
+            return;
+        }
+
+        if (!string.Equals(file.ContentType, "application/pdf", StringComparison.OrdinalIgnoreCase))
+        {
+            errorMessage = "Select a file with the application/pdf content type.";
+            ResetSyllabusInput();
+            return;
+        }
+
+        if (file.Size == 0)
+        {
+            errorMessage = "The selected syllabus PDF is empty.";
+            ResetSyllabusInput();
+            return;
+        }
+
+        if (file.Size > SyllabusMaxFileSizeBytes)
+        {
+            errorMessage = "The syllabus PDF must not exceed 10 MiB.";
+            ResetSyllabusInput();
+            return;
+        }
+
+        selectedSyllabus = file;
+    }
+
+    private async Task UploadSyllabusAsync()
+    {
+        if (course is null || selectedSyllabus is null)
+        {
+            return;
+        }
+
+        var isReplacement = !string.IsNullOrWhiteSpace(course.SyllabusFileName);
+        if (isReplacement)
+        {
+            var confirmed = await JavaScript.InvokeAsync<bool>(
+                "confirm",
+                $"Replace {course.SyllabusFileName} with {selectedSyllabus.Name} for {course.Code}?");
+            if (!confirmed)
+            {
+                return;
+            }
+        }
+
+        isSaving = true;
+        errorMessage = null;
+        statusMessage = null;
+        operationMessage = isReplacement
+            ? $"Replacing {course.SyllabusFileName}..."
+            : $"Uploading {selectedSyllabus.Name}...";
+
+        try
+        {
+            await using var stream = selectedSyllabus.OpenReadStream(SyllabusMaxFileSizeBytes);
+            var response = await CourseApi.UploadSyllabusAsync(
+                course.Id,
+                stream,
+                selectedSyllabus.Name,
+                selectedSyllabus.ContentType);
+            course = await CourseApi.GetByIdAsync(course.Id);
+            statusMessage = isReplacement
+                ? $"Syllabus replaced successfully with {response.FileName}."
+                : $"Syllabus {response.FileName} uploaded successfully.";
+            ResetSyllabusInput();
+        }
+        catch (CourseApiException exception)
+        {
+            errorMessage = exception.Message;
+        }
+        catch (HttpRequestException)
+        {
+            errorMessage = "The syllabus could not be uploaded. Check that the Course Management API is running.";
+        }
+        catch (IOException)
+        {
+            errorMessage = "The syllabus file could not be read. Confirm that it is no larger than 10 MiB.";
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            errorMessage = "The syllabus API returned an unexpected response.";
+        }
+        finally
+        {
+            isSaving = false;
+            operationMessage = null;
+        }
+    }
+
+    private async Task RemoveSyllabusAsync()
+    {
+        if (course is null || string.IsNullOrWhiteSpace(course.SyllabusFileName))
+        {
+            return;
+        }
+
+        var removedFileName = course.SyllabusFileName;
+        var confirmed = await JavaScript.InvokeAsync<bool>(
+            "confirm",
+            $"Remove {removedFileName} from {course.Code}?");
+        if (!confirmed)
+        {
+            return;
+        }
+
+        isSaving = true;
+        errorMessage = null;
+        statusMessage = null;
+        operationMessage = $"Removing {removedFileName}...";
+
+        try
+        {
+            await CourseApi.DeleteSyllabusAsync(course.Id);
+            course = await CourseApi.GetByIdAsync(course.Id);
+            statusMessage = $"Syllabus {removedFileName} removed successfully.";
+            ResetSyllabusInput();
+        }
+        catch (CourseApiException exception)
+        {
+            errorMessage = exception.Message;
+        }
+        catch (HttpRequestException)
+        {
+            errorMessage = "The syllabus could not be removed. Check that the Course Management API is running.";
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            errorMessage = "Course details could not be refreshed after removing the syllabus.";
+        }
+        finally
+        {
+            isSaving = false;
+            operationMessage = null;
+        }
+    }
+
+    private void ResetSyllabusInput()
+    {
+        selectedSyllabus = null;
+        syllabusInputKey++;
+    }
+
+    private static string FormatFileSize(long sizeBytes) =>
+        sizeBytes >= 1024 * 1024
+            ? $"{sizeBytes / 1024d / 1024d:0.##} MiB"
+            : $"{Math.Max(1, sizeBytes / 1024d):0.##} KiB";
+
     private async Task DeleteAsync()
     {
         if (course is null)
@@ -428,4 +668,6 @@ else if (course is not null)
             operationMessage = null;
         }
     }
+
+    private const long SyllabusMaxFileSizeBytes = 10 * 1024 * 1024;
 }
