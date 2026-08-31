@@ -30,4 +30,5 @@ public sealed record PrerequisiteRequirementResponse(
     string RequiredCourseCode,
     string MinimumGrade,
     string? AchievedGrade,
-    bool IsMet);
+    bool IsMet,
+    string Reason);

@@ -1,7 +1,7 @@
 using CourseManagement.Backend.BusinessRules;
 using CourseManagement.Backend.Contracts.Prerequisites;
-using CourseManagement.Backend.Data;
-using CourseManagement.Backend.Models;
+using CourseManagement.Database.Data;
+using CourseManagement.Database.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -209,7 +209,14 @@ public sealed class PrerequisitesController(CourseManagementDbContext database) 
 
     static string? NormalizeGrade(string? grade)
     {
-        return string.IsNullOrWhiteSpace(grade) ? null : grade.Trim();
+        if (string.IsNullOrWhiteSpace(grade))
+        {
+            return null;
+        }
+
+        return GradeScale.TryNormalize(grade, out var canonicalGrade, out _)
+            ? canonicalGrade
+            : grade.Trim();
     }
 
     static PrerequisiteResponse ToResponse(Prerequisite prerequisite)

@@ -1,4 +1,4 @@
-using CourseManagement.Backend.Data;
+using CourseManagement.Database.Data;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);

@@ -20,6 +20,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\backend\CourseManagement.Backend\CourseManagement.Backend.csproj" />
+    <ProjectReference Include="..\..\database\CourseManagement.Database\CourseManagement.Database.csproj" />
   </ItemGroup>
 
   <ItemGroup>
