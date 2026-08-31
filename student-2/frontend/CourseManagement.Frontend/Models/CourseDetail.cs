@@ -9,7 +9,8 @@ public sealed record CourseDetail(
     int Level,
     bool IsActive,
     string? SyllabusFileName,
-    IReadOnlyList<PrerequisiteSummary> Prerequisites);
+    IReadOnlyList<PrerequisiteSummary> Prerequisites,
+    IReadOnlyList<FacultyAssignmentSummary> FacultyAssignments);
 
 public sealed record PrerequisiteSummary(
     int Id,
