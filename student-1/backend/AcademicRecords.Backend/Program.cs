@@ -50,6 +50,22 @@ app.MapGet("/api/staff/by-user/{userId:int}", async (int userId, IHttpClientFact
     return Results.Content(content, response.Content.Headers.ContentType?.MediaType ?? "application/json", statusCode: (int)response.StatusCode);
 });
 
+app.MapGet("/api/staff", async (IHttpClientFactory clients, CancellationToken cancellationToken) =>
+{
+    using var response = await clients.CreateClient("academicRecordsDatabase")
+        .GetAsync("/api/staff", cancellationToken);
+    var content = await response.Content.ReadAsStringAsync(cancellationToken);
+    return Results.Content(content, response.Content.Headers.ContentType?.MediaType ?? "application/json", statusCode: (int)response.StatusCode);
+});
+
+app.MapGet("/api/students", async (IHttpClientFactory clients, CancellationToken cancellationToken) =>
+{
+    using var response = await clients.CreateClient("academicRecordsDatabase")
+        .GetAsync("/api/students", cancellationToken);
+    var content = await response.Content.ReadAsStringAsync(cancellationToken);
+    return Results.Content(content, response.Content.Headers.ContentType?.MediaType ?? "application/json", statusCode: (int)response.StatusCode);
+});
+
 app.MapPost("/api/students/enroll", async (HttpRequest request, IHttpClientFactory clients, CancellationToken cancellationToken) =>
 {
     using var databaseRequest = new HttpRequestMessage(HttpMethod.Post, "/api/students/enroll")

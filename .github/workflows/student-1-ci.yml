@@ -114,6 +114,8 @@ jobs:
           endpoints=(
             "http://localhost:5020/health"
             "http://localhost:5020/api/users"
+            "http://localhost:5020/api/students"
+            "http://localhost:5020/api/staff"
             "http://localhost:5020/api/students/by-user/1"
             "http://localhost:8081/"
           )

@@ -179,6 +179,84 @@ namespace AcademicRecords.Tests
             return cleaned.Length == 10 && cleaned.StartsWith("0");
         }
 
+        [Test]
+        public async Task AllStudentsCanBeRetrieved()
+        {
+            await using var connection = new SqliteConnection("Data Source=:memory:");
+            await connection.OpenAsync();
+            await using var database = CreateDatabase(connection);
+            await database.Database.EnsureCreatedAsync();
+
+            database.Students.AddRange(
+                new Student
+                {
+                    StudentId = "STU-ALL-1",
+                    FirstName = "Alice",
+                    LastName = "Anderson",
+                    Email = "alice.anderson@example.edu",
+                    DateOfBirth = new(2000, 1, 1),
+                    EnrollmentDate = new(2026, 1, 1),
+                    Status = "ACT",
+                    MailingAddress = "1 Campus Way",
+                    EmergencyContactName = "Contact Person",
+                    EmergencyContactPhone = "0400000000"
+                },
+                new Student
+                {
+                    StudentId = "STU-ALL-2",
+                    FirstName = "Bob",
+                    LastName = "Baker",
+                    Email = "bob.baker@example.edu",
+                    DateOfBirth = new(2001, 2, 2),
+                    EnrollmentDate = new(2026, 1, 1),
+                    Status = "ACT",
+                    MailingAddress = "2 Campus Way",
+                    EmergencyContactName = "Contact Person",
+                    EmergencyContactPhone = "0400000001"
+                });
+            await database.SaveChangesAsync();
+
+            var students = await database.Students.AsNoTracking().ToListAsync();
+
+            Assert.That(students, Has.Count.EqualTo(2));
+            Assert.That(students.Select(value => value.StudentId), Is.EquivalentTo(new[] { "STU-ALL-1", "STU-ALL-2" }));
+        }
+
+        [Test]
+        public async Task AllStaffCanBeRetrieved()
+        {
+            await using var connection = new SqliteConnection("Data Source=:memory:");
+            await connection.OpenAsync();
+            await using var database = CreateDatabase(connection);
+            await database.Database.EnsureCreatedAsync();
+
+            database.Set<Staff>().AddRange(
+                new Staff
+                {
+                    StaffId = "STA-ALL-1",
+                    FirstName = "Carla",
+                    LastName = "Carter",
+                    Email = "carla.carter@example.edu",
+                    DateOfBirth = new(1980, 3, 3),
+                    Status = "ACT"
+                },
+                new Staff
+                {
+                    StaffId = "STA-ALL-2",
+                    FirstName = "David",
+                    LastName = "Diaz",
+                    Email = "david.diaz@example.edu",
+                    DateOfBirth = new(1981, 4, 4),
+                    Status = "ACT"
+                });
+            await database.SaveChangesAsync();
+
+            var staff = await database.Set<Staff>().AsNoTracking().ToListAsync();
+
+            Assert.That(staff, Has.Count.EqualTo(2));
+            Assert.That(staff.Select(value => value.StaffId), Is.EquivalentTo(new[] { "STA-ALL-1", "STA-ALL-2" }));
+        }
+
         private static AcademicRecordsDbContext CreateDatabase(SqliteConnection connection) =>
             new(new DbContextOptionsBuilder<AcademicRecordsDbContext>().UseSqlite(connection).Options);
     }

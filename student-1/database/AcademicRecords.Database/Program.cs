@@ -57,6 +57,25 @@ app.MapGet("/api/staff/by-user/{userId:int}", async (int userId, AcademicRecords
     return staff is null ? Results.NotFound() : Results.Ok(staff);
 });
 
+app.MapGet("/api/staff", async (AcademicRecordsDbContext database, CancellationToken cancellationToken) =>
+    await database.Set<Staff>().AsNoTracking()
+        .OrderBy(value => value.LastName)
+        .ThenBy(value => value.FirstName)
+        .Select(value => new StaffProfileResponse(value.UserId, value.StaffId, value.FirstName, value.LastName,
+            value.Email, value.DateOfBirth, value.PhoneNumber))
+        .ToListAsync(cancellationToken));
+
+app.MapGet("/api/students", async (AcademicRecordsDbContext database, CancellationToken cancellationToken) =>
+    await database.Students.AsNoTracking()
+        .OrderBy(value => value.LastName)
+        .ThenBy(value => value.FirstName)
+        .Select(value => new StudentProfileResponse(value.UserId, value.StudentId, value.FirstName, value.LastName, value.Email,
+            value.DateOfBirth, value.PhoneNumber, value.MailingAddress, value.EmergencyContactName, value.EmergencyContactPhone,
+            value.EnrollmentDate, value.Degree, value.Major, value.SubMajor,
+            value.Enrollments.Select(enrollment => new TermEnrollmentResponse(enrollment.EnrollmentId, enrollment.CourseCode,
+                enrollment.AcademicTermId, enrollment.AcademicYear, enrollment.Status)).ToList()))
+        .ToListAsync(cancellationToken));
+
 app.MapPost("/api/students/enroll", async (EnrollStudentRequest request, AcademicRecordsDbContext database, CancellationToken cancellationToken) =>
 {
     if (string.IsNullOrWhiteSpace(request.FirstName) || string.IsNullOrWhiteSpace(request.LastName) ||
