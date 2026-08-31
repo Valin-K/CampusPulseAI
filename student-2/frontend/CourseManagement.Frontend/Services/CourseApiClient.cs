@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using CourseManagement.Frontend.Models;
@@ -69,6 +70,51 @@ public sealed class CourseApiClient(HttpClient httpClient)
     {
         using var response = await httpClient.DeleteAsync($"api/courses/{id}", cancellationToken);
         await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public async Task<SyllabusResponse> UploadSyllabusAsync(
+        int courseId,
+        Stream content,
+        string fileName,
+        string contentType,
+        CancellationToken cancellationToken = default)
+    {
+        using var form = new MultipartFormDataContent();
+        using var fileContent = new StreamContent(content);
+        fileContent.Headers.ContentType = MediaTypeHeaderValue.Parse(contentType);
+        form.Add(fileContent, "file", fileName);
+
+        using var response = await httpClient.PutAsync(
+            $"api/courses/{courseId}/syllabus",
+            form,
+            cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+
+        return await response.Content.ReadFromJsonAsync<SyllabusResponse>(cancellationToken)
+            ?? throw new JsonException("The syllabus API returned an empty response.");
+    }
+
+    public async Task DeleteSyllabusAsync(
+        int courseId,
+        CancellationToken cancellationToken = default)
+    {
+        using var response = await httpClient.DeleteAsync(
+            $"api/courses/{courseId}/syllabus",
+            cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public string GetSyllabusUrl(int courseId, bool download = false)
+    {
+        var baseAddress = httpClient.BaseAddress
+            ?? throw new InvalidOperationException("The Course API base address is not configured.");
+        var relativeUrl = $"api/courses/{courseId}/syllabus";
+        if (download)
+        {
+            relativeUrl += "?download=true";
+        }
+
+        return new Uri(baseAddress, relativeUrl).ToString();
     }
 
     public async Task<PrerequisiteSummary> GetPrerequisiteAsync(
