@@ -30,6 +30,10 @@ public sealed class CourseManagementDbContext(
             entity.Property(course => course.Code).IsRequired().HasMaxLength(20);
             entity.Property(course => course.Name).IsRequired().HasMaxLength(200);
             entity.Property(course => course.Description).IsRequired().HasMaxLength(2000);
+            entity.Property(course => course.GradeType)
+                .IsRequired()
+                .HasMaxLength(20)
+                .HasDefaultValue("Mark");
             entity.Property(course => course.SyllabusFileName).HasMaxLength(260);
         });
 

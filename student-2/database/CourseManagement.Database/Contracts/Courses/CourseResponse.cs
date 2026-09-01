@@ -11,6 +11,7 @@ public sealed record CourseResponse(
     int CreditPoints,
     int Level,
     bool IsActive,
+    string GradeType,
     string? SyllabusFileName);
 
 public sealed record CourseDetailResponse(
@@ -21,6 +22,7 @@ public sealed record CourseDetailResponse(
     int CreditPoints,
     int Level,
     bool IsActive,
+    string GradeType,
     string? SyllabusFileName,
     IReadOnlyList<PrerequisiteResponse> Prerequisites,
     IReadOnlyList<FacultyAssignmentResponse> FacultyAssignments);
