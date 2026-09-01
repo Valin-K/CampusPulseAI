@@ -31,6 +31,7 @@ services:
     environment:
       - Services__AcademicRecordsDatabase=http://academicrecords.database:8080
       - Services__CourseManagementDatabase=http://coursemanagement.database:8080
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
     depends_on:
       - academicrecords.database
       - coursemanagement.database
