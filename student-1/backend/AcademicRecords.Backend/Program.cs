@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using AcademicRecords.Backend;
+using QuestPDF.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -9,12 +10,15 @@ builder.Services.AddHttpClient("academicRecordsDatabase", client =>
 {
     client.BaseAddress = new Uri(builder.Configuration["Services:AcademicRecordsDatabase"] ?? "http://academicrecords.database:8080");
 });
+builder.Services.AddSingleton<ITranscriptPdfGenerator, TranscriptPdfGenerator>();
 builder.Services.AddCors(options => options.AddPolicy("Frontend", policy => policy
     .WithOrigins("http://localhost:5062", "http://localhost:8081")
     .AllowAnyHeader()
     .AllowAnyMethod()));
 
 var app = builder.Build();
+
+QuestPDF.Settings.License = LicenseType.Community;
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
@@ -117,6 +121,27 @@ app.MapGet("/api/students/{studentId}/wam", async (string studentId, IHttpClient
 app.MapGet("/api/students/{studentId}/gpa", async (string studentId, IHttpClientFactory clients, CancellationToken cancellationToken) =>
     await GetStudentStatisticAsync(studentId, true, clients, cancellationToken));
 
+app.MapGet("/api/students/{studentId}/transcript.pdf", async (string studentId, IHttpClientFactory clients,
+    ITranscriptPdfGenerator pdfGenerator, CancellationToken cancellationToken) =>
+{
+    using var response = await clients.CreateClient("academicRecordsDatabase")
+        .GetAsync($"/api/students/{Uri.EscapeDataString(studentId)}", cancellationToken);
+    if (!response.IsSuccessStatusCode)
+    {
+        var content = await response.Content.ReadAsStringAsync(cancellationToken);
+        return Results.Content(content, response.Content.Headers.ContentType?.MediaType ?? "application/json", statusCode: (int)response.StatusCode);
+    }
+
+    var profile = await response.Content.ReadFromJsonAsync<StudentStatisticsProfile>(cancellationToken);
+    if (profile is null)
+    {
+        return Results.Problem("The student profile response was invalid.");
+    }
+
+    var pdf = pdfGenerator.Generate(new TranscriptData(profile.StudentId, profile.FirstName, profile.LastName));
+    return Results.File(pdf, "application/pdf", $"transcript-{profile.StudentId}.pdf");
+});
+
 app.MapPut("/api/students/{studentId}", async (string studentId, HttpRequest request, IHttpClientFactory clients, CancellationToken cancellationToken) =>
 {
     using var databaseRequest = new HttpRequestMessage(HttpMethod.Put, $"/api/students/{Uri.EscapeDataString(studentId)}")
@@ -168,7 +193,8 @@ public sealed record UserResponse(
     string? StudentId,
     string? StaffId);
 
-public sealed record StudentStatisticsProfile(string StudentId, List<StudentStatisticsEnrollment>? Enrollments);
+public sealed record StudentStatisticsProfile(string StudentId, List<StudentStatisticsEnrollment>? Enrollments,
+    string? FirstName = null, string? LastName = null);
 
 public sealed record StudentStatisticsEnrollment(decimal? Credits, decimal? GradeValue, bool IsFinalized);
 
