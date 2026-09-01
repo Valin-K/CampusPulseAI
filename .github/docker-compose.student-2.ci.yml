@@ -17,5 +17,3 @@ services:
   coursemanagement.frontend:
     ports: !override
       - "18082:80"
-    volumes:
-      - ./.github/student-2-ci-appsettings.json:/usr/share/nginx/html/appsettings.json:ro

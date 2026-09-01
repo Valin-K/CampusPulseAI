@@ -73,6 +73,7 @@ jobs:
         if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.student2 == 'true'
         shell: bash
         run: |
+          cp .github/student-2-ci-appsettings.json student-2/frontend/CourseManagement.Frontend/wwwroot/appsettings.json
           docker compose -p student-2-ci -f docker-compose.yml -f .github/docker-compose.student-2.ci.yml build academicrecords.database coursemanagement.database coursemanagement.backend coursemanagement.frontend
           docker compose -p student-2-ci -f docker-compose.yml -f .github/docker-compose.student-2.ci.yml up --detach --no-build academicrecords.database coursemanagement.database coursemanagement.backend coursemanagement.frontend
 
