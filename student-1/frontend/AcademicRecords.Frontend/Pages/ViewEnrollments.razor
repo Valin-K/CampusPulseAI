@@ -104,7 +104,15 @@ else
     }
 }
 
-<a href="/profile/@Role/@UserId" class="btn btn-secondary mt-4">Back to profile</a>
+<div class="mt-4">
+    @if (studentId is not null)
+    {
+        <a href="@GetTranscriptUrl()" class="btn btn-primary" target="_blank" rel="noopener noreferrer">
+            View transcript PDF
+        </a>
+    }
+    <a href="/profile/@Role/@UserId" class="btn btn-secondary ms-2">Back to profile</a>
+</div>
 
 @code {
     [Parameter]
@@ -118,6 +126,7 @@ else
 
     private bool isLoading = true;
     private string? loadError;
+    private string? studentId;
     private List<TermEnrollmentResponse> currentEnrollments = [];
     private List<TermEnrollmentResponse> pastEnrollments = [];
     private StudentStatisticResponse? wam;
@@ -134,6 +143,7 @@ else
                 return;
             }
 
+            studentId = student.StudentId;
             var wamTask = Http.GetFromJsonAsync<StudentStatisticResponse>($"api/students/{Uri.EscapeDataString(student.StudentId)}/wam");
             var gpaTask = Http.GetFromJsonAsync<StudentStatisticResponse>($"api/students/{Uri.EscapeDataString(student.StudentId)}/gpa");
             await Task.WhenAll(wamTask, gpaTask);
@@ -193,6 +203,8 @@ else
             : enrollment.IsFinalized ? enrollment.GradeValue?.ToString() ?? "N/A" : "Pending";
 
     private static string FormatStatistic(decimal? value) => value?.ToString("0.00", CultureInfo.InvariantCulture) ?? "N/A";
+
+    private string GetTranscriptUrl() => $"api/students/{Uri.EscapeDataString(studentId!)}/transcript.pdf";
 
     private static DateOnly? GetTermEndDate(int academicYear, int startWeekOfYear, int endWeekOfYear)
     {
