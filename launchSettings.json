@@ -8,6 +8,7 @@
       "composeLaunchUrl": "http://localhost:8081",
       "serviceActions": {
         "academicrecords.backend": "StartWithoutDebugging",
+        "coursemanagement.database": "StartWithoutDebugging",
         "coursemanagement.backend": "StartWithoutDebugging",
         "campushousing.backend": "StartWithoutDebugging",
         "financialaidbilling.backend": "StartWithoutDebugging",

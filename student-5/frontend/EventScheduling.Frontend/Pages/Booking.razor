@@ -1,0 +1,58 @@
+@page "/book"
+@inject NavigationManager Nav
+
+<PageTitle>Book | Event & Facility Scheduling</PageTitle>
+
+<header class="dashboard-hero">
+    <div>
+        <span class="eyebrow">Almost there</span>
+        <h1>Confirm your booking</h1>
+        <p>Reservation submission is coming soon. Here's what you selected so far.</p>
+    </div>
+</header>
+
+<section class="surface-card" aria-label="Booking details">
+    <div class="notice" role="status">
+        The booking form isn't built yet &mdash; check back soon to submit this reservation.
+    </div>
+
+    <ul class="detail-list">
+        @if (SelectedDate is not null)
+        {
+            <li>Date: @SelectedDate.Value.ToString("MMMM d, yyyy")</li>
+        }
+        @if (!string.IsNullOrWhiteSpace(Type))
+        {
+            <li>Resource type: @(Type == "equipment" ? "Equipment" : "Study room")</li>
+        }
+        @if (!string.IsNullOrWhiteSpace(ItemName))
+        {
+            <li>Selected: @ItemName</li>
+        }
+        @if (SelectedDate is null && string.IsNullOrWhiteSpace(ItemName))
+        {
+            <li>No date or resource was selected.</li>
+        }
+    </ul>
+
+    <div class="button-row">
+        <button type="button" class="button button-secondary" @onclick="@(() => Nav.NavigateTo("/calendar"))">Back to calendar</button>
+        <button type="button" class="button button-secondary" @onclick="@(() => Nav.NavigateTo("/search"))">Back to search</button>
+    </div>
+</section>
+
+@code {
+    [SupplyParameterFromQuery(Name = "date")]
+    public string? Date { get; set; }
+
+    [SupplyParameterFromQuery(Name = "type")]
+    public string? Type { get; set; }
+
+    [SupplyParameterFromQuery(Name = "itemId")]
+    public int? ItemId { get; set; }
+
+    [SupplyParameterFromQuery(Name = "itemName")]
+    public string? ItemName { get; set; }
+
+    private DateOnly? SelectedDate => DateOnly.TryParse(Date, out var parsed) ? parsed : null;
+}

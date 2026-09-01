@@ -1,4 +1,4 @@
-﻿@page "/"
+@page "/"
 @page "/courses"
 @using CampusPulse.Shared.Components.Models
 @inject CourseApiClient CourseApi
@@ -23,10 +23,10 @@
     }
 </header>
 
-@if (UserContext.IsCourseAdministrator && Message == "deleted")
+@if (DashboardMessage is not null)
 {
     <FeedbackPanel Kind="FeedbackKind.Success"
-                   Message="Course deleted successfully." />
+                   Message="@DashboardMessage" />
 }
 
 @if (isLoading)
@@ -50,7 +50,7 @@ else if (courses.Count == 0)
                        : "There are no active Courses available to browse.")">
         @if (UserContext.IsCourseAdministrator)
         {
-            <NavLink class="btn btn-primary" href="courses/new">Create Course</NavLink>
+            <NavLink class="btn btn-primary" href="@CreateCourseUrl">Create Course</NavLink>
         }
     </FeedbackPanel>
 }
@@ -74,22 +74,134 @@ else
         else
         {
             <CampusMetricCard Label="Available Courses"
-                              Value="@ActiveCourseCount.ToString()"
+                              Value="@DisplayedCourses.Count.ToString()"
                               Detail="Active Courses in the catalogue" />
             <CampusMetricCard Label="Credit points"
-                              Value="@ActiveCreditPoints.ToString()"
-                              Detail="Across available Courses"
+                              Value="@AvailableCreditPoints.ToString()"
+                              Detail="Across all available Courses"
                               Tone="green" />
-            <CampusMetricCard Label="Course syllabi"
-                              Value="@CoursesWithSyllabi.ToString()"
-                              Detail="PDF syllabi ready to view"
+            <CampusMetricCard Label="Course levels"
+                              Value="@AvailableCourseLevelCount.ToString()"
+                              Detail="Different study levels available"
                               Tone="gold" />
         }
     </section>
 
-    <CampusSectionTabs Items="Sections"
-                       @bind-ActiveKey="activeTab"
-                       AriaLabel="@SectionAriaLabel" />
+    <section class="ai-card" aria-labelledby="course-ai-heading">
+        <div>
+            <span class="eyebrow">Gemini-powered Course guidance</span>
+            <h2 id="course-ai-heading">Ask about Courses</h2>
+            <p>
+                Mention a Course in your question, or select one or more Courses below
+                to give Gemini explicit catalogue context.
+            </p>
+        </div>
+        <span class="status-badge outstanding">Release 0 AI-Mode</span>
+
+        <div class="ai-response">
+            @if (SelectedCourses.Count == 0)
+            {
+                <p>
+                    No Courses selected. Mention a Course code or name in your question,
+                    or select Courses from the catalogue before asking.
+                </p>
+            }
+            else
+            {
+                <div aria-live="polite">
+                    <strong>
+                        @SelectedCourses.Count selected
+                        @(SelectedCourses.Count == 1 ? "Course" : "Courses")
+                    </strong>
+                    <div class="d-flex flex-wrap gap-2 mt-2">
+                        @foreach (var selectedCourse in SelectedCourses)
+                        {
+                            <span class="status-badge paid">@selectedCourse.Code</span>
+                        }
+                    </div>
+                </div>
+            }
+
+            <FeedbackPanel Kind="FeedbackKind.Warning"
+                           Title="Release 0 limitation"
+                           Message="Gemini receives catalogue details only. Uploaded syllabus PDFs are not supplied until Release 1 RAG." />
+
+            <label class="form-label mt-3" for="course-ai-question">
+                Course question
+            </label>
+            <InputTextArea id="course-ai-question"
+                           class="form-control"
+                           rows="4"
+                           maxlength="1000"
+                           @bind-Value="aiQuestion"
+                           disabled="@isAskingAi"
+                           placeholder="For example: Compare the selected Courses, or what should I know before taking CPAI3001?" />
+
+            <div class="d-flex flex-wrap gap-2 mt-3">
+                <button type="button"
+                        class="button button-accent"
+                        disabled="@(isAskingAi || string.IsNullOrWhiteSpace(aiQuestion))"
+                        @onclick="AskCourseQuestionAsync">
+                    @(isAskingAi ? "Asking Gemini..." : "Ask AI")
+                </button>
+
+                @if (aiResponse is not null || aiErrorMessage is not null)
+                {
+                    <button type="button"
+                            class="button button-secondary"
+                            disabled="@isAskingAi"
+                            @onclick="ClearAiResponse">
+                        Clear question
+                    </button>
+                }
+
+                @if (SelectedCourses.Count > 0)
+                {
+                    <button type="button"
+                            class="button button-secondary"
+                            disabled="@isAskingAi"
+                            @onclick="ClearSelectedCourses">
+                        Clear selected Courses
+                    </button>
+                }
+            </div>
+
+            @if (isAskingAi)
+            {
+                <LoadingIndicator Message="Gemini is answering your Course question..." />
+            }
+            else if (aiErrorMessage is not null)
+            {
+                <FeedbackPanel Kind="FeedbackKind.Error"
+                               Title="Course question failed"
+                               Message="@aiErrorMessage">
+                    <button type="button"
+                            class="button button-secondary"
+                            @onclick="AskCourseQuestionAsync">
+                        Try again
+                    </button>
+                </FeedbackPanel>
+            }
+            else if (aiResponse is not null)
+            {
+                <div class="mt-3" aria-live="polite">
+                    <strong>Gemini response</strong>
+                    <p>@aiResponse.Answer</p>
+                    <small>
+                        Model: @aiResponse.Model |
+                        Syllabus grounded: @(aiResponse.IsSyllabusGrounded ? "Yes" : "No")
+                    </small>
+                </div>
+            }
+        </div>
+    </section>
+
+    @if (UserContext.IsCourseAdministrator)
+    {
+        <CampusSectionTabs Items="StaffSections"
+                           @bind-ActiveKey="activeTab"
+                           AriaLabel="Staff Course sections" />
+    }
 
     <section class="surface-card">
         <div class="section-heading">
@@ -100,7 +212,7 @@ else
 
             @if (UserContext.IsCourseAdministrator)
             {
-                <NavLink class="button button-primary" href="courses/new">
+                <NavLink class="button button-primary" href="@CreateCourseUrl">
                     Create Course
                 </NavLink>
             }
@@ -115,7 +227,7 @@ else
                            Message="@EmptyStateMessage">
                 @if (UserContext.IsCourseAdministrator)
                 {
-                    <NavLink class="button button-primary" href="courses/new">
+                    <NavLink class="button button-primary" href="@CreateCourseUrl">
                         Create Course
                     </NavLink>
                 }
@@ -127,14 +239,13 @@ else
                 <table>
                     <thead>
                         <tr>
+                            <th scope="col">
+                                <span class="visually-hidden">Select for Course AI</span>
+                            </th>
                             <th scope="col">Code</th>
                             <th scope="col">Course</th>
                             <th scope="col">Level</th>
                             <th scope="col">Credit points</th>
-                            @if (activeTab == "syllabi")
-                            {
-                                <th scope="col">Syllabus</th>
-                            }
                             <th scope="col">Status</th>
                             <th scope="col">Actions</th>
                         </tr>
@@ -143,6 +254,12 @@ else
                         @foreach (var course in DisplayedCourses)
                         {
                             <tr class="@(!course.IsActive ? "course-inactive" : null)">
+                                <td>
+                                    <input type="checkbox"
+                                           checked="@selectedCourseIds.Contains(course.Id)"
+                                           aria-label="@($"Select {course.Code} for Course AI")"
+                                           @onchange="args => UpdateCourseSelection(course.Id, args)" />
+                                </td>
                                 <td><strong>@course.Code</strong></td>
                                 <td>
                                     <strong>@course.Name</strong>
@@ -150,10 +267,6 @@ else
                                 </td>
                                 <td>@course.Level</td>
                                 <td>@course.CreditPoints</td>
-                                @if (activeTab == "syllabi")
-                                {
-                                    <td>@course.SyllabusFileName</td>
-                                }
                                 <td>
                                     <span class="status-badge @(course.IsActive ? "paid" : "overdue")">
                                         @(course.IsActive ? "Active" : "Inactive")
@@ -162,23 +275,22 @@ else
                                 <td>
                                     <div class="button-row">
                                         <NavLink class="button button-small button-secondary"
-                                                 href="@($"courses/{course.Id}")">
-                                            @(activeTab == "syllabi" ? "Open syllabus" : "View")
+                                                 href="@CourseDetailsUrl(course.Id)">
+                                            View
                                         </NavLink>
-
-                                        @if (!UserContext.IsCourseAdministrator && activeTab == "eligibility")
-                                        {
-                                            <NavLink class="button button-small button-primary"
-                                                     href="@($"courses/{course.Id}/eligibility")">
-                                                Check eligibility
-                                            </NavLink>
-                                        }
 
                                         @if (UserContext.IsCourseAdministrator)
                                         {
                                             <NavLink class="button button-small button-primary"
-                                                     href="@($"courses/{course.Id}/edit")">
+                                                     href="@EditCourseUrl(course.Id)">
                                                 Edit
+                                            </NavLink>
+                                        }
+                                        else
+                                        {
+                                            <NavLink class="button button-small button-primary"
+                                                     href="@EligibilityUrl(course.Id)">
+                                                Check eligibility
                                             </NavLink>
                                         }
                                     </div>
@@ -193,13 +305,6 @@ else
 }
 
 @code {
-    static readonly IReadOnlyList<CampusTabItem> StudentSections =
-    [
-        new("catalogue", "Course catalogue", "Browse active Courses"),
-        new("eligibility", "Eligibility", "Check Course prerequisites"),
-        new("syllabi", "Course syllabi", "Open available PDF syllabi")
-    ];
-
     static readonly IReadOnlyList<CampusTabItem> StaffSections =
     [
         new("all", "All Courses", "Manage the complete catalogue"),
@@ -210,55 +315,75 @@ else
     [SupplyParameterFromQuery]
     public string? Message { get; set; }
 
-    private IReadOnlyList<CourseSummary> courses = [];
-    private string? errorMessage;
-    private string activeTab = string.Empty;
-    private bool isLoading = true;
+    [SupplyParameterFromQuery]
+    public string? Tab { get; set; }
 
-    IReadOnlyList<CampusTabItem> Sections =>
-        UserContext.IsCourseAdministrator ? StaffSections : StudentSections;
+    private IReadOnlyList<CourseSummary> courses = [];
+    private readonly HashSet<int> selectedCourseIds = [];
+    private string? errorMessage;
+    private string? aiErrorMessage;
+    private string activeTab = string.Empty;
+    private string aiQuestion = string.Empty;
+    private bool isLoading = true;
+    private bool isAskingAi;
+    private CourseQuestionResponse? aiResponse;
+
+    string DashboardReturnUrl => UserContext.IsCourseAdministrator
+        ? CourseNavigation.Dashboard(activeTab)
+        : "/courses";
+    string CreateCourseUrl => CourseNavigation.WithReturnUrl(
+        "/courses/new",
+        DashboardReturnUrl);
 
     IReadOnlyList<CourseSummary> DisplayedCourses => activeTab switch
     {
         "active" => courses.Where(course => course.IsActive).ToList(),
         "inactive" => courses.Where(course => !course.IsActive).ToList(),
-        "syllabi" => courses
-            .Where(course => course.IsActive && !string.IsNullOrWhiteSpace(course.SyllabusFileName))
-            .ToList(),
         _ when !UserContext.IsCourseAdministrator =>
             courses.Where(course => course.IsActive).ToList(),
         _ => courses
     };
 
+    IReadOnlyList<CourseSummary> AiCatalogueCourses =>
+        UserContext.IsCourseAdministrator
+            ? courses
+            : courses.Where(course => course.IsActive).ToList();
+
+    IReadOnlyList<CourseSummary> SelectedCourses =>
+        AiCatalogueCourses
+            .Where(course => selectedCourseIds.Contains(course.Id))
+            .ToList();
+
     int ActiveCourseCount => courses.Count(course => course.IsActive);
     int InactiveCourseCount => courses.Count(course => !course.IsActive);
-    int ActiveCreditPoints => courses
-        .Where(course => course.IsActive)
-        .Sum(course => course.CreditPoints);
-    int CoursesWithSyllabi => courses.Count(course =>
-        course.IsActive && !string.IsNullOrWhiteSpace(course.SyllabusFileName));
-
+    int AvailableCreditPoints => DisplayedCourses.Sum(course => course.CreditPoints);
+    int AvailableCourseLevelCount => DisplayedCourses
+        .Select(course => course.Level)
+        .Distinct()
+        .Count();
     string RoleLabel => UserContext.IsCourseAdministrator ? "Staff" : "Student";
+    string? DashboardMessage => Message switch
+    {
+        "created" => "Course created successfully.",
+        "updated" => "Course updated successfully.",
+        "deleted" => "Course deleted successfully.",
+        _ => null
+    };
     string HeroEyebrow => UserContext.IsCourseAdministrator
         ? "Your curriculum workspace"
-        : "Your Course workspace";
+        : "Your Course catalogue";
     string HeroTitle => UserContext.IsCourseAdministrator
         ? "Shape the Course catalogue."
-        : "Explore your study options.";
+        : "Explore available Courses.";
     string HeroDescription => UserContext.IsCourseAdministrator
         ? "Review Course availability, maintain curriculum records, and open the tools needed to keep Course information current."
-        : "Browse available Courses, review syllabus information, and check whether you meet each Course's prerequisites.";
+        : "Browse active Courses, review their details and syllabus, and check whether you meet their prerequisites.";
     string MetricAriaLabel => UserContext.IsCourseAdministrator
         ? "Curriculum summary"
-        : "Course catalogue summary";
-    string SectionAriaLabel => UserContext.IsCourseAdministrator
-        ? "Staff Course sections"
-        : "Student Course sections";
+        : "Available Course summary";
 
     string SectionEyebrow => activeTab switch
     {
-        "eligibility" => "Prerequisite guidance",
-        "syllabi" => "Course documents",
         "active" => "Published curriculum",
         "inactive" => "Curriculum review",
         _ => "Course catalogue"
@@ -266,8 +391,6 @@ else
 
     string SectionTitle => activeTab switch
     {
-        "eligibility" => "Check Course eligibility",
-        "syllabi" => "Available Course syllabi",
         "active" => "Active Courses",
         "inactive" => "Inactive Courses",
         "all" => "All Courses",
@@ -276,10 +399,6 @@ else
 
     string SectionDescription => activeTab switch
     {
-        "eligibility" =>
-            "Choose a Course to compare its prerequisites with a demonstration academic record.",
-        "syllabi" =>
-            "Open a Course to view or download its available syllabus PDF.",
         "active" =>
             "These Courses are visible to Students in the Course catalogue.",
         "inactive" =>
@@ -287,12 +406,11 @@ else
         "all" =>
             "Review every active and inactive Course maintained by Course Management.",
         _ =>
-            "Review active Courses and open a Course for its prerequisites, teaching staff, and syllabus."
+            "View Course details and syllabus information, or check whether you meet a Course's prerequisites."
     };
 
     string EmptyStateTitle => activeTab switch
     {
-        "syllabi" => "No Course syllabi available",
         "inactive" => "No inactive Courses",
         "active" => "No active Courses",
         _ => "No Courses available"
@@ -300,7 +418,6 @@ else
 
     string EmptyStateMessage => activeTab switch
     {
-        "syllabi" => "No active Courses currently have an uploaded syllabus PDF.",
         "inactive" => "Every Course in the catalogue is currently active.",
         "active" => "Activate a Course before it can be displayed to Students.",
         _ when UserContext.IsCourseAdministrator =>
@@ -310,9 +427,30 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        activeTab = UserContext.IsCourseAdministrator ? "all" : "catalogue";
+        activeTab = UserContext.IsCourseAdministrator
+            && StaffSections.Any(section =>
+                string.Equals(section.Key, Tab, StringComparison.Ordinal))
+            ? Tab!
+            : UserContext.IsCourseAdministrator
+                ? "all"
+                : "catalogue";
         await LoadCoursesAsync();
     }
+
+    string CourseDetailsUrl(int courseId) =>
+        CourseNavigation.WithReturnUrl(
+            $"/courses/{courseId}",
+            DashboardReturnUrl);
+
+    string EligibilityUrl(int courseId) =>
+        CourseNavigation.WithReturnUrl(
+            $"/courses/{courseId}/eligibility",
+            DashboardReturnUrl);
+
+    string EditCourseUrl(int courseId) =>
+        CourseNavigation.WithReturnUrl(
+            $"/courses/{courseId}/edit",
+            DashboardReturnUrl);
 
     private async Task LoadCoursesAsync()
     {
@@ -322,6 +460,8 @@ else
         try
         {
             courses = await CourseApi.GetAllAsync();
+            selectedCourseIds.RemoveWhere(
+                courseId => courses.All(course => course.Id != courseId));
         }
         catch (CourseApiException exception)
         {
@@ -339,5 +479,91 @@ else
         {
             isLoading = false;
         }
+    }
+
+    private void UpdateCourseSelection(
+        int courseId,
+        ChangeEventArgs args)
+    {
+        if (args.Value is true)
+        {
+            selectedCourseIds.Add(courseId);
+        }
+        else
+        {
+            selectedCourseIds.Remove(courseId);
+        }
+
+        aiErrorMessage = null;
+        aiResponse = null;
+    }
+
+    private async Task AskCourseQuestionAsync()
+    {
+        var question = aiQuestion.Trim();
+        if (question.Length < 3)
+        {
+            aiErrorMessage =
+                "Enter a Course question containing at least three characters.";
+            aiResponse = null;
+            return;
+        }
+
+        var selectedCourses = SelectedCourses;
+        var contextCourses = selectedCourses.Count > 0
+            ? selectedCourses
+            : AiCatalogueCourses;
+
+        isAskingAi = true;
+        aiErrorMessage = null;
+        aiResponse = null;
+
+        try
+        {
+            aiResponse = await CourseApi.AskCourseQuestionAsync(
+                new CourseQuestionRequest(
+                    question,
+                    contextCourses
+                        .Select(course => new CourseQuestionContext(
+                            course.Code,
+                            course.Name,
+                            course.Description,
+                            course.Level,
+                            course.CreditPoints))
+                        .ToList(),
+                    CoursesExplicitlySelected: selectedCourses.Count > 0));
+        }
+        catch (CourseApiException exception)
+        {
+            aiErrorMessage = exception.Message;
+        }
+        catch (HttpRequestException)
+        {
+            aiErrorMessage =
+                "The Course question could not be submitted. Check that Course Management is running.";
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            aiErrorMessage =
+                "The Course AI API returned an unexpected response.";
+        }
+        finally
+        {
+            isAskingAi = false;
+        }
+    }
+
+    private void ClearAiResponse()
+    {
+        aiQuestion = string.Empty;
+        aiErrorMessage = null;
+        aiResponse = null;
+    }
+
+    private void ClearSelectedCourses()
+    {
+        selectedCourseIds.Clear();
+        aiErrorMessage = null;
+        aiResponse = null;
     }
 }

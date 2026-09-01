@@ -1,21 +1,26 @@
+using EventScheduling.Backend.Services;
+
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-
-builder.Services.AddControllers();
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
+builder.Services.AddAuthorization();
+builder.Services.AddControllers();
+builder.Services.AddCors(options => options.AddDefaultPolicy(policy => policy
+    .AllowAnyOrigin()
+    .AllowAnyHeader()
+    .AllowAnyMethod()));
+builder.Services.AddTransient<DatabaseStartupRetryHandler>();
+builder.Services.AddHttpClient("eventDatabase", client =>
+{
+    client.BaseAddress = new Uri(builder.Configuration["Services:EventDatabase"] ?? "http://eventscheduling.database:8080");
+}).AddHttpMessageHandler<DatabaseStartupRetryHandler>();
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
-{
-    app.MapOpenApi();
-}
-
-app.UseAuthorization();
-
+app.MapOpenApi();
+app.UseCors();
 app.MapControllers();
+
+app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
 
 app.Run();

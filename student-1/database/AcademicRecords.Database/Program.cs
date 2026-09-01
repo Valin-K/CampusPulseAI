@@ -41,7 +41,7 @@ app.MapGet("/api/students/by-user/{userId:int}", async (int userId, AcademicReco
             value.EnrollmentDate, value.Degree, value.Major, value.SubMajor,
             value.Enrollments.Select(enrollment => new TermEnrollmentResponse(enrollment.EnrollmentId, enrollment.CourseCode,
                 enrollment.AcademicTermId, enrollment.AcademicTerm!.TermCode, enrollment.AcademicTerm.TermName,
-                enrollment.AcademicTerm.StartWeekOfYear, enrollment.AcademicTerm.EndWeekOfYear, enrollment.AcademicYear, enrollment.Status, enrollment.Credits,
+                enrollment.AcademicTerm.StartWeekOfYear, enrollment.AcademicTerm.EndWeekOfYear, enrollment.AcademicYear, enrollment.Status,
                 GradeTypePlaceholder.Get(enrollment.CourseCode), enrollment.GradeValue, enrollment.IsFinalized)).ToList()))
         .SingleOrDefaultAsync(cancellationToken);
 
@@ -110,7 +110,7 @@ app.MapGet("/api/students", async (AcademicRecordsDbContext database, Cancellati
             value.EnrollmentDate, value.Degree, value.Major, value.SubMajor,
             value.Enrollments.Select(enrollment => new TermEnrollmentResponse(enrollment.EnrollmentId, enrollment.CourseCode,
                 enrollment.AcademicTermId, enrollment.AcademicTerm!.TermCode, enrollment.AcademicTerm.TermName,
-                enrollment.AcademicTerm.StartWeekOfYear, enrollment.AcademicTerm.EndWeekOfYear, enrollment.AcademicYear, enrollment.Status, enrollment.Credits,
+                enrollment.AcademicTerm.StartWeekOfYear, enrollment.AcademicTerm.EndWeekOfYear, enrollment.AcademicYear, enrollment.Status,
                 GradeTypePlaceholder.Get(enrollment.CourseCode), enrollment.GradeValue, enrollment.IsFinalized)).ToList()))
         .ToListAsync(cancellationToken));
 
@@ -226,7 +226,7 @@ app.MapGet("/api/students/{studentId}", async (string studentId, AcademicRecords
             value.EnrollmentDate, value.Degree, value.Major, value.SubMajor,
             value.Enrollments.Select(enrollment => new TermEnrollmentResponse(enrollment.EnrollmentId, enrollment.CourseCode,
                 enrollment.AcademicTermId, enrollment.AcademicTerm!.TermCode, enrollment.AcademicTerm.TermName,
-                enrollment.AcademicTerm.StartWeekOfYear, enrollment.AcademicTerm.EndWeekOfYear, enrollment.AcademicYear, enrollment.Status, enrollment.Credits,
+                enrollment.AcademicTerm.StartWeekOfYear, enrollment.AcademicTerm.EndWeekOfYear, enrollment.AcademicYear, enrollment.Status,
                 GradeTypePlaceholder.Get(enrollment.CourseCode), enrollment.GradeValue, enrollment.IsFinalized)).ToList()))
         .SingleOrDefaultAsync(cancellationToken);
     return student is null ? Results.NotFound() : Results.Ok(student);
@@ -336,8 +336,8 @@ public static class GradeTypePlaceholder
 {
     public static string Get(string courseCode) => courseCode switch
     {
-        "CS102" or "CS105" => EnrollmentStatusRules.EnrollmentGradeTypes.PassFail,
-        "CS103" => EnrollmentStatusRules.EnrollmentGradeTypes.Ungraded,
+        "CPAI1002" or "CPAI2002" => EnrollmentStatusRules.EnrollmentGradeTypes.PassFail,
+        "CPAI1003" => EnrollmentStatusRules.EnrollmentGradeTypes.Ungraded,
         _ => EnrollmentStatusRules.EnrollmentGradeTypes.Mark
     };
 }
@@ -360,7 +360,7 @@ public sealed record StaffProfileResponse(int UserId, string StaffId, string Fir
     DateOnly? DateOfBirth, string? PhoneNumber);
 
 public sealed record TermEnrollmentResponse(int EnrollmentId, string CourseCode, int? AcademicTermId, string? TermCode,
-    string? TermName, int StartWeekOfYear, int EndWeekOfYear, int AcademicYear, string Status, decimal? Credits, string GradeType, decimal? GradeValue, bool IsFinalized);
+    string? TermName, int StartWeekOfYear, int EndWeekOfYear, int AcademicYear, string Status, string GradeType, decimal? GradeValue, bool IsFinalized);
 
 public sealed record UpdateStudentRequest(string FirstName, string LastName, string Email, DateOnly? DateOfBirth,
     string MailingAddress, string EmergencyContactName, string EmergencyContactPhone, string? PhoneNumber = null,

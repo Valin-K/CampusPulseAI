@@ -106,6 +106,9 @@ else if (course is not null)
     [Parameter]
     public int AssignmentId { get; set; }
 
+    [SupplyParameterFromQuery]
+    public string? ReturnUrl { get; set; }
+
     private FacultyAssignmentFormModel form = new();
     private CourseDetail? course;
     private string? errorMessage;
@@ -114,7 +117,9 @@ else if (course is not null)
     private bool loadFailed;
 
     private bool IsEdit => AssignmentId > 0;
-    private string CourseUrl => $"/courses/{CourseId}";
+    private string CourseUrl => CourseNavigation.LocalReturnUrl(
+        ReturnUrl,
+        $"/courses/{CourseId}");
 
     protected override async Task OnParametersSetAsync()
     {
@@ -190,7 +195,11 @@ else if (course is not null)
             var message = IsEdit
                 ? "faculty-assignment-updated"
                 : "faculty-assignment-created";
-            Navigation.NavigateTo($"{CourseUrl}?message={message}");
+            Navigation.NavigateTo(
+                CourseNavigation.AddQueryParameter(
+                    CourseUrl,
+                    "message",
+                    message));
         }
         catch (CourseApiException exception)
         {
