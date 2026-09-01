@@ -1,5 +1,6 @@
 @page "/"
 @inject EventSchedulingApiClient Api
+@inject CurrentUser CurrentUser
 @inject NavigationManager Nav
 
 <PageTitle>Event & Facility Scheduling</PageTitle>
@@ -12,8 +13,8 @@
     </div>
     <div class="term-summary">
         <span>Current profile</span>
-        <strong>Jordan Lee</strong>
-        <small>Student ID 5</small>
+        <strong>@(profile?.FullName ?? "…")</strong>
+        <small>@(profile is null ? "" : (profile.StudentId is null ? profile.Role : $"Student {profile.StudentId}"))</small>
     </div>
 </header>
 
@@ -102,9 +103,9 @@
 </section>
 
 @code {
-    private const int StudentId = 5;
     private readonly List<BookingResponse> myBookings = [];
     private readonly DateOnly anchorDate = DateOnly.FromDateTime(DateTime.Today);
+    private UserProfile? profile;
     private string? errorMessage;
     private bool isLoading = true;
 
@@ -112,11 +113,12 @@
 
     protected override async Task OnInitializedAsync()
     {
+        profile = await CurrentUser.LoadAsync();
         try
         {
             var bookings = await Api.GetBookingsAsync();
             myBookings.Clear();
-            myBookings.AddRange(bookings.Where(booking => booking.StudentId == StudentId));
+            myBookings.AddRange(bookings.Where(booking => booking.StudentId == CurrentUser.UserId));
         }
         catch (HttpRequestException)
         {

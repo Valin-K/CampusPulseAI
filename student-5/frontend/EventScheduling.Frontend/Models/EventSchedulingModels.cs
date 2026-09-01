@@ -55,3 +55,27 @@ public sealed record EquipmentResponse(
     string SerialNumber,
     EquipmentStatus Status,
     int? CreatedByStaffId);
+
+// A user from the Academic Records (student-1) directory, proxied via /api/users/{id}.
+public sealed record UserProfile(
+    int UserId,
+    string FirstName,
+    string LastName,
+    string Email,
+    string Role,
+    string? StudentId,
+    string? StaffId)
+{
+    public string FullName => $"{FirstName} {LastName}".Trim();
+
+    public string Initials
+    {
+        get
+        {
+            var first = FirstName.Length > 0 ? FirstName[..1] : string.Empty;
+            var last = LastName.Length > 0 ? LastName[..1] : string.Empty;
+            var initials = (first + last).ToUpperInvariant();
+            return initials.Length > 0 ? initials : "?";
+        }
+    }
+}

@@ -16,4 +16,16 @@ public sealed class EventSchedulingApiClient(HttpClient httpClient)
 
     public async Task<List<EquipmentResponse>> GetEquipmentAsync(CancellationToken cancellationToken = default) =>
         await httpClient.GetFromJsonAsync<List<EquipmentResponse>>("/api/equipment", cancellationToken) ?? [];
+
+    public async Task<UserProfile?> GetUserAsync(int userId, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await httpClient.GetFromJsonAsync<UserProfile>($"/api/users/{userId}", cancellationToken);
+        }
+        catch (HttpRequestException)
+        {
+            return null;
+        }
+    }
 }

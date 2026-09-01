@@ -1,5 +1,6 @@
 @page "/calendar"
 @inject EventSchedulingApiClient Api
+@inject CurrentUser CurrentUser
 @inject NavigationManager Nav
 
 <PageTitle>My Calendar | Event & Facility Scheduling</PageTitle>
@@ -60,7 +61,6 @@
 </section>
 
 @code {
-    private const int StudentId = 5;
     private static readonly IReadOnlyList<CampusTabItem> viewModes =
     [
         new("month", "Month", "Full month grid"),
@@ -82,7 +82,7 @@
         {
             var bookings = await Api.GetBookingsAsync();
             myBookings.Clear();
-            myBookings.AddRange(bookings.Where(booking => booking.StudentId == StudentId));
+            myBookings.AddRange(bookings.Where(booking => booking.StudentId == CurrentUser.UserId));
         }
         catch (HttpRequestException)
         {
