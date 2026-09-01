@@ -108,6 +108,25 @@ static async Task ReleaseEquipmentUnitAsync(EventSchedulingDbContext database, B
     booking.EquipmentId = null;
 }
 
+// True when an active (non-cancelled, non-completed) booking on the same room overlaps [startUtc, endUtc).
+static Task<bool> RoomHasClashAsync(EventSchedulingDbContext database, int roomId, DateTime startUtc, DateTime endUtc,
+    int? excludeBookingId, CancellationToken cancellationToken)
+{
+    var query = database.Bookings.Where(other =>
+        other.RoomId == roomId
+        && other.Status != BookingStatus.Cancelled
+        && other.Status != BookingStatus.Completed
+        && startUtc < other.EndUtc
+        && other.StartUtc < endUtc);
+
+    if (excludeBookingId is int excludeId)
+    {
+        query = query.Where(other => other.Id != excludeId);
+    }
+
+    return query.AnyAsync(cancellationToken);
+}
+
 var refEquipment = app.MapGroup("/api/refequipment");
 
 refEquipment.MapGet("/", async (EventSchedulingDbContext database, CancellationToken cancellationToken) =>
@@ -327,6 +346,14 @@ bookings.MapPost("/", async (BookingRequest request, EventSchedulingDbContext da
         return Results.ValidationProblem(new Dictionary<string, string[]> { ["booking"] = [error] });
     }
 
+    if (request.StartUtc.Date < DateTime.UtcNow.Date)
+    {
+        return Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            ["booking"] = ["Bookings can't start on a past date."]
+        });
+    }
+
     var booking = request.ToBooking();
 
     if (request.RoomId is not null)
@@ -336,6 +363,14 @@ bookings.MapPost("/", async (BookingRequest request, EventSchedulingDbContext da
             return Results.ValidationProblem(new Dictionary<string, string[]>
             {
                 ["booking"] = ["The specified room does not exist."]
+            });
+        }
+
+        if (await RoomHasClashAsync(database, request.RoomId.Value, request.StartUtc, request.EndUtc, null, cancellationToken))
+        {
+            return Results.ValidationProblem(new Dictionary<string, string[]>
+            {
+                ["booking"] = ["This room is already booked during part of that time."]
             });
         }
     }
@@ -384,6 +419,15 @@ bookings.MapPut("/{id:int}", async (int id, BookingRequest request, EventSchedul
     if (booking is null)
     {
         return Results.NotFound();
+    }
+
+    if (request.RoomId is not null
+        && await RoomHasClashAsync(database, request.RoomId.Value, request.StartUtc, request.EndUtc, id, cancellationToken))
+    {
+        return Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            ["booking"] = ["This room is already booked during part of that time."]
+        });
     }
 
     var wasActive = booking.Status is not (BookingStatus.Cancelled or BookingStatus.Completed);

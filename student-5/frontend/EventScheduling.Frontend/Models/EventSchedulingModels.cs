@@ -35,6 +35,18 @@ public sealed record BookingResponse(
     DateTime EndUtc,
     BookingStatus Status);
 
+// Sent to POST /api/bookings. The server resolves the equipment unit; the client never sends EquipmentId.
+public sealed record BookingRequest(
+    int StudentId,
+    int? RoomId,
+    int? RefEquipmentId,
+    string ResourceName,
+    DateTime StartUtc,
+    DateTime EndUtc,
+    BookingStatus Status);
+
+public sealed record BookingResult(bool Success, BookingResponse? Booking, string? Error);
+
 public sealed record RoomResponse(
     int Id,
     string Name,
