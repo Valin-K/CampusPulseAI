@@ -52,6 +52,24 @@ builder.Services.AddHttpClient(
         client.Timeout = TimeSpan.FromSeconds(30);
     });
 builder.Services.AddScoped<DatabaseApiProxy>();
+builder.Services.AddScoped<ICourseQuestionService, GeminiCourseQuestionService>();
+var geminiApiKey = builder.Configuration["GEMINI_API_KEY"];
+var geminiApiAddress = builder.Configuration["Gemini:BaseUrl"]
+    ?? "https://generativelanguage.googleapis.com/";
+builder.Services.AddHttpClient(
+    GeminiCourseQuestionService.ClientName,
+    client =>
+    {
+        client.BaseAddress = new Uri(geminiApiAddress, UriKind.Absolute);
+        client.Timeout = TimeSpan.FromSeconds(90);
+
+        if (!string.IsNullOrWhiteSpace(geminiApiKey))
+        {
+            client.DefaultRequestHeaders.Add(
+                "x-goog-api-key",
+                geminiApiKey);
+        }
+    });
 builder.Services.AddOpenApi();
 
 var app = builder.Build();

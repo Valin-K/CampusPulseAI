@@ -87,6 +87,115 @@ else
         }
     </section>
 
+    <section class="ai-card" aria-labelledby="course-ai-heading">
+        <div>
+            <span class="eyebrow">Gemini-powered Course guidance</span>
+            <h2 id="course-ai-heading">Ask about Courses</h2>
+            <p>
+                Mention a Course in your question, or select one or more Courses below
+                to give Gemini explicit catalogue context.
+            </p>
+        </div>
+        <span class="status-badge outstanding">Release 0 AI-Mode</span>
+
+        <div class="ai-response">
+            @if (SelectedCourses.Count == 0)
+            {
+                <p>
+                    No Courses selected. Mention a Course code or name in your question,
+                    or select Courses from the catalogue before asking.
+                </p>
+            }
+            else
+            {
+                <div aria-live="polite">
+                    <strong>
+                        @SelectedCourses.Count selected
+                        @(SelectedCourses.Count == 1 ? "Course" : "Courses")
+                    </strong>
+                    <div class="d-flex flex-wrap gap-2 mt-2">
+                        @foreach (var selectedCourse in SelectedCourses)
+                        {
+                            <span class="status-badge paid">@selectedCourse.Code</span>
+                        }
+                    </div>
+                </div>
+            }
+
+            <FeedbackPanel Kind="FeedbackKind.Warning"
+                           Title="Release 0 limitation"
+                           Message="Gemini receives catalogue details only. Uploaded syllabus PDFs are not supplied until Release 1 RAG." />
+
+            <label class="form-label mt-3" for="course-ai-question">
+                Course question
+            </label>
+            <InputTextArea id="course-ai-question"
+                           class="form-control"
+                           rows="4"
+                           maxlength="1000"
+                           @bind-Value="aiQuestion"
+                           disabled="@isAskingAi"
+                           placeholder="For example: Compare the selected Courses, or what should I know before taking CPAI3001?" />
+
+            <div class="d-flex flex-wrap gap-2 mt-3">
+                <button type="button"
+                        class="button button-accent"
+                        disabled="@(isAskingAi || string.IsNullOrWhiteSpace(aiQuestion))"
+                        @onclick="AskCourseQuestionAsync">
+                    @(isAskingAi ? "Asking Gemini..." : "Ask AI")
+                </button>
+
+                @if (aiResponse is not null || aiErrorMessage is not null)
+                {
+                    <button type="button"
+                            class="button button-secondary"
+                            disabled="@isAskingAi"
+                            @onclick="ClearAiResponse">
+                        Clear question
+                    </button>
+                }
+
+                @if (SelectedCourses.Count > 0)
+                {
+                    <button type="button"
+                            class="button button-secondary"
+                            disabled="@isAskingAi"
+                            @onclick="ClearSelectedCourses">
+                        Clear selected Courses
+                    </button>
+                }
+            </div>
+
+            @if (isAskingAi)
+            {
+                <LoadingIndicator Message="Gemini is answering your Course question..." />
+            }
+            else if (aiErrorMessage is not null)
+            {
+                <FeedbackPanel Kind="FeedbackKind.Error"
+                               Title="Course question failed"
+                               Message="@aiErrorMessage">
+                    <button type="button"
+                            class="button button-secondary"
+                            @onclick="AskCourseQuestionAsync">
+                        Try again
+                    </button>
+                </FeedbackPanel>
+            }
+            else if (aiResponse is not null)
+            {
+                <div class="mt-3" aria-live="polite">
+                    <strong>Gemini response</strong>
+                    <p>@aiResponse.Answer</p>
+                    <small>
+                        Model: @aiResponse.Model |
+                        Syllabus grounded: @(aiResponse.IsSyllabusGrounded ? "Yes" : "No")
+                    </small>
+                </div>
+            }
+        </div>
+    </section>
+
     @if (UserContext.IsCourseAdministrator)
     {
         <CampusSectionTabs Items="StaffSections"
@@ -130,6 +239,9 @@ else
                 <table>
                     <thead>
                         <tr>
+                            <th scope="col">
+                                <span class="visually-hidden">Select for Course AI</span>
+                            </th>
                             <th scope="col">Code</th>
                             <th scope="col">Course</th>
                             <th scope="col">Level</th>
@@ -142,6 +254,12 @@ else
                         @foreach (var course in DisplayedCourses)
                         {
                             <tr class="@(!course.IsActive ? "course-inactive" : null)">
+                                <td>
+                                    <input type="checkbox"
+                                           checked="@selectedCourseIds.Contains(course.Id)"
+                                           aria-label="@($"Select {course.Code} for Course AI")"
+                                           @onchange="args => UpdateCourseSelection(course.Id, args)" />
+                                </td>
                                 <td><strong>@course.Code</strong></td>
                                 <td>
                                     <strong>@course.Name</strong>
@@ -201,9 +319,14 @@ else
     public string? Tab { get; set; }
 
     private IReadOnlyList<CourseSummary> courses = [];
+    private readonly HashSet<int> selectedCourseIds = [];
     private string? errorMessage;
+    private string? aiErrorMessage;
     private string activeTab = string.Empty;
+    private string aiQuestion = string.Empty;
     private bool isLoading = true;
+    private bool isAskingAi;
+    private CourseQuestionResponse? aiResponse;
 
     string DashboardReturnUrl => UserContext.IsCourseAdministrator
         ? CourseNavigation.Dashboard(activeTab)
@@ -220,6 +343,16 @@ else
             courses.Where(course => course.IsActive).ToList(),
         _ => courses
     };
+
+    IReadOnlyList<CourseSummary> AiCatalogueCourses =>
+        UserContext.IsCourseAdministrator
+            ? courses
+            : courses.Where(course => course.IsActive).ToList();
+
+    IReadOnlyList<CourseSummary> SelectedCourses =>
+        AiCatalogueCourses
+            .Where(course => selectedCourseIds.Contains(course.Id))
+            .ToList();
 
     int ActiveCourseCount => courses.Count(course => course.IsActive);
     int InactiveCourseCount => courses.Count(course => !course.IsActive);
@@ -327,6 +460,8 @@ else
         try
         {
             courses = await CourseApi.GetAllAsync();
+            selectedCourseIds.RemoveWhere(
+                courseId => courses.All(course => course.Id != courseId));
         }
         catch (CourseApiException exception)
         {
@@ -344,5 +479,91 @@ else
         {
             isLoading = false;
         }
+    }
+
+    private void UpdateCourseSelection(
+        int courseId,
+        ChangeEventArgs args)
+    {
+        if (args.Value is true)
+        {
+            selectedCourseIds.Add(courseId);
+        }
+        else
+        {
+            selectedCourseIds.Remove(courseId);
+        }
+
+        aiErrorMessage = null;
+        aiResponse = null;
+    }
+
+    private async Task AskCourseQuestionAsync()
+    {
+        var question = aiQuestion.Trim();
+        if (question.Length < 3)
+        {
+            aiErrorMessage =
+                "Enter a Course question containing at least three characters.";
+            aiResponse = null;
+            return;
+        }
+
+        var selectedCourses = SelectedCourses;
+        var contextCourses = selectedCourses.Count > 0
+            ? selectedCourses
+            : AiCatalogueCourses;
+
+        isAskingAi = true;
+        aiErrorMessage = null;
+        aiResponse = null;
+
+        try
+        {
+            aiResponse = await CourseApi.AskCourseQuestionAsync(
+                new CourseQuestionRequest(
+                    question,
+                    contextCourses
+                        .Select(course => new CourseQuestionContext(
+                            course.Code,
+                            course.Name,
+                            course.Description,
+                            course.Level,
+                            course.CreditPoints))
+                        .ToList(),
+                    CoursesExplicitlySelected: selectedCourses.Count > 0));
+        }
+        catch (CourseApiException exception)
+        {
+            aiErrorMessage = exception.Message;
+        }
+        catch (HttpRequestException)
+        {
+            aiErrorMessage =
+                "The Course question could not be submitted. Check that Course Management is running.";
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            aiErrorMessage =
+                "The Course AI API returned an unexpected response.";
+        }
+        finally
+        {
+            isAskingAi = false;
+        }
+    }
+
+    private void ClearAiResponse()
+    {
+        aiQuestion = string.Empty;
+        aiErrorMessage = null;
+        aiResponse = null;
+    }
+
+    private void ClearSelectedCourses()
+    {
+        selectedCourseIds.Clear();
+        aiErrorMessage = null;
+        aiResponse = null;
     }
 }
