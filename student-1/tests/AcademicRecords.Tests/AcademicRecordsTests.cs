@@ -301,8 +301,8 @@ namespace AcademicRecords.Tests
 
                 var gradeType = enrollment.CourseCode switch
                 {
-                    "CS102" or "CS105" => EnrollmentStatusRules.EnrollmentGradeTypes.PassFail,
-                    "CS103" => EnrollmentStatusRules.EnrollmentGradeTypes.Ungraded,
+                    "CPAI1002" or "CPAI2002" => EnrollmentStatusRules.EnrollmentGradeTypes.PassFail,
+                    "CPAI1003" => EnrollmentStatusRules.EnrollmentGradeTypes.Ungraded,
                     _ => EnrollmentStatusRules.EnrollmentGradeTypes.Mark
                 };
                 var expectedStatus = endDate < today

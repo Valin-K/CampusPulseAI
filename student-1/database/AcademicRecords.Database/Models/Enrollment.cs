@@ -9,7 +9,6 @@ public sealed class Enrollment
     public int AcademicYear { get; set; }
     public string Status { get; set; } = string.Empty;
     public decimal? GradeValue { get; set; }
-    public decimal? Credits { get; set; }
     public DateOnly? GradeDate { get; set; }
     public bool IsFinalized { get; set; }
 

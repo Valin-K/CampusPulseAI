@@ -37,6 +37,7 @@ public static class AcademicRecordsSeedData
             foreach (var existing in existingSeedEnrollments)
             {
                 var expected = seededEnrollments[existing.EnrollmentId - 1];
+                existing.CourseCode = expected.CourseCode;
                 existing.Status = expected.Status;
                 existing.GradeValue = expected.GradeValue;
                 existing.GradeDate = expected.GradeDate;
@@ -116,7 +117,7 @@ public static class AcademicRecordsSeedData
             {
                 EnrollmentId = studentIndex * 5 + courseIndex + 1,
                 StudentId = studentIndex + 1,
-                CourseCode = $"CS{101 + courseIndex:D3}",
+                CourseCode = CourseCodes[courseIndex],
                 AcademicTermId = academicTermId,
                 AcademicYear = academicYear,
                 Status = isCompleted
@@ -129,11 +130,19 @@ public static class AcademicRecordsSeedData
                     }
                     : status,
                 GradeValue = isCompleted && courseIndex is not (1 or 2 or 4) ? 65m + studentIndex + courseIndex * 5 : null,
-                Credits = 3.0m,
                 GradeDate = isCompleted ? endDate : null,
                 IsFinalized = isCompleted
             };
         }))
+    ];
+
+    private static readonly string[] CourseCodes =
+    [
+        "CPAI1001",
+        "CPAI1002",
+        "CPAI1003",
+        "CPAI2001",
+        "CPAI2002"
     ];
 
 }
