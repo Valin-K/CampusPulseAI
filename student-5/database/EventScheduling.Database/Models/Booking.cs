@@ -63,7 +63,8 @@ public enum BookingStatus
     Confirmed,
     Cancelled,
     Completed,
-    Overdue
+    Overdue,
+    Returned
 }
 
 public sealed record BookingRequest(
@@ -82,9 +83,9 @@ public sealed record BookingRequest(
             return "Student ID must be greater than zero.";
         }
 
-        if (Status == BookingStatus.Overdue)
+        if (Status is BookingStatus.Overdue or BookingStatus.Completed or BookingStatus.Returned)
         {
-            return "Overdue is a derived status and cannot be set directly.";
+            return "Overdue, Completed and Returned are managed by the system and cannot be set directly.";
         }
 
         if (RoomId.HasValue == RefEquipmentId.HasValue)

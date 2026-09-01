@@ -76,5 +76,56 @@ public sealed class EventSchedulingApiClient(HttpClient httpClient)
         }
     }
 
+    // Equipment return: unit is freed, booking status becomes Returned, record is kept.
+    public Task<BookingResult> ReturnBookingAsync(int id, CancellationToken cancellationToken = default) =>
+        PostBookingActionAsync($"/api/bookings/{id}/return", cancellationToken);
+
+    // Room end: the room is freed for that time, booking status becomes Completed, record is kept.
+    public Task<BookingResult> EndBookingAsync(int id, CancellationToken cancellationToken = default) =>
+        PostBookingActionAsync($"/api/bookings/{id}/end", cancellationToken);
+
+    // Cancel: the booking is deleted outright and any held equipment unit is freed.
+    public async Task<BookingResult> CancelBookingAsync(int id, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var response = await httpClient.DeleteAsync($"/api/bookings/{id}", cancellationToken);
+            if (response.IsSuccessStatusCode)
+            {
+                return new BookingResult(true, null, null);
+            }
+
+            var problem = await response.Content.ReadFromJsonAsync<ProblemResponse>(cancellationToken);
+            return new BookingResult(false, null, FirstError(problem) ?? "The booking could not be cancelled.");
+        }
+        catch (HttpRequestException)
+        {
+            return new BookingResult(false, null, "The Event Scheduling service is unavailable.");
+        }
+    }
+
+    private async Task<BookingResult> PostBookingActionAsync(string url, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var response = await httpClient.PostAsync(url, content: null, cancellationToken);
+            if (response.IsSuccessStatusCode)
+            {
+                var booking = await response.Content.ReadFromJsonAsync<BookingResponse>(cancellationToken);
+                return new BookingResult(true, booking, null);
+            }
+
+            var problem = await response.Content.ReadFromJsonAsync<ProblemResponse>(cancellationToken);
+            return new BookingResult(false, null, FirstError(problem) ?? "The action could not be completed.");
+        }
+        catch (HttpRequestException)
+        {
+            return new BookingResult(false, null, "The Event Scheduling service is unavailable.");
+        }
+    }
+
+    private static string? FirstError(ProblemResponse? problem) =>
+        problem?.Errors?.Values.SelectMany(messages => messages).FirstOrDefault() ?? problem?.Detail;
+
     private sealed record ProblemResponse(string? Detail, Dictionary<string, string[]>? Errors);
 }

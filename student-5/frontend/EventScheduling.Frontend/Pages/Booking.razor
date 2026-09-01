@@ -90,7 +90,12 @@ else
                 <input type="date" min="@todayIso" @bind="date" @bind:event="onchange" />
             </label>
 
-            @if (date is not null)
+            @if (DateInPast)
+            {
+                <p class="booking-hint is-bad">Pick today or a later date.</p>
+            }
+
+            @if (date is not null && !DateInPast)
             {
                 <RoomAvailability Bookings="allBookings" Date="date.Value" RoomId="room!.Id"
                                   ProposedStart="startTime" ProposedEnd="endTime" />
@@ -124,6 +129,11 @@ else
                     <input type="time" @bind="startTime" @bind:event="onchange" />
                 </label>
             </div>
+
+            @if (DateInPast)
+            {
+                <p class="booking-hint is-bad">Pick today or a later date.</p>
+            }
 
             <label class="field">
                 <span>Return by (automatic)</span>
@@ -166,7 +176,8 @@ else
     private string? errorMessage;
 
     private bool isRoom => room is not null;
-    private string todayIso => DateTime.UtcNow.ToString("yyyy-MM-dd");
+    private string todayIso => DateTime.Today.ToString("yyyy-MM-dd");
+    private bool DateInPast => date is { } picked && picked < DateOnly.FromDateTime(DateTime.Today);
 
     private string HeroTitle => saved
         ? "All booked"
@@ -231,12 +242,7 @@ else
     {
         get
         {
-            if (isSaving || StartUtc is null)
-            {
-                return false;
-            }
-
-            if (StartUtc.Value.Date < DateTime.UtcNow.Date)
+            if (isSaving || StartUtc is null || DateInPast)
             {
                 return false;
             }

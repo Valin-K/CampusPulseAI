@@ -108,7 +108,8 @@ static async Task ReleaseEquipmentUnitAsync(EventSchedulingDbContext database, B
     booking.EquipmentId = null;
 }
 
-// True when an active (non-cancelled, non-completed) booking on the same room overlaps [startUtc, endUtc).
+// True when a live booking on the same room overlaps [startUtc, endUtc). Cancelled, Completed
+// (room ended early) and Returned bookings no longer hold the room.
 static Task<bool> RoomHasClashAsync(EventSchedulingDbContext database, int roomId, DateTime startUtc, DateTime endUtc,
     int? excludeBookingId, CancellationToken cancellationToken)
 {
@@ -116,6 +117,7 @@ static Task<bool> RoomHasClashAsync(EventSchedulingDbContext database, int roomI
         other.RoomId == roomId
         && other.Status != BookingStatus.Cancelled
         && other.Status != BookingStatus.Completed
+        && other.Status != BookingStatus.Returned
         && startUtc < other.EndUtc
         && other.StartUtc < endUtc);
 
@@ -346,7 +348,9 @@ bookings.MapPost("/", async (BookingRequest request, EventSchedulingDbContext da
         return Results.ValidationProblem(new Dictionary<string, string[]> { ["booking"] = [error] });
     }
 
-    if (request.StartUtc.Date < DateTime.UtcNow.Date)
+    // The client enforces "today or later" in the viewer's own time zone; this server runs in UTC,
+    // so allow a day of slack here and reject only clearly-past dates.
+    if (request.StartUtc.Date < DateTime.UtcNow.Date.AddDays(-1))
     {
         return Results.ValidationProblem(new Dictionary<string, string[]>
         {
@@ -430,7 +434,7 @@ bookings.MapPut("/{id:int}", async (int id, BookingRequest request, EventSchedul
         });
     }
 
-    var wasActive = booking.Status is not (BookingStatus.Cancelled or BookingStatus.Completed);
+    var wasActive = booking.Status is not (BookingStatus.Cancelled or BookingStatus.Completed or BookingStatus.Returned);
     booking.UpdateFrom(request);
 
     if (request.Status == BookingStatus.Cancelled && wasActive)
@@ -460,6 +464,29 @@ bookings.MapPost("/{id:int}/return", async (int id, EventSchedulingDbContext dat
     }
 
     await ReleaseEquipmentUnitAsync(database, booking, cancellationToken);
+    booking.Status = BookingStatus.Returned;
+    await database.SaveChangesAsync(cancellationToken);
+
+    return Results.Ok(booking.ToResponse());
+});
+
+// Ends an in-progress room booking: the room is freed for that time but the record is kept.
+bookings.MapPost("/{id:int}/end", async (int id, EventSchedulingDbContext database, CancellationToken cancellationToken) =>
+{
+    var booking = await database.Bookings.SingleOrDefaultAsync(item => item.Id == id, cancellationToken);
+    if (booking is null)
+    {
+        return Results.NotFound();
+    }
+
+    if (booking.RoomId is null)
+    {
+        return Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            ["booking"] = ["Only room bookings can be ended."]
+        });
+    }
+
     booking.Status = BookingStatus.Completed;
     await database.SaveChangesAsync(cancellationToken);
 

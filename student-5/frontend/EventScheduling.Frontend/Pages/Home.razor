@@ -98,7 +98,7 @@
     }
     else
     {
-        <BookingCalendar Bookings="myBookings" AnchorDate="anchorDate" ViewMode="month" MaxBookingsPerDay="2" ShowNavigation="false" OnDateSelected="GoToBooking" />
+        <BookingCalendar Bookings="myBookings" AnchorDate="anchorDate" ViewMode="month" MaxBookingsPerDay="2" ShowNavigation="false" OnDateSelected="GoToDay" />
     }
 </section>
 
@@ -134,7 +134,9 @@
     // returned, any date), then bookings active right now, then bookings still to start today.
     private List<DashboardEntry> BuildDashboard()
     {
-        var now = DateTime.UtcNow;
+        // Booking times are treated as wall-clock throughout this app (displayed without
+        // conversion), so "now" must be local time too - not DateTime.UtcNow.
+        var now = DateTime.Now;
         var today = DateOnly.FromDateTime(now);
         var entries = new List<DashboardEntry>();
 
@@ -167,7 +169,7 @@
             .ToList();
     }
 
-    private void GoToBooking(DateOnly date) => Nav.NavigateTo($"/book?date={date:yyyy-MM-dd}");
+    private void GoToDay(DateOnly date) => Nav.NavigateTo($"/day/{date:yyyy-MM-dd}");
 
     private enum DashboardCategory
     {

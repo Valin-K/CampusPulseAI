@@ -28,7 +28,7 @@
     else
     {
         <BookingCalendar Bookings="myBookings" AnchorDate="anchorDate" AnchorDateChanged="date => anchorDate = date"
-                          ViewMode="@viewMode" OnDateSelected="GoToBooking" />
+                          ViewMode="@viewMode" OnDateSelected="GoToDay" />
     }
 </section>
 
@@ -94,5 +94,5 @@
         }
     }
 
-    private void GoToBooking(DateOnly date) => Nav.NavigateTo($"/book?date={date:yyyy-MM-dd}");
+    private void GoToDay(DateOnly date) => Nav.NavigateTo($"/day/{date:yyyy-MM-dd}");
 }
