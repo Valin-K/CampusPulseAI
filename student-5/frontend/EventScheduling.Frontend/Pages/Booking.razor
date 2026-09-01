@@ -1,0 +1,315 @@
+@page "/book"
+@inject EventSchedulingApiClient Api
+@inject CurrentUser CurrentUser
+@inject NavigationManager Nav
+
+<PageTitle>Book | Event & Facility Scheduling</PageTitle>
+
+<header class="dashboard-hero">
+    <div>
+        <span class="eyebrow">Almost there</span>
+        <h1>@HeroTitle</h1>
+        <p>@HeroSubtitle</p>
+    </div>
+</header>
+
+@if (isLoading)
+{
+    <section class="surface-card">
+        <div class="skeleton-stack"><span></span><span></span><span></span></div>
+    </section>
+}
+else if (saved)
+{
+    <section class="surface-card" aria-label="Booking confirmed">
+        <div class="notice notice-success" role="status">
+            Your @(isRoom ? "room booking" : "equipment hire") is confirmed. It's on your calendar now.
+        </div>
+        <div class="button-row">
+            <button type="button" class="button button-primary" @onclick='() => Nav.NavigateTo("/calendar")'>View my calendar</button>
+            <button type="button" class="button button-secondary" @onclick='() => Nav.NavigateTo("/search")'>Book something else</button>
+        </div>
+    </section>
+}
+else if (room is null && equipment is null)
+{
+    <section class="surface-card" aria-label="Nothing selected">
+        <div class="notice" role="status">Pick a room or a piece of equipment to book.</div>
+        <div class="button-row">
+            <button type="button" class="button button-primary" @onclick='() => Nav.NavigateTo(SearchLink("room"))'>Browse rooms</button>
+            <button type="button" class="button button-accent" @onclick='() => Nav.NavigateTo(SearchLink("equipment"))'>Browse equipment</button>
+        </div>
+    </section>
+}
+else
+{
+    <section class="surface-card" aria-label="What you're booking">
+        @if (room is not null)
+        {
+            <div class="section-heading">
+                <div>
+                    <span class="eyebrow">Study room</span>
+                    <h2>@room.Name</h2>
+                </div>
+                <span class="status-badge paid">Seats @room.Capacity</span>
+            </div>
+            <ul class="detail-list"><li>@room.Location</li></ul>
+            <p>@room.Description</p>
+        }
+        else if (equipment is not null)
+        {
+            <div class="section-heading">
+                <div>
+                    <span class="eyebrow">Equipment</span>
+                    <h2>@equipment.Name</h2>
+                </div>
+                <span class="status-badge @(equipment.AvailableCount > 0 ? "paid" : "overdue")">@equipment.AvailableCount available</span>
+            </div>
+            <ul class="detail-list"><li>@equipment.Category</li></ul>
+            <p>@equipment.Description</p>
+        }
+    </section>
+
+    <section class="surface-card" aria-label="Booking details">
+        <div class="section-heading">
+            <div>
+                <span class="eyebrow">Schedule</span>
+                <h2>@(isRoom ? "Choose your slot" : "Schedule your hire")</h2>
+            </div>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(errorMessage))
+        {
+            <div class="notice notice-error" role="alert">@errorMessage</div>
+        }
+
+        @if (isRoom)
+        {
+            <label class="field">
+                <span>Date</span>
+                <input type="date" min="@todayIso" @bind="date" @bind:event="onchange" />
+            </label>
+
+            @if (DateInPast)
+            {
+                <p class="booking-hint is-bad">Pick today or a later date.</p>
+            }
+
+            @if (date is not null && !DateInPast)
+            {
+                <RoomAvailability Bookings="allBookings" Date="date.Value" RoomId="room!.Id"
+                                  ProposedStart="startTime" ProposedEnd="endTime" />
+
+                <div class="form-grid">
+                    <label class="field">
+                        <span>Start time</span>
+                        <input type="time" @bind="startTime" @bind:event="onchange" />
+                    </label>
+                    <label class="field">
+                        <span>End time</span>
+                        <input type="time" @bind="endTime" @bind:event="onchange" />
+                    </label>
+                </div>
+
+                @if (startTime is not null && endTime is not null)
+                {
+                    <p class="booking-hint @(RoomSlotValid ? "is-ok" : "is-bad")">@RoomSlotMessage</p>
+                }
+            }
+        }
+        else
+        {
+            <div class="form-grid">
+                <label class="field">
+                    <span>Hire date</span>
+                    <input type="date" min="@todayIso" @bind="date" @bind:event="onchange" />
+                </label>
+                <label class="field">
+                    <span>Hire time</span>
+                    <input type="time" @bind="startTime" @bind:event="onchange" />
+                </label>
+            </div>
+
+            @if (DateInPast)
+            {
+                <p class="booking-hint is-bad">Pick today or a later date.</p>
+            }
+
+            <label class="field">
+                <span>Return by (automatic)</span>
+                <input type="text" value="@ReturnText" readonly disabled />
+            </label>
+            <p class="booking-hint">Equipment hires run for 7 days from the hire date and time.</p>
+
+            @if (equipment!.AvailableCount == 0)
+            {
+                <div class="notice notice-error" role="alert">There are no units of this equipment available to hire right now.</div>
+            }
+        }
+
+        <div class="button-row">
+            <button type="button" class="button button-primary" disabled="@(!CanSubmit)" @onclick="SubmitAsync">
+                @(isSaving ? "Saving…" : (isRoom ? "Confirm booking" : "Confirm hire"))
+            </button>
+            <button type="button" class="button button-secondary" @onclick='() => Nav.NavigateTo("/search")'>Cancel</button>
+        </div>
+    </section>
+}
+
+@code {
+    [SupplyParameterFromQuery(Name = "type")] public string? Type { get; set; }
+    [SupplyParameterFromQuery(Name = "itemId")] public int? ItemId { get; set; }
+    [SupplyParameterFromQuery(Name = "itemName")] public string? ItemName { get; set; }
+    [SupplyParameterFromQuery(Name = "date")] public string? DateParam { get; set; }
+
+    private RoomResponse? room;
+    private RefEquipmentResponse? equipment;
+    private readonly List<BookingResponse> allBookings = [];
+
+    private DateOnly? date;
+    private TimeOnly? startTime;
+    private TimeOnly? endTime;
+
+    private bool isLoading = true;
+    private bool isSaving;
+    private bool saved;
+    private string? errorMessage;
+
+    private bool isRoom => room is not null;
+    private string todayIso => DateTime.Today.ToString("yyyy-MM-dd");
+    private bool DateInPast => date is { } picked && picked < DateOnly.FromDateTime(DateTime.Today);
+
+    private string HeroTitle => saved
+        ? "All booked"
+        : isRoom ? "Reserve this room" : equipment is not null ? "Hire this equipment" : "Confirm your booking";
+
+    private string HeroSubtitle => (saved, room, equipment) switch
+    {
+        (true, _, _) => "You're all set.",
+        (_, { } r, _) => $"Pick a date and time for {r.Name}.",
+        (_, _, { } e) => $"Choose when you'd like to pick up the {e.Name}.",
+        _ => "Choose what you'd like to book."
+    };
+
+    private string SearchLink(string type) =>
+        date is null ? $"/search?type={type}" : $"/search?type={type}&date={date:yyyy-MM-dd}";
+
+    private DateTime? StartUtc => date is { } d && startTime is { } t ? d.ToDateTime(t, DateTimeKind.Utc) : null;
+
+    private DateTime? EndUtc => isRoom
+        ? (date is { } d && endTime is { } t ? d.ToDateTime(t, DateTimeKind.Utc) : null)
+        : StartUtc?.AddDays(7);
+
+    private string ReturnText => EndUtc is { } end ? end.ToString("MMM d, yyyy · h:mm tt") : "—";
+
+    private bool RoomSlotValid
+    {
+        get
+        {
+            if (!isRoom || date is null || startTime is null || endTime is null)
+            {
+                return false;
+            }
+
+            if (endTime.Value <= startTime.Value)
+            {
+                return false;
+            }
+
+            return !allBookings.Any(booking =>
+                booking.RoomId == room!.Id
+                && DateOnly.FromDateTime(booking.StartUtc) == date
+                && booking.Status is not (BookingStatus.Cancelled or BookingStatus.Completed)
+                && startTime.Value < TimeOnly.FromDateTime(booking.EndUtc)
+                && TimeOnly.FromDateTime(booking.StartUtc) < endTime.Value);
+        }
+    }
+
+    private string RoomSlotMessage
+    {
+        get
+        {
+            if (startTime is not null && endTime is not null && endTime.Value <= startTime.Value)
+            {
+                return "End time must be after the start time.";
+            }
+
+            return RoomSlotValid ? "This slot is available." : "This clashes with an existing booking.";
+        }
+    }
+
+    private bool CanSubmit
+    {
+        get
+        {
+            if (isSaving || StartUtc is null || DateInPast)
+            {
+                return false;
+            }
+
+            return isRoom
+                ? RoomSlotValid
+                : equipment!.AvailableCount > 0;
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (DateOnly.TryParse(DateParam, out var parsed))
+        {
+            date = parsed;
+        }
+
+        try
+        {
+            if (string.Equals(Type, "room", StringComparison.OrdinalIgnoreCase) && ItemId is { } roomId)
+            {
+                var roomsTask = Api.GetRoomAsync(roomId);
+                var bookingsTask = Api.GetBookingsAsync();
+                await Task.WhenAll(roomsTask, bookingsTask);
+                room = await roomsTask;
+                allBookings.Clear();
+                allBookings.AddRange(await bookingsTask);
+            }
+            else if (string.Equals(Type, "equipment", StringComparison.OrdinalIgnoreCase) && ItemId is { } refId)
+            {
+                equipment = await Api.GetRefEquipmentAsync(refId);
+            }
+        }
+        catch (HttpRequestException)
+        {
+            errorMessage = "The Event Scheduling service is unavailable.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task SubmitAsync()
+    {
+        if (!CanSubmit || StartUtc is not { } start || EndUtc is not { } end)
+        {
+            return;
+        }
+
+        isSaving = true;
+        errorMessage = null;
+
+        var request = isRoom
+            ? new BookingRequest(CurrentUser.UserId, room!.Id, null, room.Name, start, end, BookingStatus.Confirmed)
+            : new BookingRequest(CurrentUser.UserId, null, equipment!.Id, equipment.Name, start, end, BookingStatus.Confirmed);
+
+        var result = await Api.CreateBookingAsync(request);
+        isSaving = false;
+
+        if (result.Success)
+        {
+            saved = true;
+        }
+        else
+        {
+            errorMessage = result.Error ?? "The booking could not be created.";
+        }
+    }
+}

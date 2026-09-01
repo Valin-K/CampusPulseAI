@@ -1,0 +1,43 @@
+.day-time {
+    margin: .1rem 0 .55rem;
+    font-weight: 700;
+    color: var(--university-navy);
+}
+
+.day-status.status-confirmed {
+    color: var(--university-success);
+    background: #e8f7f2;
+}
+
+.day-status.status-pending {
+    color: #9a6700;
+    background: #fff6d8;
+}
+
+.day-status.status-cancelled,
+.day-status.status-overdue {
+    color: var(--university-danger);
+    background: #fff0ee;
+}
+
+.day-status.status-completed {
+    color: var(--university-navy);
+    background: #eef2f7;
+}
+
+.day-status.status-returned {
+    color: #6d28d9;
+    background: #f3e8ff;
+}
+
+.card-actions {
+    margin-top: auto;
+    display: flex;
+    justify-content: flex-end;
+    padding-top: .65rem;
+}
+
+.card-actions .button {
+    min-height: 2.35rem;
+    padding: .5rem .95rem;
+}

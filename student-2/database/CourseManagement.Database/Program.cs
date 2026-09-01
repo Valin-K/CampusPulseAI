@@ -43,7 +43,7 @@ using (var scope = app.Services.CreateScope())
 {
     var database = scope.ServiceProvider
         .GetRequiredService<CourseManagementDbContext>();
-    await database.Database.EnsureCreatedAsync();
+    await CourseManagementSchema.EnsureCurrentAsync(database);
     await CourseManagementSeedData.InitializeAsync(database);
 }
 

@@ -15,7 +15,7 @@ else if (loadFailed)
     <FeedbackPanel Kind="FeedbackKind.Error"
                    Title="Eligibility requirements could not be loaded"
                    Message="@(errorMessage ?? "Eligibility requirements could not be loaded.")">
-        <NavLink class="btn btn-outline-danger" href="@CourseUrl">Back to Course</NavLink>
+        <NavLink class="button button-danger" href="@CourseUrl">Back to Course</NavLink>
     </FeedbackPanel>
 }
 else if (accessDenied)
@@ -23,7 +23,7 @@ else if (accessDenied)
     <FeedbackPanel Kind="FeedbackKind.Warning"
                    Title="Course unavailable"
                    Message="Students can check eligibility only for active Courses.">
-    <NavLink class="btn btn-outline-secondary" href="@CourseUrl">Back</NavLink>
+        <NavLink class="button button-secondary" href="@CourseUrl">Back</NavLink>
     </FeedbackPanel>
 }
 else if (course is not null)
@@ -40,18 +40,25 @@ else if (course is not null)
                        Message="@errorMessage" />
     }
 
+    @if (enrollmentErrorMessage is not null)
+    {
+        <FeedbackPanel Kind="FeedbackKind.Error"
+                       Title="Course enrolment unavailable"
+                       Message="@enrollmentErrorMessage" />
+    }
+
+    @if (enrollmentMessage is not null)
+    {
+        <FeedbackPanel Kind="FeedbackKind.Success"
+                       Message="@enrollmentMessage" />
+    }
+
     @if (isChecking)
     {
         <LoadingIndicator Message="Checking prerequisite eligibility..." />
     }
 
-    @if (selections.Count == 0)
-    {
-        <FeedbackPanel Kind="FeedbackKind.Success"
-                       Title="Eligible"
-                       Message="This Course has no prerequisites. Eligibility requirements are met." />
-    }
-    else
+    @if (selections.Count > 0)
     {
         <div class="table-responsive">
             <table class="table table-striped">
@@ -97,10 +104,38 @@ else if (course is not null)
             </table>
         </div>
 
-        <button class="btn btn-primary" disabled="@isChecking" @onclick="CheckEligibilityAsync">
-            @(isChecking ? "Checking..." : "Check eligibility")
-        </button>
     }
+
+    <div class="button-row mt-3">
+        @if (selections.Count > 0)
+        {
+            <button class="button button-primary"
+                    disabled="@isChecking"
+                    @onclick="CheckEligibilityAsync">
+                @(isChecking ? "Checking..." : "Check eligibility")
+            </button>
+        }
+
+        @if (!UserContext.IsCourseAdministrator)
+        {
+            @if (CurrentEnrollment is not null)
+            {
+                <span class="status-badge paid">Enrolled</span>
+            }
+            else if (result?.IsEligible == true && studentSummary is not null)
+            {
+                <button class="button button-primary"
+                        disabled="@isEnrolling"
+                        @onclick="EnrollAsync">
+                    @(isEnrolling ? "Enrolling..." : "Enrol")
+                </button>
+            }
+        }
+
+        <NavLink class="button button-secondary" href="@CourseUrl">
+            Back to Course
+        </NavLink>
+    </div>
 
     @if (result is not null)
     {
@@ -108,42 +143,45 @@ else if (course is not null)
             <FeedbackPanel Kind="@(result.IsEligible ? FeedbackKind.Success : FeedbackKind.Warning)"
                            Title="@(result.IsEligible ? "Eligible" : "Not eligible")"
                            Message="@(result.IsEligible
-                               ? "All prerequisite requirements are met."
+                               ? result.Requirements.Count == 0
+                                   ? "This Course has no prerequisites. Eligibility requirements are met."
+                                   : "All prerequisite requirements are met."
                                : "One or more prerequisite requirements are not met.")" />
         </div>
 
-        <div class="table-responsive">
-            <table class="table">
-                <thead>
-                    <tr>
-                        <th scope="col">Required Course</th>
-                        <th scope="col">Minimum</th>
-                        <th scope="col">Achieved</th>
-                        <th scope="col">Result</th>
-                        <th scope="col">Reason</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var requirement in result.Requirements)
-                    {
+        @if (result.Requirements.Count > 0)
+        {
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
                         <tr>
-                            <td>@requirement.RequiredCourseCode</td>
-                            <td>@requirement.MinimumGrade</td>
-                            <td>@(requirement.AchievedGrade ?? "Not completed")</td>
-                            <td>
-                                <span class="badge @(requirement.IsMet ? "bg-success" : "bg-warning text-dark")">
-                                    @(requirement.IsMet ? "Met" : "Not met")
-                                </span>
-                            </td>
-                            <td>@requirement.Reason</td>
+                            <th scope="col">Required Course</th>
+                            <th scope="col">Minimum</th>
+                            <th scope="col">Achieved</th>
+                            <th scope="col">Result</th>
+                            <th scope="col">Reason</th>
                         </tr>
-                    }
-                </tbody>
-            </table>
-        </div>
+                    </thead>
+                    <tbody>
+                        @foreach (var requirement in result.Requirements)
+                        {
+                            <tr>
+                                <td>@requirement.RequiredCourseCode</td>
+                                <td>@requirement.MinimumGrade</td>
+                                <td>@(requirement.AchievedGrade ?? "Not completed")</td>
+                                <td>
+                                    <span class="badge @(requirement.IsMet ? "bg-success" : "bg-warning text-dark")">
+                                        @(requirement.IsMet ? "Met" : "Not met")
+                                    </span>
+                                </td>
+                                <td>@requirement.Reason</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
     }
-
-    <NavLink class="btn btn-outline-secondary mt-3" href="@CourseUrl">Back to Course</NavLink>
 }
 
 @code {
@@ -155,10 +193,15 @@ else if (course is not null)
 
     private CourseDetail? course;
     private List<CompletedCourseSelection> selections = [];
+    private IReadOnlyList<CompletedCourseRequest> verifiedCompletedCourses = [];
     private PrerequisiteEligibilityResult? result;
+    private StudentCourseSummary? studentSummary;
     private string? errorMessage;
+    private string? enrollmentErrorMessage;
+    private string? enrollmentMessage;
     private bool isLoading = true;
     private bool isChecking;
+    private bool isEnrolling;
     private bool loadFailed;
     private bool accessDenied;
 
@@ -172,7 +215,11 @@ else if (course is not null)
         loadFailed = false;
         accessDenied = false;
         errorMessage = null;
+        enrollmentErrorMessage = null;
+        enrollmentMessage = null;
         result = null;
+        verifiedCompletedCourses = [];
+        studentSummary = null;
 
         try
         {
@@ -200,6 +247,16 @@ else if (course is not null)
                     };
                 })
                 .ToList();
+
+            if (!UserContext.IsCourseAdministrator)
+            {
+                await LoadStudentSummaryAsync();
+            }
+
+            if (selections.Count == 0)
+            {
+                await CheckEligibilityAsync();
+            }
         }
         catch (CourseApiException exception)
         {
@@ -227,19 +284,19 @@ else if (course is not null)
         isChecking = true;
         errorMessage = null;
         result = null;
+        verifiedCompletedCourses = [];
 
         try
         {
-            var completedCourses = selections
-                .Where(selection => selection.IsCompleted)
-                .Select(selection => new CompletedCourseRequest(
-                    selection.CourseCode,
-                    selection.Grade))
-                .ToList();
+            var completedCourses = CompletedCourses();
 
             result = await CourseApi.CheckPrerequisiteEligibilityAsync(
                 CourseId,
                 new PrerequisiteEligibilityRequest(completedCourses));
+            if (result.IsEligible)
+            {
+                verifiedCompletedCourses = completedCourses;
+            }
         }
         catch (CourseApiException exception)
         {
@@ -262,5 +319,93 @@ else if (course is not null)
     private void ClearResult()
     {
         result = null;
+        verifiedCompletedCourses = [];
+        enrollmentErrorMessage = null;
+        enrollmentMessage = null;
+    }
+
+    private IReadOnlyList<CompletedCourseRequest> CompletedCourses() =>
+        selections
+            .Where(selection => selection.IsCompleted)
+            .Select(selection => new CompletedCourseRequest(
+                selection.CourseCode,
+                selection.Grade))
+            .ToList();
+
+    private CourseEnrollment? CurrentEnrollment =>
+        course is null
+            ? null
+            : studentSummary?.Enrollments.FirstOrDefault(enrollment =>
+                enrollment.IsCurrent
+                && string.Equals(
+                    enrollment.CourseCode,
+                    course.Code,
+                    StringComparison.OrdinalIgnoreCase));
+
+    private async Task LoadStudentSummaryAsync()
+    {
+        try
+        {
+            studentSummary = await CourseApi.GetStudentCourseSummaryAsync();
+        }
+        catch (CourseApiException exception)
+        {
+            enrollmentErrorMessage = exception.Message;
+        }
+        catch (HttpRequestException)
+        {
+            enrollmentErrorMessage =
+                "Academic Records could not be reached. Eligibility can still be checked, but enrolment is unavailable.";
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            enrollmentErrorMessage =
+                "Academic Records returned unexpected enrolment information.";
+        }
+    }
+
+    private async Task EnrollAsync()
+    {
+        if (course is null
+            || result?.IsEligible != true
+            || studentSummary is null)
+        {
+            enrollmentErrorMessage =
+                "Eligibility must be confirmed before enrolment.";
+            return;
+        }
+
+        isEnrolling = true;
+        enrollmentErrorMessage = null;
+        enrollmentMessage = null;
+
+        try
+        {
+            studentSummary = await CourseApi.EnrollInCourseAsync(
+                new CreateCourseEnrollmentRequest(
+                    course.Code,
+                    verifiedCompletedCourses));
+            enrollmentMessage = $"Enrolled in {course.Code} - {course.Name}.";
+        }
+        catch (CourseApiException exception)
+        {
+            enrollmentErrorMessage = exception.Message;
+            result = null;
+            verifiedCompletedCourses = [];
+        }
+        catch (HttpRequestException)
+        {
+            enrollmentErrorMessage =
+                "The enrolment could not be submitted. Check that Academic Records is running.";
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            enrollmentErrorMessage =
+                "The Course enrolment API returned an unexpected response.";
+        }
+        finally
+        {
+            isEnrolling = false;
+        }
     }
 }

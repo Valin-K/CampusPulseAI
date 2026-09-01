@@ -26,6 +26,12 @@ builder.Services
     .Validate(
         options => !string.IsNullOrWhiteSpace(options.DemoStaffId),
         "The Course access demonstration Staff ID is required.")
+    .Validate(
+        options => options.DemoEnrollmentTermId > 0,
+        "The Course access demonstration enrolment term is required.")
+    .Validate(
+        options => options.DemoAcademicYear > 0,
+        "The Course access demonstration academic year is required.")
     .ValidateOnStart();
 var academicRecordsDatabaseAddress =
     builder.Configuration["Services:AcademicRecordsDatabase"]
@@ -51,7 +57,33 @@ builder.Services.AddHttpClient(
             UriKind.Absolute);
         client.Timeout = TimeSpan.FromSeconds(30);
     });
+builder.Services.AddHttpClient<ICourseCatalogueClient, CourseCatalogueClient>(
+    client =>
+    {
+        client.BaseAddress = new Uri(
+            courseManagementDatabaseAddress,
+            UriKind.Absolute);
+        client.Timeout = TimeSpan.FromSeconds(5);
+    });
 builder.Services.AddScoped<DatabaseApiProxy>();
+builder.Services.AddScoped<ICourseQuestionService, GeminiCourseQuestionService>();
+var geminiApiKey = builder.Configuration["GEMINI_API_KEY"];
+var geminiApiAddress = builder.Configuration["Gemini:BaseUrl"]
+    ?? "https://generativelanguage.googleapis.com/";
+builder.Services.AddHttpClient(
+    GeminiCourseQuestionService.ClientName,
+    client =>
+    {
+        client.BaseAddress = new Uri(geminiApiAddress, UriKind.Absolute);
+        client.Timeout = TimeSpan.FromSeconds(90);
+
+        if (!string.IsNullOrWhiteSpace(geminiApiKey))
+        {
+            client.DefaultRequestHeaders.Add(
+                "x-goog-api-key",
+                geminiApiKey);
+        }
+    });
 builder.Services.AddOpenApi();
 
 var app = builder.Build();

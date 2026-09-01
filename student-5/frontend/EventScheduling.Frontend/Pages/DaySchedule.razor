@@ -1,0 +1,281 @@
+@page "/day/{Date}"
+@inject EventSchedulingApiClient Api
+@inject CurrentUser CurrentUser
+@inject NavigationManager Nav
+
+<PageTitle>@day.ToString("MMMM d") | Event & Facility Scheduling</PageTitle>
+
+<header class="dashboard-hero">
+    <div>
+        <span class="eyebrow">@(isPast ? "Past day" : isToday ? "Today" : "Upcoming")</span>
+        <h1>@day.ToString("dddd, MMMM d, yyyy")</h1>
+        <p>@HeaderSubtitle</p>
+    </div>
+</header>
+
+@if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <div class="notice notice-error" role="alert">@errorMessage</div>
+}
+
+@if (isLoading)
+{
+    <section class="surface-card">
+        <div class="skeleton-stack"><span></span><span></span><span></span></div>
+    </section>
+}
+else
+{
+    @if (!isPast)
+    {
+        <section class="surface-card" aria-label="Add a booking">
+            <div class="section-heading">
+                <div>
+                    <span class="eyebrow">Get started</span>
+                    <h2>Book for @day.ToString("MMMM d")</h2>
+                </div>
+            </div>
+            <p>Reserve a study room or hire equipment for this day.</p>
+            <div class="button-row">
+                <button type="button" class="button button-primary" @onclick='() => Nav.NavigateTo($"/search?type=room&date={DateIso}")'>Reserve a study room</button>
+                <button type="button" class="button button-accent" @onclick='() => Nav.NavigateTo($"/search?type=equipment&date={DateIso}")'>Hire equipment</button>
+            </div>
+        </section>
+    }
+
+    <section class="surface-card" aria-label="Bookings for this day">
+        <div class="section-heading">
+            <div>
+                <span class="eyebrow">Your bookings</span>
+                <h2>@(dayBookings.Count == 0 ? "Nothing booked" : $"{dayBookings.Count} booking{(dayBookings.Count == 1 ? "" : "s")}")</h2>
+            </div>
+            <button type="button" class="button button-secondary" @onclick='() => Nav.NavigateTo("/calendar")'>Back to calendar</button>
+        </div>
+
+        @if (dayBookings.Count == 0)
+        {
+            <p class="eyebrow">You have no room or equipment bookings starting on this day.</p>
+        }
+        else
+        {
+            <div class="card-grid">
+                @foreach (var entry in dayBookings)
+                {
+                    var action = ActionFor(entry.Booking);
+                    <article class="scholarship-card">
+                        <div class="card-topline">
+                            <span class="status-badge paid">@(entry.Booking.ResourceType == ResourceType.Room ? "Study room" : "Equipment")</span>
+                            <span class="status-badge day-status status-@entry.Booking.Status.ToString().ToLowerInvariant()">@entry.Booking.Status</span>
+                        </div>
+                        <h3>@entry.Booking.ResourceName</h3>
+                        <p class="day-time">@entry.TimeText</p>
+                        @if (entry.Details.Count > 0)
+                        {
+                            <ul class="detail-list">
+                                @foreach (var detail in entry.Details)
+                                {
+                                    <li>@detail</li>
+                                }
+                            </ul>
+                        }
+                        @if (action is not null)
+                        {
+                            <div class="card-actions">
+                                <button type="button" class="button @action.CssClass"
+                                        disabled="@(busyId == entry.Booking.Id)"
+                                        @onclick="() => RunActionAsync(entry.Booking, action)">
+                                    @(busyId == entry.Booking.Id ? "Working…" : action.Label)
+                                </button>
+                            </div>
+                        }
+                    </article>
+                }
+            </div>
+        }
+    </section>
+}
+
+@code {
+    [Parameter] public string Date { get; set; } = string.Empty;
+
+    private DateOnly day;
+    private bool isLoading = true;
+    private string? errorMessage;
+    private int? busyId;
+    private readonly List<DayBookingEntry> dayBookings = [];
+
+    // Local date, to match the calendar grid and how booking times are displayed.
+    private static DateOnly Today => DateOnly.FromDateTime(DateTime.Today);
+    private bool isPast => day < Today;
+    private bool isToday => day == Today;
+    private string DateIso => day.ToString("yyyy-MM-dd");
+
+    private string HeaderSubtitle => (dayBookings.Count, isPast) switch
+    {
+        (0, true) => "Nothing was booked for this day.",
+        (0, false) => "You have nothing booked yet — add a room or equipment booking below.",
+        (1, _) => "You have 1 booking on this day.",
+        var (count, _) => $"You have {count} bookings on this day."
+    };
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!DateOnly.TryParse(Date, System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.None, out day))
+        {
+            day = Today;
+        }
+
+        await LoadAsync(initial: true);
+    }
+
+    private async Task LoadAsync(bool initial = false)
+    {
+        if (initial)
+        {
+            isLoading = true;
+        }
+
+        errorMessage = null;
+
+        try
+        {
+            var bookingsTask = Api.GetBookingsAsync();
+            var roomsTask = Api.GetRoomsAsync();
+            var typesTask = Api.GetRefEquipmentAsync();
+            var unitsTask = Api.GetEquipmentAsync();
+            await Task.WhenAll(bookingsTask, roomsTask, typesTask, unitsTask);
+
+            var rooms = (await roomsTask).ToDictionary(room => room.Id);
+            var types = (await typesTask).ToDictionary(type => type.Id);
+            var units = (await unitsTask).ToDictionary(unit => unit.Id);
+
+            var mine = (await bookingsTask)
+                .Where(booking => booking.StudentId == CurrentUser.UserId
+                                  && DateOnly.FromDateTime(booking.StartUtc) == day)
+                .OrderBy(booking => booking.StartUtc)
+                .ToList();
+
+            dayBookings.Clear();
+            foreach (var booking in mine)
+            {
+                dayBookings.Add(BuildEntry(booking, rooms, types, units));
+            }
+        }
+        catch (HttpRequestException)
+        {
+            errorMessage = "The Event Scheduling service is unavailable.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private CardAction? ActionFor(BookingResponse booking)
+    {
+        if (booking.ResourceType == ResourceType.Equipment)
+        {
+            if (booking.Status is BookingStatus.Pending)
+            {
+                return new CardAction(BookingActionKind.Cancel, "Cancel hire", "button-danger");
+            }
+
+            if (booking.EquipmentId is not null && booking.Status is BookingStatus.Confirmed or BookingStatus.Overdue)
+            {
+                return new CardAction(BookingActionKind.Return, "Return", "button-primary");
+            }
+
+            return null;
+        }
+
+        // Room booking.
+        if (booking.Status is not (BookingStatus.Pending or BookingStatus.Confirmed))
+        {
+            return null;
+        }
+
+        var now = DateTime.Now;
+        if (now >= booking.StartUtc && now < booking.EndUtc)
+        {
+            return new CardAction(BookingActionKind.End, "End", "button-primary");
+        }
+
+        if (now < booking.StartUtc)
+        {
+            return new CardAction(BookingActionKind.Cancel, "Cancel", "button-danger");
+        }
+
+        return null;
+    }
+
+    private async Task RunActionAsync(BookingResponse booking, CardAction action)
+    {
+        busyId = booking.Id;
+        errorMessage = null;
+
+        var result = action.Kind switch
+        {
+            BookingActionKind.Return => await Api.ReturnBookingAsync(booking.Id),
+            BookingActionKind.End => await Api.EndBookingAsync(booking.Id),
+            _ => await Api.CancelBookingAsync(booking.Id)
+        };
+
+        busyId = null;
+
+        if (result.Success)
+        {
+            await LoadAsync();
+        }
+        else
+        {
+            errorMessage = result.Error;
+        }
+    }
+
+    private static DayBookingEntry BuildEntry(
+        BookingResponse booking,
+        IReadOnlyDictionary<int, RoomResponse> rooms,
+        IReadOnlyDictionary<int, RefEquipmentResponse> types,
+        IReadOnlyDictionary<int, EquipmentResponse> units)
+    {
+        var details = new List<string>();
+        string timeText;
+
+        if (booking.ResourceType == ResourceType.Room)
+        {
+            timeText = $"{booking.StartUtc:h:mm tt} – {booking.EndUtc:h:mm tt}";
+            if (booking.RoomId is { } roomId && rooms.TryGetValue(roomId, out var room))
+            {
+                details.Add(room.Location);
+                details.Add($"Seats {room.Capacity}");
+            }
+        }
+        else
+        {
+            timeText = $"Hired {booking.StartUtc:MMM d, h:mm tt} · due back {booking.EndUtc:MMM d, h:mm tt}";
+            if (booking.RefEquipmentId is { } typeId && types.TryGetValue(typeId, out var type))
+            {
+                details.Add(type.Category);
+            }
+
+            if (booking.EquipmentId is { } unitId && units.TryGetValue(unitId, out var unit))
+            {
+                details.Add($"Unit {unit.SerialNumber}");
+            }
+        }
+
+        return new DayBookingEntry(booking, timeText, details);
+    }
+
+    private enum BookingActionKind
+    {
+        Return,
+        End,
+        Cancel
+    }
+
+    private sealed record CardAction(BookingActionKind Kind, string Label, string CssClass);
+
+    private sealed record DayBookingEntry(BookingResponse Booking, string TimeText, IReadOnlyList<string> Details);
+}

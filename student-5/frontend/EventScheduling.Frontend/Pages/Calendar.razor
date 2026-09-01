@@ -1,0 +1,98 @@
+@page "/calendar"
+@inject EventSchedulingApiClient Api
+@inject CurrentUser CurrentUser
+@inject NavigationManager Nav
+
+<PageTitle>My Calendar | Event & Facility Scheduling</PageTitle>
+
+<header class="dashboard-hero">
+    <div>
+        <span class="eyebrow">Your calendar</span>
+        <h1>My schedule</h1>
+        <p>Every room and equipment booking you've made, in month or week view.</p>
+    </div>
+</header>
+
+@if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <div class="notice notice-error" role="alert">@errorMessage</div>
+}
+
+<CampusSectionTabs Items="viewModes" @bind-ActiveKey="viewMode" AriaLabel="Calendar view" />
+
+<section class="surface-card" aria-label="Calendar">
+    @if (isLoading)
+    {
+        <div class="skeleton-stack"><span></span><span></span><span></span></div>
+    }
+    else
+    {
+        <BookingCalendar Bookings="myBookings" AnchorDate="anchorDate" AnchorDateChanged="date => anchorDate = date"
+                          ViewMode="@viewMode" OnDateSelected="GoToDay" />
+    }
+</section>
+
+<section class="surface-card" aria-label="Upcoming bookings">
+    <div class="section-heading">
+        <div>
+            <span class="eyebrow">Details</span>
+            <h2>Upcoming bookings</h2>
+        </div>
+    </div>
+    <div class="responsive-table">
+        <table>
+            <thead>
+                <tr><th>Resource</th><th>Type</th><th>Start</th><th>End</th><th>Status</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var booking in UpcomingBookings)
+                {
+                    <tr>
+                        <td><strong>@booking.ResourceName</strong></td>
+                        <td>@booking.ResourceType</td>
+                        <td>@booking.StartUtc.ToString("MMM d, yyyy h:mmtt")</td>
+                        <td>@booking.EndUtc.ToString("MMM d, yyyy h:mmtt")</td>
+                        <td><span class="status-badge @booking.Status.ToString().ToLowerInvariant()">@booking.Status</span></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</section>
+
+@code {
+    private static readonly IReadOnlyList<CampusTabItem> viewModes =
+    [
+        new("month", "Month", "Full month grid"),
+        new("week", "Week", "Current week")
+    ];
+
+    private readonly List<BookingResponse> myBookings = [];
+    private DateOnly anchorDate = DateOnly.FromDateTime(DateTime.Today);
+    private string viewMode = "month";
+    private string? errorMessage;
+    private bool isLoading = true;
+
+    private IEnumerable<BookingResponse> UpcomingBookings =>
+        myBookings.Where(booking => booking.StartUtc >= DateTime.Today).OrderBy(booking => booking.StartUtc);
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var bookings = await Api.GetBookingsAsync();
+            myBookings.Clear();
+            myBookings.AddRange(bookings.Where(booking => booking.StudentId == CurrentUser.UserId));
+        }
+        catch (HttpRequestException)
+        {
+            errorMessage = "The Event Scheduling service is unavailable.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void GoToDay(DateOnly date) => Nav.NavigateTo($"/day/{date:yyyy-MM-dd}");
+}

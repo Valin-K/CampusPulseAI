@@ -1,0 +1,140 @@
+@page "/search"
+@inject EventSchedulingApiClient Api
+@inject NavigationManager Nav
+
+<PageTitle>Search | Event & Facility Scheduling</PageTitle>
+
+<header class="dashboard-hero">
+    <div>
+        <span class="eyebrow">Find what you need</span>
+        <h1>@(resourceType == "equipment" ? "Hire equipment" : "Reserve a study room")</h1>
+        <p>Search and select an item to continue to booking.</p>
+    </div>
+</header>
+
+@if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <div class="notice notice-error" role="alert">@errorMessage</div>
+}
+
+<CampusSectionTabs Items="resourceTypes" ActiveKey="@resourceType" ActiveKeyChanged="ChangeResourceTypeAsync" AriaLabel="Resource type" />
+
+<section class="surface-card" aria-label="Search">
+    <label class="field">
+        <span>Search</span>
+        <input type="search" placeholder="@(resourceType == "equipment" ? "Search by name or category" : "Search by name or location")"
+               @bind="searchText" @bind:event="oninput" />
+    </label>
+
+    @if (isLoading)
+    {
+        <div class="skeleton-stack"><span></span><span></span><span></span></div>
+    }
+    else if (resourceType == "equipment")
+    {
+        <div class="card-grid">
+            @foreach (var item in FilteredEquipment)
+            {
+                <article class="scholarship-card">
+                    <div class="card-topline"><span class="status-badge paid">@item.Category</span><strong>@item.AvailableCount available</strong></div>
+                    <h3>@item.Name</h3>
+                    <p>@item.Description</p>
+                    <div class="button-row">
+                        <button type="button" class="button button-primary" @onclick="@(() => SelectItem(item.Id, item.Name))">Select</button>
+                    </div>
+                </article>
+            }
+        </div>
+        @if (!FilteredEquipment.Any())
+        {
+            <p class="eyebrow">No equipment matches your search.</p>
+        }
+    }
+    else
+    {
+        <div class="card-grid">
+            @foreach (var room in FilteredRooms)
+            {
+                <article class="scholarship-card">
+                    <div class="card-topline"><span class="status-badge paid">@room.Location</span><strong>Seats @room.Capacity</strong></div>
+                    <h3>@room.Name</h3>
+                    <p>@room.Description</p>
+                    <div class="button-row">
+                        <button type="button" class="button button-primary" @onclick="@(() => SelectItem(room.Id, room.Name))">Select</button>
+                    </div>
+                </article>
+            }
+        </div>
+        @if (!FilteredRooms.Any())
+        {
+            <p class="eyebrow">No rooms match your search.</p>
+        }
+    }
+</section>
+
+@code {
+    private static readonly IReadOnlyList<CampusTabItem> resourceTypes =
+    [
+        new("room", "Rooms", "Study rooms and spaces"),
+        new("equipment", "Equipment", "Hireable equipment")
+    ];
+
+    [SupplyParameterFromQuery(Name = "type")]
+    public string? Type { get; set; }
+
+    [SupplyParameterFromQuery(Name = "date")]
+    public string? Date { get; set; }
+
+    private string DateSuffix => string.IsNullOrWhiteSpace(Date) ? string.Empty : $"&date={Date}";
+
+    private readonly List<RoomResponse> rooms = [];
+    private readonly List<RefEquipmentResponse> equipment = [];
+    private string resourceType = "room";
+    private string searchText = string.Empty;
+    private string? errorMessage;
+    private bool isLoading = true;
+
+    private IEnumerable<RoomResponse> FilteredRooms => rooms.Where(room =>
+        string.IsNullOrWhiteSpace(searchText) ||
+        room.Name.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
+        room.Location.Contains(searchText, StringComparison.OrdinalIgnoreCase));
+
+    private IEnumerable<RefEquipmentResponse> FilteredEquipment => equipment.Where(item =>
+        string.IsNullOrWhiteSpace(searchText) ||
+        item.Name.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
+        item.Category.Contains(searchText, StringComparison.OrdinalIgnoreCase));
+
+    protected override async Task OnInitializedAsync()
+    {
+        resourceType = Type == "equipment" ? "equipment" : "room";
+        try
+        {
+            var roomsTask = Api.GetRoomsAsync();
+            var equipmentTask = Api.GetRefEquipmentAsync();
+            await Task.WhenAll(roomsTask, equipmentTask);
+            rooms.Clear();
+            rooms.AddRange(await roomsTask);
+            equipment.Clear();
+            equipment.AddRange(await equipmentTask);
+        }
+        catch (HttpRequestException)
+        {
+            errorMessage = "The Event Scheduling service is unavailable.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private Task ChangeResourceTypeAsync(string key)
+    {
+        resourceType = key;
+        searchText = string.Empty;
+        Nav.NavigateTo($"/search?type={key}{DateSuffix}", replace: true);
+        return Task.CompletedTask;
+    }
+
+    private void SelectItem(int id, string name) =>
+        Nav.NavigateTo($"/book?type={resourceType}&itemId={id}&itemName={Uri.EscapeDataString(name)}{DateSuffix}");
+}

@@ -31,6 +31,36 @@ public sealed class CourseApiClient(HttpClient httpClient)
             ?? [];
     }
 
+    public async Task<StudentCourseSummary> GetStudentCourseSummaryAsync(
+        CancellationToken cancellationToken = default)
+    {
+        using var response = await httpClient.GetAsync(
+            "api/course-access/student",
+            cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+
+        return await response.Content.ReadFromJsonAsync<StudentCourseSummary>(
+                cancellationToken)
+            ?? throw new JsonException(
+                "The Course enrolment API returned an empty response.");
+    }
+
+    public async Task<StudentCourseSummary> EnrollInCourseAsync(
+        CreateCourseEnrollmentRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        using var response = await httpClient.PostAsJsonAsync(
+            "api/course-access/student/enrollments",
+            request,
+            cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+
+        return await response.Content.ReadFromJsonAsync<StudentCourseSummary>(
+                cancellationToken)
+            ?? throw new JsonException(
+                "The Course enrolment API returned an empty response.");
+    }
+
     public async Task<CourseDetail> GetByIdAsync(
         int id,
         CancellationToken cancellationToken = default)
@@ -40,6 +70,22 @@ public sealed class CourseApiClient(HttpClient httpClient)
 
         return await response.Content.ReadFromJsonAsync<CourseDetail>(cancellationToken)
             ?? throw new JsonException("The Course API returned an empty response.");
+    }
+
+    public async Task<CourseQuestionResponse> AskCourseQuestionAsync(
+        CourseQuestionRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        using var response = await httpClient.PostAsJsonAsync(
+            "api/ai/course-questions",
+            request,
+            cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+
+        return await response.Content.ReadFromJsonAsync<CourseQuestionResponse>(
+                cancellationToken)
+            ?? throw new JsonException(
+                "The Course AI API returned an empty response.");
     }
 
     public async Task<CourseSummary> CreateAsync(

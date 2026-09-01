@@ -1,0 +1,136 @@
+{
+  "schemaVersion": 3,
+  "assessmentEvidence": true,
+  "workflow": "Plan -> Act -> Observe -> Adapt -> Verify",
+  "runId": "eligibility-gated-enrolment-20260901",
+  "recordedAtUtc": "2026-09-01T09:14:57.8383723Z",
+  "goal": "Require prerequisite eligibility before Student enrolment while preserving Student 1 ownership of official enrolments.",
+  "models": [
+    {
+      "stage": "Plan and Observe",
+      "provider": "Google Gemini API",
+      "name": "Gemini 3 Flash",
+      "exactModel": "gemini-3-flash-preview"
+    },
+    {
+      "stage": "Act",
+      "provider": "Local Ollama",
+      "name": "Qwen3.8-27B",
+      "exactModel": "qwen3.8:27b"
+    }
+  ],
+  "plan": {
+    "prompt": "Plan a Student 2-only flow where Students check Course prerequisites before enrolment, the backend prevents direct API bypass, Student 1 remains the official enrolment owner, and Staff CRUD and Course AI remain unchanged.",
+    "promptRecordStatus": "The original raw PLAN prompt was not persisted. This field is a reconstructed summary of the recorded session request; the raw model output below is preserved unchanged.",
+    "rawOutput": "User journey:\nA Student browses the Course homepage to find a new course. Instead of seeing a direct \"Enrol\" button for all courses, the student sees a \"Check Eligibility\" or \"Check Prerequisites\" option. Upon clicking, the system evaluates their academic history against the course's requirements. If eligible, the \"Enrol\" button is enabled. If ineligible, the system displays the specific missing prerequisites. If a student attempts to bypass the UI and send a direct API request to enrol, the request is rejected with a validation error citing unmet prerequisites.\n\nBusiness rule:\nA student shall only be permitted to enrol in a Course if they have successfully completed all mandatory prerequisite courses defined in the Course Curriculum. Successful completion is determined by cross-referencing the student's grade history from Academic Records against the prerequisite requirements stored in Student 2.\n\nImplementation plan:\n1.  **Logic Centralization:** Refactor the existing logic from the prerequisite eligibility page into a reusable Service or Utility class within Student 2 that can be accessed by both the UI and the API.\n2.  **API Hardening:** Modify the Enrolment backend controller/service to invoke the Prerequisite validation logic. This will require fetching the student's academic history (via existing Student 1 API calls) and comparing it against the specific course requirements in the Student 2 database before processing the enrolment.\n3.  **UI Modification:** Update the Course homepage component to replace the immediate \"Enrol\" action with a conditional flow. Integrate the prerequisite check to provide immediate feedback to the student.\n4.  **Error Handling:** Implement specific error responses (e.g., HTTP 403 Forbidden or 422 Unprocessable Entity) for the enrolment API when prerequisites are not met, including a payload that lists the missing requirements.\n5.  **Preservation:** Ensure Staff CRUD operations and the Course AI features remain untouched by scoping the prerequisite check specifically to Student-initiated enrolment actions.\n\nRisks:\n-   **API Dependency:** Performance of the enrolment process will be dependent on the latency of the Student 1 API (Academic Records).\n-   **Data Synchronization:** If a student's record is updated in Student 1 but not reflected immediately in the check, they may be erroneously blocked.\n-   **Complex Prerequisites:** Highly complex \"OR\" or \"AND\" prerequisite logic might require extensive testing to ensure the validation engine handles all edge cases correctly.\n\nAcceptance criteria:\n-   The \"Enrol\" button is hidden or disabled on the Course homepage for any student who has not passed the prerequisite check.\n-   The prerequisite check accurately identifies missing courses or insufficient grades.\n-   A direct POST request to the enrolment endpoint for a course where prerequisites are not met returns a failure status and does not create an enrolment record.\n-   Staff can still manage courses and use AI features without being blocked by student-specific prerequisite logic.\n-   Students who meet all requirements can successfully enrol.\n\nVerification:\n-   **Manual UI Test:** Log in as a student, attempt to enrol in a course with unmet prerequisites, and verify the UI prevents the action and displays the reason.\n-   **API Integration Test:** Use a tool like Postman to send a raw enrolment request for a blocked course and verify a non-200 error code is returned.\n-   **Positive Test:** Log in as a student who has completed the necessary prerequisites and verify the enrolment completes successfully.\n-   **Regression Test:** Log in as Staff and ensure course editing and AI functionality remain operational.\n\nHuman decisions:\n-   Determine the minimum grade threshold required to consider a prerequisite \"completed\" (e.g., a \"Pass\" or \"C\" grade).\n-   Decide if \"In-progress\" courses should count toward prerequisite eligibility for future terms.\n-   Establish the specific error messaging to be displayed to the student when eligibility fails."
+  },
+  "act": {
+    "prompt": "You are Qwen3.8-27B, the ACT agent in Plan -> Act -> Observe -> Adapt. Return a concise C# patch blueprint. Do not apply code or claim tests ran.\n\nGoal: A Student can enrol only after prerequisite eligibility succeeds. Backend must independently recheck eligibility from completed Course code/grade evidence before calling Academic Records.\n\nExisting source map:\n1. Frontend Home.razor currently has an Enrol button calling EnrollAsync(course). Remove that button, isEnrollingCourseId state, and EnrollAsync only. Keep View, Staff Edit, enrollment status, filters, AI.\n2. PrerequisiteEligibility.razor has CourseId, course, selections, result; CheckEligibilityAsync POSTs PrerequisiteEligibilityRequest(completedCourses). With zero prerequisites it displays Eligible but result is null. It injects CourseApi and CourseUserContext.\n3. CourseApiClient has GetStudentCourseSummaryAsync(), CheckPrerequisiteEligibilityAsync(courseId, request), and EnrollInCourseAsync(CreateCourseEnrollmentRequest).\n4. Frontend CreateCourseEnrollmentRequest currently contains only string CourseCode.\n5. Backend CreateCourseEnrollmentRequest currently contains only string CourseCode.\n6. StudentCourseAccessController.CreateEnrollment validates code, obtains course via GetByCodeAsync, checks active, reads Student 1 profile for duplicates, creates Student 1 enrollment, then returns refreshed summary.\n7. ICourseCatalogueClient currently has GetByCodeAsync. CourseCatalogueResponse is (Id, Code, IsActive).\n8. Existing Student 2 database endpoint: POST api/courses/{courseId}/prerequisite-eligibility with { completedCourses:[{courseCode,grade}] }; response contains CourseId, CourseCode, IsEligible, Requirements. Zero requirements means IsEligible true.\n9. Backend must return HTTP 409 ProblemDetails title 'Prerequisites not met' if false. It must not call Academic Records in that case.\n10. Eligibility page must load Student summary. If unavailable, show error and disable enrolment. If already currently enrolled, show Enrolled. If eligibility result true, show Enrol. For zero prerequisites, call eligibility endpoint automatically or before enrolment so backend always validates.\n\nRequired implementation:\n- Add completed-course request records to frontend/backend enrollment contracts.\n- Add ICourseCatalogueClient.CheckEligibilityAsync(courseId, completedCourses, ct), CourseCatalogueClient POST implementation, typed response and response-error handling.\n- Controller order: validate course -> active -> backend eligibility -> reject 409 when false -> fetch Academic Records duplicate state -> create official enrollment.\n- Eligibility page reuses exactly the evidence sent during CheckEligibilityAsync when calling EnrollInCourseAsync; clear result when selections change.\n- Tests: eligible creates, ineligible returns 409 and Academic Records create count remains zero, eligibility-service failure maps consistently, zero-prerequisite flow, existing enrollment UI logic.\n- Student 2 only. Do not change Student 1/shared code. Preserve Staff CRUD and Course AI.\n\nOutput under 900 words with exactly:\nPlan interpretation:\nFile-by-file patch blueprint:\nTests to add or update:\nRisks or questions:",
+    "rawOutput": "Plan interpretation:\nThe goal is to enforce a strict backend gate for student enrollment. The frontend must collect prerequisite evidence (completed courses and grades) and send it with the enrollment request. The backend controller must independently verify this evidence against the course catalogue's eligibility rules before proceeding. If eligibility fails, the backend returns a 409 Conflict and strictly prevents any call to Academic Records. The frontend UI must reflect this state: disabling enrollment if eligibility is not confirmed, showing specific errors for service failures, and handling the \"zero prerequisites\" case by explicitly triggering the check. Student 1 logic and Staff features remain untouched.\n\nFile-by-file patch blueprint:\n\n1.  **Shared Contracts (Frontend & Backend)**\n    *   **`CreateCourseEnrollmentRequest`**: Add `List<CompletedCourseEvidence> CompletedCourses`.\n    *   **`CompletedCourseEvidence`**: New record/class with `string CourseCode` and `string Grade`.\n    *   **`EligibilityCheckResponse`**: New record with `bool IsEligible`, `string CourseCode`, `List<string> UnmetRequirements`.\n\n2.  **Frontend: `CourseApiClient.cs`**\n    *   Update `EnrollInCourseAsync` to accept the new `CreateCourseEnrollmentRequest` structure.\n    *   Add `CheckEligibilityAsync(int courseId, List<CompletedCourseEvidence> evidence, CancellationToken ct)`.\n    *   Implement POST to `api/courses/{courseId}/prerequisite-eligibility`.\n    *   Handle 409 responses by throwing a specific `EligibilityException` or returning a typed error result to distinguish from network errors.\n\n3.  **Frontend: `PrerequisiteEligibility.razor`**\n    *   **State**: Add `bool isEligible`, `bool isLoading`, `string error`.\n    *   **Logic**:\n        *   On `OnInitializedAsync`: Load student summary. If summary fails, set `error` and disable Enrol.\n        *   If student is already enrolled, display \"Enrolled\" and disable Enrol.\n        *   Implement `CheckAndEnrollAsync`:\n            1.  Call `CheckEligibilityAsync` with current selections.\n            2.  If `IsEligible` is false, display unmet requirements and disable Enrol.\n            3.  If `IsEligible` is true, call `EnrollInCourseAsync` passing the *same* evidence list used in the check.\n            4.  On success, update UI to \"Enrolled\".\n            5.  On 409 from Enroll (race condition or backend re-check failure), display \"Prerequisites not met\".\n    *   **UI**: Remove direct `EnrollAsync` from Home. Add \"Check Eligibility\" button (or auto-check on selection change). Show Enrol button only when `isEligible == true`.\n\n4.  **Backend: `ICourseCatalogueClient.cs`**\n    *   Add `Task<EligibilityCheckResponse> CheckEligibilityAsync(int courseId, List<CompletedCourseEvidence> evidence, CancellationToken ct)`.\n\n5.  **Backend: `CourseCatalogueClient.cs`**\n    *   Implement `CheckEligibilityAsync`:\n        *   POST to internal eligibility service or local logic endpoint.\n        *   Map response to `EligibilityCheckResponse`.\n        *   If HTTP 409, parse ProblemDetails and throw `EligibilityNotMetException` or return `IsEligible: false`.\n\n6.  **Backend: `StudentCourseAccessController.cs`**\n    *   **`CreateEnrollment` Method**:\n        1.  Validate `CourseCode` and fetch course via `GetByCodeAsync`.\n        2.  Check `IsActive`.\n        3.  **New Step**: Call `ICourseCatalogueClient.CheckEligibilityAsync(course.Id, request.CompletedCourses, ct)`.\n        4.  If `!response.IsEligible`:\n            *   Return `Conflict(new ProblemDetails { Title = \"Prerequisites not met\", Detail = string.Join(\", \", response.UnmetRequirements) })`.\n            *   **Crucial**: Do NOT proceed to Academic Records.\n        5.  Fetch Student 1 profile (existing logic) to check for duplicates.\n        6.  If duplicate, return 409 \"Already Enrolled\".\n        7.  Call Academic Records to create enrollment.\n        8.  Return refreshed summary.\n\n7.  **Backend: `Program.cs` / DI**\n    *   Ensure `ICourseCatalogueClient` is registered.\n    *   Ensure `EligibilityCheckResponse` is accessible.\n\nTests to add or update:\n\n1.  **`StudentCourseAccessControllerTests.cs`**\n    *   `CreateEnrollment_WhenEligible_CreatesEnrollment`: Mock `CheckEligibilityAsync` to return `IsEligible: true`. Mock Academic Records. Assert Academic Records called once.\n    *   `CreateEnrollment_WhenIneligible_Returns409`: Mock `CheckEligibilityAsync` to return `IsEligible: false`. Assert Academic Records **not** called. Assert response is 409 with title \"Prerequisites not met\".\n    *   `CreateEnrollment_WhenEligibilityServiceFails_Returns500`: Mock `CheckEligibilityAsync` to throw. Assert 500 response.\n    *   `CreateEnrollment_Zero",
+    "execution": {
+      "runtime": "Ollama local",
+      "sourceStayedLocal": true,
+      "successfulModelCheck": "Qwen3.8-27B ready",
+      "promptAdaptationNotes": [
+        "The first oversized context caused instruction truncation and was excluded.",
+        "A 32K full-context attempt exceeded the 20-minute HTTP timeout and was excluded.",
+        "The successful attempt used an 8K compact source map and capped output."
+      ]
+    }
+  },
+  "observe": {
+    "prompt": "Review Qwen3.8-27B's proposal against verified source facts. Identify what to keep, correct and reject. Check duplicated work, error mapping, direct-API bypass prevention, zero-prerequisite behaviour and minimum coherent scope.",
+    "rawOutput": "Keep:\n*   The backend gate logic in `StudentCourseAccessController`: re-verifying eligibility immediately before calling Academic Records.\n*   The two-step UI flow in `PrerequisiteEligibility.razor`: requiring a successful eligibility check before revealing the \"Enrol\" button.\n*   The addition of the evidence list to `CreateCourseEnrollmentRequest`.\n*   The comprehensive test cases for `StudentCourseAccessController`, specifically asserting that Academic Records is not called on eligibility failure.\n\nCorrect:\n*   Use existing types: Replace `CompletedCourseEvidence` with the existing `CompletedCourseRequest` shape and `EligibilityCheckResponse` with the existing `PrerequisiteEligibilityResult`.\n*   Collection types: Use `IReadOnlyList<CompletedCourseRequest>` for the evidence list to match project conventions.\n*   Status Codes: The eligibility service returns HTTP 200 with `IsEligible: false` for unmet prerequisites. Only the `StudentCourseAccessController.CreateEnrollment` method should return 409 Conflict if the re-check fails.\n*   Error Mapping: Ensure backend service failures (timeouts/network) map to 503/502 via `CourseCatalogueResponseException` rather than a generic 500.\n\nReject:\n*   Redundant implementation of `CheckEligibilityAsync` in `CourseApiClient`; this is already implemented.\n*   Redundant registration of `ICourseCatalogueClient` in `Program.cs`; it is already registered.\n*   Overwriting `OnInitializedAsync` in the Razor component; use the existing `OnParametersSetAsync` pattern to handle parameter updates.\n\nRecommended adaptation:\n*   **Backend Validation**: In `StudentCourseAccessController`, add a check to ensure the `CourseId` (or `CourseCode`) returned in the `PrerequisiteEligibilityResult` matches the ID of the course being enrolled in. This prevents potential bypasses where a result for one course is submitted for another.\n*   **Zero-Prerequisite Handling**: In `PrerequisiteEligibility.razor`, if the course has no prerequisites, automatically trigger `CheckEligibilityAsync` with an empty list on load to satisfy the backend gate and enable the \"Enrol\" button.\n*   **Client Update**: Update `ICourseCatalogueClient` and its implementation to include the eligibility check if it is currently only present in the frontend API client.\n\nAcceptance checks:\n*   Verify `StudentCourseAccessController` returns 409 and terminates if `IsEligible` is false.\n*   Verify Academic Records is only called after a successful `IsEligible: true` response from the internal service.\n*   Verify the \"Enrol\" button is hidden/disabled in the UI until the backend confirms eligibility, even for courses with no prerequisites.\n*   Verify that a mismatch between the requested course and the eligibility check response results in a 400 or 409 error."
+  },
+  "humanApproval": {
+    "scopeDecision": "student2_demo",
+    "scopeDecisionEvidence": "User selected: Student 2 demo flow - backend rechecks manually entered evidence.",
+    "applicationApproval": "User requested the workflow and approved improvements to be fully implemented on the new branch."
+  },
+  "adapt": {
+    "applied": true,
+    "appliedToWorkingTree": true,
+    "committedByStudent": false,
+    "temporaryCommitRemoved": "50bc159",
+    "changedFiles": [
+      "student-2/backend/CourseManagement.Backend/Clients/CourseCatalogueClient.cs",
+      "student-2/backend/CourseManagement.Backend/Clients/ICourseCatalogueClient.cs",
+      "student-2/backend/CourseManagement.Backend/Contracts/CourseAccess/StudentCourseSummaryResponse.cs",
+      "student-2/backend/CourseManagement.Backend/Controllers/StudentCourseAccessController.cs",
+      "student-2/frontend/CourseManagement.Frontend/Models/CourseEnrollmentModels.cs",
+      "student-2/frontend/CourseManagement.Frontend/Pages/Home.razor",
+      "student-2/frontend/CourseManagement.Frontend/Pages/PrerequisiteEligibility.razor",
+      "student-2/tests/CourseManagement.Tests/CourseCatalogueClientTests.cs",
+      "student-2/tests/CourseManagement.Tests/StudentCourseAccessControllerTests.cs"
+    ],
+    "summary": [
+      "Removed direct Enrol from the Course catalogue.",
+      "Revealed Enrol on the eligibility page only after a successful check.",
+      "Sent completed Course and grade evidence with the enrolment request.",
+      "Recalculated eligibility in the Student 2 backend before calling Academic Records.",
+      "Returned HTTP 409 when prerequisites were not met.",
+      "Rejected eligibility responses for a different Course.",
+      "Added regression tests for eligible, ineligible, mismatched and unavailable responses."
+    ]
+  },
+  "verify": {
+    "beforeAdaptation": [
+      {
+        "check": "Student 2 automated tests",
+        "passed": true,
+        "result": "90 passed, 0 failed"
+      },
+      {
+        "check": "Student 2 frontend build",
+        "passed": true,
+        "result": "0 warnings, 0 errors"
+      },
+      {
+        "check": "Docker Compose validation",
+        "passed": true
+      }
+    ],
+    "afterAdaptation": [
+      {
+        "check": "Student 2 automated tests",
+        "passed": true,
+        "result": "94 passed, 0 failed"
+      },
+      {
+        "check": "Student 2 frontend build",
+        "passed": true,
+        "result": "0 warnings, 0 errors"
+      },
+      {
+        "check": "Docker Compose validation",
+        "passed": true
+      },
+      {
+        "check": "Student 2 isolated container smoke and business-flow checks",
+        "passed": true,
+        "result": "Health, catalogue, Student summary, frontend, Course create/update/delete, prerequisite eligibility and official enrolment requests succeeded."
+      }
+    ]
+  },
+  "privacy": {
+    "sourceCodeSentToGemini": false,
+    "qwenRanLocally": true,
+    "apiKeysRecorded": false
+  },
+  "git": {
+    "sourceBranchAtPlanning": "JYP/ai-mode-syllabus-qa",
+    "assessmentBranch": "JYP/improvements-agentic-loop-documentation",
+    "currentBaseCommit": "aa5cb128602dff8ec743c3b07c6b63172fc52932",
+    "changesCommitted": false,
+    "temporaryCommitHashesRemoved": [
+      "74ac34a",
+      "deab0ee",
+      "50bc159",
+      "84e0be0",
+      "8470a29",
+      "1cd9cb5"
+    ],
+    "note": "The temporary local commits were removed at the student's request. The implementation and evidence remain unstaged for student review and commit."
+  },
+  "knownLimitation": "Release 0 uses manually entered completed Courses and grades. The backend verifies that the evidence satisfies prerequisite rules, but does not prove the grades are authoritative Academic Records data."
+}

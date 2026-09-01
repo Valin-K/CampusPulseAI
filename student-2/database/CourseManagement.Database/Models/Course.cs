@@ -9,6 +9,7 @@ public sealed class Course
     public int CreditPoints { get; set; }
     public int Level { get; set; }
     public bool IsActive { get; set; } = true;
+    public string GradeType { get; set; } = "Mark";
     public string? SyllabusFileName { get; set; }
 
     public ICollection<Prerequisite> Prerequisites { get; set; } = [];

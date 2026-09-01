@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - master
   pull_request:
   workflow_dispatch:
 
@@ -16,7 +17,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  student-5-validation:
+  build-test-and-smoke-test:
     name: Student 5 validation
     runs-on: campuspulse-runners
 
@@ -34,6 +35,69 @@ jobs:
             student5:
               - 'student-5/**'
 
-      - name: Placeholder validation
+      - name: No Student 5 changes
+        if: github.event_name != 'workflow_dispatch' && steps.filter.outputs.student5 != 'true'
+        run: echo "No Student 5 changes detected."
+
+      - name: Restore Student 5 projects
         if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.student5 == 'true'
-        run: echo "Student 5 validation is not implemented yet."
+        run: |
+          dotnet restore student-5/backend/EventScheduling.Backend/EventScheduling.Backend.csproj
+          dotnet restore student-5/frontend/EventScheduling.Frontend/EventScheduling.Frontend.csproj
+          dotnet restore student-5/database/EventScheduling.Database/EventScheduling.Database.csproj
+          dotnet restore student-5/tests/EventScheduling.Tests/EventScheduling.Tests.csproj
+
+      - name: Build backend
+        if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.student5 == 'true'
+        run: dotnet build student-5/backend/EventScheduling.Backend/EventScheduling.Backend.csproj --configuration Release --no-restore
+
+      - name: Build frontend
+        if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.student5 == 'true'
+        run: dotnet build student-5/frontend/EventScheduling.Frontend/EventScheduling.Frontend.csproj --configuration Release --no-restore
+
+      - name: Build database API
+        if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.student5 == 'true'
+        run: dotnet build student-5/database/EventScheduling.Database/EventScheduling.Database.csproj --configuration Release --no-restore
+
+      - name: Run NUnit tests
+        if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.student5 == 'true'
+        run: dotnet test student-5/tests/EventScheduling.Tests/EventScheduling.Tests.csproj --configuration Release --no-restore
+
+      - name: Build and start Student 5 containers
+        if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.student5 == 'true'
+        shell: bash
+        run: |
+          docker compose -p student-5-ci -f docker-compose.yml -f .github/docker-compose.student-5.ci.yml build eventscheduling.database eventscheduling.backend eventscheduling.frontend
+          docker compose -p student-5-ci -f docker-compose.yml -f .github/docker-compose.student-5.ci.yml up --detach --no-build --no-deps eventscheduling.database eventscheduling.backend eventscheduling.frontend
+
+      - name: Smoke test Student 5 containers
+        if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.student5 == 'true'
+        shell: bash
+        run: |
+          endpoints=("http://localhost:18085/health" "http://localhost:18085/api/rooms" "http://localhost:18085/api/refequipment" "http://localhost:18085/api/equipment" "http://localhost:18085/api/bookings" "http://localhost:18086/")
+          for endpoint in "${endpoints[@]}"; do
+            reachable=false
+            for attempt in {1..30}; do
+              if curl -s -f -m 5 "$endpoint" > /dev/null; then
+                reachable=true
+                break
+              fi
+              sleep 2
+            done
+            if [ "$reachable" = false ]; then
+              docker compose -p student-5-ci -f docker-compose.yml -f .github/docker-compose.student-5.ci.yml ps
+              docker compose -p student-5-ci -f docker-compose.yml -f .github/docker-compose.student-5.ci.yml logs --no-color eventscheduling.database eventscheduling.backend eventscheduling.frontend
+              echo "Container did not respond successfully: $endpoint"
+              exit 1
+            fi
+          done
+          curl -s -f -X POST http://localhost:18085/api/bookings -H 'Content-Type: application/json' -d '{"studentId":4,"roomId":2,"refEquipmentId":null,"resourceName":"CI smoke booking","startUtc":"2027-06-15T10:00:00Z","endUtc":"2027-06-15T11:00:00Z","status":1}' > /dev/null
+          curl -s -f -X PUT http://localhost:18085/api/bookings/1 -H 'Content-Type: application/json' -d '{"studentId":4,"roomId":1,"refEquipmentId":null,"resourceName":"CI smoke booking (updated)","startUtc":"2027-07-01T09:00:00Z","endUtc":"2027-07-01T10:00:00Z","status":1}' > /dev/null
+          curl -s -f -X POST http://localhost:18085/api/bookings/1/end > /dev/null
+          curl -s -f -X POST http://localhost:18085/api/bookings/8/return > /dev/null
+          curl -s -f -X DELETE http://localhost:18085/api/bookings/2 > /dev/null
+
+      - name: Remove Student 5 containers
+        if: always() && (github.event_name == 'workflow_dispatch' || steps.filter.outputs.student5 == 'true')
+        shell: bash
+        run: docker compose -p student-5-ci -f docker-compose.yml -f .github/docker-compose.student-5.ci.yml down --volumes --remove-orphans

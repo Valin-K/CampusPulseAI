@@ -1,16 +1,33 @@
-﻿@inherits LayoutComponentBase
-<div class="page">
-    <div class="sidebar">
-        <NavMenu />
-    </div>
+@inherits LayoutComponentBase
+@inject CurrentUser CurrentUser
 
-    <main>
-        <div class="top-row px-4">
-            <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
-        </div>
+<CampusShell PageName="Event &amp; Facility Scheduling"
+             SectionLabel="Campus scheduling"
+             UserName="@userName"
+             UserDetails="@userDetails"
+             UserInitials="@userInitials">
+    @Body
+</CampusShell>
 
-        <article class="content px-4">
-            @Body
-        </article>
-    </main>
-</div>
+@code {
+    private string userName = "Loading…";
+    private string userDetails = string.Empty;
+    private string userInitials = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var profile = await CurrentUser.LoadAsync();
+        if (profile is not null)
+        {
+            userName = profile.FullName;
+            userDetails = profile.StudentId ?? profile.Role;
+            userInitials = profile.Initials;
+        }
+        else
+        {
+            userName = "Unknown user";
+            userDetails = $"User {CurrentUser.UserId}";
+            userInitials = "?";
+        }
+    }
+}
