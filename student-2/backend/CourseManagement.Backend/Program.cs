@@ -26,6 +26,12 @@ builder.Services
     .Validate(
         options => !string.IsNullOrWhiteSpace(options.DemoStaffId),
         "The Course access demonstration Staff ID is required.")
+    .Validate(
+        options => options.DemoEnrollmentTermId > 0,
+        "The Course access demonstration enrolment term is required.")
+    .Validate(
+        options => options.DemoAcademicYear > 0,
+        "The Course access demonstration academic year is required.")
     .ValidateOnStart();
 var academicRecordsDatabaseAddress =
     builder.Configuration["Services:AcademicRecordsDatabase"]
@@ -50,6 +56,14 @@ builder.Services.AddHttpClient(
             courseManagementDatabaseAddress,
             UriKind.Absolute);
         client.Timeout = TimeSpan.FromSeconds(30);
+    });
+builder.Services.AddHttpClient<ICourseCatalogueClient, CourseCatalogueClient>(
+    client =>
+    {
+        client.BaseAddress = new Uri(
+            courseManagementDatabaseAddress,
+            UriKind.Absolute);
+        client.Timeout = TimeSpan.FromSeconds(5);
     });
 builder.Services.AddScoped<DatabaseApiProxy>();
 builder.Services.AddScoped<ICourseQuestionService, GeminiCourseQuestionService>();
