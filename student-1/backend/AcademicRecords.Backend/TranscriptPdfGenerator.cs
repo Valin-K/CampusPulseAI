@@ -12,6 +12,8 @@ public interface ITranscriptPdfGenerator
 
 public sealed class TranscriptPdfGenerator : ITranscriptPdfGenerator
 {
+    static TranscriptPdfGenerator() => QuestPDF.Settings.License = LicenseType.Community;
+
     public byte[] Generate(TranscriptData transcript) =>
         Document.Create(document => document.Page(page =>
         {

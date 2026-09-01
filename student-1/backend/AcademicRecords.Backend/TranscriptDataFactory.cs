@@ -6,8 +6,10 @@ public static class TranscriptDataFactory
     {
         var sourceEnrollments = profile.Enrollments ?? [];
         var subjects = sourceEnrollments.Select(CreateSubject).ToList();
-        var gradedEnrollments = sourceEnrollments.Select(enrollment =>
-            new GradedEnrollment(enrollment.GradeValue, enrollment.Credits, enrollment.IsFinalized));
+        var gradedEnrollments = sourceEnrollments
+            .Where(enrollment => IsCreditGained(enrollment.Status))
+            .Select(enrollment =>
+                new GradedEnrollment(enrollment.GradeValue, enrollment.Credits, enrollment.IsFinalized));
         var gpa = StudentStatisticsCalculator.CalculateGpa(gradedEnrollments).Value;
         var wam = StudentStatisticsCalculator.CalculateWam(gradedEnrollments).Value;
 

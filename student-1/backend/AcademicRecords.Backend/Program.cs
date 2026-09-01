@@ -166,6 +166,9 @@ static async Task<IResult> GetStudentStatisticAsync(string studentId, bool gpa, 
         return Results.Problem("The student profile response was invalid.");
     }
 
+    var courses = await GetCourseMetadataAsync(clients, cancellationToken);
+    profile = ApplyCourseMetadata(profile, courses);
+
     var enrollments = (profile.Enrollments ?? []).Select(enrollment =>
         new GradedEnrollment(enrollment.GradeValue, enrollment.Credits, enrollment.IsFinalized));
     var statistic = gpa
