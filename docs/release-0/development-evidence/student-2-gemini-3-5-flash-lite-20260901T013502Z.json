@@ -4,6 +4,17 @@
   "recordedAtUtc": "2026-09-01T01:35:41.1049589Z",
   "repository": "CampusPulseAI",
   "student": "Student 2",
+  "assessmentEvidence": false,
+  "classification": "Development evidence only",
+  "reason": "This historical run used gemini-3.5-flash-lite, which does not exactly match the registered Gemini 3 Flash model identifier gemini-3-flash-preview.",
+  "assessmentAgentPolicy": {
+    "registeredModels": [
+      "Gemini 3 Flash (gemini-3-flash-preview)",
+      "Qwen3.8-27B"
+    ],
+    "actualModel": "gemini-3.5-flash-lite",
+    "compliant": false
+  },
   "plan": {
     "goal": "Validate the redesigned Student 2 Course AI homepage and apply one approved frontend-output smoke check.",
     "focus": "implementation",

@@ -1,6 +1,17 @@
 {
   "runId": "20260901T021212Z",
   "recordedAtUtc": "2026-09-01T02:12:39.0140596Z",
+  "assessmentEvidence": false,
+  "classification": "Development evidence only",
+  "reason": "This historical run used gemini-3.5-flash-lite, which does not exactly match the registered Gemini 3 Flash model identifier gemini-3-flash-preview.",
+  "assessmentAgentPolicy": {
+    "registeredModels": [
+      "Gemini 3 Flash (gemini-3-flash-preview)",
+      "Qwen3.8-27B"
+    ],
+    "actualModel": "gemini-3.5-flash-lite",
+    "compliant": false
+  },
   "plan": {
     "goal": "Verify backward-compatible Course AI requests and the redesigned multi-Course homepage.",
     "focus": "implementation",
