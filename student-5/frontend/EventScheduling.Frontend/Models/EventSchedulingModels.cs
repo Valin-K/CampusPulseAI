@@ -11,7 +11,8 @@ public enum BookingStatus
     Pending,
     Confirmed,
     Cancelled,
-    Completed
+    Completed,
+    Overdue
 }
 
 public enum EquipmentStatus

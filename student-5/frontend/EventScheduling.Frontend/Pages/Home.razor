@@ -22,10 +22,38 @@
     <div class="notice notice-error" role="alert">@errorMessage</div>
 }
 
-<section class="metric-grid" aria-label="Booking summary">
-    <CampusMetricCard Label="Upcoming bookings" Value="@UpcomingBookingCount.ToString()" Detail="Confirmed and pending" />
-    <CampusMetricCard Label="Rooms available" Value="@rooms.Count.ToString()" Detail="Across campus" Tone="green" />
-    <CampusMetricCard Label="Equipment items" Value="@equipment.Count.ToString()" Detail="Ready to hire" Tone="gold" />
+<section class="surface-card" aria-label="Bookings needing your attention" style="margin: 1.25rem 0">
+    <div class="section-heading">
+        <div>
+            <span class="eyebrow">Today at a glance</span>
+            <h2>Today's schedule</h2>
+        </div>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="skeleton-stack"><span></span><span></span><span></span></div>
+    }
+    else if (DashboardBookings.Count == 0)
+    {
+        <p class="eyebrow">Nothing overdue, active, or scheduled for today.</p>
+    }
+    else
+    {
+        <div class="booking-strip" role="list" aria-label="Priority bookings">
+            @foreach (var entry in DashboardBookings)
+            {
+                <article class="booking-strip-card" role="listitem">
+                    <div class="booking-strip-topline">
+                        <span class="status-badge @entry.BadgeClass">@entry.BadgeLabel</span>
+                        <span class="booking-strip-kind">@(entry.Booking.ResourceType == ResourceType.Room ? "Room" : "Equipment")</span>
+                    </div>
+                    <h3>@entry.Booking.ResourceName</h3>
+                    <p class="booking-strip-meta">@entry.TimeText</p>
+                </article>
+            }
+        </div>
+    }
 </section>
 
 <section class="surface-card" aria-label="Reserve or hire">
@@ -69,37 +97,26 @@
     }
     else
     {
-        <BookingCalendar Bookings="myBookings" AnchorDate="anchorDate" ViewMode="month" OnDateSelected="GoToBooking" />
+        <BookingCalendar Bookings="myBookings" AnchorDate="anchorDate" ViewMode="month" MaxBookingsPerDay="2" ShowNavigation="false" OnDateSelected="GoToBooking" />
     }
 </section>
 
 @code {
     private const int StudentId = 5;
     private readonly List<BookingResponse> myBookings = [];
-    private readonly List<RoomResponse> rooms = [];
-    private readonly List<RefEquipmentResponse> equipment = [];
     private readonly DateOnly anchorDate = DateOnly.FromDateTime(DateTime.Today);
     private string? errorMessage;
     private bool isLoading = true;
 
-    private int UpcomingBookingCount => myBookings.Count(booking =>
-        booking.Status != BookingStatus.Cancelled && booking.StartUtc >= DateTime.Today);
+    private List<DashboardEntry> DashboardBookings => BuildDashboard();
 
     protected override async Task OnInitializedAsync()
     {
         try
         {
-            var bookingsTask = Api.GetBookingsAsync();
-            var roomsTask = Api.GetRoomsAsync();
-            var equipmentTask = Api.GetRefEquipmentAsync();
-            await Task.WhenAll(bookingsTask, roomsTask, equipmentTask);
-
+            var bookings = await Api.GetBookingsAsync();
             myBookings.Clear();
-            myBookings.AddRange((await bookingsTask).Where(booking => booking.StudentId == StudentId));
-            rooms.Clear();
-            rooms.AddRange(await roomsTask);
-            equipment.Clear();
-            equipment.AddRange(await equipmentTask);
+            myBookings.AddRange(bookings.Where(booking => booking.StudentId == StudentId));
         }
         catch (HttpRequestException)
         {
@@ -111,5 +128,73 @@
         }
     }
 
+    // Cards shown on the dashboard, ordered by priority: overdue equipment first (shown until
+    // returned, any date), then bookings active right now, then bookings still to start today.
+    private List<DashboardEntry> BuildDashboard()
+    {
+        var now = DateTime.UtcNow;
+        var today = DateOnly.FromDateTime(now);
+        var entries = new List<DashboardEntry>();
+
+        foreach (var booking in myBookings)
+        {
+            if (booking.Status == BookingStatus.Overdue)
+            {
+                entries.Add(new DashboardEntry(booking, DashboardCategory.Overdue));
+                continue;
+            }
+
+            if (booking.Status is not (BookingStatus.Pending or BookingStatus.Confirmed))
+            {
+                continue;
+            }
+
+            if (now >= booking.StartUtc && now < booking.EndUtc)
+            {
+                entries.Add(new DashboardEntry(booking, DashboardCategory.Active));
+            }
+            else if (now < booking.StartUtc && DateOnly.FromDateTime(booking.StartUtc) == today)
+            {
+                entries.Add(new DashboardEntry(booking, DashboardCategory.Upcoming));
+            }
+        }
+
+        return entries
+            .OrderBy(entry => (int)entry.Category)
+            .ThenBy(entry => entry.Category == DashboardCategory.Overdue ? entry.Booking.EndUtc : entry.Booking.StartUtc)
+            .ToList();
+    }
+
     private void GoToBooking(DateOnly date) => Nav.NavigateTo($"/book?date={date:yyyy-MM-dd}");
+
+    private enum DashboardCategory
+    {
+        Overdue,
+        Active,
+        Upcoming
+    }
+
+    private sealed record DashboardEntry(BookingResponse Booking, DashboardCategory Category)
+    {
+        public string BadgeClass => Category switch
+        {
+            DashboardCategory.Overdue => "overdue",
+            DashboardCategory.Active => "paid",
+            _ => "outstanding"
+        };
+
+        public string BadgeLabel => Category switch
+        {
+            DashboardCategory.Overdue => "Overdue",
+            DashboardCategory.Active => "Active now",
+            _ => "Upcoming today"
+        };
+
+        public string TimeText => Category switch
+        {
+            DashboardCategory.Overdue => $"Was due {Booking.EndUtc:MMM d, h:mm tt}",
+            DashboardCategory.Active => $"Ends {Booking.EndUtc:h:mm tt}",
+            _ => $"Starts {Booking.StartUtc:h:mm tt}"
+        };
+    }
 }

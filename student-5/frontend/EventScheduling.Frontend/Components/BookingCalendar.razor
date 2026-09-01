@@ -2,9 +2,15 @@
 
 <div class="booking-calendar">
     <div class="calendar-toolbar">
-        <button type="button" class="button button-secondary" @onclick="GoToPrevious">&larr; Previous</button>
+        @if (ShowNavigation)
+        {
+            <button type="button" class="button button-secondary" @onclick="GoToPrevious">&larr; Previous</button>
+        }
         <strong class="calendar-heading">@HeadingText</strong>
-        <button type="button" class="button button-secondary" @onclick="GoToNext">Next &rarr;</button>
+        @if (ShowNavigation)
+        {
+            <button type="button" class="button button-secondary" @onclick="GoToNext">Next &rarr;</button>
+        }
     </div>
 
     <div class="calendar-weekday-row">
@@ -24,10 +30,21 @@
                  role="button" tabindex="0" @onclick="() => SelectDateAsync(currentDay)">
                 <span class="calendar-day-number">@currentDay.Day</span>
                 <div class="calendar-day-bookings">
-                    @foreach (var booking in BookingsOn(currentDay))
+                    @{
+                        var dayBookings = BookingsOn(currentDay).ToList();
+                        var visibleCount = MaxBookingsPerDay ?? dayBookings.Count;
+                        var hiddenCount = dayBookings.Count - visibleCount;
+                    }
+                    @foreach (var booking in dayBookings.Take(visibleCount))
                     {
                         <span class="calendar-booking-chip status-@booking.Status.ToString().ToLowerInvariant()">
                             @booking.StartUtc.ToString("h:mmtt") &middot; @booking.ResourceName
+                        </span>
+                    }
+                    @if (hiddenCount > 0)
+                    {
+                        <span class="calendar-booking-chip calendar-booking-more">
+                            @hiddenCount more booking@(hiddenCount == 1 ? "" : "s") today
                         </span>
                     }
                 </div>
@@ -42,6 +59,14 @@
     [Parameter, EditorRequired] public IReadOnlyList<BookingResponse> Bookings { get; set; } = [];
     [Parameter, EditorRequired] public DateOnly AnchorDate { get; set; }
     [Parameter] public string ViewMode { get; set; } = "month";
+
+    // When set, days with more bookings than this show the first N plus a single "X more" chip.
+    // Null (default) shows every booking for the day.
+    [Parameter] public int? MaxBookingsPerDay { get; set; }
+
+    // Shows the Previous / Next period buttons. Disabled for the read-only dashboard calendar.
+    [Parameter] public bool ShowNavigation { get; set; } = true;
+
     [Parameter] public EventCallback<DateOnly> OnDateSelected { get; set; }
     [Parameter] public EventCallback<DateOnly> AnchorDateChanged { get; set; }
 

@@ -23,17 +23,32 @@ public sealed class Booking
         Status = request.Status;
     }
 
-    public BookingResponse ToResponse() => new(
-        Id,
-        StudentId,
-        RoomId,
-        EquipmentId,
-        RefEquipmentId,
-        RoomId.HasValue ? ResourceType.Room : ResourceType.Equipment,
-        ResourceName,
-        StartUtc,
-        EndUtc,
-        Status);
+    // Equipment can be hired for at most this long before it is considered overdue.
+    public static readonly TimeSpan MaxEquipmentHire = TimeSpan.FromDays(7);
+
+    public BookingResponse ToResponse()
+    {
+        var status = Status;
+
+        if (status is BookingStatus.Pending or BookingStatus.Confirmed
+            && EquipmentId is not null
+            && DateTime.UtcNow > EndUtc)
+        {
+            status = BookingStatus.Overdue;
+        }
+
+        return new(
+            Id,
+            StudentId,
+            RoomId,
+            EquipmentId,
+            RefEquipmentId,
+            RoomId.HasValue ? ResourceType.Room : ResourceType.Equipment,
+            ResourceName,
+            StartUtc,
+            EndUtc,
+            status);
+    }
 }
 
 public enum ResourceType
@@ -47,7 +62,8 @@ public enum BookingStatus
     Pending,
     Confirmed,
     Cancelled,
-    Completed
+    Completed,
+    Overdue
 }
 
 public sealed record BookingRequest(
@@ -66,6 +82,11 @@ public sealed record BookingRequest(
             return "Student ID must be greater than zero.";
         }
 
+        if (Status == BookingStatus.Overdue)
+        {
+            return "Overdue is a derived status and cannot be set directly.";
+        }
+
         if (RoomId.HasValue == RefEquipmentId.HasValue)
         {
             return "Exactly one of room or equipment type must be specified.";
@@ -79,6 +100,11 @@ public sealed record BookingRequest(
         if (EndUtc <= StartUtc)
         {
             return "End time must be after the start time.";
+        }
+
+        if (RefEquipmentId.HasValue && EndUtc - StartUtc > Booking.MaxEquipmentHire)
+        {
+            return "Equipment can be hired for a maximum of 7 days.";
         }
 
         return null;

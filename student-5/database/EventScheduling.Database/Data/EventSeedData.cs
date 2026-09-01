@@ -32,8 +32,8 @@ public static class EventSeedData
 
         if (!await database.Equipment.AnyAsync())
         {
-            // Units held by an active seed booking (bookings 3, 8 and 5 below) start Occupied.
-            var occupiedUnitIds = new HashSet<int> { 1, 21, 44 };
+            // Units held by an active/overdue seed booking (bookings 3, 5, 8, 11, 12 below) start Occupied.
+            var occupiedUnitIds = new HashSet<int> { 1, 2, 13, 21, 44 };
             var unitTypes = new[]
             {
                 (RefEquipmentId: 1, SerialPrefix: "HDMI", Count: 12),
@@ -71,7 +71,15 @@ public static class EventSeedData
                 EquipmentBooking(8, refEquipmentId: 1, equipmentId: 1, "HDMI Adapter", new(2026, 9, 15, 9, 0, 0, DateTimeKind.Utc), new(2026, 9, 15, 10, 0, 0, DateTimeKind.Utc), BookingStatus.Confirmed),
                 RoomBooking(9, 1, "Study Room 101", new(2026, 9, 21, 10, 0, 0, DateTimeKind.Utc), new(2026, 9, 21, 12, 0, 0, DateTimeKind.Utc), BookingStatus.Confirmed),
                 // Cancelled equipment booking: unit already released (EquipmentId null), RefEquipmentId kept for history.
-                ReleasedEquipmentBooking(10, refEquipmentId: 4, "Whiteboard Markers Kit", new(2026, 9, 28, 12, 0, 0, DateTimeKind.Utc), new(2026, 9, 28, 13, 0, 0, DateTimeKind.Utc), BookingStatus.Cancelled));
+                ReleasedEquipmentBooking(10, refEquipmentId: 4, "Whiteboard Markers Kit", new(2026, 9, 28, 12, 0, 0, DateTimeKind.Utc), new(2026, 9, 28, 13, 0, 0, DateTimeKind.Utc), BookingStatus.Cancelled),
+                // Overdue: hired 2026-08-25, was due back 2026-08-27, still holding unit CHG-001 -> reported as Overdue.
+                EquipmentBooking(11, refEquipmentId: 2, equipmentId: 13, "Laptop Charger", new(2026, 8, 25, 9, 0, 0, DateTimeKind.Utc), new(2026, 8, 27, 17, 0, 0, DateTimeKind.Utc), BookingStatus.Confirmed),
+                // Active today: an all-day HDMI adapter hire holding unit HDMI-002.
+                EquipmentBooking(12, refEquipmentId: 1, equipmentId: 2, "HDMI Adapter", new(2026, 9, 1, 8, 0, 0, DateTimeKind.Utc), new(2026, 9, 1, 20, 0, 0, DateTimeKind.Utc), BookingStatus.Confirmed),
+                // Extra bookings scheduled for today so the dashboard strip overflows and scrolls.
+                RoomBooking(13, 1, "Study Room 101", new(2026, 9, 1, 6, 0, 0, DateTimeKind.Utc), new(2026, 9, 1, 18, 0, 0, DateTimeKind.Utc), BookingStatus.Confirmed),
+                RoomBooking(14, 2, "Study Room 204", new(2026, 9, 1, 15, 0, 0, DateTimeKind.Utc), new(2026, 9, 1, 16, 0, 0, DateTimeKind.Utc), BookingStatus.Confirmed),
+                RoomBooking(15, 4, "Silent Study Room 3B", new(2026, 9, 1, 18, 0, 0, DateTimeKind.Utc), new(2026, 9, 1, 19, 0, 0, DateTimeKind.Utc), BookingStatus.Pending));
         }
 
         await database.SaveChangesAsync();

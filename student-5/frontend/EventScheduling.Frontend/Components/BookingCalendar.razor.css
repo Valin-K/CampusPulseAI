@@ -114,6 +114,18 @@
     color: var(--university-navy);
 }
 
+.calendar-booking-chip.status-overdue {
+    background: rgba(180, 35, 24, .16);
+    color: var(--university-danger);
+    font-weight: 700;
+}
+
+.calendar-booking-chip.calendar-booking-more {
+    background: transparent;
+    color: var(--university-muted);
+    font-weight: 700;
+}
+
 @media (max-width: 720px) {
     .calendar-weekday-row span:nth-child(n) {
         font-size: .65rem;

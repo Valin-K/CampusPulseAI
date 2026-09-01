@@ -302,11 +302,16 @@ equipment.MapDelete("/{id:int}", async (int id, EventSchedulingDbContext databas
 var bookings = app.MapGroup("/api/bookings");
 
 bookings.MapGet("/", async (EventSchedulingDbContext database, CancellationToken cancellationToken) =>
-    await database.Bookings
+{
+    // Materialise first: ToResponse() derives the "Overdue" status from the wall clock,
+    // which cannot run inside a LINQ-to-SQL projection.
+    var all = await database.Bookings
         .AsNoTracking()
         .OrderBy(booking => booking.StartUtc)
-        .Select(booking => booking.ToResponse())
-        .ToListAsync(cancellationToken));
+        .ToListAsync(cancellationToken);
+
+    return all.Select(booking => booking.ToResponse()).ToList();
+});
 
 bookings.MapGet("/{id:int}", async (int id, EventSchedulingDbContext database, CancellationToken cancellationToken) =>
 {
