@@ -1,7 +1,49 @@
-﻿@page "/"
+@page "/"
+@using CampusHousing.Frontend.Models
+@inject HttpClient Http
 
-<PageTitle>Campus Housing</PageTitle>
+<PageTitle>The Residence | Campus Housing</PageTitle>
 
-<h1>Campus Housing</h1>
+<header class="housing-header">
+    <div><span class="eyebrow">THE RESIDENCE</span><h1>Campus housing & maintenance</h1><p>Book a room, find a compatible roommate, and keep your home in good repair.</p></div>
+    <div class="status-pill">@(loading ? "Loading..." : "Residence services online")</div>
+</header>
 
-<p>This is Jack's page. Under construction!</p>
+@if (!string.IsNullOrWhiteSpace(message)) { <div class="notice">@message</div> }
+<div class="housing-grid">
+    <section class="card-panel">
+        <h2>Book a dorm room</h2><p class="muted">Live availability is checked before every booking.</p>
+        <label>Student name <input @bind="studentName" /></label>
+        <label>Student ID <input @bind="studentId" /></label>
+        <label>Room <select @bind="roomId"><option value="0">Choose an available room</option>@foreach (var room in rooms.Where(r => r.IsAvailable && r.OccupiedBeds < r.Capacity)) { <option value="@room.Id">@room.Building @room.RoomNumber · @(room.Capacity - room.OccupiedBeds) bed(s) free</option> }</select></label>
+        <label>Roommate preference <input @bind="roommatePreference" placeholder="Quiet, social, any..." /></label>
+        <button @onclick="BookRoom" disabled="@busy">Request allocation</button>
+    </section>
+    <section class="card-panel accent-panel">
+        <h2>Report a maintenance issue</h2><p class="muted">The AI assistant categorizes urgency and routes your request.</p>
+        <label>Issue description <textarea @bind="description" rows="5" placeholder="e.g. The heater is broken and the room is very cold"></textarea></label>
+        <label>Your student ID <input @bind="ticketStudentId" /></label>
+        <button @onclick="SubmitTicket" disabled="@busy">Submit request</button>
+    </section>
+</div>
+
+<section class="card-panel table-panel"><h2>Room availability</h2><div class="room-cards">@foreach (var room in rooms) { <div class="room-card"><strong>@room.Building @room.RoomNumber</strong><span>@room.OccupiedBeds / @room.Capacity occupied</span><span class="@(room.IsAvailable && room.OccupiedBeds < room.Capacity ? "available" : "full")">@(room.IsAvailable && room.OccupiedBeds < room.Capacity ? "Available" : "Full")</span></div> }</div></section>
+
+<section class="card-panel table-panel"><h2>My allocations</h2>@if (allocations.Count == 0) { <p class="muted">No allocations yet.</p> } else { <table><thead><tr><th>Student</th><th>Room</th><th>Roommate preference</th><th></th></tr></thead><tbody>@foreach (var allocation in allocations) { <tr><td>@allocation.StudentName<br /><small>@allocation.StudentId</small></td><td>@RoomName(allocation.DormRoomId)</td><td><input class="inline-input" @bind="allocation.RoommatePreference" /></td><td><button class="link-button" @onclick="() => UpdateAllocation(allocation)">Save</button> <button class="link-button danger" @onclick="() => CancelAllocation(allocation.Id)">Cancel</button></td></tr> }</tbody></table> }</section>
+
+<section class="card-panel table-panel"><h2>Maintenance requests</h2>@if (tickets.Count == 0) { <p class="muted">No requests submitted.</p> } else { <table><thead><tr><th>Request</th><th>AI severity</th><th>Repair queue</th><th>Status</th><th></th></tr></thead><tbody>@foreach (var ticket in tickets) { <tr><td>@ticket.Description<br /><small>@ticket.StudentId · @ticket.CreatedAt.ToLocalTime().ToString("g")</small></td><td><span class="severity @ticket.Severity.ToLowerInvariant()">@ticket.Severity</span></td><td>@ticket.RepairQueue</td><td><select class="status-select" value="@ticket.Status" @onchange="e => ChangeStatus(ticket, e.Value?.ToString())"><option>Open</option><option>In Progress</option><option>Resolved</option></select></td><td><button class="link-button danger" @onclick="() => DeleteTicket(ticket.Id)">Delete</button></td></tr> }</tbody></table> }</section>
+
+@code {
+    private List<DormRoom> rooms = []; private List<HousingAllocation> allocations = []; private List<MaintenanceTicket> tickets = [];
+    private int roomId; private string studentName = "", studentId = "", ticketStudentId = "", roommatePreference = "", description = "", message = ""; private bool loading = true, busy;
+    protected override async Task OnInitializedAsync() => await Load();
+    private async Task Load() { try { rooms = await Http.GetFromJsonAsync<List<DormRoom>>("api/housing/rooms") ?? []; allocations = await Http.GetFromJsonAsync<List<HousingAllocation>>("api/housing/allocations") ?? []; tickets = await Http.GetFromJsonAsync<List<MaintenanceTicket>>("api/housing/tickets") ?? []; } catch (Exception ex) { message = $"Residence API unavailable: {ex.Message}"; } finally { loading = false; } }
+    private string RoomName(int id) => rooms.FirstOrDefault(r => r.Id == id) is { } room ? $"{room.Building} {room.RoomNumber}" : $"Room {id}";
+    private async Task BookRoom() { if (roomId == 0 || string.IsNullOrWhiteSpace(studentId) || string.IsNullOrWhiteSpace(studentName)) { message = "Choose a room and provide your student details."; return; } await Send(HttpMethod.Post, "api/housing/allocations", new { DormRoomId = roomId, StudentId = studentId, StudentName = studentName, RoommatePreference = roommatePreference }, "Room allocation submitted."); }
+    private async Task SubmitTicket() { if (string.IsNullOrWhiteSpace(ticketStudentId) || string.IsNullOrWhiteSpace(description)) { message = "Student ID and issue description are required."; return; } await Send(HttpMethod.Post, "api/housing/tickets", new { StudentId = ticketStudentId, Description = description }, "Request routed successfully."); if (string.IsNullOrEmpty(message) || message == "Request routed successfully.") description = ""; }
+    private async Task UpdateAllocation(HousingAllocation a) => await Send(HttpMethod.Put, $"api/housing/allocations/{a.Id}", new { a.StudentId, a.StudentName, a.RoommatePreference }, "Roommate preference updated.");
+    private async Task CancelAllocation(int id) => await Send(HttpMethod.Delete, $"api/housing/allocations/{id}", null, "Allocation cancelled.");
+    private async Task ChangeStatus(MaintenanceTicket t, string? status) => await Send(HttpMethod.Put, $"api/housing/tickets/{t.Id}", new { Status = status }, "Ticket status updated.");
+    private async Task DeleteTicket(int id) => await Send(HttpMethod.Delete, $"api/housing/tickets/{id}", null, "Maintenance ticket deleted.");
+    private async Task Send(HttpMethod method, string url, object? body, string success) { busy = true; try { using var request = new HttpRequestMessage(method, url); if (body is not null) request.Content = JsonContent.Create(body); using var response = await Http.SendAsync(request); message = response.IsSuccessStatusCode ? success : await response.Content.ReadAsStringAsync(); } catch (Exception ex) { message = ex.Message; } finally { busy = false; await Load(); } }
+}
