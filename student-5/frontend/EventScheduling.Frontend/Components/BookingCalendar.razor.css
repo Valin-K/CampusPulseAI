@@ -109,6 +109,11 @@
     text-decoration: line-through;
 }
 
+.calendar-booking-chip.status-completed {
+    background: rgba(16, 42, 67, .1);
+    color: var(--university-navy);
+}
+
 @media (max-width: 720px) {
     .calendar-weekday-row span:nth-child(n) {
         font-size: .65rem;

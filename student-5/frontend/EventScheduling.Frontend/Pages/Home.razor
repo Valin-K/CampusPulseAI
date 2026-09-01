@@ -77,7 +77,7 @@
     private const int StudentId = 5;
     private readonly List<BookingResponse> myBookings = [];
     private readonly List<RoomResponse> rooms = [];
-    private readonly List<EquipmentResponse> equipment = [];
+    private readonly List<RefEquipmentResponse> equipment = [];
     private readonly DateOnly anchorDate = DateOnly.FromDateTime(DateTime.Today);
     private string? errorMessage;
     private bool isLoading = true;
@@ -91,7 +91,7 @@
         {
             var bookingsTask = Api.GetBookingsAsync();
             var roomsTask = Api.GetRoomsAsync();
-            var equipmentTask = Api.GetEquipmentAsync();
+            var equipmentTask = Api.GetRefEquipmentAsync();
             await Task.WhenAll(bookingsTask, roomsTask, equipmentTask);
 
             myBookings.Clear();

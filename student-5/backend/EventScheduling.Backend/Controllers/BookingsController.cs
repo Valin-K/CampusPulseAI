@@ -37,6 +37,13 @@ public sealed class BookingsController(IHttpClientFactory httpClientFactory) : C
         return await response.ToActionResultAsync(cancellationToken);
     }
 
+    [HttpPost("{id:int}/return")]
+    public async Task<IActionResult> Return(int id, CancellationToken cancellationToken)
+    {
+        var response = await DatabaseClient.PostAsync($"/api/bookings/{id}/return", content: null, cancellationToken);
+        return await response.ToActionResultAsync(cancellationToken);
+    }
+
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> Delete(int id, CancellationToken cancellationToken)
     {

@@ -36,7 +36,7 @@
             @foreach (var item in FilteredEquipment)
             {
                 <article class="scholarship-card">
-                    <div class="card-topline"><span class="status-badge paid">@item.Category</span><strong>@item.QuantityAvailable available</strong></div>
+                    <div class="card-topline"><span class="status-badge paid">@item.Category</span><strong>@item.AvailableCount available</strong></div>
                     <h3>@item.Name</h3>
                     <p>@item.Description</p>
                     <div class="button-row">
@@ -83,7 +83,7 @@
     public string? Type { get; set; }
 
     private readonly List<RoomResponse> rooms = [];
-    private readonly List<EquipmentResponse> equipment = [];
+    private readonly List<RefEquipmentResponse> equipment = [];
     private string resourceType = "room";
     private string searchText = string.Empty;
     private string? errorMessage;
@@ -94,7 +94,7 @@
         room.Name.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
         room.Location.Contains(searchText, StringComparison.OrdinalIgnoreCase));
 
-    private IEnumerable<EquipmentResponse> FilteredEquipment => equipment.Where(item =>
+    private IEnumerable<RefEquipmentResponse> FilteredEquipment => equipment.Where(item =>
         string.IsNullOrWhiteSpace(searchText) ||
         item.Name.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
         item.Category.Contains(searchText, StringComparison.OrdinalIgnoreCase));
@@ -105,7 +105,7 @@
         try
         {
             var roomsTask = Api.GetRoomsAsync();
-            var equipmentTask = Api.GetEquipmentAsync();
+            var equipmentTask = Api.GetRefEquipmentAsync();
             await Task.WhenAll(roomsTask, equipmentTask);
             rooms.Clear();
             rooms.AddRange(await roomsTask);

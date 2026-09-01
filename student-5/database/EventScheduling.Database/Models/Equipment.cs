@@ -3,43 +3,47 @@ namespace EventScheduling.Database.Models;
 public sealed class Equipment
 {
     public int Id { get; set; }
-    public string Name { get; set; } = string.Empty;
-    public string Category { get; set; } = string.Empty;
-    public string Description { get; set; } = string.Empty;
-    public int QuantityAvailable { get; set; }
+    public int RefEquipmentId { get; set; }
+    public string SerialNumber { get; set; } = string.Empty;
+    public EquipmentStatus Status { get; set; }
+    public int? CreatedByStaffId { get; set; }
 
     public void UpdateFrom(EquipmentRequest request)
     {
-        Name = request.Name.Trim();
-        Category = request.Category.Trim();
-        Description = request.Description.Trim();
-        QuantityAvailable = request.QuantityAvailable;
+        RefEquipmentId = request.RefEquipmentId;
+        SerialNumber = request.SerialNumber.Trim();
+        Status = request.Status;
+        CreatedByStaffId = request.CreatedByStaffId;
     }
 
-    public EquipmentResponse ToResponse() => new(Id, Name, Category, Description, QuantityAvailable);
+    public EquipmentResponse ToResponse() =>
+        new(Id, RefEquipmentId, SerialNumber, Status, CreatedByStaffId);
+}
+
+public enum EquipmentStatus
+{
+    AVL,
+    OCC,
+    MTC,
+    RET
 }
 
 public sealed record EquipmentRequest(
-    string Name,
-    string Category,
-    string Description,
-    int QuantityAvailable)
+    int RefEquipmentId,
+    string SerialNumber,
+    EquipmentStatus Status,
+    int? CreatedByStaffId)
 {
     public string? Validate()
     {
-        if (string.IsNullOrWhiteSpace(Name) || Name.Trim().Length > 120)
+        if (RefEquipmentId <= 0)
         {
-            return "Name is required and must be 120 characters or fewer.";
+            return "A valid equipment type is required.";
         }
 
-        if (string.IsNullOrWhiteSpace(Category) || Category.Trim().Length > 80)
+        if (string.IsNullOrWhiteSpace(SerialNumber) || SerialNumber.Trim().Length > 80)
         {
-            return "Category is required and must be 80 characters or fewer.";
-        }
-
-        if (QuantityAvailable < 0)
-        {
-            return "Quantity available cannot be negative.";
+            return "Serial number is required and must be 80 characters or fewer.";
         }
 
         return null;
@@ -47,16 +51,16 @@ public sealed record EquipmentRequest(
 
     public Equipment ToEquipment() => new()
     {
-        Name = Name.Trim(),
-        Category = Category.Trim(),
-        Description = Description.Trim(),
-        QuantityAvailable = QuantityAvailable
+        RefEquipmentId = RefEquipmentId,
+        SerialNumber = SerialNumber.Trim(),
+        Status = Status,
+        CreatedByStaffId = CreatedByStaffId
     };
 }
 
 public sealed record EquipmentResponse(
     int Id,
-    string Name,
-    string Category,
-    string Description,
-    int QuantityAvailable);
+    int RefEquipmentId,
+    string SerialNumber,
+    EquipmentStatus Status,
+    int? CreatedByStaffId);

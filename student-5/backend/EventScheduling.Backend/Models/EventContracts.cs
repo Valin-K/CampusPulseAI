@@ -15,18 +15,38 @@ public sealed record RoomResponse(
     int Capacity,
     string Description);
 
-public sealed record EquipmentRequest(
+public sealed record RefEquipmentRequest(
     string Name,
     string Category,
-    string Description,
-    int QuantityAvailable);
+    string Description);
 
-public sealed record EquipmentResponse(
+public sealed record RefEquipmentResponse(
     int Id,
     string Name,
     string Category,
     string Description,
-    int QuantityAvailable);
+    int AvailableCount);
+
+public enum EquipmentStatus
+{
+    AVL,
+    OCC,
+    MTC,
+    RET
+}
+
+public sealed record EquipmentRequest(
+    int RefEquipmentId,
+    string SerialNumber,
+    EquipmentStatus Status,
+    int? CreatedByStaffId);
+
+public sealed record EquipmentResponse(
+    int Id,
+    int RefEquipmentId,
+    string SerialNumber,
+    EquipmentStatus Status,
+    int? CreatedByStaffId);
 
 public enum ResourceType
 {
@@ -38,13 +58,14 @@ public enum BookingStatus
 {
     Pending,
     Confirmed,
-    Cancelled
+    Cancelled,
+    Completed
 }
 
 public sealed record BookingRequest(
     int StudentId,
-    ResourceType ResourceType,
-    int ResourceId,
+    int? RoomId,
+    int? RefEquipmentId,
     string ResourceName,
     DateTime StartUtc,
     DateTime EndUtc,
@@ -53,8 +74,10 @@ public sealed record BookingRequest(
 public sealed record BookingResponse(
     int Id,
     int StudentId,
+    int? RoomId,
+    int? EquipmentId,
+    int? RefEquipmentId,
     ResourceType ResourceType,
-    int ResourceId,
     string ResourceName,
     DateTime StartUtc,
     DateTime EndUtc,

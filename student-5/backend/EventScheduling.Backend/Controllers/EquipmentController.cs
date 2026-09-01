@@ -12,7 +12,7 @@ public sealed class EquipmentController(IHttpClientFactory httpClientFactory) : 
     [HttpGet]
     public async Task<IActionResult> GetAll(CancellationToken cancellationToken)
     {
-        var response = await DatabaseClient.GetAsync("/api/equipment", cancellationToken);
+        var response = await DatabaseClient.GetAsync($"/api/equipment{Request.QueryString}", cancellationToken);
         return await response.ToActionResultAsync(cancellationToken);
     }
 

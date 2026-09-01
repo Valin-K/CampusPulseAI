@@ -4,8 +4,9 @@ public sealed class Booking
 {
     public int Id { get; set; }
     public int StudentId { get; set; }
-    public ResourceType ResourceType { get; set; }
-    public int ResourceId { get; set; }
+    public int? RoomId { get; set; }
+    public int? EquipmentId { get; set; }
+    public int? RefEquipmentId { get; set; }
     public string ResourceName { get; set; } = string.Empty;
     public DateTime StartUtc { get; set; }
     public DateTime EndUtc { get; set; }
@@ -14,15 +15,25 @@ public sealed class Booking
     public void UpdateFrom(BookingRequest request)
     {
         StudentId = request.StudentId;
-        ResourceType = request.ResourceType;
-        ResourceId = request.ResourceId;
+        RoomId = request.RoomId;
+        RefEquipmentId = request.RefEquipmentId;
         ResourceName = request.ResourceName.Trim();
         StartUtc = request.StartUtc;
         EndUtc = request.EndUtc;
         Status = request.Status;
     }
 
-    public BookingResponse ToResponse() => new(Id, StudentId, ResourceType, ResourceId, ResourceName, StartUtc, EndUtc, Status);
+    public BookingResponse ToResponse() => new(
+        Id,
+        StudentId,
+        RoomId,
+        EquipmentId,
+        RefEquipmentId,
+        RoomId.HasValue ? ResourceType.Room : ResourceType.Equipment,
+        ResourceName,
+        StartUtc,
+        EndUtc,
+        Status);
 }
 
 public enum ResourceType
@@ -35,13 +46,14 @@ public enum BookingStatus
 {
     Pending,
     Confirmed,
-    Cancelled
+    Cancelled,
+    Completed
 }
 
 public sealed record BookingRequest(
     int StudentId,
-    ResourceType ResourceType,
-    int ResourceId,
+    int? RoomId,
+    int? RefEquipmentId,
     string ResourceName,
     DateTime StartUtc,
     DateTime EndUtc,
@@ -52,6 +64,11 @@ public sealed record BookingRequest(
         if (StudentId <= 0)
         {
             return "Student ID must be greater than zero.";
+        }
+
+        if (RoomId.HasValue == RefEquipmentId.HasValue)
+        {
+            return "Exactly one of room or equipment type must be specified.";
         }
 
         if (string.IsNullOrWhiteSpace(ResourceName) || ResourceName.Trim().Length > 120)
@@ -70,8 +87,8 @@ public sealed record BookingRequest(
     public Booking ToBooking() => new()
     {
         StudentId = StudentId,
-        ResourceType = ResourceType,
-        ResourceId = ResourceId,
+        RoomId = RoomId,
+        RefEquipmentId = RefEquipmentId,
         ResourceName = ResourceName.Trim(),
         StartUtc = StartUtc,
         EndUtc = EndUtc,
@@ -82,8 +99,10 @@ public sealed record BookingRequest(
 public sealed record BookingResponse(
     int Id,
     int StudentId,
+    int? RoomId,
+    int? EquipmentId,
+    int? RefEquipmentId,
     ResourceType ResourceType,
-    int ResourceId,
     string ResourceName,
     DateTime StartUtc,
     DateTime EndUtc,
