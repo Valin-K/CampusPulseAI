@@ -128,7 +128,9 @@ app.MapGet("/api/students/{studentId}/transcript.pdf", async (string studentId, 
         return Results.Problem("The student profile response was invalid.");
     }
 
-    var pdf = pdfGenerator.Generate(new TranscriptData(profile.StudentId, profile.FirstName, profile.LastName));
+    var courses = await GetCourseMetadataAsync(clients, cancellationToken);
+    profile = ApplyCourseMetadata(profile, courses);
+    var pdf = pdfGenerator.Generate(TranscriptDataFactory.Create(profile, DateTime.Now));
     return Results.File(pdf, "application/pdf", $"transcript-{profile.StudentId}.pdf");
 });
 
@@ -189,42 +191,42 @@ static async Task<IResult> ForwardStudentResponseAsync(
         return Results.Content(content, mediaType, statusCode: (int)response.StatusCode);
     }
 
-    var courses = await GetCourseCreditsAsync(clients, cancellationToken);
+    var courses = await GetCourseMetadataAsync(clients, cancellationToken);
     var document = JsonNode.Parse(content);
     if (document is JsonArray students)
     {
         foreach (var student in students.OfType<JsonObject>())
         {
-            AddCourseCredits(student, courses);
+            AddCourseMetadata(student, courses);
         }
     }
     else if (document is JsonObject student)
     {
-        AddCourseCredits(student, courses);
+        AddCourseMetadata(student, courses);
     }
 
     return Results.Content(document?.ToJsonString() ?? content, mediaType, statusCode: (int)response.StatusCode);
 }
 
-static async Task<IReadOnlyDictionary<string, int>> GetCourseCreditsAsync(
+static async Task<IReadOnlyDictionary<string, CourseMetadataResponse>> GetCourseMetadataAsync(
     IHttpClientFactory clients,
     CancellationToken cancellationToken)
 {
     try
     {
         var courses = await clients.CreateClient("courseManagementDatabase")
-            .GetFromJsonAsync<CourseCreditResponse[]>("/api/courses", cancellationToken);
+            .GetFromJsonAsync<CourseMetadataResponse[]>("/api/courses", cancellationToken);
 
-        return courses?.ToDictionary(course => course.Code, course => course.CreditPoints, StringComparer.OrdinalIgnoreCase)
-            ?? new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        return courses?.ToDictionary(course => course.Code, StringComparer.OrdinalIgnoreCase)
+            ?? new Dictionary<string, CourseMetadataResponse>(StringComparer.OrdinalIgnoreCase);
     }
     catch (HttpRequestException)
     {
-        return new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        return new Dictionary<string, CourseMetadataResponse>(StringComparer.OrdinalIgnoreCase);
     }
 }
 
-static void AddCourseCredits(JsonObject student, IReadOnlyDictionary<string, int> courses)
+static void AddCourseMetadata(JsonObject student, IReadOnlyDictionary<string, CourseMetadataResponse> courses)
 {
     if (student["enrollments"] is not JsonArray enrollments)
     {
@@ -234,13 +236,36 @@ static void AddCourseCredits(JsonObject student, IReadOnlyDictionary<string, int
     foreach (var enrollment in enrollments.OfType<JsonObject>())
     {
         var courseCode = enrollment["courseCode"]?.GetValue<string>();
-        enrollment["credits"] = courseCode is not null && courses.TryGetValue(courseCode, out var creditPoints)
-            ? creditPoints
+        enrollment["credits"] = courseCode is not null && courses.TryGetValue(courseCode, out var course)
+            ? course.CreditPoints
+            : null;
+        enrollment["courseTitle"] = courseCode is not null && courses.TryGetValue(courseCode, out course)
+            ? course.Name
             : null;
     }
 }
 
-public sealed record CourseCreditResponse(string Code, int CreditPoints);
+static StudentStatisticsProfile ApplyCourseMetadata(
+    StudentStatisticsProfile profile,
+    IReadOnlyDictionary<string, CourseMetadataResponse> courses) =>
+    profile with
+    {
+        Enrollments = profile.Enrollments?.Select(enrollment =>
+        {
+            if (courses.TryGetValue(enrollment.CourseCode, out var course))
+            {
+                return enrollment with
+                {
+                    CourseTitle = course.Name,
+                    Credits = course.CreditPoints
+                };
+            }
+
+            return enrollment;
+        }).ToList()
+    };
+
+public sealed record CourseMetadataResponse(string Code, string Name, int CreditPoints);
 
 public sealed record UserResponse(
     int UserId,
@@ -251,10 +276,32 @@ public sealed record UserResponse(
     string? StudentId,
     string? StaffId);
 
-public sealed record StudentStatisticsProfile(string StudentId, List<StudentStatisticsEnrollment>? Enrollments,
-    string? FirstName = null, string? LastName = null);
+public sealed record StudentStatisticsProfile
+{
+    public string StudentId { get; init; } = string.Empty;
+    public List<StudentStatisticsEnrollment>? Enrollments { get; init; }
+    public string? FirstName { get; init; }
+    public string? LastName { get; init; }
+    public string? DegreeCode { get; init; }
+    public string? Degree { get; init; }
+    public string? Status { get; init; }
+    public string? Major { get; init; }
+    public string? SubMajor { get; init; }
+}
 
-public sealed record StudentStatisticsEnrollment(decimal? Credits, decimal? GradeValue, bool IsFinalized);
+public sealed record StudentStatisticsEnrollment
+{
+    public string CourseCode { get; init; } = string.Empty;
+    public string? CourseTitle { get; init; }
+    public string? TermCode { get; init; }
+    public string? TermName { get; init; }
+    public int AcademicYear { get; init; }
+    public string Status { get; init; } = string.Empty;
+    public string? GradeType { get; init; }
+    public decimal? Credits { get; init; }
+    public decimal? GradeValue { get; init; }
+    public bool IsFinalized { get; init; }
+}
 
 public sealed record StudentStatisticResponse(
     string StudentId,
