@@ -452,6 +452,6 @@ if ($null -ne $runError) {
     exit 1
 }
 
-if ($checksBefore.Where({ !$_.passed }).Count -gt 0) {
+if ($checksBefore.Where({ !$_.passed }).Count -gt 0 -and !$ApplyApprovedPatch) {
     exit 1
 }

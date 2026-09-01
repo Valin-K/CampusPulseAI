@@ -4,11 +4,12 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>EventScheduling.Frontend</title>
+    <meta name="theme-color" content="#0b263d" />
+    <title>Event &amp; Facility Scheduling | CampusPulse</title>
     <base href="/" />
     <link rel="preload" id="webassembly" />
-    <link rel="stylesheet" href="lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="css/app.css" />
+    <link rel="stylesheet" href="css/university-theme.css" />
     <link rel="icon" type="image/png" href="favicon.png" />
     <link href="EventScheduling.Frontend.styles.css" rel="stylesheet" />
     <script type="importmap"></script>
@@ -16,11 +17,10 @@
 
 <body>
     <div id="app">
-        <svg class="loading-progress">
-            <circle r="40%" cx="50%" cy="50%" />
-            <circle r="40%" cx="50%" cy="50%" />
-        </svg>
-        <div class="loading-progress-text"></div>
+        <div class="app-loading" role="status">
+            <span class="app-loading-mark" aria-hidden="true">CP</span>
+            <span><strong>CampusPulse</strong><small>Opening your scheduling workspace</small></span>
+        </div>
     </div>
 
     <div id="blazor-error-ui">
@@ -28,6 +28,8 @@
         <a href="." class="reload">Reload</a>
         <span class="dismiss">🗙</span>
     </div>
+    <script src="js/campus-nav-bar.js"></script>
+    <script src="js/university-ui.js"></script>
     <script src="_framework/blazor.webassembly.js"></script>
 </body>
 
