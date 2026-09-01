@@ -119,6 +119,46 @@ public sealed class CourseManagementDbContextTests
         });
     }
 
+    [Test]
+    public async Task SchemaUpgradeAddsMarkGradeTypeToExistingCourses()
+    {
+        await using var connection = new SqliteConnection(
+            "Data Source=:memory:;Foreign Keys=True");
+        await connection.OpenAsync();
+
+        await using (var command = connection.CreateCommand())
+        {
+            command.CommandText =
+                """
+                CREATE TABLE "Courses" (
+                    "Id" INTEGER NOT NULL CONSTRAINT "PK_Courses" PRIMARY KEY AUTOINCREMENT,
+                    "Code" TEXT NOT NULL,
+                    "Name" TEXT NOT NULL,
+                    "Description" TEXT NOT NULL,
+                    "CreditPoints" INTEGER NOT NULL,
+                    "Level" INTEGER NOT NULL,
+                    "IsActive" INTEGER NOT NULL,
+                    "SyllabusFileName" TEXT NULL
+                );
+                INSERT INTO "Courses"
+                    ("Code", "Name", "Description", "CreditPoints", "Level", "IsActive")
+                VALUES
+                    ('CPAI5000', 'Existing Course', 'Created before GradeType existed.', 6, 5, 1);
+                """;
+            await command.ExecuteNonQueryAsync();
+        }
+
+        var options = new DbContextOptionsBuilder<CourseManagementDbContext>()
+            .UseSqlite(connection)
+            .Options;
+        await using var database = new CourseManagementDbContext(options);
+
+        await CourseManagementSchema.EnsureCurrentAsync(database);
+
+        var course = await database.Courses.SingleAsync();
+        Assert.That(course.GradeType, Is.EqualTo("Mark"));
+    }
+
     static Course CreateCourse(string code)
     {
         return new Course

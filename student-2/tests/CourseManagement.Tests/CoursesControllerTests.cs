@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using CourseManagement.Backend.BusinessRules;
 using CourseManagement.Backend.Contracts.Courses;
 using CourseManagement.Backend.Controllers;
 using CourseManagement.Database.Data;
@@ -28,6 +29,7 @@ public sealed class CoursesControllerTests
             Assert.That(course.Code, Is.EqualTo("CPAI5000"));
             Assert.That(course.Name, Is.EqualTo("Test Course"));
             Assert.That(course.IsActive, Is.True);
+            Assert.That(course.GradeType, Is.EqualTo(CourseGradeTypes.Mark));
         });
     }
 
@@ -50,6 +52,8 @@ public sealed class CoursesControllerTests
     {
         await using var context = await CourseTestContext.CreateAsync();
         var course = await AddCourseAsync(context.Database, "CPAI5000");
+        course.GradeType = CourseGradeTypes.Ungraded;
+        await context.Database.SaveChangesAsync();
         var request = CreateRequest("CPAI5001");
         request.Name = "Updated Course";
         request.Level = 5;
@@ -68,7 +72,65 @@ public sealed class CoursesControllerTests
             Assert.That(updatedCourse!.Code, Is.EqualTo("CPAI5001"));
             Assert.That(updatedCourse.Name, Is.EqualTo("Updated Course"));
             Assert.That(updatedCourse.Level, Is.EqualTo(5));
+            Assert.That(updatedCourse.GradeType, Is.EqualTo(CourseGradeTypes.Ungraded));
         });
+    }
+
+    [Test]
+    public async Task GetAllAndGetByIdIncludeCourseGradeType()
+    {
+        await using var context = await CourseTestContext.CreateAsync();
+        var course = await AddCourseAsync(context.Database, "CPAI5000");
+        course.GradeType = CourseGradeTypes.PassFail;
+        await context.Database.SaveChangesAsync();
+
+        var allResult = await context.Controller.GetAll(CancellationToken.None);
+        var allResponse = (IReadOnlyList<CourseResponse>)((OkObjectResult)allResult.Result!).Value!;
+
+        var detailResult = await context.Controller.GetById(
+            course.Id,
+            CancellationToken.None);
+        var detailResponse = (CourseDetailResponse)((OkObjectResult)detailResult.Result!).Value!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(allResponse.Single().GradeType, Is.EqualTo(CourseGradeTypes.PassFail));
+            Assert.That(detailResponse.GradeType, Is.EqualTo(CourseGradeTypes.PassFail));
+        });
+    }
+
+    [Test]
+    public async Task SetGradeTypeNormalizesAndPersistsSupportedValue()
+    {
+        await using var context = await CourseTestContext.CreateAsync();
+        var course = await AddCourseAsync(context.Database, "CPAI5000");
+
+        var result = await context.Controller.SetGradeType(
+            course.Id,
+            new CourseGradeTypeRequest { GradeType = " pass/fail " },
+            CancellationToken.None);
+
+        var response = (CourseResponse)((OkObjectResult)result.Result!).Value!;
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.GradeType, Is.EqualTo(CourseGradeTypes.PassFail));
+            Assert.That(course.GradeType, Is.EqualTo(CourseGradeTypes.PassFail));
+        });
+    }
+
+    [Test]
+    public async Task SetGradeTypeRejectsUnsupportedValue()
+    {
+        await using var context = await CourseTestContext.CreateAsync();
+        var course = await AddCourseAsync(context.Database, "CPAI5000");
+
+        var result = await context.Controller.SetGradeType(
+            course.Id,
+            new CourseGradeTypeRequest { GradeType = "Letter" },
+            CancellationToken.None);
+
+        Assert.That(result.Result, Is.TypeOf<BadRequestObjectResult>());
+        Assert.That(course.GradeType, Is.EqualTo(CourseGradeTypes.Mark));
     }
 
     [Test]

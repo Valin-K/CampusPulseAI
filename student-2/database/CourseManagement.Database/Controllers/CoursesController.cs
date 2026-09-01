@@ -30,6 +30,7 @@ public sealed class CoursesController(
                 course.CreditPoints,
                 course.Level,
                 course.IsActive,
+                course.GradeType,
                 course.SyllabusFileName))
             .ToListAsync(cancellationToken);
 
@@ -133,6 +134,35 @@ public sealed class CoursesController(
         }
 
         course.IsActive = request.IsActive.Value;
+        await database.SaveChangesAsync(cancellationToken);
+
+        return Ok(ToResponse(course));
+    }
+
+    [HttpPut("{id:int}/grade-type")]
+    public async Task<ActionResult<CourseResponse>> SetGradeType(
+        int id,
+        CourseGradeTypeRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!CourseGradeTypes.TryNormalize(request.GradeType, out var gradeType))
+        {
+            return BadRequest(new ProblemDetails
+            {
+                Status = StatusCodes.Status400BadRequest,
+                Title = "Invalid Course grade type",
+                Detail = $"Grade type '{request.GradeType}' is not supported. " +
+                    "Use Mark, Pass/Fail, or Ungraded."
+            });
+        }
+
+        var course = await database.Courses.FindAsync([id], cancellationToken);
+        if (course is null)
+        {
+            return NotFoundProblem(id);
+        }
+
+        course.GradeType = gradeType;
         await database.SaveChangesAsync(cancellationToken);
 
         return Ok(ToResponse(course));
@@ -328,6 +358,7 @@ public sealed class CoursesController(
             course.CreditPoints,
             course.Level,
             course.IsActive,
+            course.GradeType,
             course.SyllabusFileName);
     }
 
@@ -365,6 +396,7 @@ public sealed class CoursesController(
             course.CreditPoints,
             course.Level,
             course.IsActive,
+            course.GradeType,
             course.SyllabusFileName,
             prerequisites,
             assignments);

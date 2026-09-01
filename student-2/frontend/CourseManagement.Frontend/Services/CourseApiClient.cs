@@ -31,6 +31,36 @@ public sealed class CourseApiClient(HttpClient httpClient)
             ?? [];
     }
 
+    public async Task<StudentCourseSummary> GetStudentCourseSummaryAsync(
+        CancellationToken cancellationToken = default)
+    {
+        using var response = await httpClient.GetAsync(
+            "api/course-access/student",
+            cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+
+        return await response.Content.ReadFromJsonAsync<StudentCourseSummary>(
+                cancellationToken)
+            ?? throw new JsonException(
+                "The Course enrolment API returned an empty response.");
+    }
+
+    public async Task<StudentCourseSummary> EnrollInCourseAsync(
+        CreateCourseEnrollmentRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        using var response = await httpClient.PostAsJsonAsync(
+            "api/course-access/student/enrollments",
+            request,
+            cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+
+        return await response.Content.ReadFromJsonAsync<StudentCourseSummary>(
+                cancellationToken)
+            ?? throw new JsonException(
+                "The Course enrolment API returned an empty response.");
+    }
+
     public async Task<CourseDetail> GetByIdAsync(
         int id,
         CancellationToken cancellationToken = default)
