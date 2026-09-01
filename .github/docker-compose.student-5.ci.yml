@@ -1,0 +1,8 @@
+services:
+  eventscheduling.backend:
+    ports:
+      - "18085:8080"
+
+  eventscheduling.frontend:
+    ports:
+      - "18086:80"
