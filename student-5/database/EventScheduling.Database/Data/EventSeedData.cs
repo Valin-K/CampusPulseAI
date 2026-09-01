@@ -5,7 +5,8 @@ namespace EventScheduling.Database.Data;
 
 public static class EventSeedData
 {
-    private const int StudentId = 5;
+    // Academic Records (student-1) UserId of the demo student every seed booking belongs to.
+    private const int StudentId = 4;
 
     public static async Task InitializeAsync(EventSchedulingDbContext database)
     {

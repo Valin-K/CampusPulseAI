@@ -10,5 +10,6 @@ builder.RootComponents.Add<HeadOutlet>("head::after");
 var backendUrl = builder.Configuration["BackendUrl"] ?? "http://localhost:8090";
 builder.Services.AddScoped(_ => new HttpClient { BaseAddress = new Uri(backendUrl) });
 builder.Services.AddScoped<EventSchedulingApiClient>();
+builder.Services.AddScoped<CurrentUser>();
 
 await builder.Build().RunAsync();

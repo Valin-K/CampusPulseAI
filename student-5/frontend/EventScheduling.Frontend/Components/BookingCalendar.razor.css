@@ -120,6 +120,11 @@
     font-weight: 700;
 }
 
+.calendar-booking-chip.status-returned {
+    background: rgba(124, 58, 237, .16);
+    color: #6d28d9;
+}
+
 .calendar-booking-chip.calendar-booking-more {
     background: transparent;
     color: var(--university-muted);
