@@ -1,3 +1,4 @@
+using EventScheduling.Backend.Clients;
 using EventScheduling.Backend.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -14,6 +15,12 @@ builder.Services.AddHttpClient("eventDatabase", client =>
 {
     client.BaseAddress = new Uri(builder.Configuration["Services:EventDatabase"] ?? "http://eventscheduling.database:8080");
 }).AddHttpMessageHandler<DatabaseStartupRetryHandler>();
+
+builder.Services.AddHttpClient<IAcademicRecordsClient, AcademicRecordsClient>(client =>
+{
+    client.BaseAddress = new Uri(builder.Configuration["Services:AcademicRecordsDatabase"]
+        ?? "http://academicrecords.database:8080");
+});
 
 var app = builder.Build();
 

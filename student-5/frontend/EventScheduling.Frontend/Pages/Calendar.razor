@@ -1,5 +1,6 @@
 @page "/calendar"
 @inject EventSchedulingApiClient Api
+@inject CurrentUser CurrentUser
 @inject NavigationManager Nav
 
 <PageTitle>My Calendar | Event & Facility Scheduling</PageTitle>
@@ -27,7 +28,7 @@
     else
     {
         <BookingCalendar Bookings="myBookings" AnchorDate="anchorDate" AnchorDateChanged="date => anchorDate = date"
-                          ViewMode="@viewMode" OnDateSelected="GoToBooking" />
+                          ViewMode="@viewMode" OnDateSelected="GoToDay" />
     }
 </section>
 
@@ -60,7 +61,6 @@
 </section>
 
 @code {
-    private const int StudentId = 5;
     private static readonly IReadOnlyList<CampusTabItem> viewModes =
     [
         new("month", "Month", "Full month grid"),
@@ -82,7 +82,7 @@
         {
             var bookings = await Api.GetBookingsAsync();
             myBookings.Clear();
-            myBookings.AddRange(bookings.Where(booking => booking.StudentId == StudentId));
+            myBookings.AddRange(bookings.Where(booking => booking.StudentId == CurrentUser.UserId));
         }
         catch (HttpRequestException)
         {
@@ -94,5 +94,5 @@
         }
     }
 
-    private void GoToBooking(DateOnly date) => Nav.NavigateTo($"/book?date={date:yyyy-MM-dd}");
+    private void GoToDay(DateOnly date) => Nav.NavigateTo($"/day/{date:yyyy-MM-dd}");
 }

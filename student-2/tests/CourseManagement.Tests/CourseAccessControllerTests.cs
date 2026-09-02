@@ -179,5 +179,16 @@ public sealed class CourseAccessControllerTests
             exception is null
                 ? Task.FromResult(users!)
                 : Task.FromException<IReadOnlyList<AcademicRecordsUserResponse>>(exception);
+
+        public Task<AcademicRecordsStudentResponse> GetStudentAsync(
+            string studentId,
+            CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+
+        public Task CreateEnrollmentAsync(
+            string studentId,
+            AcademicRecordsEnrollmentRequest request,
+            CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
     }
 }

@@ -18,4 +18,5 @@ public sealed record PrerequisiteSummary(
     string CourseCode,
     int RequiredCourseId,
     string RequiredCourseCode,
+    string RequiredCourseName,
     string? MinimumGrade);

@@ -206,7 +206,9 @@ else if (course is not null)
                         @foreach (var prerequisite in course.Prerequisites)
                         {
                             <tr>
-                                <td>@prerequisite.RequiredCourseCode</td>
+                                <td>
+                                    @prerequisite.RequiredCourseCode - @prerequisite.RequiredCourseName
+                                </td>
                                 <td>@(prerequisite.MinimumGrade ?? "Pass")</td>
                                 @if (UserContext.IsCourseAdministrator)
                                 {
