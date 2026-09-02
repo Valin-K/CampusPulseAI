@@ -227,6 +227,7 @@ public sealed class PrerequisitesController(CourseManagementDbContext database) 
             prerequisite.Course.Code,
             prerequisite.RequiredCourseId,
             prerequisite.RequiredCourse.Code,
+            prerequisite.RequiredCourse.Name,
             prerequisite.MinimumGrade);
     }
 }
