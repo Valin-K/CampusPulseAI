@@ -20,4 +20,5 @@ public sealed record PrerequisiteResponse(
     string CourseCode,
     int RequiredCourseId,
     string RequiredCourseCode,
+    string RequiredCourseName,
     string? MinimumGrade);

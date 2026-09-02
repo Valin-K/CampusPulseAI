@@ -53,6 +53,9 @@ public sealed class PrerequisitesControllerTests
                 response.Prerequisites[0].RequiredCourseCode,
                 Is.EqualTo(requiredCourse.Code));
             Assert.That(
+                response.Prerequisites[0].RequiredCourseName,
+                Is.EqualTo(requiredCourse.Name));
+            Assert.That(
                 response.Prerequisites[0].MinimumGrade,
                 Is.EqualTo("Credit"));
         });

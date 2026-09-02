@@ -372,6 +372,7 @@ public sealed class CoursesController(
                 course.Code,
                 prerequisite.RequiredCourseId,
                 prerequisite.RequiredCourse.Code,
+                prerequisite.RequiredCourse.Name,
                 prerequisite.MinimumGrade))
             .ToList();
 
