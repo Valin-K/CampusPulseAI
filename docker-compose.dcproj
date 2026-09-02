@@ -8,7 +8,7 @@
     <DockerServiceUrl>http://localhost:8081</DockerServiceUrl>
     <DockerServiceName>academicrecords.frontend</DockerServiceName>
     <DockerDevelopmentMode>Regular</DockerDevelopmentMode>
-    <DockerComposeProjectsToIgnore>student-2\frontend\CourseManagement.Frontend\CourseManagement.Frontend.csproj;student-2\database\CourseManagement.Database\CourseManagement.Database.csproj</DockerComposeProjectsToIgnore>
+    <DockerComposeProjectsToIgnore>student-2\frontend\CourseManagement.Frontend\CourseManagement.Frontend.csproj</DockerComposeProjectsToIgnore>
   </PropertyGroup>
   <ItemGroup>
     <None Include=".github\docker-compose.student-4.ci.yml" />
