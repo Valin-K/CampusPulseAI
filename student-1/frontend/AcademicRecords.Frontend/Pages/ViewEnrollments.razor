@@ -204,7 +204,13 @@ else
 
     private static string FormatStatistic(decimal? value) => value?.ToString("0.00", CultureInfo.InvariantCulture) ?? "N/A";
 
-    private string GetTranscriptUrl() => $"api/students/{Uri.EscapeDataString(studentId!)}/transcript.pdf";
+    private string GetTranscriptUrl()
+    {
+        var baseAddress = Http.BaseAddress
+            ?? throw new InvalidOperationException("The Academic Records API base address is not configured.");
+        var relativeUrl = $"api/students/{Uri.EscapeDataString(studentId!)}/transcript.pdf";
+        return new Uri(baseAddress, relativeUrl).ToString();
+    }
 
     private static DateOnly? GetTermEndDate(int academicYear, int startWeekOfYear, int endWeekOfYear)
     {
