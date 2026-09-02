@@ -1,0 +1,14 @@
+.booking-hint {
+    margin: .1rem 0 .35rem;
+    font-size: .85rem;
+    font-weight: 700;
+    color: var(--university-muted);
+}
+
+.booking-hint.is-ok {
+    color: var(--university-success);
+}
+
+.booking-hint.is-bad {
+    color: var(--university-danger);
+}

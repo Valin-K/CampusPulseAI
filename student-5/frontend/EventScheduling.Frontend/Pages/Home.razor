@@ -1,5 +1,6 @@
 @page "/"
 @inject EventSchedulingApiClient Api
+@inject CurrentUser CurrentUser
 @inject NavigationManager Nav
 
 <PageTitle>Event & Facility Scheduling</PageTitle>
@@ -12,8 +13,8 @@
     </div>
     <div class="term-summary">
         <span>Current profile</span>
-        <strong>Jordan Lee</strong>
-        <small>Student ID 5</small>
+        <strong>@(profile?.FullName ?? "…")</strong>
+        <small>@(profile is null ? "" : (profile.StudentId is null ? profile.Role : $"Student {profile.StudentId}"))</small>
     </div>
 </header>
 
@@ -97,14 +98,14 @@
     }
     else
     {
-        <BookingCalendar Bookings="myBookings" AnchorDate="anchorDate" ViewMode="month" MaxBookingsPerDay="2" ShowNavigation="false" OnDateSelected="GoToBooking" />
+        <BookingCalendar Bookings="myBookings" AnchorDate="anchorDate" ViewMode="month" MaxBookingsPerDay="2" ShowNavigation="false" OnDateSelected="GoToDay" />
     }
 </section>
 
 @code {
-    private const int StudentId = 5;
     private readonly List<BookingResponse> myBookings = [];
     private readonly DateOnly anchorDate = DateOnly.FromDateTime(DateTime.Today);
+    private UserProfile? profile;
     private string? errorMessage;
     private bool isLoading = true;
 
@@ -112,11 +113,12 @@
 
     protected override async Task OnInitializedAsync()
     {
+        profile = await CurrentUser.LoadAsync();
         try
         {
             var bookings = await Api.GetBookingsAsync();
             myBookings.Clear();
-            myBookings.AddRange(bookings.Where(booking => booking.StudentId == StudentId));
+            myBookings.AddRange(bookings.Where(booking => booking.StudentId == CurrentUser.UserId));
         }
         catch (HttpRequestException)
         {
@@ -132,7 +134,9 @@
     // returned, any date), then bookings active right now, then bookings still to start today.
     private List<DashboardEntry> BuildDashboard()
     {
-        var now = DateTime.UtcNow;
+        // Booking times are treated as wall-clock throughout this app (displayed without
+        // conversion), so "now" must be local time too - not DateTime.UtcNow.
+        var now = DateTime.Now;
         var today = DateOnly.FromDateTime(now);
         var entries = new List<DashboardEntry>();
 
@@ -165,7 +169,7 @@
             .ToList();
     }
 
-    private void GoToBooking(DateOnly date) => Nav.NavigateTo($"/book?date={date:yyyy-MM-dd}");
+    private void GoToDay(DateOnly date) => Nav.NavigateTo($"/day/{date:yyyy-MM-dd}");
 
     private enum DashboardCategory
     {

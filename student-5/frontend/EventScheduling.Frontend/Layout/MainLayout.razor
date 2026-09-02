@@ -1,9 +1,33 @@
 @inherits LayoutComponentBase
+@inject CurrentUser CurrentUser
 
 <CampusShell PageName="Event &amp; Facility Scheduling"
              SectionLabel="Campus scheduling"
-             UserName="Jordan Lee"
-             UserDetails="Student 5"
-             UserInitials="JL">
+             UserName="@userName"
+             UserDetails="@userDetails"
+             UserInitials="@userInitials">
     @Body
 </CampusShell>
+
+@code {
+    private string userName = "Loading…";
+    private string userDetails = string.Empty;
+    private string userInitials = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var profile = await CurrentUser.LoadAsync();
+        if (profile is not null)
+        {
+            userName = profile.FullName;
+            userDetails = profile.StudentId ?? profile.Role;
+            userInitials = profile.Initials;
+        }
+        else
+        {
+            userName = "Unknown user";
+            userDetails = $"User {CurrentUser.UserId}";
+            userInitials = "?";
+        }
+    }
+}
