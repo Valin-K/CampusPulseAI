@@ -15,5 +15,6 @@ WORKDIR /app
 EXPOSE 8080
 COPY --from=build /app/publish .
 COPY student-3/database/CampusHousing.Database/docker-entrypoint.sh /usr/local/bin/campus-housing-database-entrypoint
-RUN chmod +x /usr/local/bin/campus-housing-database-entrypoint
+RUN sed -i 's/\r$//' /usr/local/bin/campus-housing-database-entrypoint \
+	&& chmod +x /usr/local/bin/campus-housing-database-entrypoint
 ENTRYPOINT ["/usr/local/bin/campus-housing-database-entrypoint"]
