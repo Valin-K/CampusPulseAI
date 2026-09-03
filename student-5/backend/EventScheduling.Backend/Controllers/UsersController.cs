@@ -7,25 +7,55 @@ namespace EventScheduling.Backend.Controllers;
 [Route("api/users")]
 public sealed class UsersController(IAcademicRecordsClient academicRecords) : ControllerBase
 {
+    private static readonly int[] SelectableUserIds = [4, 14];
+
+    [HttpGet]
+    public async Task<IActionResult> GetAll(CancellationToken cancellationToken)
+    {
+        var users = await TryGetUsersAsync(cancellationToken);
+        if (users is null)
+        {
+            return AcademicRecordsUnavailable();
+        }
+
+        var selectable = SelectableUserIds
+            .Select(id => users.FirstOrDefault(candidate => candidate.UserId == id))
+            .OfType<AcademicRecordsUser>()
+            .ToList();
+
+        return Ok(selectable);
+    }
+
     [HttpGet("{userId:int}")]
     public async Task<IActionResult> GetById(int userId, CancellationToken cancellationToken)
     {
-        IReadOnlyList<AcademicRecordsUser> users;
-        try
+        var users = await TryGetUsersAsync(cancellationToken);
+        if (users is null)
         {
-            users = await academicRecords.GetUsersAsync(cancellationToken);
-        }
-        catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException)
-        {
-            return StatusCode(StatusCodes.Status503ServiceUnavailable, new ProblemDetails
-            {
-                Status = StatusCodes.Status503ServiceUnavailable,
-                Title = "Academic Records unavailable",
-                Detail = "The user directory could not be reached."
-            });
+            return AcademicRecordsUnavailable();
         }
 
         var user = users.FirstOrDefault(candidate => candidate.UserId == userId);
         return user is null ? NotFound() : Ok(user);
     }
+
+    private async Task<IReadOnlyList<AcademicRecordsUser>?> TryGetUsersAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await academicRecords.GetUsersAsync(cancellationToken);
+        }
+        catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException)
+        {
+            return null;
+        }
+    }
+
+    private ObjectResult AcademicRecordsUnavailable() =>
+        StatusCode(StatusCodes.Status503ServiceUnavailable, new ProblemDetails
+        {
+            Status = StatusCodes.Status503ServiceUnavailable,
+            Title = "Academic Records unavailable",
+            Detail = "The user directory could not be reached."
+        });
 }
