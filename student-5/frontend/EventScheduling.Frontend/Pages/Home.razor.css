@@ -1,0 +1,102 @@
+.resource-tile {
+    display: grid;
+    justify-items: start;
+    gap: .35rem;
+    padding: 1.15rem;
+    border: 1px solid var(--university-border);
+    border-radius: var(--radius-md);
+    background: var(--university-surface);
+    color: var(--university-ink);
+    cursor: pointer;
+    text-align: left;
+    transition: box-shadow .15s ease, border-color .15s ease;
+}
+
+.resource-tile:hover,
+.resource-tile:focus-visible {
+    border-color: var(--university-blue);
+    box-shadow: var(--shadow-sm);
+    outline: none;
+}
+
+.resource-tile svg {
+    color: var(--university-blue);
+}
+
+.resource-tile strong {
+    font-size: 1rem;
+    color: var(--university-navy);
+}
+
+.resource-tile span {
+    font-size: .85rem;
+    color: var(--university-muted);
+}
+
+.booking-strip {
+    display: flex;
+    gap: 1rem;
+    overflow-x: auto;
+    padding: .25rem .25rem 1rem;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+}
+
+.booking-strip-card {
+    flex: 0 0 15.5rem;
+    scroll-snap-align: start;
+    display: flex;
+    flex-direction: column;
+    gap: .5rem;
+    padding: 1.1rem;
+    border: 1px solid var(--university-border);
+    border-radius: var(--radius-md);
+    background: var(--university-surface);
+    box-shadow: var(--shadow-sm);
+}
+
+.booking-strip-topline {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .5rem;
+}
+
+.booking-strip-kind {
+    font-size: .7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: var(--university-muted);
+}
+
+/* "In use" pill for an equipment hire that is currently running. */
+.booking-strip-topline .status-badge.inuse {
+    color: var(--university-blue);
+    background: var(--university-sky);
+}
+
+.booking-strip-card h3 {
+    margin: 0;
+}
+
+.booking-strip-meta {
+    margin: 0;
+    font-size: .82rem;
+    color: var(--university-muted);
+}
+
+.booking-strip-actions {
+    margin-top: auto;
+    display: flex;
+    justify-content: flex-end;
+    padding-top: .35rem;
+}
+
+/* Smaller than the day-schedule cards to suit the narrow strip card. */
+.booking-strip-actions .button {
+    min-height: 1.95rem;
+    padding: .3rem .7rem;
+    font-size: .78rem;
+    font-weight: 750;
+}

@@ -1,0 +1,143 @@
+.booking-calendar {
+    display: grid;
+    gap: .75rem;
+}
+
+.calendar-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75rem;
+}
+
+.calendar-heading {
+    font-size: 1.05rem;
+    color: var(--university-navy);
+}
+
+.calendar-weekday-row {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: .4rem;
+    font-size: .78rem;
+    font-weight: 700;
+    color: var(--university-muted);
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    padding: 0 .1rem;
+}
+
+.calendar-weekday-row span {
+    text-align: center;
+}
+
+.calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: .4rem;
+}
+
+.calendar-day {
+    min-height: 4.5rem;
+    padding: .45rem;
+    border: 1px solid var(--university-border);
+    border-radius: var(--radius-sm);
+    background: var(--university-surface);
+    cursor: pointer;
+    display: grid;
+    gap: .3rem;
+    align-content: start;
+    transition: box-shadow .15s ease, border-color .15s ease;
+}
+
+.calendar-grid-week .calendar-day {
+    min-height: 8rem;
+}
+
+.calendar-day:hover,
+.calendar-day:focus-visible {
+    border-color: var(--university-blue);
+    box-shadow: var(--shadow-sm);
+    outline: none;
+}
+
+.calendar-day.outside-month {
+    opacity: .45;
+}
+
+.calendar-day.is-today {
+    border-color: var(--university-gold);
+    background: var(--university-sky);
+}
+
+.calendar-day-number {
+    font-weight: 700;
+    font-size: .85rem;
+    color: var(--university-ink);
+}
+
+.calendar-day-bookings {
+    display: grid;
+    gap: .2rem;
+}
+
+.calendar-booking-chip {
+    font-size: .68rem;
+    line-height: 1.2;
+    padding: .2rem .4rem;
+    border-radius: .4rem;
+    background: var(--university-sky);
+    color: var(--university-navy);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.calendar-booking-chip.status-confirmed {
+    background: rgba(20, 125, 100, .14);
+    color: var(--university-success);
+}
+
+.calendar-booking-chip.status-pending {
+    background: rgba(244, 185, 66, .18);
+    color: #8a5b00;
+}
+
+.calendar-booking-chip.status-cancelled {
+    background: rgba(180, 35, 24, .12);
+    color: var(--university-danger);
+    text-decoration: line-through;
+}
+
+.calendar-booking-chip.status-completed {
+    background: rgba(16, 42, 67, .1);
+    color: var(--university-navy);
+}
+
+.calendar-booking-chip.status-overdue {
+    background: rgba(180, 35, 24, .16);
+    color: var(--university-danger);
+    font-weight: 700;
+}
+
+.calendar-booking-chip.status-returned {
+    background: rgba(124, 58, 237, .16);
+    color: #6d28d9;
+}
+
+.calendar-booking-chip.calendar-booking-more {
+    background: transparent;
+    color: var(--university-muted);
+    font-weight: 700;
+}
+
+@media (max-width: 720px) {
+    .calendar-weekday-row span:nth-child(n) {
+        font-size: .65rem;
+    }
+
+    .calendar-day {
+        min-height: 3.5rem;
+        padding: .3rem;
+    }
+}

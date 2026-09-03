@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - master
   pull_request:
   workflow_dispatch:
 
@@ -16,9 +17,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  student-2-validation:
+  build-test-and-smoke-test:
     name: Student 2 validation
-    runs-on: campuspulse-runners
+    runs-on: ubuntu-latest
 
     steps:
       - name: Check out source
@@ -33,7 +34,109 @@ jobs:
           filters: |
             student2:
               - 'student-2/**'
+              - 'shared/frontend/CampusPulse.Shared.Components/**'
+              - 'Directory.Packages.props'
+              - 'docker-compose.yml'
+              - '.github/docker-compose.student-2.ci.yml'
+              - '.github/student-2-ci-appsettings.json'
+              - '.github/workflows/student-2-ci.yml'
 
-      - name: Placeholder validation
+      - name: No Student 2 changes
+        if: github.event_name != 'workflow_dispatch' && steps.filter.outputs.student2 != 'true'
+        run: echo "No Student 2 changes detected."
+
+      - name: Restore Student 2 projects
         if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.student2 == 'true'
-        run: echo "Student 2 validation is not implemented yet."
+        run: |
+          dotnet restore student-2/backend/CourseManagement.Backend/CourseManagement.Backend.csproj
+          dotnet restore student-2/frontend/CourseManagement.Frontend/CourseManagement.Frontend.csproj
+          dotnet restore student-2/database/CourseManagement.Database/CourseManagement.Database.csproj
+          dotnet restore student-2/tests/CourseManagement.Tests/CourseManagement.Tests.csproj
+
+      - name: Build backend
+        if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.student2 == 'true'
+        run: dotnet build student-2/backend/CourseManagement.Backend/CourseManagement.Backend.csproj --configuration Release --no-restore
+
+      - name: Build frontend
+        if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.student2 == 'true'
+        run: dotnet build student-2/frontend/CourseManagement.Frontend/CourseManagement.Frontend.csproj --configuration Release --no-restore
+
+      - name: Build database API
+        if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.student2 == 'true'
+        run: dotnet build student-2/database/CourseManagement.Database/CourseManagement.Database.csproj --configuration Release --no-restore
+
+      - name: Run NUnit tests
+        if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.student2 == 'true'
+        run: dotnet test student-2/tests/CourseManagement.Tests/CourseManagement.Tests.csproj --configuration Release --no-restore
+
+      - name: Build and start Student 2 containers
+        if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.student2 == 'true'
+        shell: bash
+        run: |
+          cp .github/student-2-ci-appsettings.json student-2/frontend/CourseManagement.Frontend/wwwroot/appsettings.json
+          docker compose -p student-2-ci -f docker-compose.yml -f .github/docker-compose.student-2.ci.yml build academicrecords.database coursemanagement.database coursemanagement.backend coursemanagement.frontend
+          docker compose -p student-2-ci -f docker-compose.yml -f .github/docker-compose.student-2.ci.yml up --detach --no-build academicrecords.database coursemanagement.database coursemanagement.backend coursemanagement.frontend
+
+      - name: Smoke test Student 2 containers
+        if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.student2 == 'true'
+        shell: bash
+        run: |
+          endpoints=(
+            "http://localhost:15118/health"
+            "http://localhost:15118/api/courses"
+            "http://localhost:15118/api/course-access/student"
+            "http://localhost:15120/health"
+            "http://localhost:18082/"
+          )
+
+          for endpoint in "${endpoints[@]}"; do
+            reachable=false
+            for attempt in {1..30}; do
+              if curl -s -f -m 5 "$endpoint" > /dev/null; then
+                reachable=true
+                break
+              fi
+              sleep 2
+            done
+
+            if [ "$reachable" = false ]; then
+              echo "Container did not respond successfully: $endpoint"
+              exit 1
+            fi
+          done
+
+          created_course=$(curl -s -f -X POST http://localhost:15118/api/courses \
+            -H 'Content-Type: application/json' \
+            -d '{"code":"CICI9001","name":"CI Course","description":"Created by Student 2 CI.","creditPoints":6,"level":1,"isActive":true}')
+          course_id=$(printf '%s' "$created_course" | sed -n 's/.*"id":\([0-9][0-9]*\).*/\1/p')
+
+          if [ -z "$course_id" ]; then
+            echo "The created Course response did not contain an ID."
+            exit 1
+          fi
+
+          curl -s -f -X PUT "http://localhost:15118/api/courses/$course_id" \
+            -H 'Content-Type: application/json' \
+            -d '{"code":"CICI9001","name":"Updated CI Course","description":"Updated by Student 2 CI.","creditPoints":6,"level":1,"isActive":true}' > /dev/null
+
+          curl -s -f -X POST "http://localhost:15118/api/courses/$course_id/prerequisite-eligibility" \
+            -H 'Content-Type: application/json' \
+            -d '{"completedCourses":[]}' > /dev/null
+
+          curl -s -f -X POST http://localhost:15118/api/course-access/student/enrollments \
+            -H 'Content-Type: application/json' \
+            -d '{"courseCode":"CICI9001","completedCourses":[]}' > /dev/null
+
+          curl -s -f -X DELETE "http://localhost:15118/api/courses/$course_id" > /dev/null
+
+      - name: Display Student 2 container diagnostics
+        if: failure() && (github.event_name == 'workflow_dispatch' || steps.filter.outputs.student2 == 'true')
+        shell: bash
+        run: |
+          docker compose -p student-2-ci -f docker-compose.yml -f .github/docker-compose.student-2.ci.yml ps
+          docker compose -p student-2-ci -f docker-compose.yml -f .github/docker-compose.student-2.ci.yml logs --no-color academicrecords.database coursemanagement.database coursemanagement.backend coursemanagement.frontend
+
+      - name: Remove Student 2 containers
+        if: always() && (github.event_name == 'workflow_dispatch' || steps.filter.outputs.student2 == 'true')
+        shell: bash
+        run: docker compose -p student-2-ci -f docker-compose.yml -f .github/docker-compose.student-2.ci.yml down --volumes --remove-orphans

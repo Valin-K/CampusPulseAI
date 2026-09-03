@@ -1,0 +1,180 @@
+{
+  "schemaVersion": 1,
+  "runId": "20260901T013502Z",
+  "recordedAtUtc": "2026-09-01T01:35:41.1049589Z",
+  "repository": "CampusPulseAI",
+  "student": "Student 2",
+  "assessmentEvidence": false,
+  "classification": "Development evidence only",
+  "reason": "This historical run used gemini-3.5-flash-lite, which does not exactly match the registered Gemini 3 Flash model identifier gemini-3-flash-preview.",
+  "assessmentAgentPolicy": {
+    "registeredModels": [
+      "Gemini 3 Flash (gemini-3-flash-preview)",
+      "Qwen3.8-27B"
+    ],
+    "actualModel": "gemini-3.5-flash-lite",
+    "compliant": false
+  },
+  "plan": {
+    "goal": "Validate the redesigned Student 2 Course AI homepage and apply one approved frontend-output smoke check.",
+    "focus": "implementation",
+    "model": "gemini-3.5-flash-lite",
+    "deterministicChecks": [
+      "Git diff validation",
+      "Student 2 automated tests",
+      "Student 2 frontend build",
+      "Docker Compose validation"
+    ],
+    "guardrails": [
+      "Gemini receives pass/fail check metadata only.",
+      "No source code, command output, file contents, or secrets are sent to Gemini.",
+      "A human-approved flag and patch are required before adaptation.",
+      "One adaptation may modify exactly one allowlisted Student 2 file.",
+      "All deterministic checks run again after adaptation."
+    ]
+  },
+  "act": {
+    "preAdaptationChecks": [
+      {
+        "name": "Git diff validation",
+        "command": "git diff --check",
+        "succeeded": true,
+        "exitCode": 0,
+        "durationMilliseconds": 309,
+        "outputTail": null
+      },
+      {
+        "name": "Student 2 automated tests",
+        "command": "dotnet test student-2\\tests\\CourseManagement.Tests\\CourseManagement.Tests.csproj --no-restore --nologo",
+        "succeeded": true,
+        "exitCode": 0,
+        "durationMilliseconds": 12458,
+        "outputTail": [
+          "  CourseManagement.Database -> C:\\Users\\JoyceChingXuan.Yap\\OneDrive - UTS\\Documents\\Subjects\\Advanced Software Development with Agentic AI\\Group Assignment\\CampusPulseAI\\student-2\\database\\CourseManagement.Database\\bin\\Debug\\net10.0\\CourseManagement.Database.dll",
+          "  CourseManagement.Backend -> C:\\Users\\JoyceChingXuan.Yap\\OneDrive - UTS\\Documents\\Subjects\\Advanced Software Development with Agentic AI\\Group Assignment\\CampusPulseAI\\student-2\\backend\\CourseManagement.Backend\\bin\\Debug\\net10.0\\CourseManagement.Backend.dll",
+          "  CourseManagement.Tests -> C:\\Users\\JoyceChingXuan.Yap\\OneDrive - UTS\\Documents\\Subjects\\Advanced Software Development with Agentic AI\\Group Assignment\\CampusPulseAI\\student-2\\tests\\CourseManagement.Tests\\bin\\Debug\\net10.0\\CourseManagement.Tests.dll",
+          "Test run for C:\\Users\\JoyceChingXuan.Yap\\OneDrive - UTS\\Documents\\Subjects\\Advanced Software Development with Agentic AI\\Group Assignment\\CampusPulseAI\\student-2\\tests\\CourseManagement.Tests\\bin\\Debug\\net10.0\\CourseManagement.Tests.dll (.NETCoreApp,Version=v10.0)",
+          "A total of 1 test files matched the specified pattern.",
+          "",
+          "Passed!  - Failed:     0, Passed:    78, Skipped:     0, Total:    78, Duration: 6 s - CourseManagement.Tests.dll (net10.0)"
+        ]
+      },
+      {
+        "name": "Student 2 frontend build",
+        "command": "dotnet build student-2\\frontend\\CourseManagement.Frontend\\CourseManagement.Frontend.csproj --no-restore --nologo",
+        "succeeded": true,
+        "exitCode": 0,
+        "durationMilliseconds": 5137,
+        "outputTail": [
+          "  CampusPulse.Shared.Components -> C:\\Users\\JoyceChingXuan.Yap\\OneDrive - UTS\\Documents\\Subjects\\Advanced Software Development with Agentic AI\\Group Assignment\\CampusPulseAI\\shared\\frontend\\CampusPulse.Shared.Components\\bin\\Debug\\net10.0\\CampusPulse.Shared.Components.dll",
+          "  CourseManagement.Frontend -> C:\\Users\\JoyceChingXuan.Yap\\OneDrive - UTS\\Documents\\Subjects\\Advanced Software Development with Agentic AI\\Group Assignment\\CampusPulseAI\\student-2\\frontend\\CourseManagement.Frontend\\bin\\Debug\\net10.0\\CourseManagement.Frontend.dll",
+          "  CourseManagement.Frontend (Blazor output) -> C:\\Users\\JoyceChingXuan.Yap\\OneDrive - UTS\\Documents\\Subjects\\Advanced Software Development with Agentic AI\\Group Assignment\\CampusPulseAI\\student-2\\frontend\\CourseManagement.Frontend\\bin\\Debug\\net10.0\\wwwroot",
+          "",
+          "Build succeeded.",
+          "    0 Warning(s)",
+          "    0 Error(s)",
+          "",
+          "Time Elapsed 00:00:04.55"
+        ]
+      },
+      {
+        "name": "Docker Compose validation",
+        "command": "docker compose config --quiet",
+        "succeeded": true,
+        "exitCode": 0,
+        "durationMilliseconds": 386,
+        "outputTail": null
+      }
+    ]
+  },
+  "observe": {
+    "aiReview": {
+      "evidenceAssessment": "The deterministic evidence proves that the Git diff, Student 2 automated tests, Student 2 frontend build, and Docker Compose validation all pass successfully. It does not prove that the user experience is optimal, that edge cases in UI rendering are fully covered, or that there are no runtime regressions in production environments.",
+      "improvement": "Add a visual regression or end-to-end smoke test specifically targeting the redesigned Course AI homepage rendering.",
+      "reason": "While the current tests and frontend build pass, adding a targeted end-to-end or visual regression check ensures the new homepage UI components render correctly without visual defects.",
+      "verification": "Student 2 automated end-to-end test suite execution in the CI workflow."
+    }
+  },
+  "adapt": {
+    "humanApprovalRequired": true,
+    "approvedPatchProvided": true,
+    "applied": true,
+    "targetFile": "scripts/agentic-loop/student-2-agentic-loop.ps1",
+    "status": "AppliedAndValidated"
+  },
+  "validation": {
+    "postAdaptationChecks": [
+      {
+        "name": "Git diff validation",
+        "command": "git diff --check",
+        "succeeded": true,
+        "exitCode": 0,
+        "durationMilliseconds": 246,
+        "outputTail": null
+      },
+      {
+        "name": "Student 2 automated tests",
+        "command": "dotnet test student-2\\tests\\CourseManagement.Tests\\CourseManagement.Tests.csproj --no-restore --nologo",
+        "succeeded": true,
+        "exitCode": 0,
+        "durationMilliseconds": 10668,
+        "outputTail": [
+          "  CourseManagement.Backend -> C:\\Users\\JoyceChingXuan.Yap\\OneDrive - UTS\\Documents\\Subjects\\Advanced Software Development with Agentic AI\\Group Assignment\\CampusPulseAI\\student-2\\backend\\CourseManagement.Backend\\bin\\Debug\\net10.0\\CourseManagement.Backend.dll",
+          "  CourseManagement.Database -> C:\\Users\\JoyceChingXuan.Yap\\OneDrive - UTS\\Documents\\Subjects\\Advanced Software Development with Agentic AI\\Group Assignment\\CampusPulseAI\\student-2\\database\\CourseManagement.Database\\bin\\Debug\\net10.0\\CourseManagement.Database.dll",
+          "  CourseManagement.Tests -> C:\\Users\\JoyceChingXuan.Yap\\OneDrive - UTS\\Documents\\Subjects\\Advanced Software Development with Agentic AI\\Group Assignment\\CampusPulseAI\\student-2\\tests\\CourseManagement.Tests\\bin\\Debug\\net10.0\\CourseManagement.Tests.dll",
+          "Test run for C:\\Users\\JoyceChingXuan.Yap\\OneDrive - UTS\\Documents\\Subjects\\Advanced Software Development with Agentic AI\\Group Assignment\\CampusPulseAI\\student-2\\tests\\CourseManagement.Tests\\bin\\Debug\\net10.0\\CourseManagement.Tests.dll (.NETCoreApp,Version=v10.0)",
+          "A total of 1 test files matched the specified pattern.",
+          "",
+          "Passed!  - Failed:     0, Passed:    78, Skipped:     0, Total:    78, Duration: 5 s - CourseManagement.Tests.dll (net10.0)"
+        ]
+      },
+      {
+        "name": "Student 2 frontend build",
+        "command": "dotnet build student-2\\frontend\\CourseManagement.Frontend\\CourseManagement.Frontend.csproj --no-restore --nologo",
+        "succeeded": true,
+        "exitCode": 0,
+        "durationMilliseconds": 6095,
+        "outputTail": [
+          "  CampusPulse.Shared.Components -> C:\\Users\\JoyceChingXuan.Yap\\OneDrive - UTS\\Documents\\Subjects\\Advanced Software Development with Agentic AI\\Group Assignment\\CampusPulseAI\\shared\\frontend\\CampusPulse.Shared.Components\\bin\\Debug\\net10.0\\CampusPulse.Shared.Components.dll",
+          "  CourseManagement.Frontend -> C:\\Users\\JoyceChingXuan.Yap\\OneDrive - UTS\\Documents\\Subjects\\Advanced Software Development with Agentic AI\\Group Assignment\\CampusPulseAI\\student-2\\frontend\\CourseManagement.Frontend\\bin\\Debug\\net10.0\\CourseManagement.Frontend.dll",
+          "  CourseManagement.Frontend (Blazor output) -> C:\\Users\\JoyceChingXuan.Yap\\OneDrive - UTS\\Documents\\Subjects\\Advanced Software Development with Agentic AI\\Group Assignment\\CampusPulseAI\\student-2\\frontend\\CourseManagement.Frontend\\bin\\Debug\\net10.0\\wwwroot",
+          "",
+          "Build succeeded.",
+          "    0 Warning(s)",
+          "    0 Error(s)",
+          "",
+          "Time Elapsed 00:00:05.42"
+        ]
+      },
+      {
+        "name": "Docker Compose validation",
+        "command": "docker compose config --quiet",
+        "succeeded": true,
+        "exitCode": 0,
+        "durationMilliseconds": 448,
+        "outputTail": null
+      }
+    ]
+  },
+  "git": {
+    "branch": "JYP/ai-mode-syllabus-qa",
+    "commit": "7e02cfdab3223e6b389d15e6a5c153e3bbaab23b",
+    "status": [
+      " M docker-compose.yml",
+      " M student-2/backend/CourseManagement.Backend/Program.cs",
+      " M student-2/backend/CourseManagement.Backend/appsettings.json",
+      " M student-2/frontend/CourseManagement.Frontend/Pages/Home.razor",
+      " M student-2/frontend/CourseManagement.Frontend/Services/CourseApiClient.cs",
+      "?? docs/release-0/agentic-loop-evidence/",
+      "?? scripts/agentic-loop/",
+      "?? student-2/backend/CourseManagement.Backend/Contracts/Ai/",
+      "?? student-2/backend/CourseManagement.Backend/Controllers/CourseQuestionsController.cs",
+      "?? student-2/backend/CourseManagement.Backend/Services/GeminiCourseQuestionService.cs",
+      "?? student-2/backend/CourseManagement.Backend/Services/ICourseQuestionService.cs",
+      "?? student-2/frontend/CourseManagement.Frontend/Models/CourseAiModels.cs",
+      "?? student-2/tests/CourseManagement.Tests/CourseQuestionsControllerTests.cs",
+      "?? student-2/tests/CourseManagement.Tests/GeminiCourseQuestionServiceTests.cs"
+    ]
+  },
+  "error": null
+}

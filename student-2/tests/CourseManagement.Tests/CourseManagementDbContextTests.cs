@@ -2,8 +2,6 @@ using CourseManagement.Database.Data;
 using CourseManagement.Database.Models;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace CourseManagement.Tests;
 
@@ -103,42 +101,62 @@ public sealed class CourseManagementDbContextTests
     }
 
     [Test]
-    public async Task MigrationUpgradesLegacyDatabaseWithoutLosingCourseData()
+    public async Task SeedDataCreatesCourseCatalogueRelationships()
+    {
+        await using var context = await DatabaseTestContext.CreateEmptyAsync();
+
+        await CourseManagementSeedData.InitializeAsync(context.Database);
+
+        var courseCount = await context.Database.Courses.CountAsync();
+        var prerequisiteCount = await context.Database.Prerequisites.CountAsync();
+        var assignmentCount = await context.Database.FacultyAssignments.CountAsync();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(courseCount, Is.EqualTo(10));
+            Assert.That(prerequisiteCount, Is.EqualTo(10));
+            Assert.That(assignmentCount, Is.EqualTo(15));
+        });
+    }
+
+    [Test]
+    public async Task SchemaUpgradeAddsMarkGradeTypeToExistingCourses()
     {
         await using var connection = new SqliteConnection(
             "Data Source=:memory:;Foreign Keys=True");
         await connection.OpenAsync();
 
+        await using (var command = connection.CreateCommand())
+        {
+            command.CommandText =
+                """
+                CREATE TABLE "Courses" (
+                    "Id" INTEGER NOT NULL CONSTRAINT "PK_Courses" PRIMARY KEY AUTOINCREMENT,
+                    "Code" TEXT NOT NULL,
+                    "Name" TEXT NOT NULL,
+                    "Description" TEXT NOT NULL,
+                    "CreditPoints" INTEGER NOT NULL,
+                    "Level" INTEGER NOT NULL,
+                    "IsActive" INTEGER NOT NULL,
+                    "SyllabusFileName" TEXT NULL
+                );
+                INSERT INTO "Courses"
+                    ("Code", "Name", "Description", "CreditPoints", "Level", "IsActive")
+                VALUES
+                    ('CPAI5000', 'Existing Course', 'Created before GradeType existed.', 6, 5, 1);
+                """;
+            await command.ExecuteNonQueryAsync();
+        }
+
         var options = new DbContextOptionsBuilder<CourseManagementDbContext>()
             .UseSqlite(connection)
             .Options;
+        await using var database = new CourseManagementDbContext(options);
 
-        await using (var legacyDatabase = new CourseManagementDbContext(options))
-        {
-            var migrator = legacyDatabase.Database.GetService<IMigrator>();
-            await migrator.MigrateAsync(
-                CourseManagementDatabaseMigrator.InitialMigrationId);
-            await legacyDatabase.Database.ExecuteSqlRawAsync(
-                """DROP TABLE "__EFMigrationsHistory";""");
+        await CourseManagementSchema.EnsureCurrentAsync(database);
 
-            legacyDatabase.Courses.Add(CreateCourse("CPAI5000"));
-            await legacyDatabase.SaveChangesAsync();
-        }
-
-        await using var upgradedDatabase = new CourseManagementDbContext(options);
-        await CourseManagementDataInitializer.InitializeAsync(upgradedDatabase);
-
-        Assert.That(
-            await upgradedDatabase.Courses.AnyAsync(
-                course => course.Code == "CPAI5000"),
-            Is.True);
-
-        var upgradedCourse = await upgradedDatabase.Courses.SingleAsync(
-            course => course.Code == "CPAI5000");
-        upgradedCourse.Level = 0;
-
-        Assert.ThrowsAsync<DbUpdateException>(
-            async () => await upgradedDatabase.SaveChangesAsync());
+        var course = await database.Courses.SingleAsync();
+        Assert.That(course.GradeType, Is.EqualTo("Mark"));
     }
 
     static Course CreateCourse(string code)
@@ -183,6 +201,13 @@ public sealed class CourseManagementDbContextTests
         public CourseManagementDbContext Database { get; } = database;
 
         public static async Task<DatabaseTestContext> CreateAsync()
+        {
+            var context = await CreateEmptyAsync();
+            await context.Database.Database.EnsureCreatedAsync();
+            return context;
+        }
+
+        public static async Task<DatabaseTestContext> CreateEmptyAsync()
         {
             var connection = new SqliteConnection(
                 "Data Source=:memory:;Foreign Keys=True");

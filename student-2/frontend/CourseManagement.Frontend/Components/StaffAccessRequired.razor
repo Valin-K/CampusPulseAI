@@ -1,0 +1,11 @@
+<FeedbackPanel Kind="FeedbackKind.Warning"
+               Title="Staff access required"
+               Message="@Message">
+    <NavLink class="btn btn-outline-secondary" href="courses">Back to Courses</NavLink>
+</FeedbackPanel>
+
+@code {
+    [Parameter]
+    public string Message { get; set; } =
+        "Select the Staff demonstration user to manage Course information.";
+}

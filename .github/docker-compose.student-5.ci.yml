@@ -1,0 +1,12 @@
+services:
+  academicrecords.database:
+    ports: !override
+      - "15521:8080"
+
+  eventscheduling.backend:
+    ports: !override
+      - "18085:8080"
+
+  eventscheduling.frontend:
+    ports: !override
+      - "18086:80"

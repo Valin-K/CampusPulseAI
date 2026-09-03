@@ -1,0 +1,173 @@
+.booking-hint {
+    margin: .1rem 0 .35rem;
+    font-size: .85rem;
+    font-weight: 700;
+    color: var(--university-muted);
+}
+
+.booking-hint.is-ok {
+    color: var(--university-success);
+}
+
+.booking-hint.is-bad {
+    color: var(--university-danger);
+}
+
+.recurrence-days {
+    border: 1px solid var(--university-border, #d7e0ea);
+    border-radius: .6rem;
+    padding: .7rem .8rem .85rem;
+    margin: .35rem 0 .6rem;
+}
+
+.recurrence-days legend {
+    font-size: .8rem;
+    font-weight: 800;
+    letter-spacing: .02em;
+    text-transform: uppercase;
+    color: var(--university-muted);
+    padding: 0 .3rem;
+}
+
+.day-toggle-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .4rem;
+}
+
+.day-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 3.1rem;
+    padding: .4rem .55rem;
+    border: 1px solid var(--university-border, #d7e0ea);
+    border-radius: .5rem;
+    font-size: .82rem;
+    font-weight: 750;
+    color: var(--university-ink, #102a43);
+    cursor: pointer;
+    user-select: none;
+    transition: background-color .12s ease, border-color .12s ease, color .12s ease;
+}
+
+.day-toggle:hover {
+    border-color: var(--university-blue);
+}
+
+.day-toggle.is-on {
+    background: var(--university-blue);
+    border-color: var(--university-blue);
+    color: #fff;
+}
+
+.day-toggle input {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.recurrence-weeks {
+    max-width: 12rem;
+}
+
+.recurrence-preview {
+    margin-top: .6rem;
+}
+
+.occurrence-disclosure {
+    border: 1px solid var(--university-border, #d7e0ea);
+    border-radius: .55rem;
+    background: var(--university-surface, #fff);
+}
+
+.occurrence-disclosure > summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75rem;
+    padding: .6rem .8rem;
+    cursor: pointer;
+    list-style: none;
+    user-select: none;
+}
+
+.occurrence-disclosure > summary::-webkit-details-marker {
+    display: none;
+}
+
+.occurrence-disclosure > summary .eyebrow {
+    margin: 0;
+}
+
+.occurrence-disclosure-hint {
+    display: inline-flex;
+    align-items: center;
+    gap: .3rem;
+    font-size: .82rem;
+    font-weight: 700;
+    color: var(--university-blue);
+}
+
+.occurrence-disclosure-hint::after {
+    content: "\25BC";
+    font-size: .62rem;
+    transition: transform .15s ease;
+}
+
+.occurrence-disclosure[open] > summary .occurrence-disclosure-hint::after {
+    transform: rotate(180deg);
+}
+
+.occurrence-disclosure[open] > summary .occurrence-disclosure-hint {
+    color: var(--university-muted);
+}
+
+.occurrence-list {
+    list-style: none;
+    margin: 0;
+    padding: 0 .55rem .55rem;
+    display: grid;
+    gap: .3rem;
+}
+
+.occurrence-list-standalone {
+    margin: .6rem 0 0;
+    padding: 0;
+}
+
+.occurrence {
+    display: flex;
+    justify-content: space-between;
+    gap: .75rem;
+    padding: .45rem .7rem;
+    border-radius: .45rem;
+    font-size: .86rem;
+    font-weight: 650;
+    background: #eef2f7;
+    color: #334155;
+}
+
+.occurrence span {
+    font-weight: 600;
+    color: var(--university-muted);
+}
+
+.occurrence.is-ok {
+    background: #e7f6ec;
+    color: #1a7a3d;
+}
+
+.occurrence.is-ok span {
+    color: #1a7a3d;
+}
+
+.occurrence.is-clash {
+    background: #fdecec;
+    color: #b42318;
+}
+
+.occurrence.is-clash span {
+    color: #b42318;
+}

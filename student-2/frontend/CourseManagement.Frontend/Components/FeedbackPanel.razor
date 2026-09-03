@@ -1,0 +1,41 @@
+<div class="@CssClass"
+     role="@Role"
+     aria-live="@AriaLive"
+     aria-atomic="true">
+    @if (!string.IsNullOrWhiteSpace(Title))
+    {
+        <strong>@Title</strong>
+    }
+    <div>@Message</div>
+    @if (ChildContent is not null)
+    {
+        <div class="feedback-actions">
+            @ChildContent
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public FeedbackKind Kind { get; set; } = FeedbackKind.Information;
+
+    [Parameter]
+    public string? Title { get; set; }
+
+    [Parameter, EditorRequired]
+    public required string Message { get; set; }
+
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    private string CssClass => Kind switch
+    {
+        FeedbackKind.Success => "alert alert-success feedback-panel",
+        FeedbackKind.Warning => "alert alert-warning feedback-panel",
+        FeedbackKind.Error => "alert alert-danger feedback-panel",
+        _ => "alert alert-info feedback-panel"
+    };
+
+    private string Role => Kind == FeedbackKind.Error ? "alert" : "status";
+    private string AriaLive => Kind == FeedbackKind.Error ? "assertive" : "polite";
+}

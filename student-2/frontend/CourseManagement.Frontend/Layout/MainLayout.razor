@@ -1,16 +1,110 @@
 ﻿@inherits LayoutComponentBase
-<div class="page">
-    <div class="sidebar">
-        <NavMenu />
-    </div>
+@inject CourseUserContext UserContext
 
-    <main>
-        <div class="top-row px-4">
-            <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
+<CampusShell PageName="Course Management"
+             SectionLabel="Course services"
+             UserName=""
+             HomeHref="http://localhost:8080"
+             PortalHref="http://localhost:8080"
+             ContextLabel="@ContextLabel">
+    <UserSelector>
+        <div class="course-user-selector">
+            @if (!UserContext.IsInitialized)
+            {
+                <span role="status">Verifying Course access...</span>
+            }
+            else if (UserContext.IsAvailable)
+            {
+                <label for="course-user-select">Viewing as</label>
+                <select id="course-user-select"
+                        value="@UserContext.CurrentUser!.UserId"
+                        @onchange="ChangeUserAsync"
+                        aria-label="Select demonstration Course user">
+                    @foreach (var user in UserContext.Users)
+                    {
+                        <option value="@user.UserId">
+                            @user.DisplayName (@DisplayRole(user))
+                        </option>
+                    }
+                </select>
+            }
+            else
+            {
+                <span>Course access unavailable</span>
+            }
         </div>
+    </UserSelector>
+    <ChildContent>
+        @if (!UserContext.IsInitialized)
+        {
+            <LoadingIndicator Message="Verifying Course access..." />
+        }
+        else if (!UserContext.IsAvailable)
+        {
+            <FeedbackPanel Kind="FeedbackKind.Error"
+                           Title="Course access unavailable"
+                           Message="@(UserContext.ErrorMessage ?? "Course access could not be verified.")">
+                <button class="btn btn-outline-danger" @onclick="RetryAsync">Try again</button>
+            </FeedbackPanel>
+        }
+        else
+        {
+            @if (selectionErrorMessage is not null)
+            {
+                <FeedbackPanel Kind="FeedbackKind.Error"
+                               Title="User selection could not be saved"
+                               Message="@selectionErrorMessage" />
+            }
 
-        <article class="content px-4">
             @Body
-        </article>
-    </main>
-</div>
+        }
+    </ChildContent>
+</CampusShell>
+
+@code {
+    string? selectionErrorMessage;
+
+    string ContextLabel => UserContext.CurrentUser is null
+        ? "Course and curriculum workspace"
+        : $"{DisplayRole(UserContext.CurrentUser)} Course workspace";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await UserContext.InitializeAsync();
+    }
+
+    async Task ChangeUserAsync(ChangeEventArgs args)
+    {
+        if (int.TryParse(args.Value?.ToString(), out var userId))
+        {
+            selectionErrorMessage = null;
+            try
+            {
+                await UserContext.SelectUserAsync(userId);
+            }
+            catch (JSException)
+            {
+                selectionErrorMessage =
+                    "This browser did not allow the selected user to be saved. Try again or use another browser window.";
+            }
+            catch (InvalidOperationException)
+            {
+                selectionErrorMessage =
+                    "The selected user is no longer available. Refresh Course Management and try again.";
+            }
+        }
+    }
+
+    async Task RetryAsync()
+    {
+        await UserContext.InitializeAsync(forceRefresh: true);
+    }
+
+    static string DisplayRole(CourseAccessUser user) =>
+        string.Equals(
+            user.CourseRole,
+            CourseAccessRoles.CourseAdministrator,
+            StringComparison.Ordinal)
+            ? "Staff"
+            : "Student";
+}

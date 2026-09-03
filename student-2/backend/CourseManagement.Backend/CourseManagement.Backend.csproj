@@ -17,8 +17,4 @@
     <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" />
   </ItemGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\..\database\CourseManagement.Database\CourseManagement.Database.csproj" />
-  </ItemGroup>
-
 </Project>

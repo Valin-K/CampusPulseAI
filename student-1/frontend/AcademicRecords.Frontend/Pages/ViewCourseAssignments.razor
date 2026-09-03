@@ -1,0 +1,131 @@
+@page "/profile/{Role}/{UserId:int}/course-assignments"
+@using System.Net.Http.Json
+
+<PageTitle>Course Assignments</PageTitle>
+
+<h1>Course Assignments</h1>
+
+@if (isLoading)
+{
+    <p>Loading course assignments...</p>
+}
+else if (loadError is not null)
+{
+    <div class="alert alert-danger">Unable to load course assignments: @loadError</div>
+}
+else if (staff is null)
+{
+    <div class="alert alert-danger">Staff profile not found.</div>
+}
+else if (assignments.Count == 0)
+{
+    <p>@staff.FirstName @staff.LastName is not assigned to any courses.</p>
+}
+else
+{
+    <p class="text-muted">Courses assigned to @staff.FirstName @staff.LastName</p>
+    <div class="table-responsive">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Course Code</th>
+                    <th>Course Name</th>
+                    <th>Level</th>
+                    <th>Credit Points</th>
+                    <th>Status</th>
+                    <th>Teaching Period</th>
+                    <th>Role</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var assignment in assignments)
+                {
+                    <tr>
+                        <td>@assignment.Course.Code</td>
+                        <td>@assignment.Course.Name</td>
+                        <td>@assignment.Course.Level</td>
+                        <td>@assignment.Course.CreditPoints</td>
+                        <td>@(assignment.Course.IsActive ? "Active" : "Inactive")</td>
+                        <td>@assignment.TeachingPeriod</td>
+                        <td>@assignment.Role</td>
+                        <td><a class="btn btn-outline-primary btn-sm" href="/course-assignments/@Uri.EscapeDataString(assignment.Course.Code)/grades">Enter grades</a></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+<a href="/profile/@Role/@UserId" class="btn btn-secondary mt-4">Back to profile</a>
+
+@code {
+    [Parameter]
+    public int UserId { get; set; }
+
+    [Parameter]
+    public string Role { get; set; } = string.Empty;
+
+    [Inject]
+    private HttpClient Http { get; set; } = default!;
+
+    private StaffProfileResponse? staff;
+    private List<AssignmentRow> assignments = [];
+    private bool isLoading = true;
+    private string? loadError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!string.Equals(Role, "staff", StringComparison.OrdinalIgnoreCase))
+        {
+            loadError = "Course assignments are only available for staff profiles.";
+            isLoading = false;
+            return;
+        }
+
+        try
+        {
+            staff = await Http.GetFromJsonAsync<StaffProfileResponse>($"api/staff/by-user/{UserId}");
+            if (staff is null)
+            {
+                return;
+            }
+
+            var assignmentsTask = Http.GetFromJsonAsync<IReadOnlyList<FacultyAssignmentResponse>>("api/faculty-assignments");
+            var coursesTask = Http.GetFromJsonAsync<IReadOnlyList<CourseResponse>>("api/courses");
+            await Task.WhenAll(assignmentsTask, coursesTask);
+
+            var coursesById = (await coursesTask ?? []).ToDictionary(course => course.Id);
+            assignments = (await assignmentsTask ?? [])
+                .Where(assignment => string.Equals(assignment.StaffEmail, staff.Email, StringComparison.OrdinalIgnoreCase))
+                .Where(assignment => coursesById.ContainsKey(assignment.CourseId))
+                .Select(assignment => new AssignmentRow(assignment, coursesById[assignment.CourseId]))
+                .OrderBy(assignment => assignment.Course.Code)
+                .ThenBy(assignment => assignment.TeachingPeriod)
+                .ToList();
+        }
+        catch (HttpRequestException exception)
+        {
+            loadError = exception.Message;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private sealed record AssignmentRow(FacultyAssignmentResponse Assignment, CourseResponse Course)
+    {
+        public string Role => Assignment.Role;
+        public string TeachingPeriod => Assignment.TeachingPeriod;
+    }
+
+    private sealed record StaffProfileResponse(int UserId, string StaffId, string FirstName, string LastName,
+        string Email, DateOnly? DateOfBirth, string? PhoneNumber);
+
+    private sealed record FacultyAssignmentResponse(int Id, int CourseId, string CourseCode, string StaffName,
+        string StaffEmail, string Role, string TeachingPeriod);
+
+    private sealed record CourseResponse(int Id, string Code, string Name, string Description, int CreditPoints,
+        int Level, bool IsActive, string GradeType, string? SyllabusFileName);
+}

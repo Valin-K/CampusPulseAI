@@ -2,19 +2,29 @@
 @page "/courses/{CourseId:int}/faculty-assignments/{AssignmentId:int}/edit"
 @inject CourseApiClient CourseApi
 @inject NavigationManager Navigation
+@inject CourseUserContext UserContext
 
 <PageTitle>@(IsEdit ? "Edit faculty assignment" : "Add faculty assignment")</PageTitle>
 
+@if (!UserContext.IsCourseAdministrator)
+{
+    <StaffAccessRequired />
+}
+else
+{
 <h1>@(IsEdit ? "Edit faculty assignment" : "Add faculty assignment")</h1>
 
 @if (isLoading)
 {
-    <p role="status">Loading faculty assignment form...</p>
+    <LoadingIndicator Message="Loading faculty assignment form..." />
 }
 else if (loadFailed)
 {
-    <div class="alert alert-danger" role="alert">@errorMessage</div>
-    <NavLink class="btn btn-outline-secondary" href="@CourseUrl">Back to Course</NavLink>
+    <FeedbackPanel Kind="FeedbackKind.Error"
+                   Title="Faculty assignment form could not be loaded"
+                   Message="@(errorMessage ?? "The faculty assignment form could not be loaded.")">
+        <NavLink class="btn btn-outline-danger" href="@CourseUrl">Back to Course</NavLink>
+    </FeedbackPanel>
 }
 else if (course is not null)
 {
@@ -25,10 +35,20 @@ else if (course is not null)
 
     @if (errorMessage is not null)
     {
-        <div class="alert alert-danger" role="alert">@errorMessage</div>
+        <FeedbackPanel Kind="FeedbackKind.Error"
+                       Title="Faculty assignment could not be saved"
+                       Message="@errorMessage" />
     }
 
-    <EditForm Model="@form" OnValidSubmit="SaveAsync" FormName="faculty-assignment-form">
+    @if (isSaving)
+    {
+        <LoadingIndicator Message="Saving faculty assignment..." />
+    }
+
+    <EditForm Model="@form"
+              OnValidSubmit="SaveAsync"
+              FormName="faculty-assignment-form"
+              aria-busy="@isSaving">
         <DataAnnotationsValidator />
         <ValidationSummary />
 
@@ -69,13 +89,14 @@ else if (course is not null)
             <ValidationMessage For="@(() => form.TeachingPeriod)" />
         </div>
 
-        <div class="d-flex gap-2">
+        <div class="d-flex flex-wrap gap-2">
             <button class="btn btn-primary" type="submit" disabled="@isSaving">
                 @(isSaving ? "Saving..." : "Save assignment")
             </button>
             <NavLink class="btn btn-outline-secondary" href="@CourseUrl">Cancel</NavLink>
         </div>
     </EditForm>
+}
 }
 
 @code {
@@ -85,6 +106,9 @@ else if (course is not null)
     [Parameter]
     public int AssignmentId { get; set; }
 
+    [SupplyParameterFromQuery]
+    public string? ReturnUrl { get; set; }
+
     private FacultyAssignmentFormModel form = new();
     private CourseDetail? course;
     private string? errorMessage;
@@ -93,10 +117,18 @@ else if (course is not null)
     private bool loadFailed;
 
     private bool IsEdit => AssignmentId > 0;
-    private string CourseUrl => $"/courses/{CourseId}";
+    private string CourseUrl => CourseNavigation.LocalReturnUrl(
+        ReturnUrl,
+        $"/courses/{CourseId}");
 
     protected override async Task OnParametersSetAsync()
     {
+        if (!UserContext.IsCourseAdministrator)
+        {
+            isLoading = false;
+            return;
+        }
+
         isLoading = true;
         loadFailed = false;
         errorMessage = null;
@@ -163,7 +195,11 @@ else if (course is not null)
             var message = IsEdit
                 ? "faculty-assignment-updated"
                 : "faculty-assignment-created";
-            Navigation.NavigateTo($"{CourseUrl}?message={message}");
+            Navigation.NavigateTo(
+                CourseNavigation.AddQueryParameter(
+                    CourseUrl,
+                    "message",
+                    message));
         }
         catch (CourseApiException exception)
         {
@@ -172,6 +208,10 @@ else if (course is not null)
         catch (HttpRequestException)
         {
             errorMessage = "The faculty assignment could not be saved. Check that the API is running.";
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            errorMessage = "The faculty assignment API returned an unexpected response.";
         }
         finally
         {

@@ -1,7 +1,238 @@
-﻿@page "/"
+@page "/"
+@inject EventSchedulingApiClient Api
+@inject CurrentUser CurrentUser
+@inject NavigationManager Nav
 
-<PageTitle>Event Scheduling</PageTitle>
+<PageTitle>Event & Facility Scheduling</PageTitle>
 
-<h1>Event Scheduling</h1>
+<header class="dashboard-hero">
+    <div>
+        <span class="eyebrow">Your campus workspace</span>
+        <h1>Book rooms. Hire gear. Stay on schedule.</h1>
+        <p>Reserve study rooms, hire equipment, and keep track of everything you've already booked.</p>
+    </div>
+    <div class="term-summary">
+        <span>Current profile</span>
+        <strong>@(profile?.FullName ?? "…")</strong>
+        <small>@(profile?.Descriptor ?? "")</small>
+    </div>
+</header>
 
-<p>This is Ryan's page. Under construction!</p>
+@if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <div class="notice notice-error" role="alert">@errorMessage</div>
+}
+
+<section class="surface-card" aria-label="Bookings needing your attention" style="margin: 1.25rem 0">
+    <div class="section-heading">
+        <div>
+            <span class="eyebrow">Today at a glance</span>
+            <h2>Today's schedule</h2>
+        </div>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="skeleton-stack"><span></span><span></span><span></span></div>
+    }
+    else if (DashboardBookings.Count == 0)
+    {
+        <p class="eyebrow">Nothing scheduled for today, and nothing overdue.</p>
+    }
+    else
+    {
+        <div class="booking-strip" role="list" aria-label="Priority bookings">
+            @foreach (var entry in DashboardBookings)
+            {
+                var action = BookingActions.For(entry.Booking);
+                <article class="booking-strip-card" role="listitem">
+                    <div class="booking-strip-topline">
+                        <span class="status-badge @entry.BadgeClass">@entry.BadgeLabel</span>
+                        <span class="booking-strip-kind">@(entry.Booking.ResourceType == ResourceType.Room ? "Room" : "Equipment")</span>
+                    </div>
+                    <h3>@entry.Booking.ResourceName</h3>
+                    <p class="booking-strip-meta">@entry.TimeText</p>
+                    @if (action is not null)
+                    {
+                        <div class="booking-strip-actions">
+                            <button type="button" class="button @action.CssClass"
+                                    disabled="@(busyBookingId == entry.Booking.Id)"
+                                    @onclick="() => RunCardActionAsync(entry.Booking, action)">
+                                @(busyBookingId == entry.Booking.Id ? "…" : action.Label)
+                            </button>
+                        </div>
+                    }
+                </article>
+            }
+        </div>
+    }
+</section>
+
+<section class="surface-card" aria-label="Reserve or hire">
+    <div class="section-heading">
+        <div>
+            <span class="eyebrow">Get started</span>
+            <h2>What do you need today?</h2>
+        </div>
+    </div>
+    <div class="card-grid">
+        <button type="button" class="resource-tile" @onclick="@(() => Nav.NavigateTo("/search?type=room"))">
+            <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+                <rect x="3" y="4" width="18" height="16" rx="2" />
+                <path d="M3 9h18M8 4v5" />
+            </svg>
+            <strong>@(CurrentUser.IsStaff ? "Reserve a teaching room" : "Reserve a study room")</strong>
+            <span>@(CurrentUser.IsStaff ? "Book lab and lecture rooms for classes" : "Browse rooms by location and capacity")</span>
+        </button>
+        <button type="button" class="resource-tile" @onclick="@(() => Nav.NavigateTo("/search?type=equipment"))">
+            <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+                <rect x="2" y="6" width="20" height="12" rx="2" />
+                <circle cx="12" cy="12" r="3" />
+            </svg>
+            <strong>Hire equipment</strong>
+            <span>Cameras, adapters, projectors, and more</span>
+        </button>
+    </div>
+</section>
+
+<section class="surface-card" aria-label="My schedule">
+    <div class="section-heading">
+        <div>
+            <span class="eyebrow">Your calendar</span>
+            <h2>My schedule</h2>
+        </div>
+        <button type="button" class="button button-secondary" @onclick="@(() => Nav.NavigateTo("/calendar"))">View full calendar</button>
+    </div>
+    @if (isLoading)
+    {
+        <div class="skeleton-stack"><span></span><span></span><span></span></div>
+    }
+    else
+    {
+        <BookingCalendar Bookings="myBookings" AnchorDate="anchorDate" ViewMode="month" MaxBookingsPerDay="2" ShowNavigation="false" OnDateSelected="GoToDay" />
+    }
+</section>
+
+@code {
+    private readonly List<BookingResponse> myBookings = [];
+    private readonly DateOnly anchorDate = DateOnly.FromDateTime(DateTime.Today);
+    private UserProfile? profile;
+    private string? errorMessage;
+    private bool isLoading = true;
+    private int? busyBookingId;
+
+    private List<DashboardEntry> DashboardBookings => BuildDashboard();
+
+    protected override async Task OnInitializedAsync()
+    {
+        profile = await CurrentUser.LoadAsync();
+        await LoadBookingsAsync();
+        isLoading = false;
+    }
+
+    private async Task LoadBookingsAsync()
+    {
+        try
+        {
+            var bookings = await Api.GetBookingsAsync();
+            myBookings.Clear();
+            myBookings.AddRange(bookings.Where(booking => booking.StudentId == CurrentUser.UserId));
+            errorMessage = null;
+        }
+        catch (HttpRequestException)
+        {
+            errorMessage = "The Event Scheduling service is unavailable.";
+        }
+    }
+
+    private async Task RunCardActionAsync(BookingResponse booking, BookingCardAction action)
+    {
+        busyBookingId = booking.Id;
+        var result = await BookingActions.RunAsync(Api, booking, action);
+        busyBookingId = null;
+
+        if (result.Success)
+        {
+            await LoadBookingsAsync();
+        }
+        else
+        {
+            errorMessage = result.Error;
+        }
+    }
+
+    private List<DashboardEntry> BuildDashboard()
+    {
+        // Booking times are treated as wall-clock throughout this app (displayed without
+        // conversion), so "now" must be local time too - not DateTime.UtcNow.
+        var now = DateTime.Now;
+        var today = DateOnly.FromDateTime(now);
+        var entries = new List<DashboardEntry>();
+
+        foreach (var booking in myBookings)
+        {
+            if (booking.Status == BookingStatus.Overdue)
+            {
+                entries.Add(new DashboardEntry(booking, DashboardCategory.Overdue));
+                continue;
+            }
+
+            if (booking.Status is BookingStatus.Cancelled or BookingStatus.Completed or BookingStatus.Returned)
+            {
+                continue;
+            }
+
+            var startsToday = DateOnly.FromDateTime(booking.StartUtc) == today;
+
+            // Pending / Confirmed.
+            if (now >= booking.StartUtc && now < booking.EndUtc)
+            {
+                entries.Add(new DashboardEntry(booking, DashboardCategory.Active));
+            }
+            else if (now < booking.StartUtc && startsToday)
+            {
+                entries.Add(new DashboardEntry(booking, DashboardCategory.Upcoming));
+            }
+        }
+
+        return entries
+            .OrderBy(entry => (int)entry.Category)
+            .ThenBy(entry => entry.Category == DashboardCategory.Overdue ? entry.Booking.EndUtc : entry.Booking.StartUtc)
+            .ToList();
+    }
+
+    private void GoToDay(DateOnly date) => Nav.NavigateTo($"/day/{date:yyyy-MM-dd}");
+
+    private enum DashboardCategory
+    {
+        Overdue,
+        Active,
+        Upcoming
+    }
+
+    private sealed record DashboardEntry(BookingResponse Booking, DashboardCategory Category)
+    {
+        private bool IsEquipment => Booking.ResourceType == ResourceType.Equipment;
+
+        public string BadgeClass => Category switch
+        {
+            DashboardCategory.Overdue => "overdue",
+            DashboardCategory.Active => IsEquipment ? "inuse" : "paid",
+            _ => "outstanding"
+        };
+
+        public string BadgeLabel => Category switch
+        {
+            DashboardCategory.Overdue => "Overdue",
+            DashboardCategory.Active => IsEquipment ? "In use" : "Active now",
+            _ => "Upcoming today"
+        };
+
+        public string TimeText => Category switch
+        {
+            DashboardCategory.Overdue => $"Was due {Booking.EndUtc:MMM d, h:mm tt}",
+            DashboardCategory.Active => $"Ends {Booking.EndUtc:h:mm tt}",
+            _ => $"Starts {Booking.StartUtc:h:mm tt}"
+        };
+    }
+}

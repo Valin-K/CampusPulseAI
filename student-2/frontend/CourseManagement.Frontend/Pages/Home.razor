@@ -1,96 +1,545 @@
-﻿@page "/"
+@page "/"
 @page "/courses"
+@using CampusPulse.Shared.Components.Models
 @inject CourseApiClient CourseApi
+@inject CourseUserContext UserContext
 
 <PageTitle>Course Management</PageTitle>
 
-<div class="d-flex justify-content-between align-items-center mb-3">
+<header class="dashboard-hero course-dashboard-hero">
     <div>
-        <h1>Course Management</h1>
-        <p class="text-muted mb-0">Browse and manage the Course catalogue.</p>
+        <span class="eyebrow">@HeroEyebrow</span>
+        <h1>@HeroTitle</h1>
+        <p>@HeroDescription</p>
     </div>
-    <NavLink class="btn btn-primary" href="courses/new">Create Course</NavLink>
-</div>
 
-@if (Message == "deleted")
+    @if (UserContext.CurrentUser is not null)
+    {
+        <div class="term-summary">
+            <span>Current demo user</span>
+            <strong>@UserContext.CurrentUser.DisplayName</strong>
+            <small>@UserContext.CurrentUser.ExternalId | @RoleLabel</small>
+        </div>
+    }
+</header>
+
+@if (DashboardMessage is not null)
 {
-    <div class="alert alert-success" role="status">Course deleted successfully.</div>
+    <FeedbackPanel Kind="FeedbackKind.Success"
+                   Message="@DashboardMessage" />
 }
 
 @if (isLoading)
 {
-    <p role="status">Loading Courses...</p>
-}
-else if (errorMessage is not null)
-{
-    <div class="alert alert-danger" role="alert">@errorMessage</div>
-    <button class="btn btn-outline-primary" @onclick="LoadCoursesAsync">Try again</button>
-}
-else if (courses.Count == 0)
-{
-    <div class="alert alert-info" role="status">No Courses are available.</div>
+    <LoadingIndicator Message="Loading Courses..." />
 }
 else
 {
-    <p>Showing @courses.Count Courses loaded from the Course Management API.</p>
-
-    <table class="table table-striped">
-        <thead>
-            <tr>
-                <th scope="col">Code</th>
-                <th scope="col">Name</th>
-                <th scope="col">Level</th>
-                <th scope="col">Credit points</th>
-                <th scope="col">Status</th>
-                <th scope="col">Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var course in courses)
+    @if (errorMessage is not null)
+    {
+        <FeedbackPanel Kind="FeedbackKind.Error"
+                       Title="Courses could not be loaded"
+                       Message="@errorMessage">
+            <button class="button button-danger" @onclick="LoadCoursesAsync">
+                Try again
+            </button>
+        </FeedbackPanel>
+    }
+    else if (courses.Count == 0)
+    {
+        <FeedbackPanel Kind="FeedbackKind.Empty"
+                       Title="No Courses available"
+                       Message="@(UserContext.IsCourseAdministrator
+                           ? "Create a Course to begin building the Course catalogue."
+                           : "There are no active Courses available to browse.")">
+            @if (UserContext.IsCourseAdministrator)
             {
-                <tr class="@(!course.IsActive ? "course-inactive" : null)">
-                    <td>@course.Code</td>
-                    <td>@course.Name</td>
-                    <td>@course.Level</td>
-                    <td>@course.CreditPoints</td>
-                    <td>
-                        @if (course.IsActive)
-                        {
-                            <span class="badge bg-success">Active</span>
-                        }
-                        else
-                        {
-                            <span class="badge bg-secondary">Inactive</span>
-                        }
-                    </td>
-                    <td class="text-nowrap">
-                        <NavLink class="btn btn-sm btn-outline-primary me-2"
-                                 href="@($"courses/{course.Id}")">
-                            View
-                        </NavLink>
-                        <NavLink class="btn btn-sm btn-outline-secondary"
-                                 href="@($"courses/{course.Id}/edit")">
-                            Edit
-                        </NavLink>
-                    </td>
-                </tr>
+                <NavLink class="button button-primary" href="@CreateCourseUrl">
+                    Create Course
+                </NavLink>
             }
-        </tbody>
-    </table>
+        </FeedbackPanel>
+    }
+    else
+    {
+        <section class="metric-grid course-metric-grid" aria-label="@MetricAriaLabel">
+            @if (UserContext.IsCourseAdministrator)
+            {
+                <CampusMetricCard Label="Total Courses"
+                                  Value="@courses.Count.ToString()"
+                                  Detail="Across the curriculum catalogue" />
+                <CampusMetricCard Label="Active Courses"
+                                  Value="@ActiveCourseCount.ToString()"
+                                  Detail="Available to Students"
+                                  Tone="green" />
+                <CampusMetricCard Label="Inactive Courses"
+                                  Value="@InactiveCourseCount.ToString()"
+                                  Detail="Hidden from Students"
+                                  Tone="gold" />
+            }
+            else
+            {
+                <CampusMetricCard Label="Available Courses"
+                                  Value="@AvailableCourses.Count.ToString()"
+                                  Detail="Active Courses in the catalogue" />
+                <CampusMetricCard Label="Enrolled Courses"
+                                  Value="@(studentSummary is null
+                                      ? "-"
+                                      : EnrolledCatalogueCourseCount.ToString())"
+                                  Detail="Current Courses in this catalogue"
+                                  Tone="green" />
+                <CampusMetricCard Label="Completed credits"
+                                  Value="@(studentSummary?.CompletedCredits.ToString("0.#") ?? "-")"
+                                  Detail="Across Academic Records"
+                                  Tone="gold" />
+            }
+        </section>
+    }
+
+    <section class="ai-card course-ai-card @(isAiExpanded ? "expanded" : "collapsed")"
+             aria-labelledby="course-ai-heading">
+        <div class="course-ai-heading">
+            <div>
+                <span class="eyebrow">Course assistant</span>
+                <h2 id="course-ai-heading">Ask Course AI</h2>
+                <p>
+                    Get help comparing catalogue Courses or understanding Course details.
+                </p>
+            </div>
+            @if (SelectedCourses.Count > 0)
+            {
+                <span class="status-badge paid">
+                    @SelectedCourses.Count selected
+                </span>
+            }
+        </div>
+
+        <button type="button"
+                class="button button-secondary"
+                aria-expanded="@isAiExpanded"
+                aria-controls="course-ai-workspace"
+                @onclick="ToggleAi">
+            @(isAiExpanded ? "Close AI" : "Open AI")
+        </button>
+
+        @if (isAiExpanded)
+        {
+            <div id="course-ai-workspace" class="ai-response course-ai-workspace">
+                @if (SelectedCourses.Count == 0)
+                {
+                    <small>
+                        Ask about a Course by name or select Courses from the catalogue.
+                    </small>
+                }
+                else
+                {
+                    <div aria-live="polite">
+                        <strong>
+                            Comparing @SelectedCourses.Count
+                            @(SelectedCourses.Count == 1 ? "Course" : "Courses")
+                        </strong>
+                        <div class="d-flex flex-wrap gap-2 mt-2">
+                            @foreach (var selectedCourse in SelectedCourses)
+                            {
+                                <span class="status-badge paid">@selectedCourse.Code</span>
+                            }
+                        </div>
+                    </div>
+                }
+
+                <small class="ai-limit">
+                    AI answers use catalogue details. Verify important Course decisions.
+                </small>
+
+                <label class="form-label mt-2" for="course-ai-question">
+                    What would you like to know?
+                </label>
+                <InputTextArea id="course-ai-question"
+                               class="form-control"
+                               rows="2"
+                               maxlength="1000"
+                               @bind-Value="aiQuestion"
+                               disabled="@isAskingAi"
+                               placeholder="For example: Compare CPAI3001 and CPAI3002." />
+
+                <div class="button-row mt-2">
+                    <button type="button"
+                            class="button button-accent"
+                            disabled="@(isAskingAi || string.IsNullOrWhiteSpace(aiQuestion))"
+                            @onclick="AskCourseQuestionAsync">
+                        @(isAskingAi ? "Asking Gemini..." : "Ask AI")
+                    </button>
+
+                    @if (aiResponse is not null || aiErrorMessage is not null)
+                    {
+                        <button type="button"
+                                class="button button-secondary"
+                                disabled="@isAskingAi"
+                                @onclick="ClearAiResponse">
+                            Clear question
+                        </button>
+                    }
+
+                    @if (SelectedCourses.Count > 0)
+                    {
+                        <button type="button"
+                                class="button button-secondary"
+                                disabled="@isAskingAi"
+                                @onclick="ClearSelectedCourses">
+                            Clear selection
+                        </button>
+                    }
+                </div>
+
+                @if (isAskingAi)
+                {
+                    <LoadingIndicator Message="Gemini is answering your Course question..." />
+                }
+                else if (aiErrorMessage is not null)
+                {
+                    <FeedbackPanel Kind="FeedbackKind.Error"
+                                   Title="Course question failed"
+                                   Message="@aiErrorMessage">
+                        <button type="button"
+                                class="button button-secondary"
+                                @onclick="AskCourseQuestionAsync">
+                            Try again
+                        </button>
+                    </FeedbackPanel>
+                }
+                else if (aiResponse is not null)
+                {
+                    <div class="ai-answer" aria-live="polite">
+                        <strong>Course AI response</strong>
+                        <p>@aiResponse.Answer</p>
+                    </div>
+                }
+            </div>
+        }
+    </section>
+
+    @if (errorMessage is null && courses.Count > 0)
+    {
+    <section class="surface-card">
+        <div class="section-heading">
+            <div>
+                <span class="eyebrow">Course catalogue</span>
+                <h2>Find a Course</h2>
+                <p class="section-summary">@CatalogueDescription</p>
+            </div>
+
+            @if (UserContext.IsCourseAdministrator)
+            {
+                <NavLink class="button button-primary" href="@CreateCourseUrl">
+                    Create Course
+                </NavLink>
+            }
+        </div>
+
+        <div class="catalogue-toolbar">
+            <div class="course-search">
+                <label for="course-search">Search Courses</label>
+                <input id="course-search"
+                       class="form-control"
+                       type="search"
+                       placeholder="Search by code, name, or description"
+                       @bind="searchTerm"
+                       @bind:event="oninput" />
+            </div>
+
+            <div class="course-filter" role="group" aria-label="@FilterAriaLabel">
+                @foreach (var filter in AvailableFilters)
+                {
+                    <button type="button"
+                            class="course-filter-button @(courseFilter == filter.Key ? "active" : null)"
+                            disabled="@IsEnrollmentFilterUnavailable(filter)"
+                            aria-pressed="@(courseFilter == filter.Key)"
+                            @onclick="() => SetCourseFilter(filter.Key)">
+                        @filter.Label
+                    </button>
+                }
+            </div>
+        </div>
+
+        @if (enrollmentErrorMessage is not null)
+        {
+            <FeedbackPanel Kind="FeedbackKind.Error"
+                           Title="Course enrolment unavailable"
+                           Message="@enrollmentErrorMessage" />
+        }
+
+        @if (DisplayedCourses.Count == 0)
+        {
+            <FeedbackPanel Kind="FeedbackKind.Empty"
+                           Title="@EmptyStateTitle"
+                           Message="@EmptyStateMessage">
+                @if (UserContext.IsCourseAdministrator)
+                {
+                    <NavLink class="button button-primary" href="@CreateCourseUrl">
+                        Create Course
+                    </NavLink>
+                }
+            </FeedbackPanel>
+        }
+        else
+        {
+            <div class="responsive-table">
+                <table>
+                    <thead>
+                        <tr>
+                            @if (isAiExpanded)
+                            {
+                                <th scope="col">AI context</th>
+                            }
+                            <th scope="col">Code</th>
+                            <th scope="col">Course</th>
+                            <th scope="col">Level</th>
+                            <th scope="col">Credit points</th>
+                            <th scope="col">
+                                @(UserContext.IsCourseAdministrator ? "Status" : "Enrollment")
+                            </th>
+                            <th scope="col">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var course in DisplayedCourses)
+                        {
+                            var enrollment = CurrentEnrollment(course.Code);
+                            <tr class="@(!course.IsActive ? "course-inactive" : null)">
+                                @if (isAiExpanded)
+                                {
+                                    <td>
+                                        <input type="checkbox"
+                                               checked="@selectedCourseIds.Contains(course.Id)"
+                                               aria-label="@($"Use {course.Code} as Course AI context")"
+                                               @onchange="args => UpdateCourseSelection(course.Id, args)" />
+                                    </td>
+                                }
+                                <td><strong>@course.Code</strong></td>
+                                <td>
+                                    <strong>@course.Name</strong>
+                                    <small>@course.Description</small>
+                                </td>
+                                <td>@course.Level</td>
+                                <td>@course.CreditPoints</td>
+                                @if (UserContext.IsCourseAdministrator)
+                                {
+                                    <td>
+                                        <span class="status-badge @(course.IsActive ? "paid" : "overdue")">
+                                            @(course.IsActive ? "Active" : "Inactive")
+                                        </span>
+                                    </td>
+                                }
+                                else
+                                {
+                                    <td>
+                                        @if (studentSummary is null)
+                                        {
+                                            <span class="status-badge outstanding">
+                                                Unavailable
+                                            </span>
+                                        }
+                                        else
+                                        {
+                                            <span class="status-badge @(enrollment is null ? "outstanding" : "paid")">
+                                                @(enrollment is null ? "Not enrolled" : enrollment.Status)
+                                            </span>
+                                        }
+                                    </td>
+                                }
+                                <td>
+                                    <div class="button-row">
+                                        <NavLink class="button button-small button-secondary"
+                                                 href="@CourseDetailsUrl(course.Id)">
+                                            View
+                                        </NavLink>
+
+                                        @if (UserContext.IsCourseAdministrator)
+                                        {
+                                            <NavLink class="button button-small button-primary"
+                                                     href="@EditCourseUrl(course.Id)">
+                                                Edit
+                                            </NavLink>
+                                        }
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </section>
+    }
 }
 
 @code {
+    static readonly IReadOnlyList<CourseFilterOption> StaffFilters =
+    [
+        new("all", "All"),
+        new("active", "Active"),
+        new("inactive", "Inactive")
+    ];
+
+    static readonly IReadOnlyList<CourseFilterOption> StudentFilters =
+    [
+        new("all", "All"),
+        new("enrolled", "Enrolled"),
+        new("not-enrolled", "Not enrolled")
+    ];
+
     [SupplyParameterFromQuery]
     public string? Message { get; set; }
 
+    [SupplyParameterFromQuery]
+    public string? Tab { get; set; }
+
     private IReadOnlyList<CourseSummary> courses = [];
+    private readonly HashSet<int> selectedCourseIds = [];
     private string? errorMessage;
+    private string? aiErrorMessage;
+    private string courseFilter = "all";
+    private string aiQuestion = string.Empty;
+    private string searchTerm = string.Empty;
+    private string? enrollmentErrorMessage;
     private bool isLoading = true;
+    private bool isAskingAi;
+    private bool isAiExpanded;
+    private CourseQuestionResponse? aiResponse;
+    private StudentCourseSummary? studentSummary;
+
+    string DashboardReturnUrl => UserContext.IsCourseAdministrator
+        ? CourseNavigation.Dashboard(courseFilter)
+        : "/courses";
+    string CreateCourseUrl => CourseNavigation.WithReturnUrl(
+        "/courses/new",
+        DashboardReturnUrl);
+
+    IReadOnlyList<CourseSummary> AvailableCourses =>
+        courses.Where(course => course.IsActive).ToList();
+
+    IReadOnlyList<CourseFilterOption> AvailableFilters =>
+        UserContext.IsCourseAdministrator
+            ? StaffFilters
+            : StudentFilters;
+
+    IReadOnlyList<CourseSummary> DisplayedCourses
+    {
+        get
+        {
+            IEnumerable<CourseSummary> filteredCourses = courseFilter switch
+            {
+                "active" => courses.Where(course => course.IsActive),
+                "inactive" => courses.Where(course => !course.IsActive),
+                "enrolled" => AvailableCourses.Where(course =>
+                    CurrentEnrollment(course.Code) is not null),
+                "not-enrolled" => AvailableCourses.Where(course =>
+                    CurrentEnrollment(course.Code) is null),
+                _ when !UserContext.IsCourseAdministrator => AvailableCourses,
+                _ => courses
+            };
+
+            var search = searchTerm.Trim();
+            if (search.Length > 0)
+            {
+                filteredCourses = filteredCourses.Where(course =>
+                    course.Code.Contains(search, StringComparison.OrdinalIgnoreCase)
+                    || course.Name.Contains(search, StringComparison.OrdinalIgnoreCase)
+                    || course.Description.Contains(search, StringComparison.OrdinalIgnoreCase));
+            }
+
+            return filteredCourses.ToList();
+        }
+    }
+
+    IReadOnlyList<CourseSummary> AiCatalogueCourses =>
+        UserContext.IsCourseAdministrator
+            ? courses
+            : courses.Where(course => course.IsActive).ToList();
+
+    IReadOnlyList<CourseSummary> SelectedCourses =>
+        AiCatalogueCourses
+            .Where(course => selectedCourseIds.Contains(course.Id))
+            .ToList();
+
+    int ActiveCourseCount => courses.Count(course => course.IsActive);
+    int InactiveCourseCount => courses.Count(course => !course.IsActive);
+    int EnrolledCatalogueCourseCount => AvailableCourses.Count(course =>
+        CurrentEnrollment(course.Code) is not null);
+    string RoleLabel => UserContext.IsCourseAdministrator ? "Staff" : "Student";
+    string? DashboardMessage => Message switch
+    {
+        "created" => "Course created successfully.",
+        "updated" => "Course updated successfully.",
+        "deleted" => "Course deleted successfully.",
+        _ => null
+    };
+    string HeroEyebrow => UserContext.IsCourseAdministrator
+        ? "Your curriculum workspace"
+        : "Your Course catalogue";
+    string HeroTitle => UserContext.IsCourseAdministrator
+        ? "Shape the Course catalogue."
+        : "Explore available Courses.";
+    string HeroDescription => UserContext.IsCourseAdministrator
+        ? "Review Course availability, maintain curriculum records, and open the tools needed to keep Course information current."
+        : "Browse active Courses, review their details and syllabus, and check whether you meet their prerequisites.";
+    string MetricAriaLabel => UserContext.IsCourseAdministrator
+        ? "Curriculum summary"
+        : "Available Course summary";
+
+    string CatalogueDescription => UserContext.IsCourseAdministrator
+        ? "Search, filter, and maintain the curriculum catalogue."
+        : "Search Courses, review details and prerequisites, then enrol when ready.";
+    string FilterAriaLabel => UserContext.IsCourseAdministrator
+        ? "Filter Courses by publication status"
+        : "Filter Courses by enrolment status";
+
+    string EmptyStateTitle => courseFilter switch
+    {
+        _ when !string.IsNullOrWhiteSpace(searchTerm) => "No matching Courses",
+        "inactive" => "No inactive Courses",
+        "active" => "No active Courses",
+        "enrolled" => "No enrolled Courses in this catalogue",
+        "not-enrolled" => "No Courses available to enrol in",
+        _ => "No Courses available"
+    };
+
+    string EmptyStateMessage => courseFilter switch
+    {
+        _ when !string.IsNullOrWhiteSpace(searchTerm) =>
+            "Try a different Course code, name, or description.",
+        "inactive" => "Every Course in the catalogue is currently active.",
+        "active" => "Activate a Course before it can be displayed to Students.",
+        "enrolled" =>
+            "No current Academic Records enrolments match this Course catalogue.",
+        "not-enrolled" =>
+            "Every available Course in this catalogue is already enrolled.",
+        _ when UserContext.IsCourseAdministrator =>
+            "Create a Course to begin building the Course catalogue.",
+        _ => "There are no active Courses available to browse."
+    };
 
     protected override async Task OnInitializedAsync()
     {
+        var availableFilters = UserContext.IsCourseAdministrator
+            ? StaffFilters
+            : StudentFilters;
+        courseFilter = availableFilters.Any(filter =>
+            string.Equals(filter.Key, Tab, StringComparison.Ordinal))
+                ? Tab!
+                : "all";
         await LoadCoursesAsync();
     }
+
+    string CourseDetailsUrl(int courseId) =>
+        CourseNavigation.WithReturnUrl(
+            $"/courses/{courseId}",
+            DashboardReturnUrl);
+
+    string EditCourseUrl(int courseId) =>
+        CourseNavigation.WithReturnUrl(
+            $"/courses/{courseId}/edit",
+            DashboardReturnUrl);
 
     private async Task LoadCoursesAsync()
     {
@@ -100,6 +549,13 @@ else
         try
         {
             courses = await CourseApi.GetAllAsync();
+            selectedCourseIds.RemoveWhere(
+                courseId => courses.All(course => course.Id != courseId));
+
+            if (!UserContext.IsCourseAdministrator)
+            {
+                await LoadStudentSummaryAsync();
+            }
         }
         catch (CourseApiException exception)
         {
@@ -118,4 +574,150 @@ else
             isLoading = false;
         }
     }
+
+    private async Task LoadStudentSummaryAsync()
+    {
+        enrollmentErrorMessage = null;
+
+        try
+        {
+            studentSummary = await CourseApi.GetStudentCourseSummaryAsync();
+        }
+        catch (CourseApiException exception)
+        {
+            studentSummary = null;
+            courseFilter = "all";
+            enrollmentErrorMessage = exception.Message;
+        }
+        catch (HttpRequestException)
+        {
+            studentSummary = null;
+            courseFilter = "all";
+            enrollmentErrorMessage =
+                "Academic Records could not be reached. Course browsing is still available.";
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            studentSummary = null;
+            courseFilter = "all";
+            enrollmentErrorMessage =
+                "Academic Records returned unexpected enrolment information.";
+        }
+    }
+
+    private CourseEnrollment? CurrentEnrollment(string courseCode) =>
+        studentSummary?.Enrollments.FirstOrDefault(enrollment =>
+            enrollment.IsCurrent
+            && string.Equals(
+                enrollment.CourseCode,
+                courseCode,
+                StringComparison.OrdinalIgnoreCase));
+
+    private void SetCourseFilter(string filter)
+    {
+        if (AvailableFilters.Any(option =>
+                string.Equals(option.Key, filter, StringComparison.Ordinal)
+                && !IsEnrollmentFilterUnavailable(option)))
+        {
+            courseFilter = filter;
+        }
+    }
+
+    private bool IsEnrollmentFilterUnavailable(CourseFilterOption filter) =>
+        !UserContext.IsCourseAdministrator
+        && studentSummary is null
+        && !string.Equals(filter.Key, "all", StringComparison.Ordinal);
+
+    private void ToggleAi()
+    {
+        isAiExpanded = !isAiExpanded;
+    }
+
+    private void UpdateCourseSelection(
+        int courseId,
+        ChangeEventArgs args)
+    {
+        if (args.Value is true)
+        {
+            selectedCourseIds.Add(courseId);
+        }
+        else
+        {
+            selectedCourseIds.Remove(courseId);
+        }
+
+        aiErrorMessage = null;
+        aiResponse = null;
+    }
+
+    private async Task AskCourseQuestionAsync()
+    {
+        var question = aiQuestion.Trim();
+        if (question.Length < 3)
+        {
+            aiErrorMessage =
+                "Enter a Course question containing at least three characters.";
+            aiResponse = null;
+            return;
+        }
+
+        var selectedCourses = SelectedCourses;
+        var contextCourses = selectedCourses.Count > 0
+            ? selectedCourses
+            : AiCatalogueCourses;
+
+        isAskingAi = true;
+        aiErrorMessage = null;
+        aiResponse = null;
+
+        try
+        {
+            aiResponse = await CourseApi.AskCourseQuestionAsync(
+                new CourseQuestionRequest(
+                    question,
+                    contextCourses
+                        .Select(course => new CourseQuestionContext(
+                            course.Code,
+                            course.Name,
+                            course.Description,
+                            course.Level,
+                            course.CreditPoints))
+                        .ToList(),
+                    CoursesExplicitlySelected: selectedCourses.Count > 0));
+        }
+        catch (CourseApiException exception)
+        {
+            aiErrorMessage = exception.Message;
+        }
+        catch (HttpRequestException)
+        {
+            aiErrorMessage =
+                "The Course question could not be submitted. Check that Course Management is running.";
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            aiErrorMessage =
+                "The Course AI API returned an unexpected response.";
+        }
+        finally
+        {
+            isAskingAi = false;
+        }
+    }
+
+    private void ClearAiResponse()
+    {
+        aiQuestion = string.Empty;
+        aiErrorMessage = null;
+        aiResponse = null;
+    }
+
+    private void ClearSelectedCourses()
+    {
+        selectedCourseIds.Clear();
+        aiErrorMessage = null;
+        aiResponse = null;
+    }
+
+    sealed record CourseFilterOption(string Key, string Label);
 }

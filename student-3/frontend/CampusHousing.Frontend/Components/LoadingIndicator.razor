@@ -1,0 +1,12 @@
+<div class="loading-indicator"
+     role="status"
+     aria-live="polite"
+     aria-atomic="true">
+    <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+    <span>@Message</span>
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public required string Message { get; set; }
+}

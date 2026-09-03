@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using CourseManagement.Frontend.Models;
@@ -7,6 +8,19 @@ namespace CourseManagement.Frontend.Services;
 
 public sealed class CourseApiClient(HttpClient httpClient)
 {
+    public async Task<IReadOnlyList<CourseAccessUser>> GetCourseAccessUsersAsync(
+        CancellationToken cancellationToken = default)
+    {
+        using var response = await httpClient.GetAsync(
+            "api/course-access/users",
+            cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+
+        return await response.Content.ReadFromJsonAsync<List<CourseAccessUser>>(
+                cancellationToken)
+            ?? throw new JsonException("The Course access API returned an empty response.");
+    }
+
     public async Task<IReadOnlyList<CourseSummary>> GetAllAsync(
         CancellationToken cancellationToken = default)
     {
@@ -15,6 +29,36 @@ public sealed class CourseApiClient(HttpClient httpClient)
 
         return await response.Content.ReadFromJsonAsync<List<CourseSummary>>(cancellationToken)
             ?? [];
+    }
+
+    public async Task<StudentCourseSummary> GetStudentCourseSummaryAsync(
+        CancellationToken cancellationToken = default)
+    {
+        using var response = await httpClient.GetAsync(
+            "api/course-access/student",
+            cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+
+        return await response.Content.ReadFromJsonAsync<StudentCourseSummary>(
+                cancellationToken)
+            ?? throw new JsonException(
+                "The Course enrolment API returned an empty response.");
+    }
+
+    public async Task<StudentCourseSummary> EnrollInCourseAsync(
+        CreateCourseEnrollmentRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        using var response = await httpClient.PostAsJsonAsync(
+            "api/course-access/student/enrollments",
+            request,
+            cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+
+        return await response.Content.ReadFromJsonAsync<StudentCourseSummary>(
+                cancellationToken)
+            ?? throw new JsonException(
+                "The Course enrolment API returned an empty response.");
     }
 
     public async Task<CourseDetail> GetByIdAsync(
@@ -26,6 +70,22 @@ public sealed class CourseApiClient(HttpClient httpClient)
 
         return await response.Content.ReadFromJsonAsync<CourseDetail>(cancellationToken)
             ?? throw new JsonException("The Course API returned an empty response.");
+    }
+
+    public async Task<CourseQuestionResponse> AskCourseQuestionAsync(
+        CourseQuestionRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        using var response = await httpClient.PostAsJsonAsync(
+            "api/ai/course-questions",
+            request,
+            cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+
+        return await response.Content.ReadFromJsonAsync<CourseQuestionResponse>(
+                cancellationToken)
+            ?? throw new JsonException(
+                "The Course AI API returned an empty response.");
     }
 
     public async Task<CourseSummary> CreateAsync(
@@ -69,6 +129,51 @@ public sealed class CourseApiClient(HttpClient httpClient)
     {
         using var response = await httpClient.DeleteAsync($"api/courses/{id}", cancellationToken);
         await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public async Task<SyllabusResponse> UploadSyllabusAsync(
+        int courseId,
+        Stream content,
+        string fileName,
+        string contentType,
+        CancellationToken cancellationToken = default)
+    {
+        using var form = new MultipartFormDataContent();
+        using var fileContent = new StreamContent(content);
+        fileContent.Headers.ContentType = MediaTypeHeaderValue.Parse(contentType);
+        form.Add(fileContent, "file", fileName);
+
+        using var response = await httpClient.PutAsync(
+            $"api/courses/{courseId}/syllabus",
+            form,
+            cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+
+        return await response.Content.ReadFromJsonAsync<SyllabusResponse>(cancellationToken)
+            ?? throw new JsonException("The syllabus API returned an empty response.");
+    }
+
+    public async Task DeleteSyllabusAsync(
+        int courseId,
+        CancellationToken cancellationToken = default)
+    {
+        using var response = await httpClient.DeleteAsync(
+            $"api/courses/{courseId}/syllabus",
+            cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public string GetSyllabusUrl(int courseId, bool download = false)
+    {
+        var baseAddress = httpClient.BaseAddress
+            ?? throw new InvalidOperationException("The Course API base address is not configured.");
+        var relativeUrl = $"api/courses/{courseId}/syllabus";
+        if (download)
+        {
+            relativeUrl += "?download=true";
+        }
+
+        return new Uri(baseAddress, relativeUrl).ToString();
     }
 
     public async Task<PrerequisiteSummary> GetPrerequisiteAsync(
@@ -213,7 +318,18 @@ public sealed class CourseApiClient(HttpClient httpClient)
             return;
         }
 
-        var problem = await response.Content.ReadFromJsonAsync<ApiProblemDetails>(cancellationToken);
+        ApiProblemDetails? problem = null;
+        try
+        {
+            problem = await response.Content.ReadFromJsonAsync<ApiProblemDetails>(cancellationToken);
+        }
+        catch (JsonException)
+        {
+        }
+        catch (NotSupportedException)
+        {
+        }
+
         var validationMessages = problem?.Errors?
             .SelectMany(error => error.Value)
             .Where(message => !string.IsNullOrWhiteSpace(message))

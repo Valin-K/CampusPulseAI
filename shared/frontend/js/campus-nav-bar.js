@@ -47,9 +47,10 @@ class CampusNavBar extends HTMLElement {
         const globalLink = portalHref
             ? `<nav class="global-nav" aria-label="Application navigation"><a href="${escape(portalHref)}">All services</a></nav>`
             : '';
-        const user = userName
+        const fallbackUser = userName
             ? `<div class="user" aria-label="Current student"><span class="avatar" aria-hidden="true">${userInitials}</span><span><strong>${escape(userName)}</strong><small>${userDetails}</small></span></div>`
             : '';
+        const user = `<slot name="user-selector">${fallbackUser}</slot>`;
         const count = serviceCount
             ? `<span class="service-count">${escape(serviceCount)}</span>`
             : '';
@@ -75,6 +76,7 @@ class CampusNavBar extends HTMLElement {
                 .user { display: flex; align-items: center; gap: .65rem; padding-left: .9rem; border-left: 1px solid rgba(255, 255, 255, .18); }
                 .user strong { font-size: .8rem; }
                 .avatar { width: 2.35rem; height: 2.35rem; display: grid; place-items: center; border: 1px solid rgba(255, 255, 255, .22); border-radius: 50%; color: #fff; background: #1769aa; font-size: .72rem; font-weight: 850; }
+                ::slotted([slot="user-selector"]) { display: block; min-width: min(19rem, 32vw); padding-left: .9rem; border-left: 1px solid rgba(255, 255, 255, .18); }
                 .context-bar { padding: .65rem clamp(1rem, 4vw, 4rem); color: #243b53; background: rgba(255, 255, 255, .72); border-bottom: 1px solid #d9e2ec; font-size: .72rem; font-weight: 700; }
                 .context-bar span { display: flex; align-items: center; gap: .45rem; }
                 .context-bar i { width: .48rem; height: .48rem; border-radius: 50%; background: #20a47a; box-shadow: 0 0 0 4px rgba(32, 164, 122, .12); }
@@ -85,6 +87,7 @@ class CampusNavBar extends HTMLElement {
                     .global-nav { margin-left: auto; }
                     .user > span:last-child { display: none; }
                     .user { padding-left: 0; border-left: 0; }
+                    ::slotted([slot="user-selector"]) { width: 100%; min-width: 0; padding: .65rem 0 0; border-top: 1px solid rgba(255, 255, 255, .15); border-left: 0; }
                 }
                 @media (max-width: 480px) {
                     .brand-copy { display: none; }

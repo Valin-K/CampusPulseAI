@@ -1,0 +1,255 @@
+@page "/search"
+@inject EventSchedulingApiClient Api
+@inject CurrentUser CurrentUser
+@inject NavigationManager Nav
+
+<PageTitle>Search | Event & Facility Scheduling</PageTitle>
+
+<header class="dashboard-hero">
+    <div>
+        <span class="eyebrow">Find what you need</span>
+        <h1>@RoomsOrEquipmentHeading</h1>
+        <p>Filter the list, then pick a @(resourceType == "equipment" ? "kit" : "room") to continue to booking.</p>
+    </div>
+</header>
+
+@if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <div class="notice notice-error" role="alert">@errorMessage</div>
+}
+
+<CampusSectionTabs Items="resourceTypes" ActiveKey="@resourceType" ActiveKeyChanged="ChangeResourceTypeAsync" AriaLabel="Resource type" />
+
+<section class="surface-card" aria-label="Search">
+    <div class="search-toolbar">
+        <label class="field search-field">
+            <span>Search</span>
+            <input type="search"
+                   placeholder="@(resourceType == "equipment" ? "Search by name or category" : "Search by name or location")"
+                   @bind="searchText" @bind:event="oninput" />
+        </label>
+
+        @if (resourceType == "equipment")
+        {
+            <label class="field">
+                <span>Type</span>
+                <select @bind="categoryFilter">
+                    <option value="">Any type</option>
+                    @foreach (var category in Categories)
+                    {
+                        <option value="@category">@category</option>
+                    }
+                </select>
+            </label>
+            <label class="field">
+                <span>Hire date</span>
+                <input type="date" min="@todayIso" @bind="selectedDate" />
+            </label>
+        }
+        else
+        {
+            <label class="field">
+                <span>Building</span>
+                <select @bind="buildingFilter">
+                    <option value="">Any building</option>
+                    @foreach (var building in Buildings)
+                    {
+                        <option value="@building">@building</option>
+                    }
+                </select>
+            </label>
+            <label class="field">
+                <span>Min. seats</span>
+                <input type="number" min="1" step="1" placeholder="Any" @bind="minSeats" />
+            </label>
+            <label class="field">
+                <span>Date of use</span>
+                <input type="date" min="@todayIso" @bind="selectedDate" />
+            </label>
+        }
+
+        @if (HasActiveFilters)
+        {
+            <button type="button" class="button button-secondary" @onclick="ClearFilters">Clear filters</button>
+        }
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="skeleton-stack"><span></span><span></span><span></span></div>
+    }
+    else if (resourceType == "equipment")
+    {
+        <div class="result-list">
+            @foreach (var item in FilteredEquipment)
+            {
+                <div class="result-row" role="button" tabindex="0" @onclick="() => SelectItem(item.Id, item.Name)">
+                    <div class="result-row-head">
+                        <strong>@item.Name</strong>
+                        <span class="result-row-meta">@item.AvailableCount available</span>
+                    </div>
+                    <span class="result-row-info">@item.Category</span>
+                    <span class="result-row-desc">@item.Description</span>
+                </div>
+            }
+        </div>
+        @if (!FilteredEquipment.Any())
+        {
+            <p class="eyebrow">No equipment matches your filters.</p>
+        }
+    }
+    else
+    {
+        <div class="result-list">
+            @foreach (var room in FilteredRooms)
+            {
+                <div class="result-row" role="button" tabindex="0" @onclick="() => SelectItem(room.Id, room.Name)">
+                    <div class="result-row-head">
+                        <strong>@room.Name</strong>
+                        <span class="result-row-meta">Seats @room.Capacity</span>
+                    </div>
+                    <span class="result-row-info">@(CurrentUser.IsStaff ? $"{room.KindLabel} · {room.Location}" : room.Location)</span>
+                    <span class="result-row-desc">@room.Description</span>
+                </div>
+            }
+        </div>
+        @if (!FilteredRooms.Any())
+        {
+            <p class="eyebrow">No rooms match your filters.</p>
+        }
+    }
+</section>
+
+@code {
+    private IReadOnlyList<CampusTabItem> resourceTypes =>
+    [
+        new("room", "Rooms", CurrentUser.IsStaff ? "Lab and lecture rooms" : "Study rooms and spaces"),
+        new("equipment", "Equipment", "Hireable equipment")
+    ];
+
+    [SupplyParameterFromQuery(Name = "type")]
+    public string? Type { get; set; }
+
+    [SupplyParameterFromQuery(Name = "date")]
+    public string? Date { get; set; }
+
+    private readonly List<RoomResponse> rooms = [];
+    private readonly List<RefEquipmentResponse> equipment = [];
+
+    private string resourceType = "room";
+    private string searchText = string.Empty;
+    private string categoryFilter = string.Empty;
+    private string buildingFilter = string.Empty;
+    private int? minSeats;
+    private DateOnly? selectedDate;
+
+    private string? errorMessage;
+    private bool isLoading = true;
+
+    private static string todayIso => DateTime.Today.ToString("yyyy-MM-dd");
+
+    private string RoomsOrEquipmentHeading => resourceType == "equipment"
+        ? "Hire equipment"
+        : CurrentUser.IsStaff ? "Reserve a teaching room" : "Reserve a study room";
+
+    // Rooms this user is allowed to book: staff see Lab/Lecture, students see Study.
+    private IEnumerable<RoomResponse> VisibleRooms =>
+        rooms.Where(room => CurrentUser.IsStaff ? room.IsStaffRoom : room.Kind == RoomKind.Study);
+
+    private string DateSuffix => selectedDate is { } date ? $"&date={date:yyyy-MM-dd}" : string.Empty;
+
+    private bool HasActiveFilters =>
+        searchText.Length > 0 || categoryFilter.Length > 0 || buildingFilter.Length > 0
+        || minSeats is not null || selectedDate is not null;
+
+    private IEnumerable<string> Buildings => VisibleRooms
+        .Select(BuildingOf)
+        .Where(building => building.Length > 0)
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .OrderBy(building => building, StringComparer.OrdinalIgnoreCase);
+
+    private IEnumerable<string> Categories => equipment
+        .Select(item => item.Category)
+        .Where(category => !string.IsNullOrWhiteSpace(category))
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .OrderBy(category => category, StringComparer.OrdinalIgnoreCase);
+
+    private IEnumerable<RoomResponse> FilteredRooms => VisibleRooms.Where(room =>
+        (searchText.Length == 0
+            || room.Name.Contains(searchText, StringComparison.OrdinalIgnoreCase)
+            || room.Location.Contains(searchText, StringComparison.OrdinalIgnoreCase))
+        && (buildingFilter.Length == 0
+            || string.Equals(BuildingOf(room), buildingFilter, StringComparison.OrdinalIgnoreCase))
+        && (minSeats is not { } min || room.Capacity >= min));
+
+    private IEnumerable<RefEquipmentResponse> FilteredEquipment => equipment.Where(item =>
+        (searchText.Length == 0
+            || item.Name.Contains(searchText, StringComparison.OrdinalIgnoreCase)
+            || item.Category.Contains(searchText, StringComparison.OrdinalIgnoreCase))
+        && (categoryFilter.Length == 0
+            || string.Equals(item.Category, categoryFilter, StringComparison.OrdinalIgnoreCase)));
+
+    private static string BuildingOf(RoomResponse room)
+    {
+        var comma = room.Location.IndexOf(',');
+        return (comma > 0 ? room.Location[..comma] : room.Location).Trim();
+    }
+
+    protected override void OnParametersSet() =>
+        resourceType = string.Equals(Type, "equipment", StringComparison.OrdinalIgnoreCase) ? "equipment" : "room";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CurrentUser.LoadAsync();
+
+        if (DateOnly.TryParse(Date, System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.None, out var parsedDate))
+        {
+            selectedDate = parsedDate;
+        }
+
+        try
+        {
+            var roomsTask = Api.GetRoomsAsync();
+            var equipmentTask = Api.GetRefEquipmentAsync();
+            await Task.WhenAll(roomsTask, equipmentTask);
+            rooms.Clear();
+            rooms.AddRange(await roomsTask);
+            equipment.Clear();
+            equipment.AddRange(await equipmentTask);
+        }
+        catch (HttpRequestException)
+        {
+            errorMessage = "The Event Scheduling service is unavailable.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private Task ChangeResourceTypeAsync(string key)
+    {
+        // The date is a shared "when do you want it" and carries across tabs.
+        ResetTypeFilters();
+        Nav.NavigateTo($"/search?type={key}{DateSuffix}", replace: true);
+        return Task.CompletedTask;
+    }
+
+    private void ClearFilters()
+    {
+        ResetTypeFilters();
+        selectedDate = null;
+    }
+
+    private void ResetTypeFilters()
+    {
+        searchText = string.Empty;
+        categoryFilter = string.Empty;
+        buildingFilter = string.Empty;
+        minSeats = null;
+    }
+
+    private void SelectItem(int id, string name) =>
+        Nav.NavigateTo($"/book?type={resourceType}&itemId={id}&itemName={Uri.EscapeDataString(name)}{DateSuffix}");
+}

@@ -7,8 +7,8 @@ services:
     environment:
       ASPNETCORE_HTTP_PORTS: 8080
       ConnectionStrings__AcademicRecords: Data Source=/app/data/academic-records.db
-    volumes:
-      - academicrecords-data:/app/data
+    ports:
+      - "5021:8080"
 
   academicrecords.backend:
     image: ${DOCKER_REGISTRY-}academicrecordsbackend
@@ -18,6 +18,7 @@ services:
     environment:
       ASPNETCORE_HTTP_PORTS: 8080
       Services__AcademicRecordsDatabase: http://academicrecords.database:8080
+      Services__CourseManagementDatabase: http://coursemanagement.database:8080
     ports:
       - "5020:8080"
     depends_on:
@@ -29,16 +30,51 @@ services:
       context: .
       dockerfile: student-2/backend/CourseManagement.Backend/Dockerfile
     environment:
+      - Services__AcademicRecordsDatabase=http://academicrecords.database:8080
+      - Services__CourseManagementDatabase=http://coursemanagement.database:8080
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+    depends_on:
+      - academicrecords.database
+      - coursemanagement.database
+
+  coursemanagement.database:
+    image: ${DOCKER_REGISTRY-}coursemanagement.database
+    build:
+      context: .
+      dockerfile: student-2/database/CourseManagement.Database/Dockerfile
+    environment:
+      - ASPNETCORE_HTTP_PORTS=8080
       - ConnectionStrings__CourseManagementDatabase=Data Source=/app/data/course-management.db;Foreign Keys=True
+      - SyllabusStorage__RootPath=/app/data/syllabi
+    ports:
+      - "5120:8080"
     volumes:
       - coursemanagement-data:/app/data
-
 
   campushousing.backend:
     image: ${DOCKER_REGISTRY-}campushousingbackend
     build:
       context: .
       dockerfile: student-3/backend/CampusHousing.Backend/Dockerfile
+    environment:
+      ASPNETCORE_HTTP_PORTS: 8080
+      Services__CampusHousingDatabase: http://campushousing.database:8080
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+    ports:
+      - "5083:8080"
+    depends_on:
+      - campushousing.database
+
+  campushousing.database:
+    image: ${DOCKER_REGISTRY-}campushousingdatabase
+    build:
+      context: .
+      dockerfile: student-3/database/CampusHousing.Database/Dockerfile
+    environment:
+      ASPNETCORE_HTTP_PORTS: 8080
+      ConnectionStrings__CampusHousing: Data Source=/app/data/campus-housing.db
+    volumes:
+      - campushousing-data:/app/data
 
 
   financialaidbilling.backend:
@@ -71,6 +107,26 @@ services:
     build:
       context: .
       dockerfile: student-5/backend/EventScheduling.Backend/Dockerfile
+    environment:
+      ASPNETCORE_HTTP_PORTS: 8080
+      Services__EventDatabase: http://eventscheduling.database:8080
+      Services__AcademicRecordsDatabase: http://academicrecords.database:8080
+    ports:
+      - "8090:8080"
+    depends_on:
+      eventscheduling.database:
+        condition: service_started
+      academicrecords.database:
+        condition: service_started
+
+  eventscheduling.database:
+    image: ${DOCKER_REGISTRY-}eventschedulingdatabase
+    build:
+      context: .
+      dockerfile: student-5/database/EventScheduling.Database/Dockerfile
+    environment:
+      ASPNETCORE_HTTP_PORTS: 8080
+      ConnectionStrings__EventScheduling: Data Source=/app/data/event-scheduling.db
 
 
   mcpserver:
@@ -122,6 +178,8 @@ services:
       dockerfile: docker/frontend/CampusHousing.Dockerfile
     ports:
       - "8083:80"
+    depends_on:
+      - campushousing.backend
 
 
   financialaidbilling.frontend:
@@ -143,6 +201,9 @@ services:
       dockerfile: docker/frontend/EventScheduling.Dockerfile
     ports:
       - "8085:80"
+    depends_on:
+      eventscheduling.backend:
+        condition: service_started
 
   shared-ui:
     image: nginx:alpine
@@ -152,5 +213,5 @@ services:
       - ./shared/frontend:/usr/share/nginx/html:ro
 
 volumes:
-  academicrecords-data:
   coursemanagement-data:
+  campushousing-data:

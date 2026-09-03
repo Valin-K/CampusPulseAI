@@ -5,7 +5,9 @@
                   UserDetails="@UserDetails"
                   UserInitials="@UserInitials"
                   HomeHref="@HomeHref"
-                  PortalHref="@PortalHref" />
+                  PortalHref="@PortalHref"
+                  ContextLabel="@ContextLabel"
+                  UserSelector="@UserSelector" />
 
     <main class="campus-workspace">
         @ChildContent
@@ -25,5 +27,7 @@
     [Parameter] public string UserInitials { get; set; } = "ST";
     [Parameter] public string HomeHref { get; set; } = "/";
     [Parameter] public string PortalHref { get; set; } = "http://localhost:8080";
+    [Parameter] public string ContextLabel { get; set; } = "Student portal";
+    [Parameter] public RenderFragment? UserSelector { get; set; }
     [Parameter, EditorRequired] public RenderFragment? ChildContent { get; set; }
 }

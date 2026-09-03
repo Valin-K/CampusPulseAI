@@ -1,0 +1,84 @@
+@namespace EventScheduling.Frontend.Components
+
+<div class="room-availability">
+    <span class="eyebrow">Availability on @Date.ToString("dddd, MMMM d")</span>
+
+    <div class="availability-track" aria-hidden="true">
+        @foreach (var booking in dayBookings)
+        {
+            <div class="availability-block status-@booking.Status.ToString().ToLowerInvariant()"
+                 style="@BlockStyle(TimeOnly.FromDateTime(booking.StartUtc), TimeOnly.FromDateTime(booking.EndUtc))"
+                 title="@booking.ResourceName · @booking.StartUtc.ToString("h:mm tt")–@booking.EndUtc.ToString("h:mm tt")"></div>
+        }
+        @if (proposed is { } slot)
+        {
+            <div class="availability-block is-proposed @(ProposedClashes ? "is-clash" : null)"
+                 style="@BlockStyle(slot.Start, slot.End)"></div>
+        }
+    </div>
+
+    <div class="availability-scale">
+        <span>12 am</span><span>6 am</span><span>12 pm</span><span>6 pm</span><span>12 am</span>
+    </div>
+
+    @if (dayBookings.Count == 0)
+    {
+        <p class="availability-empty">Nothing is booked on this room for @Date.ToString("MMM d").</p>
+    }
+    else
+    {
+        <ul class="availability-list">
+            @foreach (var booking in dayBookings)
+            {
+                <li class="availability-chip status-@booking.Status.ToString().ToLowerInvariant()">
+                    @booking.StartUtc.ToString("h:mm tt") – @booking.EndUtc.ToString("h:mm tt") · @booking.Status
+                </li>
+            }
+        </ul>
+    }
+</div>
+
+@code {
+    // Full 24-hour day so bookings at any time (including overnight or early hours) are shown.
+    private const int OpenHour = 0;
+    private const int CloseHour = 24;
+    private const double WindowMinutes = (CloseHour - OpenHour) * 60;
+
+    [Parameter, EditorRequired] public IReadOnlyList<BookingResponse> Bookings { get; set; } = [];
+    [Parameter, EditorRequired] public DateOnly Date { get; set; }
+    [Parameter] public int RoomId { get; set; }
+    [Parameter] public TimeOnly? ProposedStart { get; set; }
+    [Parameter] public TimeOnly? ProposedEnd { get; set; }
+
+    private List<BookingResponse> dayBookings = [];
+    private (TimeOnly Start, TimeOnly End)? proposed;
+
+    protected override void OnParametersSet()
+    {
+        dayBookings = Bookings
+            .Where(booking => booking.RoomId == RoomId
+                              && DateOnly.FromDateTime(booking.StartUtc) == Date
+                              && booking.Status is not (BookingStatus.Cancelled or BookingStatus.Completed or BookingStatus.Returned))
+            .OrderBy(booking => booking.StartUtc)
+            .ToList();
+
+        proposed = ProposedStart is { } start && ProposedEnd is { } end && end > start
+            ? (start, end)
+            : null;
+    }
+
+    private bool ProposedClashes =>
+        proposed is { } slot
+        && dayBookings.Any(booking =>
+            slot.Start < TimeOnly.FromDateTime(booking.EndUtc)
+            && TimeOnly.FromDateTime(booking.StartUtc) < slot.End);
+
+    private static string BlockStyle(TimeOnly start, TimeOnly end)
+    {
+        var startMinutes = Math.Clamp(start.ToTimeSpan().TotalMinutes - OpenHour * 60, 0, WindowMinutes);
+        var endMinutes = Math.Clamp(end.ToTimeSpan().TotalMinutes - OpenHour * 60, 0, WindowMinutes);
+        var left = startMinutes / WindowMinutes * 100;
+        var width = Math.Max(1.5, (endMinutes - startMinutes) / WindowMinutes * 100);
+        return string.Create(System.Globalization.CultureInfo.InvariantCulture, $"left:{left:0.##}%;width:{width:0.##}%");
+    }
+}

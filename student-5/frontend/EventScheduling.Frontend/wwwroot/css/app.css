@@ -24,6 +24,10 @@ a, .btn-link {
     padding-top: 1.1rem;
 }
 
+.surface-card {
+    margin-bottom: 1.25rem;
+}
+
 .valid.modified:not([type=checkbox]) {
     outline: 1px solid #26b050;
 }
@@ -67,39 +71,45 @@ a, .btn-link {
         content: "An error has occurred."
     }
 
-.loading-progress {
-    position: absolute;
-    display: block;
-    width: 8rem;
-    height: 8rem;
-    inset: 20vh 0 auto 0;
-    margin: 0 auto 0 auto;
+.app-loading {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: .9rem;
+    color: #102a43;
+    background: radial-gradient(circle at center, #fff 0, #eef4f8 65%);
 }
 
-    .loading-progress circle {
-        fill: none;
-        stroke: #e0e0e0;
-        stroke-width: 0.6rem;
-        transform-origin: 50% 50%;
-        transform: rotate(-90deg);
-    }
-
-        .loading-progress circle:last-child {
-            stroke: #1b6ec2;
-            stroke-dasharray: calc(3.141 * var(--blazor-load-percentage, 0%) * 0.8), 500%;
-            transition: stroke-dasharray 0.05s ease-in-out;
-        }
-
-.loading-progress-text {
-    position: absolute;
-    text-align: center;
-    font-weight: bold;
-    inset: calc(20vh + 3.25rem) 0 auto 0.2rem;
+.app-loading > span:last-child {
+    display: grid;
+    gap: .2rem;
 }
 
-    .loading-progress-text:after {
-        content: var(--blazor-load-percentage-text, "Loading");
-    }
+.app-loading strong {
+    font-size: 1.1rem;
+}
+
+.app-loading small {
+    color: #627d98;
+}
+
+.app-loading-mark {
+    width: 3.25rem;
+    height: 3.25rem;
+    display: grid;
+    place-items: center;
+    border-radius: .9rem .9rem .9rem .25rem;
+    color: #102a43;
+    background: #f4b942;
+    font-size: .9rem;
+    font-weight: 900;
+    animation: loading-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes loading-pulse {
+    50% { transform: translateY(-4px); box-shadow: 0 10px 24px rgba(16, 42, 67, .18); }
+}
 
 code {
     color: #c02d76;
