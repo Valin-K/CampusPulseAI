@@ -1,10 +1,11 @@
 @page "/allocations"
 @using CampusHousing.Frontend.Models
 @inject HttpClient Http
+@inject HousingUserContext UserContext
 
 <PageTitle>Allocations | Campus Housing</PageTitle>
 
-<header class="housing-header">
+<header class="dashboard-hero housing-header">
     <div><span class="eyebrow">THE RESIDENCE</span><h1>Housing allocations</h1><p>Review current room assignments and update roommate preferences.</p></div>
     <NavLink class="button-link" href="/">Book a room</NavLink>
 </header>
@@ -15,7 +16,7 @@
 }
 
 <section class="card-panel table-panel">
-    <h2>Current allocations</h2>
+    <h2>@(UserContext.IsAdministrator ? "Manage allocations" : "Current allocations")</h2>
     @if (loading)
     {
         <p class="muted">Loading allocations...</p>
@@ -29,7 +30,7 @@
         <div class="table-responsive"><table><thead><tr><th>Student</th><th>Room</th><th>Allocated</th><th>Roommate preference</th><th>Actions</th></tr></thead><tbody>
             @foreach (var allocation in allocations)
             {
-                <tr><td><strong>@allocation.StudentName</strong><br /><small>@allocation.StudentId</small></td><td>@RoomName(allocation.DormRoomId)</td><td>@allocation.AllocatedAt.ToLocalTime().ToString("MMM d, yyyy")</td><td><input class="inline-input" @bind="allocation.RoommatePreference" /></td><td><button class="link-button" @onclick="() => UpdateAsync(allocation)">Save</button> <button class="link-button danger" @onclick="() => CancelAsync(allocation.Id)">Cancel</button></td></tr>
+                <tr><td><strong>@allocation.StudentName</strong><br /><small>@allocation.StudentId</small></td><td>@if (UserContext.IsAdministrator) { <select @bind="allocation.DormRoomId">@foreach (var room in rooms.Where(room => room.IsAvailable || room.Id == allocation.DormRoomId)) { <option value="@room.Id">@RoomName(room.Id)</option> }</select> } else { @RoomName(allocation.DormRoomId) }</td><td>@allocation.AllocatedAt.ToLocalTime().ToString("MMM d, yyyy")</td><td>@if (UserContext.IsAdministrator) { <input class="inline-input" @bind="allocation.RoommatePreference" /> } else { @allocation.RoommatePreference }</td><td>@if (UserContext.IsAdministrator) { <button class="link-button" @onclick="() => UpdateAsync(allocation)">Save</button> <button class="link-button danger" @onclick="() => CancelAsync(allocation.Id)">Cancel</button> }</td></tr>
             }
         </tbody></table></div>
     }
@@ -60,7 +61,7 @@
 
     private string RoomName(int id) => rooms.FirstOrDefault(room => room.Id == id) is { } room ? $"{room.Building} {room.RoomNumber}" : $"Room {id}";
 
-    private async Task UpdateAsync(HousingAllocation allocation) => await SendAsync(HttpMethod.Put, $"api/housing/allocations/{allocation.Id}", new { allocation.StudentId, allocation.StudentName, allocation.RoommatePreference }, "Roommate preference updated.");
+    private async Task UpdateAsync(HousingAllocation allocation) => await SendAsync(HttpMethod.Put, $"api/housing/allocations/{allocation.Id}", new { allocation.DormRoomId, allocation.StudentId, allocation.StudentName, allocation.RoommatePreference }, "Allocation updated.");
     private async Task CancelAsync(int id) => await SendAsync(HttpMethod.Delete, $"api/housing/allocations/{id}", null, "Allocation cancelled.");
 
     private async Task SendAsync(HttpMethod method, string url, object? body, string success)

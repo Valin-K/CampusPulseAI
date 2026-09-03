@@ -16,6 +16,7 @@ await using (var scope = app.Services.CreateAsyncScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<CampusHousingDbContext>();
     await db.Database.EnsureCreatedAsync();
+    await CampusHousingSeedData.EnsureSeededAsync(db);
 }
 app.UseCors();
 
@@ -62,6 +63,8 @@ app.MapPost("/api/allocations", async (HousingAllocation allocation, CampusHousi
     if (room is null) return Results.BadRequest(new { message = "Room does not exist." });
     if (string.IsNullOrWhiteSpace(allocation.StudentId) || string.IsNullOrWhiteSpace(allocation.StudentName))
         return Results.BadRequest(new { message = "Student ID and student name are required." });
+    if (await db.HousingAllocations.AnyAsync(item => item.StudentId == allocation.StudentId))
+        return Results.Conflict(new { message = "This student already has a room allocation. Confirm reallocation before changing rooms." });
     if (!room.IsAvailable) return Results.Conflict(new { message = "Room is not available for booking." });
     var occupied = await db.HousingAllocations.CountAsync(item => item.DormRoomId == allocation.DormRoomId);
     if (occupied >= room.Capacity) return Results.Conflict(new { message = "Room is at capacity." });
@@ -78,8 +81,23 @@ app.MapPut("/api/allocations/{id:int}", async (int id, HousingAllocation input, 
     if (allocation is null) return Results.NotFound();
     if (string.IsNullOrWhiteSpace(input.StudentId) || string.IsNullOrWhiteSpace(input.StudentName))
         return Results.BadRequest(new { message = "Student ID and student name are required." });
-    allocation.StudentId = input.StudentId; allocation.StudentName = input.StudentName; allocation.RoommatePreference = input.RoommatePreference;
-    await db.SaveChangesAsync(); return Results.Ok(allocation);
+    var newRoom = await db.DormRooms.FindAsync(input.DormRoomId);
+    if (newRoom is null) return Results.BadRequest(new { message = "Room does not exist." });
+    if (await db.HousingAllocations.AnyAsync(item => item.Id != id && item.StudentId == input.StudentId))
+        return Results.Conflict(new { message = "A student can only have one room allocation." });
+    var occupied = await db.HousingAllocations.CountAsync(item => item.DormRoomId == input.DormRoomId && item.Id != id);
+    if (!newRoom.IsAvailable || occupied >= newRoom.Capacity) return Results.Conflict(new { message = "The selected room is not available." });
+    var oldRoomId = allocation.DormRoomId;
+    allocation.DormRoomId = input.DormRoomId; allocation.StudentId = input.StudentId; allocation.StudentName = input.StudentName; allocation.RoommatePreference = input.RoommatePreference;
+    await db.SaveChangesAsync();
+    if (oldRoomId != input.DormRoomId)
+    {
+        var oldRoom = await db.DormRooms.FindAsync(oldRoomId);
+        if (oldRoom is not null) oldRoom.IsAvailable = await db.HousingAllocations.CountAsync(item => item.DormRoomId == oldRoomId) < oldRoom.Capacity;
+        newRoom.IsAvailable = await db.HousingAllocations.CountAsync(item => item.DormRoomId == input.DormRoomId) < newRoom.Capacity;
+        await db.SaveChangesAsync();
+    }
+    return Results.Ok(allocation);
 });
 app.MapDelete("/api/allocations/{id:int}", async (int id, CampusHousingDbContext db) =>
 {

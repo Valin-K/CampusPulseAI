@@ -1,12 +1,13 @@
 @page "/rooms"
 @using CampusHousing.Frontend.Models
 @inject HttpClient Http
+@inject HousingUserContext UserContext
 
 <PageTitle>Rooms | Campus Housing</PageTitle>
 
 <header class="housing-header">
     <div><span class="eyebrow">THE RESIDENCE</span><h1>Room inventory</h1><p>Review availability and maintain the campus housing room catalogue.</p></div>
-    <button @onclick="BeginCreate">Add room</button>
+    @if (UserContext.IsAdministrator) { <button @onclick="BeginCreate">Add room</button> }
 </header>
 
 @if (!string.IsNullOrWhiteSpace(message))
@@ -35,13 +36,15 @@
                         <strong>@room.Building @room.RoomNumber</strong>
                         <span>@room.OccupiedBeds / @room.Capacity occupied</span>
                         <span class="@(IsAvailable(room) ? "available" : "full")">@(IsAvailable(room) ? "Available" : "Full")</span>
-                        <div><button class="link-button" @onclick="() => BeginEdit(room)">Edit</button> <button class="link-button danger" @onclick="() => DeleteAsync(room.Id)">Delete</button></div>
+                        @if (UserContext.IsAdministrator) { <div><button class="link-button" @onclick="() => BeginEdit(room)">Edit</button> <button class="link-button danger" @onclick="() => DeleteAsync(room.Id)">Delete</button></div> }
                     </article>
                 }
             </div>
         }
     </section>
 
+    @if (UserContext.IsAdministrator)
+    {
     <section class="card-panel accent-panel">
         <h2>@(editingId is null ? "Add a room" : $"Edit room #{editingId}")</h2>
         <EditForm Model="draft" OnValidSubmit="SaveAsync">
@@ -57,6 +60,7 @@
             }
         </EditForm>
     </section>
+    }
 </div>
 
 @code {

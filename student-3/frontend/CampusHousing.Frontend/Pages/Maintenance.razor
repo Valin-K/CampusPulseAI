@@ -1,10 +1,11 @@
 @page "/maintenance"
 @using CampusHousing.Frontend.Models
 @inject HttpClient Http
+@inject HousingUserContext UserContext
 
 <PageTitle>Maintenance | Campus Housing</PageTitle>
 
-<header class="housing-header">
+<header class="dashboard-hero housing-header">
     <div><span class="eyebrow">THE RESIDENCE</span><h1>Maintenance requests</h1><p>Report issues, review AI triage, and follow repair progress.</p></div>
 </header>
 
@@ -41,7 +42,7 @@
             <div class="table-responsive"><table><thead><tr><th>Request</th><th>Severity</th><th>Queue</th><th>Status</th><th>Actions</th></tr></thead><tbody>
                 @foreach (var ticket in tickets)
                 {
-                    <tr><td><strong>@ticket.Description</strong><br /><small>@ticket.StudentId · @ticket.CreatedAt.ToLocalTime().ToString("g")</small></td><td><span class="severity @ticket.Severity.ToLowerInvariant()">@ticket.Severity</span></td><td>@ticket.RepairQueue</td><td><select class="status-select" value="@ticket.Status" @onchange="eventArgs => ChangeStatusAsync(ticket, eventArgs.Value?.ToString())"><option>Open</option><option>In Progress</option><option>Resolved</option></select></td><td><button class="link-button danger" @onclick="() => DeleteAsync(ticket.Id)">Delete</button></td></tr>
+                    <tr><td><strong>@ticket.Description</strong><br /><small>@ticket.StudentId · @ticket.CreatedAt.ToLocalTime().ToString("g")</small></td><td>@if (UserContext.IsAdministrator) { <select class="status-select" @bind="ticket.Severity"><option>Emergency</option><option>High</option><option>Medium</option><option>Low</option></select> } else { <span class="severity @ticket.Severity.ToLowerInvariant()">@ticket.Severity</span> }</td><td>@if (UserContext.IsAdministrator) { <select class="status-select" @bind="ticket.RepairQueue"><option>Heating</option><option>Plumbing</option><option>Electrical</option><option>Security</option><option>General Maintenance</option></select> } else { @ticket.RepairQueue }</td><td>@if (UserContext.IsAdministrator) { <select class="status-select" @bind="ticket.Status"><option>Open</option><option>In Progress</option><option>Resolved</option></select> } else { @ticket.Status }</td><td>@if (UserContext.IsAdministrator) { <button class="link-button" @onclick="() => UpdateAsync(ticket)">Save</button><button class="link-button danger" @onclick="() => DeleteAsync(ticket.Id)">Delete</button> }</td></tr>
                 }
             </tbody></table></div>
         }
@@ -86,6 +87,7 @@
         finally { busy = false; await LoadAsync(); }
     }
 
+    private async Task UpdateAsync(MaintenanceTicket ticket) => await SendAsync(HttpMethod.Put, $"api/housing/tickets/{ticket.Id}", new { ticket.Status, ticket.Severity, ticket.RepairQueue }, "Ticket updated.");
     private async Task ChangeStatusAsync(MaintenanceTicket ticket, string? status) => await SendAsync(HttpMethod.Put, $"api/housing/tickets/{ticket.Id}", new { Status = status }, "Ticket status updated.");
     private async Task DeleteAsync(int id) => await SendAsync(HttpMethod.Delete, $"api/housing/tickets/{id}", null, "Maintenance ticket deleted.");
 

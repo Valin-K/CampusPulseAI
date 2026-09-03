@@ -19,38 +19,65 @@ public sealed class HousingController(IHttpClientFactory httpClientFactory, Main
 
     [HttpPost("rooms")]
     public async Task<IActionResult> CreateRoom(CreateRoomRequest request, CancellationToken cancellationToken) =>
-        await ForwardJsonAsync(HttpMethod.Post, "api/rooms", request, cancellationToken);
+        !IsAdministrator ? Forbid() : await ForwardJsonAsync(HttpMethod.Post, "api/rooms", request, cancellationToken);
 
     [HttpPut("rooms/{id:int}")]
-    public async Task<IActionResult> UpdateRoom(int id, CreateRoomRequest request, CancellationToken cancellationToken) =>
-        await ForwardJsonAsync(HttpMethod.Put, $"api/rooms/{id}", request, cancellationToken);
+    public async Task<IActionResult> UpdateRoom(int id, CreateRoomRequest request, CancellationToken cancellationToken)
+    {
+        if (!IsAdministrator) return Forbid();
+        return await ForwardJsonAsync(HttpMethod.Put, $"api/rooms/{id}", request, cancellationToken);
+    }
 
     [HttpDelete("rooms/{id:int}")]
-    public async Task<IActionResult> DeleteRoom(int id, CancellationToken cancellationToken) => await ForwardDeleteAsync($"api/rooms/{id}", cancellationToken);
+    public async Task<IActionResult> DeleteRoom(int id, CancellationToken cancellationToken) => !IsAdministrator ? Forbid() : await ForwardDeleteAsync($"api/rooms/{id}", cancellationToken);
 
     [HttpPost("allocations")]
     public async Task<IActionResult> Allocate(CreateAllocationRequest request, CancellationToken cancellationToken)
     {
+        if (!IsAdministrator && !IsCurrentStudent(request.StudentId)) return Forbid();
         var response = await Database.PostAsJsonAsync("api/allocations", request, cancellationToken);
         return await ToActionResult(response);
     }
 
     [HttpGet("allocations")]
-    public async Task<IActionResult> Allocations(CancellationToken cancellationToken) => await ForwardGetAsync("api/allocations", cancellationToken);
+    public async Task<IActionResult> Allocations(CancellationToken cancellationToken)
+    {
+        var response = await Database.GetAsync("api/allocations", cancellationToken);
+        if (IsAdministrator || string.IsNullOrWhiteSpace(CurrentStudentId)) return await ToActionResult(response);
+        var allocations = await response.Content.ReadFromJsonAsync<List<HousingAllocation>>(cancellationToken: cancellationToken) ?? [];
+        return Ok(allocations.Where(allocation => IsCurrentStudent(allocation.StudentId)));
+    }
 
     [HttpPut("allocations/{id:int}")]
-    public async Task<IActionResult> UpdateAllocation(int id, UpdateAllocationRequest request, CancellationToken cancellationToken) =>
-        await ForwardJsonAsync(HttpMethod.Put, $"api/allocations/{id}", request, cancellationToken);
+    public async Task<IActionResult> UpdateAllocation(int id, UpdateAllocationRequest request, CancellationToken cancellationToken)
+    {
+        if (!IsAdministrator && !IsCurrentStudent(request.StudentId)) return Forbid();
+        if (!IsAdministrator)
+        {
+            var existing = await Database.GetAsync($"api/allocations/{id}", cancellationToken);
+            if (!existing.IsSuccessStatusCode) return await ToActionResult(existing);
+            var allocation = await existing.Content.ReadFromJsonAsync<HousingAllocation>(cancellationToken: cancellationToken);
+            if (allocation is null || !IsCurrentStudent(allocation.StudentId)) return Forbid();
+        }
+        return await ForwardJsonAsync(HttpMethod.Put, $"api/allocations/{id}", request, cancellationToken);
+    }
 
     [HttpDelete("allocations/{id:int}")]
-    public async Task<IActionResult> DeleteAllocation(int id, CancellationToken cancellationToken) => await ForwardDeleteAsync($"api/allocations/{id}", cancellationToken);
+    public async Task<IActionResult> DeleteAllocation(int id, CancellationToken cancellationToken) => !IsAdministrator ? Forbid() : await ForwardDeleteAsync($"api/allocations/{id}", cancellationToken);
 
     [HttpGet("tickets")]
-    public async Task<IActionResult> Tickets(CancellationToken cancellationToken) => await ForwardGetAsync("api/tickets", cancellationToken);
+    public async Task<IActionResult> Tickets(CancellationToken cancellationToken)
+    {
+        var response = await Database.GetAsync("api/tickets", cancellationToken);
+        if (IsAdministrator || string.IsNullOrWhiteSpace(CurrentStudentId)) return await ToActionResult(response);
+        var tickets = await response.Content.ReadFromJsonAsync<List<MaintenanceTicket>>(cancellationToken: cancellationToken) ?? [];
+        return Ok(tickets.Where(ticket => IsCurrentStudent(ticket.StudentId)));
+    }
 
     [HttpPost("tickets")]
     public async Task<IActionResult> CreateTicket(CreateMaintenanceRequest request, CancellationToken cancellationToken)
     {
+        if (!IsAdministrator && !IsCurrentStudent(request.StudentId)) return Forbid();
         if (string.IsNullOrWhiteSpace(request.Description)) return BadRequest(new { message = "Description is required." });
         var classification = await classifier.ClassifyAsync(request.Description, cancellationToken);
         var ticket = new MaintenanceTicket(0, request.StudentId, request.DormRoomId, request.Description, classification.Severity, classification.RepairQueue, "Open", DateTime.UtcNow, null);
@@ -61,13 +88,21 @@ public sealed class HousingController(IHttpClientFactory httpClientFactory, Main
     [HttpPut("tickets/{id:int}")]
     public async Task<IActionResult> UpdateTicket(int id, UpdateTicketRequest request, CancellationToken cancellationToken)
     {
+        if (!IsAdministrator) return Forbid();
         if (string.IsNullOrWhiteSpace(request.Status)) return BadRequest(new { message = "Status is required." });
         var response = await Database.PutAsJsonAsync($"api/tickets/{id}", request, cancellationToken);
         return await ToActionResult(response);
     }
 
     [HttpDelete("tickets/{id:int}")]
-    public async Task<IActionResult> DeleteTicket(int id, CancellationToken cancellationToken) => await ForwardDeleteAsync($"api/tickets/{id}", cancellationToken);
+    public async Task<IActionResult> DeleteTicket(int id, CancellationToken cancellationToken) => !IsAdministrator ? Forbid() : await ForwardDeleteAsync($"api/tickets/{id}", cancellationToken);
+
+    private bool IsAdministrator => string.Equals(Request.Headers["X-Housing-Role"], "Administrator", StringComparison.OrdinalIgnoreCase);
+
+    private string? CurrentStudentId => Request.Headers["X-Housing-User"].FirstOrDefault();
+
+    private bool IsCurrentStudent(string studentId) =>
+        !string.IsNullOrWhiteSpace(CurrentStudentId) && string.Equals(CurrentStudentId, studentId, StringComparison.OrdinalIgnoreCase);
 
     private async Task<IActionResult> ForwardGetAsync(string path, CancellationToken cancellationToken)
     {

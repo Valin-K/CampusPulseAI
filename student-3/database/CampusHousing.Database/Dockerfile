@@ -14,6 +14,6 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
 EXPOSE 8080
 COPY --from=build /app/publish .
-RUN mkdir -p /app/data && chown -R $APP_UID /app
-USER $APP_UID
-ENTRYPOINT ["dotnet", "CampusHousing.Database.dll"]
+COPY student-3/database/CampusHousing.Database/docker-entrypoint.sh /usr/local/bin/campus-housing-database-entrypoint
+RUN chmod +x /usr/local/bin/campus-housing-database-entrypoint
+ENTRYPOINT ["/usr/local/bin/campus-housing-database-entrypoint"]

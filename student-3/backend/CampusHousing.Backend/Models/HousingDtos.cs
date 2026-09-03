@@ -6,5 +6,9 @@ public sealed record MaintenanceTicket(int Id, string StudentId, int? DormRoomId
 public sealed record CreateAllocationRequest(int DormRoomId, string StudentId, string StudentName, string? RoommatePreference);
 public sealed record CreateMaintenanceRequest(string StudentId, int? DormRoomId, string Description);
 public sealed record UpdateTicketRequest(string Status, string? Severity = null, string? RepairQueue = null);
-public sealed record UpdateAllocationRequest(string StudentId, string StudentName, string? RoommatePreference);
+public sealed record UpdateAllocationRequest(
+    int DormRoomId,
+    string StudentId,
+    string StudentName,
+    string? RoommatePreference);
 public sealed record CreateRoomRequest(string Building, string RoomNumber, int Capacity, bool IsAvailable = true);
