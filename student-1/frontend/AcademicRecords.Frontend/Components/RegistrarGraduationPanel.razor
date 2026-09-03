@@ -1,74 +1,75 @@
-@page "/registrar/graduation"
 @using System.Net.Http.Json
 
-<PageTitle>Registrar Graduation</PageTitle>
-
-<h1>Registrar Graduation</h1>
-<p class="text-muted">Students currently meeting the graduation eligibility requirements.</p>
-
-@if (isLoading)
-{
-    <p>Loading eligible students...</p>
-}
-else if (loadError is not null)
-{
-    <div class="alert alert-danger">Unable to load eligible students: @loadError</div>
-}
-else if (students.Count == 0)
-{
-    <div class="alert alert-info">There are no students currently eligible for graduation.</div>
-}
-else
-{
-    <div class="table-responsive">
-        <table class="table table-striped align-middle">
-            <thead>
-                <tr>
-                    <th>Student</th>
-                    <th>Student ID</th>
-                    <th>Degree</th>
-                    <th>WAM</th>
-                    <th>GPA</th>
-                    <th>Academic record</th>
-                    <th>Action</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var student in students)
-                {
-                    <tr>
-                        <td>@student.FirstName @student.LastName</td>
-                        <td>@student.StudentId</td>
-                        <td>@(student.Degree ?? "Not specified")</td>
-                        <td>@FormatStatistic(student.Wam)</td>
-                        <td>@FormatStatistic(student.Gpa)</td>
-                        <td>
-                            <a href="@GetTranscriptUrl(student.StudentId)" target="_blank" rel="noopener noreferrer">
-                                View PDF
-                            </a>
-                        </td>
-                        <td>
-                            @if (student.IsFinalizing)
-                            {
-                                <span>Finalizing...</span>
-                            }
-                            else
-                            {
-                                <button class="btn btn-primary btn-sm" @onclick="() => FinalizeGraduationAsync(student)">
-                                    Finalize graduation
-                                </button>
-                            }
-                            @if (student.FinalizeError is not null)
-                            {
-                                <div class="text-danger small mt-1">@student.FinalizeError</div>
-                            }
-                        </td>
-                    </tr>
-                }
-            </tbody>
-        </table>
+<section class="surface-card table-panel">
+    <div class="section-heading">
+        <div><span class="eyebrow">Registrar</span><h2>Registrar graduation</h2></div>
     </div>
-}
+    <p class="muted">Students currently meeting the graduation eligibility requirements.</p>
+
+    @if (isLoading)
+    {
+        <p class="muted">Loading eligible students...</p>
+    }
+    else if (loadError is not null)
+    {
+        <div class="notice notice-error">Unable to load eligible students: @loadError</div>
+    }
+    else if (students.Count == 0)
+    {
+        <p class="muted">There are no students currently eligible for graduation.</p>
+    }
+    else
+    {
+        <div class="responsive-table">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Student</th>
+                        <th>Student ID</th>
+                        <th>Degree</th>
+                        <th>WAM</th>
+                        <th>GPA</th>
+                        <th>Academic record</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var student in students)
+                    {
+                        <tr>
+                            <td>@student.FirstName @student.LastName</td>
+                            <td>@student.StudentId</td>
+                            <td>@(student.Degree ?? "Not specified")</td>
+                            <td>@FormatStatistic(student.Wam)</td>
+                            <td>@FormatStatistic(student.Gpa)</td>
+                            <td>
+                                <a href="@GetTranscriptUrl(student.StudentId)" target="_blank" rel="noopener noreferrer">
+                                    View PDF
+                                </a>
+                            </td>
+                            <td>
+                                @if (student.IsFinalizing)
+                                {
+                                    <span>Finalizing...</span>
+                                }
+                                else
+                                {
+                                    <button class="button button-small button-primary" @onclick="() => FinalizeGraduationAsync(student)">
+                                        Finalize graduation
+                                    </button>
+                                }
+                                @if (student.FinalizeError is not null)
+                                {
+                                    <div class="text-danger small mt-1">@student.FinalizeError</div>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>
 
 @code {
     [Inject]

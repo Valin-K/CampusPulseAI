@@ -209,11 +209,6 @@ app.MapPut("/api/enrollments/{enrollmentId:int}/grade", async (int enrollmentId,
         return Results.NotFound("Enrollment was not found.");
     }
 
-    if (enrollment.IsFinalized)
-    {
-        return Results.BadRequest("A finalized enrollment cannot be edited.");
-    }
-
     if (enrollment.AcademicTerm is null)
     {
         return Results.BadRequest("The enrollment does not have an academic session.");
@@ -235,29 +230,10 @@ app.MapPut("/api/enrollments/{enrollmentId:int}/grade", async (int enrollmentId,
     }
 
     enrollment.GradeValue = request.GradeValue;
-    enrollment.GradeDate = null;
-    enrollment.IsFinalized = false;
+    enrollment.GradeDate = today;
     await database.SaveChangesAsync(cancellationToken);
 
     return Results.Ok(new { enrollment.EnrollmentId, enrollment.GradeValue, enrollment.Status, enrollment.GradeDate });
-});
-
-app.MapPut("/api/enrollments/{enrollmentId:int}/finalize", async (int enrollmentId,
-    AcademicRecordsDbContext database, CancellationToken cancellationToken) =>
-{
-    var enrollment = await database.Enrollments
-        .Include(value => value.AcademicTerm)
-        .SingleOrDefaultAsync(value => value.EnrollmentId == enrollmentId, cancellationToken);
-    if (enrollment is null)
-    {
-        return Results.NotFound("Enrollment was not found.");
-    }
-
-    enrollment.GradeDate = DateOnly.FromDateTime(DateTime.UtcNow);
-    enrollment.IsFinalized = true;
-    await database.SaveChangesAsync(cancellationToken);
-
-    return Results.Ok(new { enrollment.EnrollmentId, enrollment.GradeValue, enrollment.Status, enrollment.GradeDate, enrollment.IsFinalized });
 });
 
 app.MapGet("/api/students/{studentId}", async (string studentId, AcademicRecordsDbContext database, CancellationToken cancellationToken) =>
@@ -334,6 +310,40 @@ app.MapPut("/api/students/{studentId}/graduation", async (string studentId, Grad
     student.GraduationDate = request.GraduationDate;
     await database.SaveChangesAsync(cancellationToken);
     return Results.Ok(new GraduationResponse(student.StudentId, request.GraduationDate));
+});
+
+app.MapPut("/api/staff/{staffId}", async (string staffId, UpdateStaffRequest request, AcademicRecordsDbContext database, CancellationToken cancellationToken) =>
+{
+    var staff = await database.Set<Staff>().SingleOrDefaultAsync(value => value.StaffId == staffId, cancellationToken);
+    if (staff is null)
+    {
+        return Results.NotFound("Staff member was not found.");
+    }
+
+    if (string.IsNullOrWhiteSpace(request.FirstName) || string.IsNullOrWhiteSpace(request.LastName) ||
+        string.IsNullOrWhiteSpace(request.Email) || request.DateOfBirth is null)
+    {
+        return Results.BadRequest("First name, last name, email, and date of birth are required.");
+    }
+
+    if (!IsValidEmail(request.Email))
+    {
+        return Results.BadRequest("Email address is not valid.");
+    }
+
+    if (!string.IsNullOrWhiteSpace(request.PhoneNumber) && !IsValidPhoneNumber(request.PhoneNumber))
+    {
+        return Results.BadRequest("Phone number is not valid. Use format: 0400000000 or +61400000000");
+    }
+
+    staff.FirstName = request.FirstName.Trim();
+    staff.LastName = request.LastName.Trim();
+    staff.Email = request.Email.Trim();
+    staff.DateOfBirth = request.DateOfBirth;
+    staff.PhoneNumber = request.PhoneNumber?.Trim();
+
+    await database.SaveChangesAsync(cancellationToken);
+    return Results.NoContent();
 });
 
 app.Run();
@@ -426,6 +436,9 @@ public sealed record TermEnrollmentResponse(int EnrollmentId, string CourseCode,
 public sealed record UpdateStudentRequest(string FirstName, string LastName, string Email, DateOnly? DateOfBirth,
     string MailingAddress, string EmergencyContactName, string EmergencyContactPhone, string? PhoneNumber = null,
     string? Degree = null, string? Major = null, string? SubMajor = null);
+
+public sealed record UpdateStaffRequest(string FirstName, string LastName, string Email, DateOnly? DateOfBirth,
+    string? PhoneNumber = null);
 
 public sealed record GraduationUpdateRequest(DateOnly GraduationDate);
 

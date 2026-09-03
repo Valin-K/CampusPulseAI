@@ -10,6 +10,16 @@ a, .btn-link {
     color: #0071c1;
 }
 
+a.button,
+.button {
+    text-decoration: none;
+}
+
+a.button:hover,
+.button:hover {
+    text-decoration: none;
+}
+
 .btn-primary {
     color: #fff;
     background-color: #1b6ec2;
@@ -34,6 +44,23 @@ a, .btn-link {
 
 .validation-message {
     color: red;
+}
+
+.muted {
+    color: #627d98;
+}
+
+.inline-input {
+    border: 1px solid #cdd5e2;
+    border-radius: 5px;
+    padding: .4rem;
+    font: inherit;
+    max-width: 170px;
+}
+
+.table-panel {
+    margin-top: 1rem;
+    overflow: auto;
 }
 
 .ai-recommended-action {
