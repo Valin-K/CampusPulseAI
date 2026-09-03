@@ -1,8 +1,10 @@
 ﻿using AcademicRecords.Backend;
+using AcademicRecords.Backend.Services;
 using AcademicRecords.Database.Data;
 using AcademicRecords.Database.Models;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -49,6 +51,37 @@ namespace AcademicRecords.Tests
             Assert.That(profile.StudentId, Is.EqualTo("STU-PERMANENT-1"));
             Assert.That(profile.Enrollments, Has.Count.EqualTo(2));
             Assert.That(profile.UserId, Is.GreaterThan(0));
+        }
+
+        [Test]
+        public async Task AcademicProgressAnalysisReportsMissingApiKey()
+        {
+            var service = new GeminiAcademicProgressService(null!, new ConfigurationBuilder().Build());
+            var profile = new StudentStatisticsProfile
+            {
+                StudentId = "AI-TEST-1",
+                Enrollments =
+                [
+                    new StudentStatisticsEnrollment
+                    {
+                        AcademicYear = 2026,
+                        TermCode = "T1",
+                        CourseCode = "CS101",
+                        Status = "Passed",
+                        GradeValue = 75,
+                        Credits = 12,
+                        IsFinalized = true
+                    }
+                ]
+            };
+
+            var result = await service.AnalyzeAsync(profile, CancellationToken.None);
+
+            Assert.That(result.Succeeded, Is.False);
+            Assert.That(result.Status, Is.EqualTo("Failed"));
+            Assert.That(result.Message, Does.Contain("GEMINI_API_KEY"));
+            Assert.That(result.Metrics.EarnedCredits, Is.EqualTo(12));
+            Assert.That(result.Metrics.CreditsRemaining, Is.EqualTo(132));
         }
 
         [Test]

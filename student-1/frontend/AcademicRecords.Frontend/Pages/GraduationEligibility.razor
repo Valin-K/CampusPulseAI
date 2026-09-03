@@ -47,6 +47,46 @@ else if (eligibility is not null)
     {
         <p class="text-muted">Graduation date: @graduationDate.Value.ToString("yyyy-MM-dd")</p>
     }
+
+    <div class="card mt-4">
+        <div class="card-body">
+            <h2 class="card-title h5">AI progress analysis</h2>
+            <p class="ai-progress-blurb">Analyze your credit pace, grades, and course-taking pattern to estimate your graduation timeline and identify academic risks.</p>
+            @if (analysis is not null)
+            {
+                <div class="alert @(analysis.Succeeded ? "ai-analysis-success" : "ai-analysis-failure") mt-3">
+                    <strong>Request status: @analysis.Status</strong>
+                    <div>@analysis.Message</div>
+                </div>
+                <div class="row g-3">
+                    <div class="col-md-6"><strong>Credits</strong><br />@analysis.Metrics.EarnedCredits.ToString("0.##") of @analysis.Metrics.RequiredCredits.ToString("0.##") (@analysis.Metrics.CreditsRemaining.ToString("0.##") remaining)</div>
+                    <div class="col-md-6"><strong>Average credits per academic year</strong><br />@analysis.Metrics.AverageCreditsPerYear.ToString("0.##")</div>
+                    @if (analysis.Prediction is not null)
+                    {
+                        <div class="col-12"><strong>Expected graduation</strong><br />@analysis.Prediction.ExpectedGraduationTerm (@analysis.Prediction.ExpectedGraduationDate)<br /><span class="ai-explanation">@analysis.Prediction.Explanation</span></div>
+                    }
+                </div>
+                @if (analysis.RiskFlags.Count > 0)
+                {
+                    <h3 class="h6 fw-bold mt-3">Academic risk flags</h3>
+                    <ul>
+                        @foreach (var flag in analysis.RiskFlags)
+                        {
+                            <li>
+                                <strong>@flag.Severity: @flag.Category</strong>
+                                <p class="mb-1">@flag.Description</p>
+                                <p class="ai-recommended-action"><strong>Recommended action:</strong> @flag.RecommendedAction</p>
+                            </li>
+                        }
+                    </ul>
+                }
+            }
+
+            <button class="btn btn-primary mt-3" @onclick="RunAnalysisAsync" disabled="@isAnalysing">
+                @(isAnalysing ? "Analysing..." : "Analyse my progress")
+            </button>
+        </div>
+    </div>
 }
 
 <div class="mt-4">
@@ -66,8 +106,11 @@ else if (eligibility is not null)
 
     private bool isLoading = true;
     private string? loadError;
+    private string? studentId;
     private GraduationEligibilityResponse? eligibility;
     private DateOnly? graduationDate;
+    private AcademicProgressAnalysisResponse? analysis;
+    private bool isAnalysing;
 
     protected override async Task OnInitializedAsync()
     {
@@ -80,6 +123,7 @@ else if (eligibility is not null)
                 return;
             }
 
+            studentId = student.StudentId;
             graduationDate = student.GraduationDate;
             eligibility = await Http.GetFromJsonAsync<GraduationEligibilityResponse>(
                 $"api/students/{Uri.EscapeDataString(student.StudentId)}/eligibility");
@@ -94,6 +138,30 @@ else if (eligibility is not null)
         }
     }
 
+    private async Task RunAnalysisAsync()
+    {
+        if (studentId is null)
+        {
+            return;
+        }
+
+        isAnalysing = true;
+        try
+        {
+            using var response = await Http.PostAsync($"api/students/{Uri.EscapeDataString(studentId)}/ai-analysis", null);
+            analysis = await response.Content.ReadFromJsonAsync<AcademicProgressAnalysisResponse>()
+                ?? new(false, "Failed", "The AI service returned an empty response.", null, [], new(0, 0, 0, 0, null, null, 0, 0));
+        }
+        catch (HttpRequestException exception)
+        {
+            analysis = new(false, "Failed", exception.Message, null, [], new(0, 0, 0, 0, null, null, 0, 0));
+        }
+        finally
+        {
+            isAnalysing = false;
+        }
+    }
+
     private sealed record StudentProfileResponse(
         int UserId,
         string StudentId,
@@ -104,4 +172,26 @@ else if (eligibility is not null)
         decimal EarnedCreditPoints,
         decimal RequiredCreditPoints,
         List<string> OutstandingRequirements);
+
+    private sealed record AcademicProgressAnalysisResponse(
+        bool Succeeded,
+        string Status,
+        string? Message,
+        AcademicProgressPrediction? Prediction,
+        List<AcademicRiskFlag> RiskFlags,
+        AcademicProgressMetrics Metrics);
+
+    private sealed record AcademicProgressPrediction(string ExpectedGraduationTerm, string ExpectedGraduationDate, string Explanation);
+
+    private sealed record AcademicRiskFlag(string Severity, string Category, string Description, string RecommendedAction);
+
+    private sealed record AcademicProgressMetrics(
+        decimal EarnedCredits,
+        decimal RequiredCredits,
+        decimal CreditsRemaining,
+        decimal AverageCreditsPerYear,
+        decimal? OverallGpa,
+        decimal? RecentGpa,
+        int CompletedYears,
+        int FailedCourses);
 }
