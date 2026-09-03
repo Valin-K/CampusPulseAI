@@ -1,0 +1,107 @@
+@page "/profile/{Role}/{UserId:int}/graduation"
+@using System.Net.Http.Json
+
+<PageTitle>Graduation Eligibility</PageTitle>
+
+<h1>Graduation Eligibility</h1>
+
+@if (isLoading)
+{
+    <p>Loading graduation eligibility...</p>
+}
+else if (loadError is not null)
+{
+    <div class="alert alert-danger">Unable to load graduation eligibility: @loadError</div>
+}
+else if (eligibility is not null)
+{
+    <div class="card mb-4">
+        <div class="card-body">
+            <h2 class="card-title h5">Current status</h2>
+            <p class="fs-4 @(eligibility.IsEligible ? "text-success" : "text-warning")">
+                @(eligibility.IsEligible ? "Eligible to graduate" : "Not yet eligible to graduate")
+            </p>
+            <p class="mb-0">
+                Credit points earned: <strong>@eligibility.EarnedCreditPoints.ToString("0.##")</strong>
+                of <strong>@eligibility.RequiredCreditPoints.ToString("0.##")</strong>
+            </p>
+        </div>
+    </div>
+
+    @if (eligibility.OutstandingRequirements.Count > 0)
+    {
+        <h2 class="h5">Outstanding requirements</h2>
+        <ol>
+            @foreach (var requirement in eligibility.OutstandingRequirements)
+            {
+                <li>@requirement</li>
+            }
+        </ol>
+    }
+    else
+    {
+        <div class="alert alert-success">All graduation eligibility requirements have been met.</div>
+    }
+
+    @if (graduationDate is not null)
+    {
+        <p class="text-muted">Graduation date: @graduationDate.Value.ToString("yyyy-MM-dd")</p>
+    }
+}
+
+<div class="mt-4">
+    <a href="/profile/@Role/@UserId/enrollments" class="btn btn-primary">View enrollments</a>
+    <a href="/profile/@Role/@UserId" class="btn btn-secondary ms-2">Back to profile</a>
+</div>
+
+@code {
+    [Parameter]
+    public int UserId { get; set; }
+
+    [Parameter]
+    public string Role { get; set; } = string.Empty;
+
+    [Inject]
+    private HttpClient Http { get; set; } = default!;
+
+    private bool isLoading = true;
+    private string? loadError;
+    private GraduationEligibilityResponse? eligibility;
+    private DateOnly? graduationDate;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var student = await Http.GetFromJsonAsync<StudentProfileResponse>($"api/students/by-user/{UserId}");
+            if (student is null)
+            {
+                loadError = "Student profile not found.";
+                return;
+            }
+
+            graduationDate = student.GraduationDate;
+            eligibility = await Http.GetFromJsonAsync<GraduationEligibilityResponse>(
+                $"api/students/{Uri.EscapeDataString(student.StudentId)}/eligibility");
+        }
+        catch (HttpRequestException exception)
+        {
+            loadError = exception.Message;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private sealed record StudentProfileResponse(
+        int UserId,
+        string StudentId,
+        DateOnly? GraduationDate = null);
+
+    private sealed record GraduationEligibilityResponse(
+        bool IsEligible,
+        decimal EarnedCreditPoints,
+        decimal RequiredCreditPoints,
+        List<string> OutstandingRequirements);
+}
