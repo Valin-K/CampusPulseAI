@@ -368,7 +368,6 @@ namespace AcademicRecords.Tests
 
             enrollment.GradeValue = 49.99m;
             enrollment.GradeDate = DateOnly.FromDateTime(DateTime.UtcNow);
-            enrollment.IsFinalized = true;
             await database.SaveChangesAsync();
 
             var saved = await database.Enrollments.SingleAsync();
@@ -388,10 +387,10 @@ namespace AcademicRecords.Tests
                     StartWeekOfYear = 1,
                     EndWeekOfYear = ISOWeek.GetWeekOfYear(today.ToDateTime(TimeOnly.MinValue))
                 },
-                GradeValue = 95m,
-                IsFinalized = true
+                GradeValue = 95m
             };
 
+            Assert.That(enrollment.IsFinalized, Is.False);
             Assert.That(enrollment.Status, Is.EqualTo(EnrollmentStatusRules.InProgress));
         }
 
@@ -448,7 +447,7 @@ namespace AcademicRecords.Tests
                 var endYear = term.EndWeekOfYear < term.StartWeekOfYear ? enrollment.AcademicYear + 1 : enrollment.AcademicYear;
                 var endDate = DateOnly.FromDateTime(ISOWeek.ToDateTime(endYear, term.EndWeekOfYear, DayOfWeek.Sunday));
 
-                var expectedFinalized = enrollment.IsFinalized;
+                var expectedFinalized = endDate < today;
                 var expectedStatus = startDate > today
                     ? EnrollmentStatusRules.Enrolled
                     : endDate >= today
@@ -461,11 +460,10 @@ namespace AcademicRecords.Tests
                     CourseCode = enrollment.CourseCode,
                     AcademicYear = enrollment.AcademicYear,
                     AcademicTerm = term,
-                    GradeValue = enrollment.GradeValue,
-                    IsFinalized = enrollment.IsFinalized
+                    GradeValue = enrollment.GradeValue
                 };
                 Assert.That(calculatedEnrollment.Status, Is.EqualTo(expectedStatus));
-                Assert.That(enrollment.IsFinalized, Is.EqualTo(expectedFinalized));
+                Assert.That(calculatedEnrollment.IsFinalized, Is.EqualTo(expectedFinalized));
                 Assert.That(enrollment.GradeDate is null || enrollment.GradeDate <= today, Is.True);
             }
 
@@ -501,8 +499,7 @@ namespace AcademicRecords.Tests
             {
                 StudentId = student.UserId,
                 CourseCode = "CS999",
-                AcademicYear = 2026,
-                IsFinalized = false
+                AcademicYear = 2026
             });
 
             await database.SaveChangesAsync();

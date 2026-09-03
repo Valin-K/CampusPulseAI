@@ -224,11 +224,6 @@ app.MapPut("/api/enrollments/{enrollmentId:int}/grade", async (int enrollmentId,
 
     if (today > sessionDates.EndDate)
     {
-        if (enrollment.IsFinalized)
-        {
-            return Results.BadRequest("A finalized enrollment cannot be edited.");
-        }
-
         return Results.BadRequest("Grades cannot be edited after the course ends.");
     }
 
@@ -237,24 +232,6 @@ app.MapPut("/api/enrollments/{enrollmentId:int}/grade", async (int enrollmentId,
     await database.SaveChangesAsync(cancellationToken);
 
     return Results.Ok(new { enrollment.EnrollmentId, enrollment.GradeValue, enrollment.Status, enrollment.GradeDate });
-});
-
-app.MapPut("/api/enrollments/{enrollmentId:int}/finalize", async (int enrollmentId,
-    AcademicRecordsDbContext database, CancellationToken cancellationToken) =>
-{
-    var enrollment = await database.Enrollments
-        .Include(value => value.AcademicTerm)
-        .SingleOrDefaultAsync(value => value.EnrollmentId == enrollmentId, cancellationToken);
-    if (enrollment is null)
-    {
-        return Results.NotFound("Enrollment was not found.");
-    }
-
-    enrollment.GradeDate = DateOnly.FromDateTime(DateTime.UtcNow);
-    enrollment.IsFinalized = true;
-    await database.SaveChangesAsync(cancellationToken);
-
-    return Results.Ok(new { enrollment.EnrollmentId, enrollment.GradeValue, enrollment.Status, enrollment.GradeDate, enrollment.IsFinalized });
 });
 
 app.MapGet("/api/students/{studentId}", async (string studentId, AcademicRecordsDbContext database, CancellationToken cancellationToken) =>

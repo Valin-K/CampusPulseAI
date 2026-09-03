@@ -79,9 +79,9 @@ public sealed class AcademicRecordsDbContext(DbContextOptions<AcademicRecordsDbC
             entity.Property(enrollment => enrollment.AcademicTermId).HasColumnName("academic_term_id");
             entity.Property(enrollment => enrollment.AcademicYear).HasColumnName("academic_year").IsRequired();
             entity.Ignore(enrollment => enrollment.Status);
+            entity.Ignore(enrollment => enrollment.IsFinalized);
             entity.Property(enrollment => enrollment.GradeValue).HasColumnName("grade_value").HasPrecision(5, 2);
             entity.Property(enrollment => enrollment.GradeDate).HasColumnName("grade_date").HasColumnType("DATE");
-            entity.Property(enrollment => enrollment.IsFinalized).HasColumnName("is_finalized").IsRequired();
 
             entity.HasOne(enrollment => enrollment.Student)
                 .WithMany(user => user.Enrollments)

@@ -38,7 +38,21 @@ public sealed class Enrollment
     }
     public decimal? GradeValue { get; set; }
     public DateOnly? GradeDate { get; set; }
-    public bool IsFinalized { get; set; }
+
+    public bool IsFinalized
+    {
+        get
+        {
+            if (AcademicTerm is null)
+            {
+                return GradeValue is not null;
+            }
+
+            var sessionDates = EnrollmentStatusRules.GetSessionDates(
+                AcademicYear, AcademicTerm.StartWeekOfYear, AcademicTerm.EndWeekOfYear);
+            return DateOnly.FromDateTime(DateTime.UtcNow) > sessionDates.EndDate;
+        }
+    }
 
     public Student? Student { get; set; }
     public AcademicTerm? AcademicTerm { get; set; }

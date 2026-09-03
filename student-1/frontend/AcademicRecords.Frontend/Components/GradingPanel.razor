@@ -100,7 +100,7 @@ else
                                         <td>@enrollment.StudentName</td>
                                         <td>@enrollment.Status</td>
                                         <td style="min-width: 150px">
-                                            <input class="inline-input" type="number" min="0" max="100" step="0.01"
+                                            <input class="inline-input" type="number" min="0" max="100" step="1"
                                                    @bind="enrollment.GradeValue" disabled="@(!enrollment.CanEditGrade || enrollment.IsSaving)" />
                                         </td>
                                         <td>
