@@ -1,11 +1,15 @@
 using CampusHousing.Database.Data;
 using CampusHousing.Database.Models;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
+using System.Net.Http.Json;
 
 var builder = Microsoft.AspNetCore.Builder.WebApplication.CreateBuilder(args);
 var connectionString = builder.Configuration.GetConnectionString("CampusHousing")
     ?? "Data Source=/app/data/campus-housing.db";
 builder.Services.AddDbContext<CampusHousingDbContext>(options => options.UseSqlite(connectionString));
+var academicRecordsUrl = builder.Configuration["Services:AcademicRecordsDatabase"] ?? "http://localhost:5021";
+builder.Services.AddHttpClient("AcademicRecords", client => client.BaseAddress = new Uri(academicRecordsUrl.TrimEnd('/') + "/"));
 builder.Services.AddCors(options => options.AddDefaultPolicy(policy => policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod()));
 
 var app = builder.Build();
@@ -16,7 +20,9 @@ await using (var scope = app.Services.CreateAsyncScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<CampusHousingDbContext>();
     await db.Database.EnsureCreatedAsync();
-    await CampusHousingSeedData.EnsureSeededAsync(db);
+    var users = await GetAcademicRecordsUsersAsync(
+        scope.ServiceProvider.GetRequiredService<IHttpClientFactory>().CreateClient("AcademicRecords"));
+    await CampusHousingSeedData.EnsureSeededAsync(db, users);
 }
 app.UseCors();
 
@@ -133,3 +139,26 @@ app.MapDelete("/api/tickets/{id:int}", async (int id, CampusHousingDbContext db)
 });
 
 await app.RunAsync();
+
+static async Task<List<AcademicRecordsUser>?> GetAcademicRecordsUsersAsync(HttpClient client)
+{
+    const int maxAttempts = 15;
+
+    for (var attempt = 1; attempt <= maxAttempts; attempt++)
+    {
+        try
+        {
+            return await client.GetFromJsonAsync<List<AcademicRecordsUser>>("api/users");
+        }
+        catch (HttpRequestException) when (attempt < maxAttempts)
+        {
+            await Task.Delay(TimeSpan.FromSeconds(2));
+        }
+        catch (JsonException) when (attempt < maxAttempts)
+        {
+            await Task.Delay(TimeSpan.FromSeconds(2));
+        }
+    }
+
+    throw new InvalidOperationException("Academic Records did not become available while Campus Housing was starting.");
+}

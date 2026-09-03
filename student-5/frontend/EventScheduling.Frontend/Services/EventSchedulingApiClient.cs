@@ -135,6 +135,30 @@ public sealed class EventSchedulingApiClient(HttpClient httpClient)
         }
     }
 
+    public async Task<AssistantResult> AskAssistantAsync(
+        AssistantChatRequest request, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var response = await httpClient.PostAsJsonAsync("/api/ai/assistant", request, cancellationToken);
+            if (response.IsSuccessStatusCode)
+            {
+                var chat = await response.Content.ReadFromJsonAsync<AssistantChatResponse>(cancellationToken);
+                return chat is null
+                    ? new AssistantResult(false, null, "The assistant returned an empty response.")
+                    : new AssistantResult(true, chat, null);
+            }
+
+            var problem = await response.Content.ReadFromJsonAsync<ProblemResponse>(cancellationToken);
+            return new AssistantResult(false, null,
+                FirstError(problem) ?? "The assistant could not answer right now.");
+        }
+        catch (HttpRequestException)
+        {
+            return new AssistantResult(false, null, "The Event Scheduling service is unavailable.");
+        }
+    }
+
     private async Task<BookingResult> PostBookingActionAsync(string url, CancellationToken cancellationToken)
     {
         try

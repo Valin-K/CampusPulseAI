@@ -1,0 +1,111 @@
+.assistant-fab {
+    position: fixed;
+    right: 1.35rem;
+    bottom: 1.35rem;
+    z-index: 1200;
+    display: inline-flex;
+    align-items: center;
+    gap: .5rem;
+    height: 3.4rem;
+    padding: 0 1.15rem 0 1rem;
+    border: none;
+    border-radius: 999px;
+    background: var(--university-blue, #1b4f8a);
+    color: #fff;
+    font-size: .92rem;
+    font-weight: 750;
+    cursor: pointer;
+    box-shadow: 0 12px 28px rgba(16, 42, 67, .28);
+}
+
+.assistant-fab:hover {
+    background: var(--university-navy, #0b263d);
+    box-shadow: 0 16px 34px rgba(16, 42, 67, .34);
+}
+
+.assistant-fab:focus-visible {
+    outline: 3px solid var(--university-gold, #f4b942);
+    outline-offset: 2px;
+}
+
+.assistant-fab-text {
+    white-space: nowrap;
+}
+
+.assistant-drawer {
+    position: fixed;
+    right: 1.35rem;
+    bottom: 1.35rem;
+    z-index: 1201;
+    width: min(380px, calc(100vw - 2.7rem));
+    height: min(560px, calc(100dvh - 3rem));
+    display: none;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--university-surface, #fff);
+    border: 1px solid var(--university-border, #d7e0ea);
+    border-radius: 1rem 1rem .3rem 1rem;
+    box-shadow: 0 24px 60px rgba(16, 42, 67, .28);
+}
+
+.assistant-drawer.is-open {
+    display: flex;
+}
+
+.assistant-drawer-head {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: .75rem;
+    padding: .85rem 1rem;
+    background: var(--university-navy, #0b263d);
+    color: #fff;
+}
+
+.assistant-drawer-eyebrow {
+    display: block;
+    font-size: .72rem;
+    font-weight: 800;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: #9fb8cd;
+}
+
+.assistant-drawer-head strong {
+    font-size: 1rem;
+}
+
+.assistant-drawer-min {
+    flex: 0 0 auto;
+    display: inline-grid;
+    place-items: center;
+    width: 2rem;
+    height: 2rem;
+    border: none;
+    border-radius: .5rem;
+    background: rgba(255, 255, 255, .12);
+    color: #fff;
+    cursor: pointer;
+}
+
+.assistant-drawer-min:hover {
+    background: rgba(255, 255, 255, .22);
+}
+
+.assistant-drawer-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    padding: .85rem .9rem .9rem;
+}
+
+.assistant-drawer-body ::deep .assistant-chat {
+    flex: 1 1 auto;
+    width: 100%;
+}
+
+@media (max-width: 640px) {
+    .assistant-fab-text { display: none; }
+    .assistant-fab { padding: 0; width: 3.4rem; justify-content: center; }
+}
