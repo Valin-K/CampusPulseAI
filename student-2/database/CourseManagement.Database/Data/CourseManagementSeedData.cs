@@ -45,7 +45,11 @@ public static class CourseManagementSeedData
                 CreateAssignment(coursesByCode, "CPAI3001", "Olivia Martin", "olivia.martin@campuspulse.edu", "Course Coordinator", "Autumn 2026"),
                 CreateAssignment(coursesByCode, "CPAI3002", "Lucas Reed", "lucas.reed@campuspulse.edu", "Lecturer", "Spring 2026"),
                 CreateAssignment(coursesByCode, "CPAI3003", "Ava Robinson", "ava.robinson@campuspulse.edu", "Course Coordinator", "Autumn 2026"),
-                CreateAssignment(coursesByCode, "CPAI4001", "Mia Taylor", "mia.taylor@campuspulse.edu", "Course Coordinator", "Spring 2026"));
+                CreateAssignment(coursesByCode, "CPAI4001", "Mia Taylor", "mia.taylor@campuspulse.edu", "Course Coordinator", "Spring 2026"),
+                CreateAssignment(coursesByCode, "CPAI1003", "Grace Brillis", "grace.brillis@example.edu", "Lecturer", "Autumn 2026"),
+                CreateAssignment(coursesByCode, "CPAI2003", "Grace Brillis", "grace.brillis@example.edu", "Course Coordinator", "Spring 2026"),
+                CreateAssignment(coursesByCode, "CPAI1002", "Georges Bou Ghantous", "georges.boughantous@example.edu", "Lecturer", "Autumn 2026"),
+                CreateAssignment(coursesByCode, "CPAI3002", "Georges Bou Ghantous", "georges.boughantous@example.edu", "Course Coordinator", "Spring 2026"));
         }
 
         await database.SaveChangesAsync();

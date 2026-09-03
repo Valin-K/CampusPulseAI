@@ -1,4 +1,5 @@
 @page "/course-assignments/{CourseCode}/grades"
+@using System.Globalization
 @using System.Net.Http.Json
 
 <PageTitle>Enter Grades</PageTitle>
@@ -51,11 +52,15 @@ else
                                 <td>@enrollment.Status</td>
                                 <td style="min-width: 150px">
                                     <input class="form-control" type="number" min="0" max="100" step="0.01"
-                                           @bind="enrollment.GradeValue" disabled="@enrollment.IsSaving" />
+                                           @bind="enrollment.GradeValue" disabled="@(!enrollment.CanEditGrade || enrollment.IsSaving)" />
                                 </td>
                                 <td>
-                                    <button class="btn btn-primary btn-sm" @onclick="() => SaveGradeAsync(enrollment)" disabled="@enrollment.IsSaving">
-                                        @(enrollment.IsSaving ? "Saving..." : "Save")
+                                    <button class="btn btn-primary btn-sm" @onclick="() => SaveGradeAsync(enrollment)" disabled="@(!enrollment.CanEditGrade || enrollment.IsSaving)">
+                                        @(enrollment.IsSaving ? "Saving..." : "Assign grade")
+                                    </button>
+                                    <button class="btn btn-outline-success btn-sm ms-1" @onclick="() => FinalizeGradeAsync(enrollment)"
+                                            disabled="@enrollment.IsSaving || enrollment.GradeValue is null || enrollment.IsFinalized">
+                                        Finalize
                                     </button>
                                     @if (enrollment.SaveError is not null)
                                     {
@@ -64,6 +69,10 @@ else
                                     else if (enrollment.SaveSucceeded)
                                     {
                                         <div class="text-success small mt-1">Saved</div>
+                                    }
+                                    @if (!enrollment.CanEditGrade && enrollment.IsFutureCourse)
+                                    {
+                                        <div class="text-muted small mt-1">Available when the course starts.</div>
                                     }
                                 </td>
                             </tr>
@@ -138,7 +147,38 @@ else
                 return;
             }
 
-            enrollment.Status = enrollment.GradeValue >= 50 ? "Passed" : "Failed";
+            enrollment.SaveSucceeded = true;
+        }
+        catch (HttpRequestException exception)
+        {
+            enrollment.SaveError = exception.Message;
+        }
+        finally
+        {
+            enrollment.IsSaving = false;
+        }
+    }
+
+    private async Task FinalizeGradeAsync(GradeEnrollment enrollment)
+    {
+        enrollment.SaveError = null;
+        enrollment.SaveSucceeded = false;
+        enrollment.IsSaving = true;
+        try
+        {
+            var finalStatus = course?.GradeType == "Ungraded"
+                ? "Completed"
+                : enrollment.GradeValue >= 50 ? "Passed" : "Failed";
+            var response = await Http.PutAsJsonAsync($"api/enrollments/{enrollment.EnrollmentId}/finalize",
+                new FinalizeGradeRequest(finalStatus));
+            if (!response.IsSuccessStatusCode)
+            {
+                enrollment.SaveError = await response.Content.ReadAsStringAsync();
+                return;
+            }
+
+            enrollment.Status = finalStatus;
+            enrollment.IsFinalized = true;
             enrollment.SaveSucceeded = true;
         }
         catch (HttpRequestException exception)
@@ -162,6 +202,20 @@ else
         public string Status { get; set; } = enrollment.Status;
         public decimal? GradeValue { get; set; } = enrollment.GradeValue;
         public bool IsSaving { get; set; }
+        public bool IsFinalized { get; set; } = enrollment.IsFinalized;
+        public bool IsFutureCourse => DateOnly.FromDateTime(DateTime.UtcNow) < StartDate;
+        public bool CanEditGrade => !IsFinalized && DateOnly.FromDateTime(DateTime.UtcNow) >= StartDate
+            && DateOnly.FromDateTime(DateTime.UtcNow) <= EndDate;
+        private DateOnly StartDate => DateOnly.FromDateTime(
+            ISOWeek.ToDateTime(AcademicYear, enrollment.StartWeekOfYear, DayOfWeek.Monday));
+        private DateOnly EndDate
+        {
+            get
+            {
+                var endYear = enrollment.EndWeekOfYear < enrollment.StartWeekOfYear ? AcademicYear + 1 : AcademicYear;
+                return DateOnly.FromDateTime(ISOWeek.ToDateTime(endYear, enrollment.EndWeekOfYear, DayOfWeek.Sunday));
+            }
+        }
         public bool SaveSucceeded { get; set; }
         public string? SaveError { get; set; }
     }
@@ -179,4 +233,6 @@ else
         string Status, string GradeType, decimal? GradeValue, bool IsFinalized);
 
     private sealed record GradeEntryRequest(decimal? GradeValue);
+
+    private sealed record FinalizeGradeRequest(string Status);
 }

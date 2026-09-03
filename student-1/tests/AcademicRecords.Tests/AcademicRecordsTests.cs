@@ -290,7 +290,7 @@ namespace AcademicRecords.Tests
         }
 
         [Test]
-        public async Task GradeEntryPassFinalizesEnrollment()
+        public async Task GradeAssignmentDoesNotFinalizeEnrollment()
         {
             await using var connection = new SqliteConnection("Data Source=:memory:");
             await connection.OpenAsync();
@@ -307,20 +307,17 @@ namespace AcademicRecords.Tests
             await database.SaveChangesAsync();
 
             enrollment.GradeValue = 75m;
-            enrollment.GradeDate = DateOnly.FromDateTime(DateTime.UtcNow);
-            enrollment.Status = EnrollmentStatusRules.GetFinalStatus(EnrollmentStatusRules.EnrollmentGradeTypes.Mark, enrollment.GradeValue);
-            enrollment.IsFinalized = true;
             await database.SaveChangesAsync();
 
             var saved = await database.Enrollments.SingleAsync();
             Assert.That(saved.GradeValue, Is.EqualTo(75m));
-            Assert.That(saved.Status, Is.EqualTo(EnrollmentStatusRules.Passed));
-            Assert.That(saved.IsFinalized, Is.True);
-            Assert.That(saved.GradeDate, Is.EqualTo(DateOnly.FromDateTime(DateTime.UtcNow)));
+            Assert.That(saved.Status, Is.EqualTo(EnrollmentStatusRules.InProgress));
+            Assert.That(saved.IsFinalized, Is.False);
+            Assert.That(saved.GradeDate, Is.Null);
         }
 
         [Test]
-        public async Task GradeEntryFailFinalizesEnrollmentAsFailed()
+        public async Task FinalizingAssignedGradeUpdatesFinalStatus()
         {
             await using var connection = new SqliteConnection("Data Source=:memory:");
             await connection.OpenAsync();
@@ -354,6 +351,17 @@ namespace AcademicRecords.Tests
             Assert.That(IsValidGrade(0m), Is.True);
             Assert.That(IsValidGrade(100m), Is.True);
             Assert.That(IsValidGrade(100.01m), Is.False);
+        }
+
+        [Test]
+        public void GradeEditingWindowExcludesFutureAndEndedCourseDates()
+        {
+            var sessionDates = EnrollmentStatusRules.GetSessionDates(2026, 10, 20);
+
+            Assert.That(IsWithinGradeEditingWindow(sessionDates.StartDate.AddDays(-1), sessionDates), Is.False);
+            Assert.That(IsWithinGradeEditingWindow(sessionDates.StartDate, sessionDates), Is.True);
+            Assert.That(IsWithinGradeEditingWindow(sessionDates.EndDate, sessionDates), Is.True);
+            Assert.That(IsWithinGradeEditingWindow(sessionDates.EndDate.AddDays(1), sessionDates), Is.False);
         }
 
         [Test]
@@ -613,6 +621,9 @@ namespace AcademicRecords.Tests
             new(new DbContextOptionsBuilder<AcademicRecordsDbContext>().UseSqlite(connection).Options);
 
         private static bool IsValidGrade(decimal? grade) => grade is >= 0 and <= 100;
+
+        private static bool IsWithinGradeEditingWindow(DateOnly date, (DateOnly StartDate, DateOnly EndDate) sessionDates) =>
+            date >= sessionDates.StartDate && date <= sessionDates.EndDate;
 
         private sealed record TermEnrollmentResponse(string StudentId, string StudentName, string CourseCode,
             string TermCode, string TermName, int AcademicYear, string Status);

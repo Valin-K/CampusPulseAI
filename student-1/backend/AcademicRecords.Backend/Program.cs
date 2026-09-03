@@ -57,6 +57,19 @@ app.MapPut("/api/enrollments/{enrollmentId:int}/grade", async (int enrollmentId,
     return Results.Content(content, response.Content.Headers.ContentType?.MediaType ?? "application/json", statusCode: (int)response.StatusCode);
 });
 
+app.MapPut("/api/enrollments/{enrollmentId:int}/finalize", async (int enrollmentId, HttpRequest request,
+    IHttpClientFactory clients, CancellationToken cancellationToken) =>
+{
+    using var databaseRequest = new HttpRequestMessage(HttpMethod.Put, $"/api/enrollments/{enrollmentId}/finalize")
+    {
+        Content = new StreamContent(request.Body)
+    };
+    databaseRequest.Content.Headers.ContentType = new("application/json");
+    using var response = await clients.CreateClient("academicRecordsDatabase").SendAsync(databaseRequest, cancellationToken);
+    var content = await response.Content.ReadAsStringAsync(cancellationToken);
+    return Results.Content(content, response.Content.Headers.ContentType?.MediaType ?? "application/json", statusCode: (int)response.StatusCode);
+});
+
 app.MapGet("/api/courses", (IHttpClientFactory clients, CancellationToken cancellationToken) =>
     ForwardCourseManagementResponseAsync("/api/courses", clients, cancellationToken));
 

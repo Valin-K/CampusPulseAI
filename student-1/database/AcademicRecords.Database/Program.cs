@@ -226,20 +226,72 @@ app.MapPut("/api/enrollments/{enrollmentId:int}/grade", async (int enrollmentId,
     }
 
     var enrollment = await database.Enrollments
+        .Include(value => value.AcademicTerm)
         .SingleOrDefaultAsync(value => value.EnrollmentId == enrollmentId, cancellationToken);
     if (enrollment is null)
     {
         return Results.NotFound("Enrollment was not found.");
     }
 
-    var gradeType = GradeTypePlaceholder.Get(enrollment.CourseCode);
+    if (enrollment.IsFinalized)
+    {
+        return Results.BadRequest("A finalized enrollment cannot be edited.");
+    }
+
+    if (enrollment.AcademicTerm is null)
+    {
+        return Results.BadRequest("The enrollment does not have an academic session.");
+    }
+
+    var sessionDates = EnrollmentStatusRules.GetSessionDates(
+        enrollment.AcademicYear,
+        enrollment.AcademicTerm.StartWeekOfYear,
+        enrollment.AcademicTerm.EndWeekOfYear);
+    var today = DateOnly.FromDateTime(DateTime.UtcNow);
+    if (today < sessionDates.StartDate)
+    {
+        return Results.BadRequest("Grades cannot be assigned before the course starts.");
+    }
+
+    if (today > sessionDates.EndDate)
+    {
+        return Results.BadRequest("Grades cannot be edited after the course ends.");
+    }
+
     enrollment.GradeValue = request.GradeValue;
-    enrollment.GradeDate = DateOnly.FromDateTime(DateTime.UtcNow);
-    enrollment.Status = EnrollmentStatusRules.GetFinalStatus(gradeType, request.GradeValue);
-    enrollment.IsFinalized = true;
+    enrollment.GradeDate = null;
+    enrollment.IsFinalized = false;
     await database.SaveChangesAsync(cancellationToken);
 
     return Results.Ok(new { enrollment.EnrollmentId, enrollment.GradeValue, enrollment.Status, enrollment.GradeDate });
+});
+
+app.MapPut("/api/enrollments/{enrollmentId:int}/finalize", async (int enrollmentId, FinalizeGradeRequest request,
+    AcademicRecordsDbContext database, CancellationToken cancellationToken) =>
+{
+    if (request.Status is not (EnrollmentStatusRules.Completed or EnrollmentStatusRules.Passed or EnrollmentStatusRules.Failed))
+    {
+        return Results.BadRequest("Final status must be Completed, Passed, or Failed.");
+    }
+
+    var enrollment = await database.Enrollments
+        .SingleOrDefaultAsync(value => value.EnrollmentId == enrollmentId, cancellationToken);
+    if (enrollment is null)
+    {
+        return Results.NotFound("Enrollment was not found.");
+    }
+
+    if ((request.Status is EnrollmentStatusRules.Passed or EnrollmentStatusRules.Failed) && enrollment.GradeValue is null)
+    {
+        return Results.BadRequest("A grade must be assigned before the enrollment can be finalized.");
+    }
+
+    enrollment.Status = request.Status;
+    enrollment.GradeDate = DateOnly.FromDateTime(DateTime.UtcNow);
+    enrollment.IsFinalized = true;
+    await database.SaveChangesAsync(cancellationToken);
+
+    return Results.Ok(new { enrollment.EnrollmentId, enrollment.GradeValue, enrollment.Status, enrollment.GradeDate, enrollment.IsFinalized });
 });
 
 app.MapGet("/api/students/{studentId}", async (string studentId, AcademicRecordsDbContext database, CancellationToken cancellationToken) =>
@@ -375,6 +427,8 @@ public sealed record EnrollStudentRequest(string FirstName, string LastName, str
 public sealed record AddEnrollmentRequest(string CourseCode, int AcademicTermId, int? AcademicYear = null);
 
 public sealed record GradeEntryRequest(decimal? GradeValue);
+
+public sealed record FinalizeGradeRequest(string Status);
 
 public sealed record EnrollStaffRequest(string FirstName, string LastName, string Email, DateOnly? DateOfBirth,
     string? PhoneNumber = null);
