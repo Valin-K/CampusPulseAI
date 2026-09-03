@@ -69,7 +69,7 @@ else if (eligibility is not null)
                     @foreach (var flag in analysis.RiskFlags)
                     {
                         <li>
-                            <strong>@flag.Severity: @flag.Category</strong>
+                            <strong>@Capitalize(flag.Severity): @Capitalize(flag.Category)</strong>
                             <p class="mb-1">@flag.Description</p>
                             <p class="ai-recommended-action"><strong>Recommended action:</strong> @flag.RecommendedAction</p>
                         </li>
@@ -158,6 +158,11 @@ else if (eligibility is not null)
             isAnalysing = false;
         }
     }
+
+    private static string Capitalize(string? text) =>
+        string.IsNullOrWhiteSpace(text)
+            ? string.Empty
+            : char.ToUpperInvariant(text[0]) + text.Substring(1);
 
     private string GetTranscriptUrl()
     {

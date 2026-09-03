@@ -14,6 +14,7 @@ else
     <div class="metric-grid">
         <CampusMetricCard Label="WAM" Value="@FormatStatistic(wam?.Value)" Detail="Weighted average mark" />
         <CampusMetricCard Label="GPA" Value="@FormatStatistic(gpa?.Value)" Detail="Grade point average" Tone="green" />
+        <CampusMetricCard Label="Credit points gained" Value="@FormatCreditPoints()" Detail="Earned from passed and completed courses" Tone="gold" />
     </div>
 
     <section class="surface-card table-panel">
@@ -124,6 +125,7 @@ else
     private List<TermEnrollmentResponse> pastEnrollments = [];
     private StudentStatisticResponse? wam;
     private StudentStatisticResponse? gpa;
+    private decimal? creditPointsGained;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -171,6 +173,10 @@ else
                 .OrderBy(enrollment => GetTermStartDate(enrollment.AcademicYear, enrollment.StartWeekOfYear))
                 .ThenBy(enrollment => enrollment.CourseCode)
                 .ToList();
+
+            creditPointsGained = student.Enrollments
+                .Where(enrollment => enrollment.Status is "Passed" or "Completed")
+                .Sum(enrollment => enrollment.Credits ?? 0m);
         }
         catch (HttpRequestException exception)
         {
@@ -198,6 +204,8 @@ else
             : enrollment.Status is "Completed" or "Passed" or "Failed"
                 ? enrollment.GradeValue?.ToString() ?? "N/A"
                 : "Pending";
+
+    private string FormatCreditPoints() => creditPointsGained?.ToString("0.##", CultureInfo.InvariantCulture) ?? "N/A";
 
     private static string FormatStatistic(decimal? value) => value?.ToString("0.00", CultureInfo.InvariantCulture) ?? "N/A";
 

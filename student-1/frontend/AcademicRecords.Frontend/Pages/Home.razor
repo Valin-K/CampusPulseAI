@@ -101,18 +101,32 @@
             var roleFiltered = source.Where(person =>
                 string.Equals(person.Role, IsStudentTab ? "Student" : "Staff", StringComparison.OrdinalIgnoreCase));
 
-            if (string.IsNullOrWhiteSpace(filter))
+            IEnumerable<PersonResponse> filtered = roleFiltered;
+            if (!string.IsNullOrWhiteSpace(filter))
             {
-                return roleFiltered;
+                var term = filter.Trim();
+                filtered = roleFiltered.Where(person =>
+                    person.FirstName.Contains(term, StringComparison.OrdinalIgnoreCase)
+                    || person.LastName.Contains(term, StringComparison.OrdinalIgnoreCase)
+                    || (person.StudentId ?? person.StaffId ?? string.Empty).Contains(term, StringComparison.OrdinalIgnoreCase)
+                    || person.Email.Contains(term, StringComparison.OrdinalIgnoreCase));
             }
 
-            var term = filter.Trim();
-            return roleFiltered.Where(person =>
-                person.FirstName.Contains(term, StringComparison.OrdinalIgnoreCase)
-                || person.LastName.Contains(term, StringComparison.OrdinalIgnoreCase)
-                || (person.StudentId ?? person.StaffId ?? string.Empty).Contains(term, StringComparison.OrdinalIgnoreCase)
-                || person.Email.Contains(term, StringComparison.OrdinalIgnoreCase));
+            return filtered
+                .OrderBy(person => GetIdSortKey(person.StudentId ?? person.StaffId))
+                .ThenBy(person => person.StudentId ?? person.StaffId, StringComparer.OrdinalIgnoreCase);
         }
+    }
+
+    private static long GetIdSortKey(string? id)
+    {
+        if (string.IsNullOrWhiteSpace(id))
+        {
+            return long.MaxValue;
+        }
+
+        var digits = new string(id.Where(char.IsDigit).ToArray());
+        return long.TryParse(digits, out var value) ? value : long.MaxValue - 1;
     }
 
     private string GetViewHref(PersonResponse person) =>

@@ -26,16 +26,16 @@ else if (profile is not null)
         <div class="form-grid">
             <label class="field"><span>ID</span><input value="@(profile.StudentId ?? profile.StaffId)" readonly disabled /></label>
             <label class="field"><span>Role</span><input value="@profile.Role" readonly disabled /></label>
-            <label class="field"><span>First name</span><input value="@profile.FirstName" readonly disabled /></label>
-            <label class="field"><span>Last name</span><input value="@profile.LastName" readonly disabled /></label>
-            <label class="field"><span>Email</span><input value="@profile.Email" readonly disabled /></label>
-            <label class="field"><span>Date of birth</span><input value="@profile.DateOfBirth" readonly disabled /></label>
-            <label class="field"><span>Phone number</span><input value="@profile.PhoneNumber" readonly disabled /></label>
+            <label class="field"><span>First name</span><input @bind="editFirstName" /></label>
+            <label class="field"><span>Last name</span><input @bind="editLastName" /></label>
+            <label class="field"><span>Email</span><input type="email" @bind="editEmail" /></label>
+            <label class="field"><span>Date of birth</span><input type="date" @bind="editDateOfBirth" /></label>
+            <label class="field"><span>Phone number</span><input @bind="editPhoneNumber" /></label>
             @if (profile.StudentId is not null)
             {
-                <label class="field"><span>Mailing address</span><input value="@profile.MailingAddress" readonly disabled /></label>
-                <label class="field"><span>Emergency contact name</span><input value="@profile.EmergencyContactName" readonly disabled /></label>
-                <label class="field"><span>Emergency contact phone</span><input value="@profile.EmergencyContactPhone" readonly disabled /></label>
+                <label class="field"><span>Mailing address</span><input @bind="editMailingAddress" /></label>
+                <label class="field"><span>Emergency contact name</span><input @bind="editEmergencyContactName" /></label>
+                <label class="field"><span>Emergency contact phone</span><input @bind="editEmergencyContactPhone" /></label>
                 <label class="field"><span>Enrollment date</span><input value="@profile.EnrollmentDate" readonly disabled /></label>
                 <label class="field"><span>Degree</span><input @bind="editDegree" /></label>
                 <label class="field"><span>Major</span><input @bind="editMajor" /></label>
@@ -43,12 +43,9 @@ else if (profile is not null)
             }
         </div>
 
-        @if (profile.StudentId is not null)
-        {
-            <div class="button-row" style="margin-top: 1rem;">
-                <button class="button button-primary" @onclick="SaveAsync" disabled="@isSaving">@(isSaving ? "Saving..." : "Save changes")</button>
-            </div>
-        }
+        <div class="button-row" style="margin-top: 1rem;">
+            <button class="button button-primary" @onclick="SaveAsync" disabled="@isSaving">@(isSaving ? "Saving..." : "Save changes")</button>
+        </div>
     </section>
 }
 
@@ -69,6 +66,14 @@ else if (profile is not null)
     private string? saveError;
     private bool saveSuccess;
 
+    private string? editFirstName;
+    private string? editLastName;
+    private string? editEmail;
+    private DateOnly? editDateOfBirth;
+    private string? editPhoneNumber;
+    private string? editMailingAddress;
+    private string? editEmergencyContactName;
+    private string? editEmergencyContactPhone;
     private string? editDegree;
     private string? editMajor;
     private string? editSubMajor;
@@ -94,6 +99,9 @@ else if (profile is not null)
 
                 if (profile is not null)
                 {
+                    editMailingAddress = profile.MailingAddress;
+                    editEmergencyContactName = profile.EmergencyContactName;
+                    editEmergencyContactPhone = profile.EmergencyContactPhone;
                     editDegree = profile.Degree;
                     editMajor = profile.Major;
                     editSubMajor = profile.SubMajor;
@@ -111,7 +119,15 @@ else if (profile is not null)
                 loadError = "Unknown profile role.";
             }
 
-            if (profile is null)
+            if (profile is not null)
+            {
+                editFirstName = profile.FirstName;
+                editLastName = profile.LastName;
+                editEmail = profile.Email;
+                editDateOfBirth = profile.DateOfBirth;
+                editPhoneNumber = profile.PhoneNumber;
+            }
+            else
             {
                 loadError ??= "Profile not found.";
             }
@@ -128,7 +144,7 @@ else if (profile is not null)
 
     private async Task SaveAsync()
     {
-        if (profile is null || profile.StudentId is null)
+        if (profile is null)
         {
             return;
         }
@@ -138,12 +154,27 @@ else if (profile is not null)
         saveSuccess = false;
         try
         {
-            var request = new UpdateStudentRequest(profile.FirstName, profile.LastName, profile.Email, profile.DateOfBirth,
-                profile.MailingAddress ?? string.Empty, profile.EmergencyContactName ?? string.Empty,
-                profile.EmergencyContactPhone ?? string.Empty, profile.PhoneNumber,
-                editDegree, editMajor, editSubMajor);
+            HttpResponseMessage response;
+            if (profile.StudentId is not null)
+            {
+                var request = new UpdateStudentRequest(editFirstName ?? string.Empty, editLastName ?? string.Empty,
+                    editEmail ?? string.Empty, editDateOfBirth,
+                    editMailingAddress ?? string.Empty, editEmergencyContactName ?? string.Empty,
+                    editEmergencyContactPhone ?? string.Empty, editPhoneNumber,
+                    editDegree, editMajor, editSubMajor);
+                response = await Http.PutAsJsonAsync($"api/students/{profile.StudentId}", request);
+            }
+            else if (profile.StaffId is not null)
+            {
+                var request = new UpdateStaffRequest(editFirstName ?? string.Empty, editLastName ?? string.Empty,
+                    editEmail ?? string.Empty, editDateOfBirth, editPhoneNumber);
+                response = await Http.PutAsJsonAsync($"api/staff/{profile.StaffId}", request);
+            }
+            else
+            {
+                return;
+            }
 
-            var response = await Http.PutAsJsonAsync($"api/students/{profile.StudentId}", request);
             if (response.IsSuccessStatusCode)
             {
                 saveSuccess = true;
@@ -183,4 +214,7 @@ else if (profile is not null)
     private sealed record UpdateStudentRequest(string FirstName, string LastName, string Email, DateOnly? DateOfBirth,
         string MailingAddress, string EmergencyContactName, string EmergencyContactPhone, string? PhoneNumber,
         string? Degree, string? Major, string? SubMajor);
+
+    private sealed record UpdateStaffRequest(string FirstName, string LastName, string Email, DateOnly? DateOfBirth,
+        string? PhoneNumber);
 }
