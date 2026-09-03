@@ -1,6 +1,22 @@
-html, body {
-    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-}
+html, body { min-height: 100%; }
+
+.table-panel { margin-top: 1rem; overflow: auto; }
+.table-panel table { width: 100%; border-collapse: collapse; }
+.table-panel th, .table-panel td { text-align: left; border-bottom: 1px solid #edf0f4; padding: .8rem .5rem; vertical-align: top; }
+.table-panel th { font-size: .75rem; color: #687386; text-transform: uppercase; }
+.room-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: .75rem; }
+.room-card { display: grid; gap: .3rem; padding: .9rem; border: 1px solid #e1e6ef; border-radius: 9px; }
+.room-card span { color: #687386; font-size: .85rem; }
+.room-card .available { color: #147a48; font-weight: 700; }
+.room-card .full { color: #b3261e; font-weight: 700; }
+.inline-input, .status-select { border: 1px solid #cdd5e2; border-radius: 5px; padding: .4rem; font: inherit; max-width: 170px; }
+.status-select { background: #fff; }
+.housing-user-selector { display: flex; align-items: center; gap: .6rem; }
+.housing-user-selector label { color: #627d98; font-size: .78rem; font-weight: 700; }
+.housing-user-selector select { border: 1px solid #bcccdc; border-radius: 7px; padding: .45rem .6rem; color: #243b53; background: #fff; }
+ .modal-backdrop { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; padding: 1rem; background: rgb(16 42 67 / 55%); }
+ .modal-card { width: min(100%, 30rem); max-width: 30rem; padding: 2rem; border-radius: 12px; background: #fff; box-shadow: 0 1rem 3rem rgb(16 42 67 / 25%); }
+@media (max-width: 700px) { .term-summary { margin-top: 1rem; } .housing-user-selector { align-items: flex-start; flex-direction: column; } }
 
 h1:focus {
     outline: none;

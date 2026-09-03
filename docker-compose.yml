@@ -56,6 +56,25 @@ services:
     build:
       context: .
       dockerfile: student-3/backend/CampusHousing.Backend/Dockerfile
+    environment:
+      ASPNETCORE_HTTP_PORTS: 8080
+      Services__CampusHousingDatabase: http://campushousing.database:8080
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+    ports:
+      - "5083:8080"
+    depends_on:
+      - campushousing.database
+
+  campushousing.database:
+    image: ${DOCKER_REGISTRY-}campushousingdatabase
+    build:
+      context: .
+      dockerfile: student-3/database/CampusHousing.Database/Dockerfile
+    environment:
+      ASPNETCORE_HTTP_PORTS: 8080
+      ConnectionStrings__CampusHousing: Data Source=/app/data/campus-housing.db
+    volumes:
+      - campushousing-data:/app/data
 
 
   financialaidbilling.backend:
@@ -159,6 +178,8 @@ services:
       dockerfile: docker/frontend/CampusHousing.Dockerfile
     ports:
       - "8083:80"
+    depends_on:
+      - campushousing.backend
 
 
   financialaidbilling.frontend:
@@ -193,3 +214,4 @@ services:
 
 volumes:
   coursemanagement-data:
+  campushousing-data:

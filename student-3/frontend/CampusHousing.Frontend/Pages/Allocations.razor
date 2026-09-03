@@ -1,0 +1,79 @@
+@page "/allocations"
+@using CampusHousing.Frontend.Models
+@inject HttpClient Http
+@inject HousingUserContext UserContext
+
+<PageTitle>Allocations | Campus Housing</PageTitle>
+
+<header class="dashboard-hero housing-header">
+    <div><span class="eyebrow">THE RESIDENCE</span><h1>Housing allocations</h1><p>Review current room assignments and update roommate preferences.</p></div>
+    <NavLink class="button-link" href="/">Book a room</NavLink>
+</header>
+
+@if (!string.IsNullOrWhiteSpace(message))
+{
+    <div class="notice" role="status">@message</div>
+}
+
+<section class="card-panel table-panel">
+    <h2>@(UserContext.IsAdministrator ? "Manage allocations" : "Current allocations")</h2>
+    @if (loading)
+    {
+        <p class="muted">Loading allocations...</p>
+    }
+    else if (allocations.Count == 0)
+    {
+        <p class="muted">No housing allocations have been recorded.</p>
+    }
+    else
+    {
+        <div class="table-responsive"><table><thead><tr><th>Student</th><th>Room</th><th>Allocated</th><th>Roommate preference</th><th>Actions</th></tr></thead><tbody>
+            @foreach (var allocation in allocations)
+            {
+                <tr><td><strong>@allocation.StudentName</strong><br /><small>@allocation.StudentId</small></td><td>@if (UserContext.IsAdministrator) { <select @bind="allocation.DormRoomId">@foreach (var room in rooms.Where(room => room.IsAvailable || room.Id == allocation.DormRoomId)) { <option value="@room.Id">@RoomName(room.Id)</option> }</select> } else { @RoomName(allocation.DormRoomId) }</td><td>@allocation.AllocatedAt.ToLocalTime().ToString("MMM d, yyyy")</td><td>@if (UserContext.IsAdministrator) { <input class="inline-input" @bind="allocation.RoommatePreference" /> } else { @allocation.RoommatePreference }</td><td>@if (UserContext.IsAdministrator) { <button class="link-button" @onclick="() => UpdateAsync(allocation)">Save</button> <button class="link-button danger" @onclick="() => CancelAsync(allocation.Id)">Cancel</button> }</td></tr>
+            }
+        </tbody></table></div>
+    }
+</section>
+
+@code {
+    private List<DormRoom> rooms = [];
+    private List<HousingAllocation> allocations = [];
+    private string message = "";
+    private bool loading = true;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        loading = true;
+        try
+        {
+            var roomsTask = Http.GetFromJsonAsync<List<DormRoom>>("api/housing/rooms");
+            var allocationsTask = Http.GetFromJsonAsync<List<HousingAllocation>>("api/housing/allocations");
+            await Task.WhenAll(roomsTask, allocationsTask);
+            rooms = await roomsTask ?? [];
+            allocations = await allocationsTask ?? [];
+        }
+        catch (Exception ex) { message = $"Allocations could not be loaded: {ex.Message}"; }
+        finally { loading = false; }
+    }
+
+    private string RoomName(int id) => rooms.FirstOrDefault(room => room.Id == id) is { } room ? $"{room.Building} {room.RoomNumber}" : $"Room {id}";
+
+    private async Task UpdateAsync(HousingAllocation allocation) => await SendAsync(HttpMethod.Put, $"api/housing/allocations/{allocation.Id}", new { allocation.DormRoomId, allocation.StudentId, allocation.StudentName, allocation.RoommatePreference }, "Allocation updated.");
+    private async Task CancelAsync(int id) => await SendAsync(HttpMethod.Delete, $"api/housing/allocations/{id}", null, "Allocation cancelled.");
+
+    private async Task SendAsync(HttpMethod method, string url, object? body, string success)
+    {
+        try
+        {
+            using var request = new HttpRequestMessage(method, url);
+            if (body is not null) request.Content = JsonContent.Create(body);
+            using var response = await Http.SendAsync(request);
+            message = response.IsSuccessStatusCode ? success : await response.Content.ReadAsStringAsync();
+            await LoadAsync();
+        }
+        catch (Exception ex) { message = ex.Message; }
+    }
+}

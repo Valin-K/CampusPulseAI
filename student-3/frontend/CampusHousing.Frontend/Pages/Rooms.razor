@@ -1,0 +1,122 @@
+@page "/rooms"
+@using CampusHousing.Frontend.Models
+@inject HttpClient Http
+@inject HousingUserContext UserContext
+
+<PageTitle>Rooms | Campus Housing</PageTitle>
+
+<header class="housing-header">
+    <div><span class="eyebrow">THE RESIDENCE</span><h1>Room inventory</h1><p>Review availability and maintain the campus housing room catalogue.</p></div>
+    @if (UserContext.IsAdministrator) { <button @onclick="BeginCreate">Add room</button> }
+</header>
+
+@if (!string.IsNullOrWhiteSpace(message))
+{
+    <div class="notice" role="status">@message</div>
+}
+
+<div class="housing-grid">
+    <section class="card-panel">
+        <h2>Available inventory</h2>
+        <p class="muted">@rooms.Count room(s) loaded from the Campus Housing service.</p>
+        @if (loading)
+        {
+            <p class="muted">Loading rooms...</p>
+        }
+        else if (rooms.Count == 0)
+        {
+            <p class="muted">No rooms have been added yet.</p>
+        }
+        else
+        {
+            <div class="room-cards">
+                @foreach (var room in rooms)
+                {
+                    <article class="room-card">
+                        <strong>@room.Building @room.RoomNumber</strong>
+                        <span>@room.OccupiedBeds / @room.Capacity occupied</span>
+                        <span class="@(IsAvailable(room) ? "available" : "full")">@(IsAvailable(room) ? "Available" : "Full")</span>
+                        @if (UserContext.IsAdministrator) { <div><button class="link-button" @onclick="() => BeginEdit(room)">Edit</button> <button class="link-button danger" @onclick="() => DeleteAsync(room.Id)">Delete</button></div> }
+                    </article>
+                }
+            </div>
+        }
+    </section>
+
+    @if (UserContext.IsAdministrator)
+    {
+    <section class="card-panel accent-panel">
+        <h2>@(editingId is null ? "Add a room" : $"Edit room #{editingId}")</h2>
+        <EditForm Model="draft" OnValidSubmit="SaveAsync">
+            <DataAnnotationsValidator />
+            <label>Building <InputText @bind-Value="draft.Building" /></label>
+            <label>Room number <InputText @bind-Value="draft.RoomNumber" /></label>
+            <label>Capacity <InputNumber @bind-Value="draft.Capacity" min="1" /></label>
+            <label><InputCheckbox @bind-Value="draft.IsAvailable" /> Accept new allocations</label>
+            <button type="submit" disabled="@busy">@(busy ? "Saving..." : "Save room")</button>
+            @if (editingId is not null)
+            {
+                <button type="button" class="link-button" @onclick="BeginCreate">Cancel</button>
+            }
+        </EditForm>
+    </section>
+    }
+</div>
+
+@code {
+    private List<DormRoom> rooms = [];
+    private RoomDraft draft = new();
+    private int? editingId;
+    private string message = "";
+    private bool loading = true;
+    private bool busy;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private bool IsAvailable(DormRoom room) => room.IsAvailable && room.OccupiedBeds < room.Capacity;
+
+    private async Task LoadAsync()
+    {
+        loading = true;
+        try { rooms = await Http.GetFromJsonAsync<List<DormRoom>>("api/housing/rooms") ?? []; }
+        catch (Exception ex) { message = $"Rooms could not be loaded: {ex.Message}"; }
+        finally { loading = false; }
+    }
+
+    private void BeginCreate() { editingId = null; draft = new(); }
+    private void BeginEdit(DormRoom room) { editingId = room.Id; draft = new() { Building = room.Building, RoomNumber = room.RoomNumber, Capacity = room.Capacity, IsAvailable = room.IsAvailable }; }
+
+    private async Task SaveAsync()
+    {
+        busy = true;
+        try
+        {
+            using var response = editingId is null
+                ? await Http.PostAsJsonAsync("api/housing/rooms", draft)
+                : await Http.PutAsJsonAsync($"api/housing/rooms/{editingId}", draft);
+            message = response.IsSuccessStatusCode ? "Room saved successfully." : await response.Content.ReadAsStringAsync();
+            if (response.IsSuccessStatusCode) BeginCreate();
+        }
+        catch (Exception ex) { message = ex.Message; }
+        finally { busy = false; await LoadAsync(); }
+    }
+
+    private async Task DeleteAsync(int id)
+    {
+        try
+        {
+            using var response = await Http.DeleteAsync($"api/housing/rooms/{id}");
+            message = response.IsSuccessStatusCode ? "Room deleted successfully." : await response.Content.ReadAsStringAsync();
+            await LoadAsync();
+        }
+        catch (Exception ex) { message = ex.Message; }
+    }
+
+    private sealed class RoomDraft
+    {
+        public string Building { get; set; } = "";
+        public string RoomNumber { get; set; } = "";
+        public int Capacity { get; set; } = 1;
+        public bool IsAvailable { get; set; } = true;
+    }
+}
