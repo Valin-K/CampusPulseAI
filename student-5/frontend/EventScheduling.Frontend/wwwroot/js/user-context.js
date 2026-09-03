@@ -1,4 +1,3 @@
-// Remembers which student is selected in the nav-bar "Viewing as" switcher, per browser.
 window.campusPulseUser = {
     get(key) {
         try {
@@ -17,6 +16,18 @@ window.campusPulseUser = {
     remove(key) {
         try {
             window.localStorage.removeItem(key);
+        } catch {
+            /* no-op */
+        }
+    }
+};
+
+window.campusPulseScroll = {
+    toEnd(element) {
+        try {
+            if (element) {
+                element.scrollTop = element.scrollHeight;
+            }
         } catch {
             /* no-op */
         }
