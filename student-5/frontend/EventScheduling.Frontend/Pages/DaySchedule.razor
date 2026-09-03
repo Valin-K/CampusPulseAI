@@ -61,11 +61,12 @@ else
             <div class="card-grid">
                 @foreach (var entry in dayBookings)
                 {
-                    var action = ActionFor(entry.Booking);
+                    var action = BookingActions.For(entry.Booking);
+                    var displayStatus = entry.Booking.DisplayStatus();
                     <article class="scholarship-card">
                         <div class="card-topline">
                             <span class="status-badge paid">@(entry.Booking.ResourceType == ResourceType.Room ? "Study room" : "Equipment")</span>
-                            <span class="status-badge day-status status-@entry.Booking.Status.ToString().ToLowerInvariant()">@entry.Booking.Status</span>
+                            <span class="status-badge day-status status-@displayStatus.CssName()">@displayStatus.Label()</span>
                         </div>
                         <h3>@entry.Booking.ResourceName</h3>
                         <p class="day-time">@entry.TimeText</p>
@@ -136,6 +137,8 @@ else
             isLoading = true;
         }
 
+        await CurrentUser.LoadAsync();
+
         errorMessage = null;
 
         try
@@ -172,54 +175,12 @@ else
         }
     }
 
-    private CardAction? ActionFor(BookingResponse booking)
-    {
-        if (booking.ResourceType == ResourceType.Equipment)
-        {
-            if (booking.Status is BookingStatus.Pending)
-            {
-                return new CardAction(BookingActionKind.Cancel, "Cancel hire", "button-danger");
-            }
-
-            if (booking.EquipmentId is not null && booking.Status is BookingStatus.Confirmed or BookingStatus.Overdue)
-            {
-                return new CardAction(BookingActionKind.Return, "Return", "button-primary");
-            }
-
-            return null;
-        }
-
-        // Room booking.
-        if (booking.Status is not (BookingStatus.Pending or BookingStatus.Confirmed))
-        {
-            return null;
-        }
-
-        var now = DateTime.Now;
-        if (now >= booking.StartUtc && now < booking.EndUtc)
-        {
-            return new CardAction(BookingActionKind.End, "End", "button-primary");
-        }
-
-        if (now < booking.StartUtc)
-        {
-            return new CardAction(BookingActionKind.Cancel, "Cancel", "button-danger");
-        }
-
-        return null;
-    }
-
-    private async Task RunActionAsync(BookingResponse booking, CardAction action)
+    private async Task RunActionAsync(BookingResponse booking, BookingCardAction action)
     {
         busyId = booking.Id;
         errorMessage = null;
 
-        var result = action.Kind switch
-        {
-            BookingActionKind.Return => await Api.ReturnBookingAsync(booking.Id),
-            BookingActionKind.End => await Api.EndBookingAsync(booking.Id),
-            _ => await Api.CancelBookingAsync(booking.Id)
-        };
+        var result = await BookingActions.RunAsync(Api, booking, action);
 
         busyId = null;
 
@@ -267,15 +228,6 @@ else
 
         return new DayBookingEntry(booking, timeText, details);
     }
-
-    private enum BookingActionKind
-    {
-        Return,
-        End,
-        Cancel
-    }
-
-    private sealed record CardAction(BookingActionKind Kind, string Label, string CssClass);
 
     private sealed record DayBookingEntry(BookingResponse Booking, string TimeText, IReadOnlyList<string> Details);
 }

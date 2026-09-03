@@ -1,24 +1,66 @@
+using System.Globalization;
 using EventScheduling.Frontend.Models;
+using Microsoft.AspNetCore.Components;
+using Microsoft.JSInterop;
 
 namespace EventScheduling.Frontend.Services;
 
-// The signed-in student. There is no authentication yet, so this is fixed to
-// Academic Records (student-1) UserId 4 - Ryan Takayasu / STU004. Bookings, the
-// dashboard and the calendar are all scoped to this user.
-public sealed class CurrentUser(EventSchedulingApiClient api)
+public sealed class CurrentUser(EventSchedulingApiClient api, IJSRuntime js, NavigationManager navigation)
 {
-    public const int UserId = 4;
+    private const string StorageKey = "campuspulse.event-scheduling.selected-user-id";
+    private const int DefaultUserId = 4;
 
+    public IReadOnlyList<UserProfile> Users { get; private set; } = [];
     public UserProfile? Profile { get; private set; }
+    public bool IsInitialized { get; private set; }
+
+    public int UserId => Profile?.UserId ?? DefaultUserId;
+
+    public bool IsStaff => string.Equals(Profile?.Role, "Staff", StringComparison.OrdinalIgnoreCase);
 
     private Task<UserProfile?>? loadTask;
 
-    // Fetches the profile once and caches it for the lifetime of the session.
-    public Task<UserProfile?> LoadAsync() => loadTask ??= FetchAsync();
+    public Task<UserProfile?> LoadAsync() => loadTask ??= InitializeAsync();
 
-    private async Task<UserProfile?> FetchAsync()
+    private async Task<UserProfile?> InitializeAsync()
     {
-        Profile = await api.GetUserAsync(UserId);
+        Users = await api.GetUsersAsync();
+
+        int? storedId = null;
+        try
+        {
+            var raw = await js.InvokeAsync<string?>("campusPulseUser.get", StorageKey);
+            if (int.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed))
+            {
+                storedId = parsed;
+            }
+        }
+        catch (JSException)
+        {
+            // storage not available - fall back to the default
+        }
+
+        Profile =
+            (storedId is { } id ? Users.FirstOrDefault(user => user.UserId == id) : null)
+            ?? Users.FirstOrDefault(user => user.UserId == DefaultUserId)
+            ?? Users.FirstOrDefault();
+
+        IsInitialized = true;
         return Profile;
+    }
+
+    public async Task SelectAsync(int userId)
+    {
+        try
+        {
+            await js.InvokeVoidAsync("campusPulseUser.set", StorageKey,
+                userId.ToString(CultureInfo.InvariantCulture));
+        }
+        catch (JSException)
+        {
+            return;
+        }
+
+        navigation.NavigateTo(navigation.Uri, forceLoad: true);
     }
 }

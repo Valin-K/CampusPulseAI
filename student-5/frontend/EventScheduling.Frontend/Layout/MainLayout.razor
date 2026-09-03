@@ -6,7 +6,34 @@
              UserName="@userName"
              UserDetails="@userDetails"
              UserInitials="@userInitials">
-    @Body
+    <UserSelector>
+        <div class="event-user-selector">
+            @if (!CurrentUser.IsInitialized)
+            {
+                <span role="status">Loading students…</span>
+            }
+            else if (CurrentUser.Users.Count > 0)
+            {
+                <label for="event-user-select">Viewing as</label>
+                <select id="event-user-select"
+                        value="@CurrentUser.UserId"
+                        @onchange="OnUserChangedAsync"
+                        aria-label="Choose which user to view the schedule as">
+                    @foreach (var user in CurrentUser.Users)
+                    {
+                        <option value="@user.UserId">@user.FullName (@user.Role)</option>
+                    }
+                </select>
+            }
+            else
+            {
+                <span><strong>@userName</strong></span>
+            }
+        </div>
+    </UserSelector>
+    <ChildContent>
+        @Body
+    </ChildContent>
 </CampusShell>
 
 @code {
@@ -17,17 +44,26 @@
     protected override async Task OnInitializedAsync()
     {
         var profile = await CurrentUser.LoadAsync();
+
         if (profile is not null)
         {
             userName = profile.FullName;
-            userDetails = profile.StudentId ?? profile.Role;
+            userDetails = profile.Descriptor;
             userInitials = profile.Initials;
         }
         else
         {
             userName = "Unknown user";
-            userDetails = $"User {CurrentUser.UserId}";
+            userDetails = string.Empty;
             userInitials = "?";
+        }
+    }
+
+    private async Task OnUserChangedAsync(ChangeEventArgs args)
+    {
+        if (int.TryParse(args.Value?.ToString(), out var userId) && userId != CurrentUser.UserId)
+        {
+            await CurrentUser.SelectAsync(userId);
         }
     }
 }
