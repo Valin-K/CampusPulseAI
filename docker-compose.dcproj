@@ -12,7 +12,6 @@
   </PropertyGroup>
   <ItemGroup>
     <None Include=".github\docker-compose.student-4.ci.yml" />
-    <None Include=".github\workflows\student-3.yml" />
     <None Include="docker-compose.override.yml">
       <DependentUpon>docker-compose.yml</DependentUpon>
     </None>
