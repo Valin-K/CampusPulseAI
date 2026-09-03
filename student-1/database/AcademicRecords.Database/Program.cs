@@ -217,6 +217,31 @@ app.MapPost("/api/students/{studentId}/enrollments", async (string studentId, Ad
     return Results.Created($"/api/students/{studentId}/enrollments/{enrollment.EnrollmentId}", enrollment.EnrollmentId);
 });
 
+app.MapPut("/api/enrollments/{enrollmentId:int}/grade", async (int enrollmentId, GradeEntryRequest request,
+    AcademicRecordsDbContext database, CancellationToken cancellationToken) =>
+{
+    if (request.GradeValue is < 0 or > 100)
+    {
+        return Results.BadRequest("Grade must be between 0 and 100.");
+    }
+
+    var enrollment = await database.Enrollments
+        .SingleOrDefaultAsync(value => value.EnrollmentId == enrollmentId, cancellationToken);
+    if (enrollment is null)
+    {
+        return Results.NotFound("Enrollment was not found.");
+    }
+
+    var gradeType = GradeTypePlaceholder.Get(enrollment.CourseCode);
+    enrollment.GradeValue = request.GradeValue;
+    enrollment.GradeDate = DateOnly.FromDateTime(DateTime.UtcNow);
+    enrollment.Status = EnrollmentStatusRules.GetFinalStatus(gradeType, request.GradeValue);
+    enrollment.IsFinalized = true;
+    await database.SaveChangesAsync(cancellationToken);
+
+    return Results.Ok(new { enrollment.EnrollmentId, enrollment.GradeValue, enrollment.Status, enrollment.GradeDate });
+});
+
 app.MapGet("/api/students/{studentId}", async (string studentId, AcademicRecordsDbContext database, CancellationToken cancellationToken) =>
 {
     var student = await database.Set<Student>().AsNoTracking()
@@ -348,6 +373,8 @@ public sealed record EnrollStudentRequest(string FirstName, string LastName, str
     int? AcademicTermId = null, string? CourseCode = null, int? AcademicYear = null);
 
 public sealed record AddEnrollmentRequest(string CourseCode, int AcademicTermId, int? AcademicYear = null);
+
+public sealed record GradeEntryRequest(decimal? GradeValue);
 
 public sealed record EnrollStaffRequest(string FirstName, string LastName, string Email, DateOnly? DateOfBirth,
     string? PhoneNumber = null);

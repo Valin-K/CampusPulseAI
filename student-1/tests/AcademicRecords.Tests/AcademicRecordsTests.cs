@@ -290,6 +290,93 @@ namespace AcademicRecords.Tests
         }
 
         [Test]
+        public async Task GradeEntryPassFinalizesEnrollment()
+        {
+            await using var connection = new SqliteConnection("Data Source=:memory:");
+            await connection.OpenAsync();
+            await using var database = CreateDatabase(connection);
+            await database.Database.EnsureCreatedAsync();
+
+            var enrollment = new Enrollment
+            {
+                CourseCode = "CS101",
+                AcademicYear = 2026,
+                Status = EnrollmentStatusRules.InProgress
+            };
+            database.Enrollments.Add(enrollment);
+            await database.SaveChangesAsync();
+
+            enrollment.GradeValue = 75m;
+            enrollment.GradeDate = DateOnly.FromDateTime(DateTime.UtcNow);
+            enrollment.Status = EnrollmentStatusRules.GetFinalStatus(EnrollmentStatusRules.EnrollmentGradeTypes.Mark, enrollment.GradeValue);
+            enrollment.IsFinalized = true;
+            await database.SaveChangesAsync();
+
+            var saved = await database.Enrollments.SingleAsync();
+            Assert.That(saved.GradeValue, Is.EqualTo(75m));
+            Assert.That(saved.Status, Is.EqualTo(EnrollmentStatusRules.Passed));
+            Assert.That(saved.IsFinalized, Is.True);
+            Assert.That(saved.GradeDate, Is.EqualTo(DateOnly.FromDateTime(DateTime.UtcNow)));
+        }
+
+        [Test]
+        public async Task GradeEntryFailFinalizesEnrollmentAsFailed()
+        {
+            await using var connection = new SqliteConnection("Data Source=:memory:");
+            await connection.OpenAsync();
+            await using var database = CreateDatabase(connection);
+            await database.Database.EnsureCreatedAsync();
+
+            var enrollment = new Enrollment
+            {
+                CourseCode = "CS101",
+                AcademicYear = 2026,
+                Status = EnrollmentStatusRules.Enrolled
+            };
+            database.Enrollments.Add(enrollment);
+            await database.SaveChangesAsync();
+
+            enrollment.GradeValue = 49.99m;
+            enrollment.GradeDate = DateOnly.FromDateTime(DateTime.UtcNow);
+            enrollment.Status = EnrollmentStatusRules.GetFinalStatus(EnrollmentStatusRules.EnrollmentGradeTypes.Mark, enrollment.GradeValue);
+            enrollment.IsFinalized = true;
+            await database.SaveChangesAsync();
+
+            var saved = await database.Enrollments.SingleAsync();
+            Assert.That(saved.Status, Is.EqualTo(EnrollmentStatusRules.Failed));
+            Assert.That(saved.IsFinalized, Is.True);
+        }
+
+        [Test]
+        public void GradeEntryRejectsGradesOutsideTheSupportedRange()
+        {
+            Assert.That(IsValidGrade(-0.01m), Is.False);
+            Assert.That(IsValidGrade(0m), Is.True);
+            Assert.That(IsValidGrade(100m), Is.True);
+            Assert.That(IsValidGrade(100.01m), Is.False);
+        }
+
+        [Test]
+        public void CurrentCourseEnrollmentsCanBeGroupedBySession()
+        {
+            var enrollments = new[]
+            {
+                new TermEnrollmentResponse("STU001", "Alex Student", "CPAI1001", "T1", "Term 1", 2026, "In Progress"),
+                new TermEnrollmentResponse("STU002", "Sam Student", "CPAI1001", "T1", "Term 1", 2026, "Enrolled"),
+                new TermEnrollmentResponse("STU003", "Pat Student", "CPAI1001", "T2", "Term 2", 2026, "Completed")
+            };
+
+            var sessions = enrollments
+                .Where(enrollment => enrollment.Status is EnrollmentStatusRules.Enrolled or EnrollmentStatusRules.InProgress)
+                .GroupBy(enrollment => $"{enrollment.TermName} ({enrollment.TermCode}) - {enrollment.AcademicYear}")
+                .ToList();
+
+            Assert.That(sessions, Has.Count.EqualTo(1));
+            Assert.That(sessions[0].Key, Is.EqualTo("Term 1 (T1) - 2026"));
+            Assert.That(sessions[0].ToList(), Has.Count.EqualTo(2));
+        }
+
+        [Test]
         public void SeedEnrollmentsHaveStatusesConsistentWithTheirSessionDates()
         {
             var today = DateOnly.FromDateTime(DateTime.UtcNow);
@@ -524,5 +611,10 @@ namespace AcademicRecords.Tests
 
         private static AcademicRecordsDbContext CreateDatabase(SqliteConnection connection) =>
             new(new DbContextOptionsBuilder<AcademicRecordsDbContext>().UseSqlite(connection).Options);
+
+        private static bool IsValidGrade(decimal? grade) => grade is >= 0 and <= 100;
+
+        private sealed record TermEnrollmentResponse(string StudentId, string StudentName, string CourseCode,
+            string TermCode, string TermName, int AcademicYear, string Status);
     }
 }

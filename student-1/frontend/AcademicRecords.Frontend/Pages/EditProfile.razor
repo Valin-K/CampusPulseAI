@@ -49,6 +49,10 @@ else if (profile is not null)
             <button class="btn btn-primary" @onclick="SaveAsync" disabled="@isSaving">Save changes</button>
             <a href="/profile/@Role/@UserId/enrollments" class="btn btn-outline-secondary ms-2">View enrollments</a>
         }
+         else if (profile.StaffId is not null)
+         {
+             <a href="/profile/@Role/@UserId/course-assignments" class="btn btn-primary">View course assignments</a>
+         }
     </div>
 }
 
