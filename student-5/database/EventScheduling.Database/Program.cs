@@ -84,14 +84,11 @@ rooms.MapDelete("/{id:int}", async (int id, EventSchedulingDbContext database, C
     return Results.NoContent();
 });
 
-// Resolves the live "available" count for an equipment type (COUNT of AVL units).
 static Task<int> AvailableCountAsync(EventSchedulingDbContext database, int refEquipmentId, CancellationToken cancellationToken) =>
     database.Equipment.CountAsync(
         unit => unit.RefEquipmentId == refEquipmentId && unit.Status == EquipmentStatus.AVL,
         cancellationToken);
 
-// Releases the equipment unit held by a booking: flips the unit back to AVL and nulls Booking.EquipmentId.
-// Booking.RefEquipmentId is left intact as a stable history snapshot.
 static async Task ReleaseEquipmentUnitAsync(EventSchedulingDbContext database, Booking booking, CancellationToken cancellationToken)
 {
     if (booking.EquipmentId is null)
@@ -108,8 +105,6 @@ static async Task ReleaseEquipmentUnitAsync(EventSchedulingDbContext database, B
     booking.EquipmentId = null;
 }
 
-// True when a live booking on the same room overlaps [startUtc, endUtc). Cancelled, Completed
-// (room ended early) and Returned bookings no longer hold the room.
 static Task<bool> RoomHasClashAsync(EventSchedulingDbContext database, int roomId, DateTime startUtc, DateTime endUtc,
     int? excludeBookingId, CancellationToken cancellationToken)
 {
@@ -324,8 +319,6 @@ var bookings = app.MapGroup("/api/bookings");
 
 bookings.MapGet("/", async (EventSchedulingDbContext database, CancellationToken cancellationToken) =>
 {
-    // Materialise first: ToResponse() derives the "Overdue" status from the wall clock,
-    // which cannot run inside a LINQ-to-SQL projection.
     var all = await database.Bookings
         .AsNoTracking()
         .OrderBy(booking => booking.StartUtc)
@@ -348,8 +341,6 @@ bookings.MapPost("/", async (BookingRequest request, EventSchedulingDbContext da
         return Results.ValidationProblem(new Dictionary<string, string[]> { ["booking"] = [error] });
     }
 
-    // The client enforces "today or later" in the viewer's own time zone; this server runs in UTC,
-    // so allow a day of slack here and reject only clearly-past dates.
     if (request.StartUtc.Date < DateTime.UtcNow.Date.AddDays(-1))
     {
         return Results.ValidationProblem(new Dictionary<string, string[]>
@@ -362,11 +353,22 @@ bookings.MapPost("/", async (BookingRequest request, EventSchedulingDbContext da
 
     if (request.RoomId is not null)
     {
-        if (!await database.Rooms.AnyAsync(room => room.Id == request.RoomId, cancellationToken))
+        var room = await database.Rooms.AsNoTracking().SingleOrDefaultAsync(item => item.Id == request.RoomId, cancellationToken);
+        if (room is null)
         {
             return Results.ValidationProblem(new Dictionary<string, string[]>
             {
                 ["booking"] = ["The specified room does not exist."]
+            });
+        }
+
+        if (room.IsStaffRoom != request.IsStaff)
+        {
+            return Results.ValidationProblem(new Dictionary<string, string[]>
+            {
+                ["booking"] = [room.IsStaffRoom
+                    ? "Lab and lecture rooms can only be booked by teaching staff."
+                    : "Study rooms are booked by students, not teaching staff."]
             });
         }
 
@@ -470,7 +472,6 @@ bookings.MapPost("/{id:int}/return", async (int id, EventSchedulingDbContext dat
     return Results.Ok(booking.ToResponse());
 });
 
-// Ends an in-progress room booking: the room is freed for that time but the record is kept.
 bookings.MapPost("/{id:int}/end", async (int id, EventSchedulingDbContext database, CancellationToken cancellationToken) =>
 {
     var booking = await database.Bookings.SingleOrDefaultAsync(item => item.Id == id, cancellationToken);

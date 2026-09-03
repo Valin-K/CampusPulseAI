@@ -5,7 +5,6 @@ namespace EventScheduling.Database.Data;
 
 public static class EventSeedData
 {
-    // Academic Records (student-1) UserId of the demo student every seed booking belongs to.
     private const int StudentId = 4;
 
     public static async Task InitializeAsync(EventSchedulingDbContext database)
@@ -13,11 +12,21 @@ public static class EventSeedData
         if (!await database.Rooms.AnyAsync())
         {
             database.Rooms.AddRange(
-                Room(1, "Study Room 101", "Library, Level 1", 4, "Quiet room with a whiteboard, ideal for small group study."),
-                Room(2, "Study Room 204", "Library, Level 2", 6, "Booth seating with a wall-mounted display for group work."),
-                Room(3, "Group Pod A", "Student Centre, Level 3", 8, "Open pod with movable furniture and a large screen."),
-                Room(4, "Silent Study Room 3B", "Library, Level 3", 2, "Single-occupant silent room for focused study."),
-                Room(5, "Collaboration Suite C", "Engineering Building, Level 1", 10, "Large suite with breakout seating and dual displays."));
+                Room(1, "Study Room 101", "Library, Level 1", 4, "Quiet room with a whiteboard, ideal for small group study.", RoomKind.Study),
+                Room(2, "Study Room 204", "Library, Level 2", 6, "Booth seating with a wall-mounted display for group work.", RoomKind.Study),
+                Room(3, "Group Pod A", "Student Centre, Level 3", 8, "Open pod with movable furniture and a large screen.", RoomKind.Study),
+                Room(4, "Silent Study Room 3B", "Library, Level 3", 2, "Single-occupant silent room for focused study.", RoomKind.Study),
+                Room(5, "Collaboration Suite C", "Engineering Building, Level 1", 10, "Large suite with breakout seating and dual displays.", RoomKind.Study),
+                Room(6, "Study Room 302", "Library, Level 3", 4, "Corner room with natural light and a small whiteboard.", RoomKind.Study),
+                Room(7, "Group Pod B", "Student Centre, Level 3", 8, "Open pod beside Pod A with movable furniture and a screen.", RoomKind.Study),
+                Room(8, "Media Booth 1", "Library, Level 1", 3, "Soundproofed booth for recording and editing group projects.", RoomKind.Study),
+                Room(9, "Computer Lab 1", "Engineering Building, Level 2", 30, "30 workstations with dual monitors for programming classes.", RoomKind.Lab),
+                Room(10, "Computer Lab 2", "Engineering Building, Level 2", 24, "24 workstations configured for networking and security labs.", RoomKind.Lab),
+                Room(11, "Physics Lab", "Science Building, Level 1", 20, "Bench lab with power rigs and measurement equipment.", RoomKind.Lab),
+                Room(12, "Chemistry Lab", "Science Building, Level 2", 18, "Wet lab with fume hoods for supervised chemistry practicals.", RoomKind.Lab),
+                Room(13, "Lecture Theatre A", "Central Hall, Ground Floor", 180, "Tiered theatre with a lectern, projector and lecture-capture.", RoomKind.Lecture),
+                Room(14, "Lecture Theatre B", "Central Hall, Level 1", 120, "Tiered theatre with dual projection and a document camera.", RoomKind.Lecture),
+                Room(15, "Seminar Room 210", "Arts Building, Level 2", 40, "Flat-floor seminar room with movable tables and a screen.", RoomKind.Lecture));
         }
 
         if (!await database.RefEquipment.AnyAsync())
@@ -71,13 +80,9 @@ public static class EventSeedData
                 RoomBooking(7, 5, "Collaboration Suite C", new(2026, 9, 12, 15, 0, 0, DateTimeKind.Utc), new(2026, 9, 12, 17, 0, 0, DateTimeKind.Utc), BookingStatus.Pending),
                 EquipmentBooking(8, refEquipmentId: 1, equipmentId: 1, "HDMI Adapter", new(2026, 9, 15, 9, 0, 0, DateTimeKind.Utc), new(2026, 9, 15, 10, 0, 0, DateTimeKind.Utc), BookingStatus.Confirmed),
                 RoomBooking(9, 1, "Study Room 101", new(2026, 9, 21, 10, 0, 0, DateTimeKind.Utc), new(2026, 9, 21, 12, 0, 0, DateTimeKind.Utc), BookingStatus.Confirmed),
-                // Cancelled equipment booking: unit already released (EquipmentId null), RefEquipmentId kept for history.
                 ReleasedEquipmentBooking(10, refEquipmentId: 4, "Whiteboard Markers Kit", new(2026, 9, 28, 12, 0, 0, DateTimeKind.Utc), new(2026, 9, 28, 13, 0, 0, DateTimeKind.Utc), BookingStatus.Cancelled),
-                // Overdue: hired 2026-08-25, was due back 2026-08-27, still holding unit CHG-001 -> reported as Overdue.
                 EquipmentBooking(11, refEquipmentId: 2, equipmentId: 13, "Laptop Charger", new(2026, 8, 25, 9, 0, 0, DateTimeKind.Utc), new(2026, 8, 27, 17, 0, 0, DateTimeKind.Utc), BookingStatus.Confirmed),
-                // Active today: an all-day HDMI adapter hire holding unit HDMI-002.
                 EquipmentBooking(12, refEquipmentId: 1, equipmentId: 2, "HDMI Adapter", new(2026, 9, 1, 8, 0, 0, DateTimeKind.Utc), new(2026, 9, 1, 20, 0, 0, DateTimeKind.Utc), BookingStatus.Confirmed),
-                // Extra bookings scheduled for today so the dashboard strip overflows and scrolls.
                 RoomBooking(13, 1, "Study Room 101", new(2026, 9, 1, 6, 0, 0, DateTimeKind.Utc), new(2026, 9, 1, 18, 0, 0, DateTimeKind.Utc), BookingStatus.Confirmed),
                 RoomBooking(14, 2, "Study Room 204", new(2026, 9, 1, 15, 0, 0, DateTimeKind.Utc), new(2026, 9, 1, 16, 0, 0, DateTimeKind.Utc), BookingStatus.Confirmed),
                 RoomBooking(15, 4, "Silent Study Room 3B", new(2026, 9, 1, 18, 0, 0, DateTimeKind.Utc), new(2026, 9, 1, 19, 0, 0, DateTimeKind.Utc), BookingStatus.Pending));
@@ -86,13 +91,14 @@ public static class EventSeedData
         await database.SaveChangesAsync();
     }
 
-    private static Room Room(int id, string name, string location, int capacity, string description) => new()
+    private static Room Room(int id, string name, string location, int capacity, string description, RoomKind kind) => new()
     {
         Id = id,
         Name = name,
         Location = location,
         Capacity = capacity,
-        Description = description
+        Description = description,
+        Kind = kind
     };
 
     private static RefEquipment RefEquipment(int id, string name, string category, string description) => new()
