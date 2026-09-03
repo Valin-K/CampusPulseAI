@@ -1,4 +1,5 @@
 using CourseManagement.Database.Models;
+using CourseManagement.Backend.BusinessRules;
 using Microsoft.EntityFrameworkCore;
 
 namespace CourseManagement.Database.Data;
@@ -49,6 +50,7 @@ public static class CourseManagementSeedData
                 CreateAssignment(coursesByCode, "CPAI1003", "Grace Brillis", "grace.brillis@example.edu", "Lecturer", "Autumn 2026"),
                 CreateAssignment(coursesByCode, "CPAI2003", "Grace Brillis", "grace.brillis@example.edu", "Course Coordinator", "Spring 2026"),
                 CreateAssignment(coursesByCode, "CPAI1002", "Georges Bou Ghantous", "georges.boughantous@example.edu", "Lecturer", "Autumn 2026"),
+                CreateAssignment(coursesByCode, "CPAI1003", "Georges Bou Ghantous", "georges.boughantous@example.edu", "Lecturer", "Spring 2026"),
                 CreateAssignment(coursesByCode, "CPAI3002", "Georges Bou Ghantous", "georges.boughantous@example.edu", "Course Coordinator", "Spring 2026"));
         }
 
@@ -58,8 +60,8 @@ public static class CourseManagementSeedData
     public static Course[] Courses =>
     [
         new() { Code = "CPAI1001", Name = "Programming Fundamentals", Description = "Introduces programming concepts, problem solving, and basic software development.", CreditPoints = 6, Level = 1 },
-        new() { Code = "CPAI1002", Name = "Database Foundations", Description = "Covers relational data modelling, SQL, constraints, and database design.", CreditPoints = 6, Level = 1 },
-        new() { Code = "CPAI1003", Name = "Web Development", Description = "Introduces browser applications, HTTP, frontend development, and web APIs.", CreditPoints = 6, Level = 1 },
+        new() { Code = "CPAI1002", Name = "Database Foundations", Description = "Covers relational data modelling, SQL, constraints, and database design.", CreditPoints = 6, Level = 1, GradeType = CourseGradeTypes.PassFail },
+        new() { Code = "CPAI1003", Name = "Web Development", Description = "Introduces browser applications, HTTP, frontend development, and web APIs.", CreditPoints = 6, Level = 1, GradeType = CourseGradeTypes.Ungraded },
         new() { Code = "CPAI2001", Name = "Software Design", Description = "Applies object-oriented design, architecture principles, and reusable patterns.", CreditPoints = 6, Level = 2 },
         new() { Code = "CPAI2002", Name = "Data Structures", Description = "Examines common data structures, algorithms, complexity, and implementation trade-offs.", CreditPoints = 6, Level = 2 },
         new() { Code = "CPAI2003", Name = "Cloud Fundamentals", Description = "Introduces cloud services, deployment models, containers, and scalable infrastructure.", CreditPoints = 6, Level = 2 },

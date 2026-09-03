@@ -8,7 +8,7 @@ public sealed class Enrollment
     public int? AcademicTermId { get; set; }
     public int AcademicYear { get; set; }
     public string Status => IsFinalized
-        ? EnrollmentStatusRules.GetFinalStatus(EnrollmentStatusRules.GetGradeType(CourseCode), GradeValue)
+        ? EnrollmentStatusRules.GetFinalStatus(GradeValue)
         : AcademicTerm is null
             ? EnrollmentStatusRules.Enrolled
             : EnrollmentStatusRules.GetStatus(

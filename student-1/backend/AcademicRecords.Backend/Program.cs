@@ -289,6 +289,7 @@ static void AddCourseMetadata(JsonObject student, IReadOnlyDictionary<string, Co
 
         enrollment["credits"] = course?.CreditPoints;
         enrollment["courseTitle"] = course?.Name;
+        enrollment["gradeType"] = course?.GradeType;
     }
 }
 
@@ -304,7 +305,8 @@ static StudentStatisticsProfile ApplyCourseMetadata(
                 return enrollment with
                 {
                     CourseTitle = course.Name,
-                    Credits = course.CreditPoints
+                    Credits = course.CreditPoints,
+                    GradeType = course.GradeType
                 };
             }
 
@@ -312,7 +314,7 @@ static StudentStatisticsProfile ApplyCourseMetadata(
         }).ToList()
     };
 
-public sealed record CourseMetadataResponse(string Code, string Name, int CreditPoints);
+public sealed record CourseMetadataResponse(string Code, string Name, int CreditPoints, string GradeType);
 
 public sealed record UserResponse(
     int UserId,

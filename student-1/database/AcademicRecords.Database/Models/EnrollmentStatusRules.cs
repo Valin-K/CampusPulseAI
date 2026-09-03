@@ -28,13 +28,6 @@ public static class EnrollmentStatusRules
     public static string GetStatus(DateOnly startDate, DateOnly endDate, DateOnly today) =>
         endDate < today ? Completed : startDate > today ? Enrolled : InProgress;
 
-    public static string GetGradeType(string courseCode) => courseCode switch
-    {
-        "CPAI1002" or "CPAI2002" => EnrollmentGradeTypes.PassFail,
-        "CPAI1003" => EnrollmentGradeTypes.Ungraded,
-        _ => EnrollmentGradeTypes.Mark
-    };
-
     public static string GetFinalStatus(string gradeType, decimal? gradeValue) =>
         gradeType switch
         {
@@ -43,6 +36,14 @@ public static class EnrollmentStatusRules
             EnrollmentGradeTypes.PassFail when gradeValue >= 50m => Passed,
             EnrollmentGradeTypes.PassFail when gradeValue is not null => Failed,
             EnrollmentGradeTypes.Ungraded => Completed,
+            _ => Completed
+        };
+
+    public static string GetFinalStatus(decimal? gradeValue) =>
+        gradeValue switch
+        {
+            >= 50m => Passed,
+            not null => Failed,
             _ => Completed
         };
 }

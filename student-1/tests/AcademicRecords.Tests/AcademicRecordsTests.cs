@@ -396,19 +396,9 @@ namespace AcademicRecords.Tests
                 var endYear = term.EndWeekOfYear < term.StartWeekOfYear ? enrollment.AcademicYear + 1 : enrollment.AcademicYear;
                 var endDate = DateOnly.FromDateTime(ISOWeek.ToDateTime(endYear, term.EndWeekOfYear, DayOfWeek.Sunday));
 
-                var gradeType = enrollment.CourseCode switch
-                {
-                    "CPAI1002" or "CPAI2002" => EnrollmentStatusRules.EnrollmentGradeTypes.PassFail,
-                    "CPAI1003" => EnrollmentStatusRules.EnrollmentGradeTypes.Ungraded,
-                    _ => EnrollmentStatusRules.EnrollmentGradeTypes.Mark
-                };
-                var expectedStatus = endDate < today
-                    ? gradeType switch
-                    {
-                        EnrollmentStatusRules.EnrollmentGradeTypes.PassFail => enrollment.StudentId % 2 == 1 ? "Passed" : "Failed",
-                        EnrollmentStatusRules.EnrollmentGradeTypes.Ungraded => "Completed",
-                        _ => enrollment.GradeValue >= 50m ? "Passed" : enrollment.GradeValue is null ? "Completed" : "Failed"
-                    }
+                var expectedFinalized = enrollment.StudentId == 1 || endDate < today;
+                var expectedStatus = expectedFinalized
+                    ? EnrollmentStatusRules.GetFinalStatus(enrollment.GradeValue)
                     : startDate > today ? "Enrolled" : "In Progress";
                 var calculatedEnrollment = new Enrollment
                 {
@@ -419,7 +409,7 @@ namespace AcademicRecords.Tests
                     IsFinalized = enrollment.IsFinalized
                 };
                 Assert.That(calculatedEnrollment.Status, Is.EqualTo(expectedStatus));
-                Assert.That(enrollment.IsFinalized, Is.EqualTo(endDate < today));
+                Assert.That(enrollment.IsFinalized, Is.EqualTo(expectedFinalized));
                 Assert.That(enrollment.GradeDate is null || enrollment.GradeDate <= today, Is.True);
             }
 

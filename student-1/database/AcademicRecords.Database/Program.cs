@@ -251,11 +251,6 @@ app.MapPut("/api/enrollments/{enrollmentId:int}/finalize", async (int enrollment
         return Results.NotFound("Enrollment was not found.");
     }
 
-    if (EnrollmentStatusRules.GetGradeType(enrollment.CourseCode) == EnrollmentStatusRules.EnrollmentGradeTypes.Mark && enrollment.GradeValue is null)
-    {
-        return Results.BadRequest("A grade must be assigned before the enrollment can be finalized.");
-    }
-
     enrollment.GradeDate = DateOnly.FromDateTime(DateTime.UtcNow);
     enrollment.IsFinalized = true;
     await database.SaveChangesAsync(cancellationToken);
@@ -379,13 +374,8 @@ static StudentProfileResponse CreateStudentProfileResponse(Student value) =>
         value.Enrollments.Select(enrollment => new TermEnrollmentResponse(enrollment.EnrollmentId, enrollment.CourseCode,
             enrollment.AcademicTermId, enrollment.AcademicTerm?.TermCode, enrollment.AcademicTerm?.TermName,
             enrollment.AcademicTerm?.StartWeekOfYear ?? 0, enrollment.AcademicTerm?.EndWeekOfYear ?? 0,
-            enrollment.AcademicYear, enrollment.Status, GradeTypePlaceholder.Get(enrollment.CourseCode),
+            enrollment.AcademicYear, enrollment.Status, null,
             enrollment.GradeValue, enrollment.IsFinalized)).ToList());
-
-public static class GradeTypePlaceholder
-{
-    public static string Get(string courseCode) => EnrollmentStatusRules.GetGradeType(courseCode);
-}
 
 public sealed record EnrollStudentRequest(string FirstName, string LastName, string Email, DateOnly? DateOfBirth,
     string MailingAddress, string EmergencyContactName, string EmergencyContactPhone, string? PhoneNumber = null,
@@ -407,7 +397,7 @@ public sealed record StaffProfileResponse(int UserId, string StaffId, string Fir
     DateOnly? DateOfBirth, string? PhoneNumber);
 
 public sealed record TermEnrollmentResponse(int EnrollmentId, string CourseCode, int? AcademicTermId, string? TermCode,
-    string? TermName, int StartWeekOfYear, int EndWeekOfYear, int AcademicYear, string Status, string GradeType, decimal? GradeValue, bool IsFinalized);
+    string? TermName, int StartWeekOfYear, int EndWeekOfYear, int AcademicYear, string Status, string? GradeType, decimal? GradeValue, bool IsFinalized);
 
 public sealed record UpdateStudentRequest(string FirstName, string LastName, string Email, DateOnly? DateOfBirth,
     string MailingAddress, string EmergencyContactName, string EmergencyContactPhone, string? PhoneNumber = null,

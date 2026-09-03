@@ -115,7 +115,7 @@ public sealed class CourseManagementDbContextTests
         {
             Assert.That(courseCount, Is.EqualTo(10));
             Assert.That(prerequisiteCount, Is.EqualTo(10));
-            Assert.That(assignmentCount, Is.EqualTo(10));
+            Assert.That(assignmentCount, Is.EqualTo(15));
         });
     }
 

@@ -34,6 +34,7 @@ public static class AcademicRecordsSeedData
         }
         else
         {
+            var existingById = existingSeedEnrollments.ToDictionary(enrollment => enrollment.EnrollmentId);
             foreach (var existing in existingSeedEnrollments)
             {
                 var expected = seededEnrollments[existing.EnrollmentId - 1];
@@ -42,6 +43,9 @@ public static class AcademicRecordsSeedData
                 existing.GradeDate = expected.GradeDate;
                 existing.IsFinalized = expected.IsFinalized;
             }
+
+            database.Enrollments.AddRange(seededEnrollments
+                .Where(expected => !existingById.ContainsKey(expected.EnrollmentId)));
         }
 
         await database.SaveChangesAsync();
@@ -101,16 +105,10 @@ public static class AcademicRecordsSeedData
             var academicTermId = (studentIndex + courseIndex) % 3 + 13;
             var academicYear = 2026;
             var term = AcademicTerms.Single(value => value.TermId == academicTermId);
-            var gradeType = courseIndex switch
-            {
-                1 or 4 => EnrollmentStatusRules.EnrollmentGradeTypes.PassFail,
-                2 => EnrollmentStatusRules.EnrollmentGradeTypes.Ungraded,
-                _ => EnrollmentStatusRules.EnrollmentGradeTypes.Mark
-            };
             var (startDate, endDate) = EnrollmentStatusRules.GetSessionDates(academicYear, term.StartWeekOfYear, term.EndWeekOfYear);
             var today = DateOnly.FromDateTime(DateTime.UtcNow);
             var status = EnrollmentStatusRules.GetStatus(startDate, endDate, today);
-            var isCompleted = status == EnrollmentStatusRules.Completed;
+            var isCompleted = studentIndex == 0 || status == EnrollmentStatusRules.Completed;
 
             return new Enrollment
             {
@@ -124,10 +122,29 @@ public static class AcademicRecordsSeedData
                         ? studentIndex % 2 == 0 ? 50m : 49m
                         : 65m + studentIndex + courseIndex * 5
                     : null,
-                GradeDate = isCompleted ? endDate : null,
+                GradeDate = isCompleted ? studentIndex == 0 ? today : endDate : null,
                 IsFinalized = isCompleted
             };
-        }))
+        })),
+        .. Enumerable.Range(0, 5).Select(courseIndex =>
+        {
+            var academicTermId = (courseIndex + 2) % 3 + 13;
+            var academicYear = 2025;
+            var term = AcademicTerms.Single(value => value.TermId == academicTermId);
+            var (_, endDate) = EnrollmentStatusRules.GetSessionDates(academicYear, term.StartWeekOfYear, term.EndWeekOfYear);
+
+            return new Enrollment
+            {
+                EnrollmentId = 51 + courseIndex,
+                StudentId = 1,
+                CourseCode = AdditionalCourseCodes[courseIndex],
+                AcademicTermId = academicTermId,
+                AcademicYear = academicYear,
+                GradeValue = courseIndex == 2 ? null : 70m + courseIndex,
+                GradeDate = DateOnly.FromDateTime(DateTime.UtcNow),
+                IsFinalized = true
+            };
+        })
     ];
 
     private static readonly string[] CourseCodes =
@@ -137,6 +154,15 @@ public static class AcademicRecordsSeedData
         "CPAI1003",
         "CPAI2001",
         "CPAI2002"
+    ];
+
+    private static readonly string[] AdditionalCourseCodes =
+    [
+        "CPAI2003",
+        "CPAI3001",
+        "CPAI3002",
+        "CPAI3003",
+        "CPAI4001"
     ];
 
 }

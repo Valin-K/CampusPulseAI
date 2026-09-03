@@ -34,6 +34,21 @@ public sealed class CoursesControllerTests
     }
 
     [Test]
+    public void SeedCoursesIncludeEverySupportedGradeType()
+    {
+        var gradeTypes = CourseManagementSeedData.Courses
+            .Select(course => course.GradeType)
+            .ToHashSet(StringComparer.Ordinal);
+
+        Assert.That(gradeTypes, Is.SupersetOf(new[]
+        {
+            CourseGradeTypes.Mark,
+            CourseGradeTypes.PassFail,
+            CourseGradeTypes.Ungraded
+        }));
+    }
+
+    [Test]
     public async Task CreateReturnsConflictForDuplicateCode()
     {
         await using var context = await CourseTestContext.CreateAsync();
