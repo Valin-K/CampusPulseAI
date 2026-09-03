@@ -70,12 +70,6 @@
     color: var(--university-muted);
 }
 
-/* "Completed" pill for bookings that already finished earlier today. */
-.booking-strip-topline .status-badge.done {
-    color: #475569;
-    background: #eef2f7;
-}
-
 /* "In use" pill for an equipment hire that is currently running. */
 .booking-strip-topline .status-badge.inuse {
     color: var(--university-blue);

@@ -161,8 +161,6 @@
         }
     }
 
-    // Cards shown on "Today's schedule": overdue equipment first (any date, until returned),
-    // then bookings active right now, then still to start today, then finished earlier today.
     private List<DashboardEntry> BuildDashboard()
     {
         // Booking times are treated as wall-clock throughout this app (displayed without
@@ -179,21 +177,12 @@
                 continue;
             }
 
-            if (booking.Status is BookingStatus.Cancelled)
+            if (booking.Status is BookingStatus.Cancelled or BookingStatus.Completed or BookingStatus.Returned)
             {
                 continue;
             }
 
             var startsToday = DateOnly.FromDateTime(booking.StartUtc) == today;
-
-            if (booking.Status is BookingStatus.Completed or BookingStatus.Returned)
-            {
-                if (startsToday)
-                {
-                    entries.Add(new DashboardEntry(booking, DashboardCategory.Done));
-                }
-                continue;
-            }
 
             // Pending / Confirmed.
             if (now >= booking.StartUtc && now < booking.EndUtc)
@@ -203,10 +192,6 @@
             else if (now < booking.StartUtc && startsToday)
             {
                 entries.Add(new DashboardEntry(booking, DashboardCategory.Upcoming));
-            }
-            else if (now >= booking.EndUtc && startsToday)
-            {
-                entries.Add(new DashboardEntry(booking, DashboardCategory.Done));
             }
         }
 
@@ -222,8 +207,7 @@
     {
         Overdue,
         Active,
-        Upcoming,
-        Done
+        Upcoming
     }
 
     private sealed record DashboardEntry(BookingResponse Booking, DashboardCategory Category)
@@ -234,24 +218,21 @@
         {
             DashboardCategory.Overdue => "overdue",
             DashboardCategory.Active => IsEquipment ? "inuse" : "paid",
-            DashboardCategory.Upcoming => "outstanding",
-            _ => "done"
+            _ => "outstanding"
         };
 
         public string BadgeLabel => Category switch
         {
             DashboardCategory.Overdue => "Overdue",
             DashboardCategory.Active => IsEquipment ? "In use" : "Active now",
-            DashboardCategory.Upcoming => "Upcoming today",
-            _ => "Completed"
+            _ => "Upcoming today"
         };
 
         public string TimeText => Category switch
         {
             DashboardCategory.Overdue => $"Was due {Booking.EndUtc:MMM d, h:mm tt}",
             DashboardCategory.Active => $"Ends {Booking.EndUtc:h:mm tt}",
-            DashboardCategory.Upcoming => $"Starts {Booking.StartUtc:h:mm tt}",
-            _ => $"Ended {Booking.EndUtc:h:mm tt}"
+            _ => $"Starts {Booking.StartUtc:h:mm tt}"
         };
     }
 }

@@ -17,7 +17,8 @@ public static class BookingActions
     {
         if (booking.ResourceType == ResourceType.Equipment)
         {
-            if (booking.Status is BookingStatus.Pending)
+            if (booking.Status is BookingStatus.Pending
+                || (booking.Status is BookingStatus.Confirmed && DateTime.Now < booking.StartUtc))
             {
                 return new BookingCardAction(BookingActionKind.Cancel, "Cancel hire", "button-danger");
             }
