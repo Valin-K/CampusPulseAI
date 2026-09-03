@@ -75,10 +75,15 @@ public sealed record StudentProfile(
     int StudentId,
     string Name,
     string Major,
-    decimal Gpa,
-    int YearLevel,
-    bool IsFirstGeneration,
-    IReadOnlyList<string> Interests);
+    int YearLevel);
+
+public sealed record AcademicStudentProfile(
+    int UserId,
+    string StudentId,
+    string FirstName,
+    string LastName,
+    DateOnly? EnrollmentDate,
+    string? Major);
 
 public sealed record GeminiGenerateRequest(IReadOnlyList<GeminiContent> Contents);
 
