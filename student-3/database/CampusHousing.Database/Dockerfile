@@ -13,6 +13,9 @@ RUN dotnet publish "./CampusHousing.Database.csproj" -c $BUILD_CONFIGURATION -o 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
 EXPOSE 8080
+RUN apt-get update \
+	&& apt-get install -y --no-install-recommends curl \
+	&& rm -rf /var/lib/apt/lists/*
 COPY --from=build /app/publish .
 COPY student-3/database/CampusHousing.Database/docker-entrypoint.sh /usr/local/bin/campus-housing-database-entrypoint
 RUN sed -i 's/\r$//' /usr/local/bin/campus-housing-database-entrypoint \

@@ -20,7 +20,7 @@
         <p class="muted">The residence assistant categorizes urgency and routes your request.</p>
         <EditForm Model="draft" OnValidSubmit="SubmitAsync">
             <DataAnnotationsValidator />
-            <label>Student ID <InputText @bind-Value="draft.StudentId" /></label>
+            <label>Student ID <input value="@(UserContext.CurrentUser?.StudentId ?? "")" readonly /></label>
             <label>Room <select @bind="draft.DormRoomId"><option value="">Not specified</option>@foreach (var room in rooms) { <option value="@room.Id">@room.Building @room.RoomNumber</option> }</select></label>
             <label>Issue description <InputTextArea @bind-Value="draft.Description" rows="5" /></label>
             <button type="submit" disabled="@busy">@(busy ? "Submitting..." : "Submit request")</button>
@@ -79,6 +79,12 @@
         busy = true;
         try
         {
+            draft.StudentId = UserContext.CurrentUser?.StudentId ?? "";
+            if (string.IsNullOrWhiteSpace(draft.StudentId))
+            {
+                message = "A student user must be selected before submitting a request.";
+                return;
+            }
             using var response = await Http.PostAsJsonAsync("api/housing/tickets", draft);
             message = response.IsSuccessStatusCode ? "Request routed successfully." : await response.Content.ReadAsStringAsync();
             if (response.IsSuccessStatusCode) draft = new();

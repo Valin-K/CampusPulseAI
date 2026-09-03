@@ -12,3 +12,4 @@ public sealed record UpdateAllocationRequest(
     string StudentName,
     string? RoommatePreference);
 public sealed record CreateRoomRequest(string Building, string RoomNumber, int Capacity, bool IsAvailable = true);
+public sealed record HousingUser(int UserId, string FirstName, string LastName, string Email, string Role, string? StudentId, string? StaffId);

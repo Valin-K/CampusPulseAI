@@ -10,6 +10,8 @@ builder.Services.AddDbContext<AcademicRecordsDbContext>(options => options.UseSq
 
 var app = builder.Build();
 
+app.MapGet("/health", () => Results.Ok(new { service = "academic-records-database", status = "healthy" }));
+
 using (var scope = app.Services.CreateScope())
 {
     var database = scope.ServiceProvider.GetRequiredService<AcademicRecordsDbContext>();
