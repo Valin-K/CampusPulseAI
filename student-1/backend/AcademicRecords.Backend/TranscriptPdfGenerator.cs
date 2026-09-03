@@ -12,6 +12,8 @@ public interface ITranscriptPdfGenerator
 
 public sealed class TranscriptPdfGenerator : ITranscriptPdfGenerator
 {
+    private static readonly SvgImage Logo = SvgImage.FromFile(Path.Combine(AppContext.BaseDirectory, "campus-pulse-logo.svg"));
+
     static TranscriptPdfGenerator() => QuestPDF.Settings.License = LicenseType.Community;
 
     public byte[] Generate(TranscriptData transcript) =>
@@ -20,6 +22,8 @@ public sealed class TranscriptPdfGenerator : ITranscriptPdfGenerator
             page.Size(PageSizes.A4);
             page.Margin(1.4f, Unit.Centimetre);
             page.DefaultTextStyle(style => style.FontFamily("Arial").FontSize(8.5f).FontColor(Colors.Grey.Darken4));
+            page.Foreground().AlignCenter().AlignMiddle().Rotate(-35)
+                .Text("THIS IS NOT AN OFFICIAL DOCUMENT").Bold().FontSize(55).FontColor(Colors.Grey.Lighten1);
             page.Header().Element(container => ComposeHeader(container, transcript));
             page.Content().Element(container => ComposeContent(container, transcript));
             page.Footer().Element(container => ComposeFooter(container, transcript));
@@ -41,6 +45,7 @@ public sealed class TranscriptPdfGenerator : ITranscriptPdfGenerator
                     text.TotalPages();
                 });
             });
+            column.Item().AlignLeft().Width(166).Height(41).Svg(Logo).FitArea();
             column.Item().PaddingTop(5).AlignCenter().Text(transcript.InstitutionName).Bold().FontSize(13);
             column.Item().AlignCenter().Text(transcript.DocumentTitle).FontSize(10);
             column.Item().PaddingTop(8).Text(text =>
@@ -110,7 +115,7 @@ public sealed class TranscriptPdfGenerator : ITranscriptPdfGenerator
                         columns.ConstantColumn(35);
                         columns.RelativeColumn(1.6f);
                         columns.ConstantColumn(32);
-                        columns.ConstantColumn(32);
+                        columns.ConstantColumn(55);
                     });
                     table.Header(header =>
                     {
@@ -119,8 +124,8 @@ public sealed class TranscriptPdfGenerator : ITranscriptPdfGenerator
                         HeaderCell(header.Cell(), "Year");
                         HeaderCell(header.Cell(), "Term");
                         HeaderCell(header.Cell(), "Result");
-                        HeaderCell(header.Cell(), "Mark");
-                        HeaderCell(header.Cell(), "Credit\nPoints\nGained");
+                        HeaderCell(header.Cell(), "Mark", true);
+                        HeaderCell(header.Cell(), "Credit Gained", true);
                     });
                     foreach (var subject in subjects)
                     {
@@ -142,22 +147,22 @@ public sealed class TranscriptPdfGenerator : ITranscriptPdfGenerator
                         columns.ConstantColumn(40);
                         columns.ConstantColumn(38);
                         columns.RelativeColumn(1.8f);
-                        columns.ConstantColumn(43);
+                        columns.ConstantColumn(65);
                     });
                     table.Header(header =>
                     {
                         HeaderCell(header.Cell(), "Code");
                         HeaderCell(header.Cell(), "Subject");
-                        HeaderCell(header.Cell(), "Year");
+                        HeaderCell(header.Cell(), "Year", true);
                         HeaderCell(header.Cell(), "Term");
                         HeaderCell(header.Cell(), "Status");
-                        HeaderCell(header.Cell(), "Credit\nPoints");
+                        HeaderCell(header.Cell(), "Credit Points", true);
                     });
                     foreach (var subject in subjects)
                     {
                         SubjectCell(table.Cell(), subject.CourseCode);
                         SubjectCell(table.Cell(), subject.CourseTitle);
-                        SubjectCell(table.Cell(), subject.AcademicYear.ToString(CultureInfo.InvariantCulture));
+                        SubjectCell(table.Cell(), subject.AcademicYear.ToString(CultureInfo.InvariantCulture), true);
                         SubjectCell(table.Cell(), subject.TermCode);
                         SubjectCell(table.Cell(), subject.Status);
                         SubjectCell(table.Cell(), FormatCredits(subject.CreditsEnrolled), true);
@@ -186,9 +191,19 @@ public sealed class TranscriptPdfGenerator : ITranscriptPdfGenerator
             .AlignCenter().Text(transcript.Disclaimer).FontSize(7.5f);
     }
 
-    private static void HeaderCell(IContainer container, string value) =>
-        container.Background(Colors.Grey.Lighten2).BorderBottom(0.7f).BorderColor(Colors.Grey.Medium)
-            .PaddingVertical(4).PaddingHorizontal(3).Text(value).Bold().FontSize(7.5f);
+    private static void HeaderCell(IContainer container, string value, bool alignRight = false)
+    {
+        var cell = container.Background(Colors.Grey.Lighten2).BorderBottom(0.7f).BorderColor(Colors.Grey.Medium)
+            .MinHeight(26).PaddingVertical(4).PaddingHorizontal(3);
+        if (alignRight)
+        {
+            cell.AlignRight().Text(value).Bold().FontSize(7.5f);
+        }
+        else
+        {
+            cell.Text(value).Bold().FontSize(7.5f);
+        }
+    }
 
     private static void SubjectCell(IContainer container, string? value, bool alignRight = false)
     {
@@ -207,7 +222,7 @@ public sealed class TranscriptPdfGenerator : ITranscriptPdfGenerator
         credits?.ToString("0.##", CultureInfo.InvariantCulture) ?? string.Empty;
 
     private static string FormatMark(decimal? mark) =>
-        mark?.ToString("0.##", CultureInfo.InvariantCulture) ?? string.Empty;
+        mark?.ToString("0.##", CultureInfo.InvariantCulture) ?? "N/A";
 
     private static string FormatStatistic(decimal? statistic) =>
         statistic?.ToString("0.00", CultureInfo.InvariantCulture) ?? "N/A";

@@ -14,7 +14,7 @@ public static class TranscriptDataFactory
         var wam = StudentStatisticsCalculator.CalculateWam(gradedEnrollments).Value;
 
         return new TranscriptData(
-            "University of Technology Sydney",
+            "Campus Pulse AI",
             "Online Student Record",
             printedAt,
             profile.StudentId,

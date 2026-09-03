@@ -465,8 +465,10 @@ namespace AcademicRecords.Tests
 
             var transcript = TranscriptDataFactory.Create(profile, new DateTime(2026, 8, 25, 16, 5, 3));
 
+            Assert.That(transcript.InstitutionName, Is.EqualTo("Campus Pulse AI"));
             Assert.That(transcript.StudentName, Is.EqualTo("Alec Steele"));
             Assert.That(transcript.EnrolledSubjects, Has.Count.EqualTo(1));
+            Assert.That(transcript.EnrolledSubjects[0].Mark, Is.Null);
             Assert.That(transcript.CompletedSubjects, Has.Count.EqualTo(3));
             Assert.That(transcript.CompletedSubjects[0].Result, Is.EqualTo("HIGH DISTINCTION"));
             Assert.That(transcript.CompletedSubjects[1].Result, Is.EqualTo("PASS - NOT GRADED"));
@@ -493,7 +495,7 @@ namespace AcademicRecords.Tests
                     true))
                 .ToList();
             var transcript = new TranscriptData(
-                "University of Technology Sydney",
+                 "Campus Pulse AI",
                 "Online Student Record",
                 new DateTime(2026, 8, 25, 16, 5, 3),
                 "STU-TRANSCRIPT-1",
