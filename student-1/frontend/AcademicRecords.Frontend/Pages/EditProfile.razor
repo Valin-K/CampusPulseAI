@@ -183,7 +183,7 @@ else if (profile is not null)
         string Email, DateOnly? DateOfBirth, string? PhoneNumber);
 
     private sealed record TermEnrollmentResponse(int EnrollmentId, string CourseCode, int? AcademicTermId, string? TermCode,
-        string? TermName, int EndWeekOfYear, int AcademicYear, string Status, decimal? Credits, decimal? GradeValue, bool IsFinalized);
+        string? TermName, int EndWeekOfYear, int AcademicYear, string Status, decimal? Credits, decimal? GradeValue);
 
     private sealed record UpdateStudentRequest(string FirstName, string LastName, string Email, DateOnly? DateOfBirth,
         string MailingAddress, string EmergencyContactName, string EmergencyContactPhone, string? PhoneNumber,

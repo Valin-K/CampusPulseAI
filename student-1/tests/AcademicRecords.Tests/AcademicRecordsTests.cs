@@ -327,8 +327,8 @@ namespace AcademicRecords.Tests
             var enrollment = new Enrollment
             {
                 CourseCode = "CS101",
-                AcademicYear = 2026,
-                AcademicTerm = new AcademicTerm { StartWeekOfYear = 1, EndWeekOfYear = 52 }
+                AcademicYear = 2020,
+                AcademicTerm = new AcademicTerm { StartWeekOfYear = 1, EndWeekOfYear = 2 }
             };
             database.Enrollments.Add(enrollment);
             await database.SaveChangesAsync();
@@ -341,6 +341,25 @@ namespace AcademicRecords.Tests
             var saved = await database.Enrollments.SingleAsync();
             Assert.That(saved.Status, Is.EqualTo(EnrollmentStatusRules.Failed));
             Assert.That(saved.IsFinalized, Is.True);
+        }
+
+        [Test]
+        public void FinalizedEnrollmentInUnfinishedSessionRemainsInProgress()
+        {
+            var today = DateOnly.FromDateTime(DateTime.UtcNow);
+            var enrollment = new Enrollment
+            {
+                AcademicYear = today.Year,
+                AcademicTerm = new AcademicTerm
+                {
+                    StartWeekOfYear = 1,
+                    EndWeekOfYear = ISOWeek.GetWeekOfYear(today.ToDateTime(TimeOnly.MinValue))
+                },
+                GradeValue = 95m,
+                IsFinalized = true
+            };
+
+            Assert.That(enrollment.Status, Is.EqualTo(EnrollmentStatusRules.InProgress));
         }
 
         [Test]
@@ -396,10 +415,14 @@ namespace AcademicRecords.Tests
                 var endYear = term.EndWeekOfYear < term.StartWeekOfYear ? enrollment.AcademicYear + 1 : enrollment.AcademicYear;
                 var endDate = DateOnly.FromDateTime(ISOWeek.ToDateTime(endYear, term.EndWeekOfYear, DayOfWeek.Sunday));
 
-                var expectedFinalized = enrollment.StudentId == 1 || endDate < today;
-                var expectedStatus = expectedFinalized
-                    ? EnrollmentStatusRules.GetFinalStatus(enrollment.GradeValue)
-                    : startDate > today ? "Enrolled" : "In Progress";
+                var expectedFinalized = enrollment.IsFinalized;
+                var expectedStatus = startDate > today
+                    ? EnrollmentStatusRules.Enrolled
+                    : endDate >= today
+                        ? EnrollmentStatusRules.InProgress
+                    : expectedFinalized
+                        ? EnrollmentStatusRules.GetFinalStatus(enrollment.GradeValue)
+                        : EnrollmentStatusRules.Completed;
                 var calculatedEnrollment = new Enrollment
                 {
                     CourseCode = enrollment.CourseCode,
@@ -527,7 +550,7 @@ namespace AcademicRecords.Tests
                         AcademicYear = 2025,
                         TermCode = "AUT",
                         Status = "Passed",
-                        GradeType = "Mark",
+                        GradeType = "Pass/Fail",
                         GradeValue = 94,
                         Credits = 6,
                         IsFinalized = true
@@ -565,7 +588,8 @@ namespace AcademicRecords.Tests
             Assert.That(transcript.EnrolledSubjects, Has.Count.EqualTo(1));
             Assert.That(transcript.EnrolledSubjects[0].Mark, Is.Null);
             Assert.That(transcript.CompletedSubjects, Has.Count.EqualTo(3));
-            Assert.That(transcript.CompletedSubjects[0].Result, Is.EqualTo("HIGH DISTINCTION"));
+            Assert.That(transcript.CompletedSubjects[0].Mark, Is.Null);
+            Assert.That(transcript.CompletedSubjects[0].Result, Is.EqualTo("PASS - NOT GRADED"));
             Assert.That(transcript.CompletedSubjects[1].Result, Is.EqualTo("PASS - NOT GRADED"));
             Assert.That(transcript.CompletedSubjects[2].Result, Is.EqualTo("FAIL"));
             Assert.That(transcript.TotalCreditPointsGained, Is.EqualTo(12m));

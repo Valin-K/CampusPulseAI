@@ -58,10 +58,6 @@ else
                                     <button class="btn btn-primary btn-sm" @onclick="() => SaveGradeAsync(enrollment)" disabled="@(!enrollment.CanEditGrade || enrollment.IsSaving)">
                                         @(enrollment.IsSaving ? "Saving..." : "Assign grade")
                                     </button>
-                                    <button class="btn btn-outline-success btn-sm ms-1" @onclick="() => FinalizeGradeAsync(enrollment)"
-                                            disabled="@enrollment.IsSaving || enrollment.GradeValue is null || enrollment.IsFinalized">
-                                        Finalize
-                                    </button>
                                     @if (enrollment.SaveError is not null)
                                     {
                                         <div class="text-danger small mt-1">@enrollment.SaveError</div>
@@ -116,7 +112,7 @@ else
             sessions = (await studentsTask ?? [])
                 .SelectMany(student => student.Enrollments
                     .Where(enrollment => string.Equals(enrollment.CourseCode, course.Code, StringComparison.OrdinalIgnoreCase)
-                        && (enrollment.Status == "Enrolled" || enrollment.Status == "In Progress"))
+                        && enrollment.Status == "In Progress")
                     .Select(enrollment => new GradeEnrollment(student, enrollment)))
                 .GroupBy(enrollment => $"{enrollment.TermName ?? "Session"} ({enrollment.TermCode ?? "-"}) - {enrollment.AcademicYear}")
                 .OrderBy(session => session.Key)
@@ -159,37 +155,6 @@ else
         }
     }
 
-    private async Task FinalizeGradeAsync(GradeEnrollment enrollment)
-    {
-        enrollment.SaveError = null;
-        enrollment.SaveSucceeded = false;
-        enrollment.IsSaving = true;
-        try
-        {
-            var finalStatus = course?.GradeType == "Ungraded"
-                ? "Completed"
-                : enrollment.GradeValue >= 50 ? "Passed" : "Failed";
-            var response = await Http.PutAsync($"api/enrollments/{enrollment.EnrollmentId}/finalize", null);
-            if (!response.IsSuccessStatusCode)
-            {
-                enrollment.SaveError = await response.Content.ReadAsStringAsync();
-                return;
-            }
-
-            enrollment.Status = finalStatus;
-            enrollment.IsFinalized = true;
-            enrollment.SaveSucceeded = true;
-        }
-        catch (HttpRequestException exception)
-        {
-            enrollment.SaveError = exception.Message;
-        }
-        finally
-        {
-            enrollment.IsSaving = false;
-        }
-    }
-
     private sealed class GradeEnrollment(StudentProfileResponse student, TermEnrollmentResponse enrollment)
     {
         public int EnrollmentId => enrollment.EnrollmentId;
@@ -201,9 +166,8 @@ else
         public string Status { get; set; } = enrollment.Status;
         public decimal? GradeValue { get; set; } = enrollment.GradeValue;
         public bool IsSaving { get; set; }
-        public bool IsFinalized { get; set; } = enrollment.IsFinalized;
         public bool IsFutureCourse => DateOnly.FromDateTime(DateTime.UtcNow) < StartDate;
-        public bool CanEditGrade => !IsFinalized && DateOnly.FromDateTime(DateTime.UtcNow) >= StartDate
+        public bool CanEditGrade => DateOnly.FromDateTime(DateTime.UtcNow) >= StartDate
             && DateOnly.FromDateTime(DateTime.UtcNow) <= EndDate;
         private DateOnly StartDate => DateOnly.FromDateTime(
             ISOWeek.ToDateTime(AcademicYear, enrollment.StartWeekOfYear, DayOfWeek.Monday));
@@ -229,7 +193,7 @@ else
 
     private sealed record TermEnrollmentResponse(int EnrollmentId, string CourseCode, int? AcademicTermId,
         string? TermCode, string? TermName, int StartWeekOfYear, int EndWeekOfYear, int AcademicYear,
-        string Status, string GradeType, decimal? GradeValue, bool IsFinalized);
+        string Status, string GradeType, decimal? GradeValue);
 
     private sealed record GradeEntryRequest(decimal? GradeValue);
 

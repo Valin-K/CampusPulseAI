@@ -144,7 +144,23 @@ public static class AcademicRecordsSeedData
                 GradeDate = DateOnly.FromDateTime(DateTime.UtcNow),
                 IsFinalized = true
             };
-        })
+        }),
+        new()
+        {
+            EnrollmentId = 56,
+            StudentId = 1,
+            CourseCode = "CPAI4001",
+            AcademicTermId = 14,
+            AcademicYear = 2026
+        },
+        new()
+        {
+            EnrollmentId = 57,
+            StudentId = 1,
+            CourseCode = "CPAI3001",
+            AcademicTermId = 15,
+            AcademicYear = 2026
+        }
     ];
 
     private static readonly string[] CourseCodes =
