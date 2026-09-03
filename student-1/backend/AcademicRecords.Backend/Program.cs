@@ -169,8 +169,7 @@ static async Task<IResult> GetStudentStatisticAsync(string studentId, bool gpa, 
     var courses = await GetCourseMetadataAsync(clients, cancellationToken);
     profile = ApplyCourseMetadata(profile, courses);
 
-    var enrollments = (profile.Enrollments ?? []).Select(enrollment =>
-        new GradedEnrollment(enrollment.GradeValue, enrollment.Credits, enrollment.IsFinalized));
+    var enrollments = StudentStatisticsCalculator.ToGradedEnrollments(profile.Enrollments);
     var statistic = gpa
         ? StudentStatisticsCalculator.CalculateGpa(enrollments)
         : StudentStatisticsCalculator.CalculateWam(enrollments);
@@ -239,12 +238,14 @@ static void AddCourseMetadata(JsonObject student, IReadOnlyDictionary<string, Co
     foreach (var enrollment in enrollments.OfType<JsonObject>())
     {
         var courseCode = enrollment["courseCode"]?.GetValue<string>();
-        enrollment["credits"] = courseCode is not null && courses.TryGetValue(courseCode, out var course)
-            ? course.CreditPoints
-            : null;
-        enrollment["courseTitle"] = courseCode is not null && courses.TryGetValue(courseCode, out course)
-            ? course.Name
-            : null;
+        CourseMetadataResponse? course = null;
+        if (courseCode is not null)
+        {
+            courses.TryGetValue(courseCode, out course);
+        }
+
+        enrollment["credits"] = course?.CreditPoints;
+        enrollment["courseTitle"] = course?.Name;
     }
 }
 

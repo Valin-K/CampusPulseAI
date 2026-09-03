@@ -2,6 +2,12 @@ namespace AcademicRecords.Backend;
 
 public static class StudentStatisticsCalculator
 {
+    public static IReadOnlyList<GradedEnrollment> ToGradedEnrollments(
+        IEnumerable<StudentStatisticsEnrollment>? enrollments) =>
+        (enrollments ?? [])
+            .Select(enrollment => new GradedEnrollment(enrollment.GradeValue, enrollment.Credits, enrollment.IsFinalized))
+            .ToList();
+
     public static StudentStatistic CalculateWam(IEnumerable<GradedEnrollment>? enrollments) =>
         Calculate(enrollments, static enrollment => enrollment.Mark!.Value);
 

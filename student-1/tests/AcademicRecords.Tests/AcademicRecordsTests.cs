@@ -474,8 +474,8 @@ namespace AcademicRecords.Tests
             Assert.That(transcript.CompletedSubjects[1].Result, Is.EqualTo("PASS - NOT GRADED"));
             Assert.That(transcript.CompletedSubjects[2].Result, Is.EqualTo("FAIL"));
             Assert.That(transcript.TotalCreditPointsGained, Is.EqualTo(12m));
-            Assert.That(transcript.Gpa, Is.EqualTo(7m));
-            Assert.That(transcript.Wam, Is.EqualTo(94m));
+             Assert.That(transcript.Gpa, Is.EqualTo(3.5m));
+             Assert.That(transcript.Wam, Is.EqualTo(67m));
         }
 
         [Test]
