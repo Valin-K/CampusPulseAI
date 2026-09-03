@@ -16,6 +16,25 @@ else if (loadError is not null)
 }
 else
 {
+    <div class="row mb-4">
+        <div class="col-md-6 mb-3 mb-md-0">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h2 class="card-title h5">WAM</h2>
+                    <p class="display-6 mb-0">@FormatStatistic(wam?.Value)</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h2 class="card-title h5">GPA</h2>
+                    <p class="display-6 mb-0">@FormatStatistic(gpa?.Value)</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <h2>Current and Future Enrollments</h2>
     @if (currentEnrollments.Count == 0)
     {
@@ -85,7 +104,15 @@ else
     }
 }
 
-<a href="/profile/@Role/@UserId" class="btn btn-secondary mt-4">Back to profile</a>
+<div class="mt-4">
+    @if (studentId is not null)
+    {
+        <a href="@GetTranscriptUrl()" class="btn btn-primary" target="_blank" rel="noopener noreferrer">
+            View transcript PDF
+        </a>
+    }
+    <a href="/profile/@Role/@UserId" class="btn btn-secondary ms-2">Back to profile</a>
+</div>
 
 @code {
     [Parameter]
@@ -99,8 +126,11 @@ else
 
     private bool isLoading = true;
     private string? loadError;
+    private string? studentId;
     private List<TermEnrollmentResponse> currentEnrollments = [];
     private List<TermEnrollmentResponse> pastEnrollments = [];
+    private StudentStatisticResponse? wam;
+    private StudentStatisticResponse? gpa;
 
     protected override async Task OnInitializedAsync()
     {
@@ -112,6 +142,13 @@ else
                 loadError = "Profile not found.";
                 return;
             }
+
+            studentId = student.StudentId;
+            var wamTask = Http.GetFromJsonAsync<StudentStatisticResponse>($"api/students/{Uri.EscapeDataString(student.StudentId)}/wam");
+            var gpaTask = Http.GetFromJsonAsync<StudentStatisticResponse>($"api/students/{Uri.EscapeDataString(student.StudentId)}/gpa");
+            await Task.WhenAll(wamTask, gpaTask);
+            wam = await wamTask;
+            gpa = await gpaTask;
 
             var today = DateOnly.FromDateTime(DateTime.UtcNow);
             currentEnrollments = [];
@@ -165,6 +202,16 @@ else
             ? "N/A"
             : enrollment.IsFinalized ? enrollment.GradeValue?.ToString() ?? "N/A" : "Pending";
 
+    private static string FormatStatistic(decimal? value) => value?.ToString("0.00", CultureInfo.InvariantCulture) ?? "N/A";
+
+    private string GetTranscriptUrl()
+    {
+        var baseAddress = Http.BaseAddress
+            ?? throw new InvalidOperationException("The Academic Records API base address is not configured.");
+        var relativeUrl = $"api/students/{Uri.EscapeDataString(studentId!)}/transcript.pdf";
+        return new Uri(baseAddress, relativeUrl).ToString();
+    }
+
     private static DateOnly? GetTermEndDate(int academicYear, int startWeekOfYear, int endWeekOfYear)
     {
         if (endWeekOfYear <= 0 || endWeekOfYear > 53)
@@ -186,4 +233,7 @@ else
 
     private sealed record TermEnrollmentResponse(int EnrollmentId, string CourseCode, int? AcademicTermId, string? TermCode,
         string? TermName, int StartWeekOfYear, int EndWeekOfYear, int AcademicYear, string Status, decimal? Credits, string GradeType, decimal? GradeValue, bool IsFinalized);
+
+    private sealed record StudentStatisticResponse(string StudentId, string Statistic, decimal? Value,
+        int GradedEnrollmentCount, decimal TotalCredits);
 }

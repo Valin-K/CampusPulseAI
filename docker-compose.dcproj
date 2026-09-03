@@ -8,7 +8,7 @@
     <DockerServiceUrl>http://localhost:8081</DockerServiceUrl>
     <DockerServiceName>academicrecords.frontend</DockerServiceName>
     <DockerDevelopmentMode>Regular</DockerDevelopmentMode>
-    <DockerComposeProjectsToIgnore>student-2\frontend\CourseManagement.Frontend\CourseManagement.Frontend.csproj;student-2\database\CourseManagement.Database\CourseManagement.Database.csproj</DockerComposeProjectsToIgnore>
+    <DockerComposeProjectsToIgnore>student-2\frontend\CourseManagement.Frontend\CourseManagement.Frontend.csproj</DockerComposeProjectsToIgnore>
   </PropertyGroup>
   <ItemGroup>
     <None Include=".github\docker-compose.student-4.ci.yml" />
@@ -17,6 +17,7 @@
     </None>
     <None Include="docker-compose.yml" />
     <None Include=".dockerignore" />
+    <None Include="shared\frontend\assets\campus-pulse-logo.svg" />
     <None Include="shared\frontend\CampusPulse.Shared.Components\CampusMetricCard.razor" />
     <None Include="shared\frontend\CampusPulse.Shared.Components\CampusMetricCard.razor.css" />
     <None Include="shared\frontend\CampusPulse.Shared.Components\CampusNavBar.razor" />
@@ -41,9 +42,6 @@
     <None Include="student-4\database\FinancialAidBilling.Database\FinancialAidBilling.Database.csproj" />
     <None Include="student-5\database\EventScheduling.Database\Dockerfile" />
     <None Include="student-5\database\EventScheduling.Database\EventScheduling.Database.csproj" />
-  </ItemGroup>
-  <ItemGroup>
-    <Folder Include="shared\frontend\assets\" />
   </ItemGroup>
   <Target Name="OpenAcademicRecordsFrontend" AfterTargets="DockerPrepareForLaunch" Condition="'$(BuildingInsideVisualStudio)' == 'true'">
     <Exec Command="&quot;$(SystemRoot)\System32\WindowsPowerShell\v1.0\powershell.exe&quot; -NoProfile -NonInteractive -Command &quot;Start-Process -WindowStyle Hidden -FilePath '$(SystemRoot)\System32\WindowsPowerShell\v1.0\powershell.exe' -ArgumentList '-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File','$(MSBuildProjectDirectory)\scripts\launch-compose-browser.ps1'&quot;" />

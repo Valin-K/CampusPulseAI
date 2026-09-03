@@ -1,8 +1,11 @@
-﻿using AcademicRecords.Database.Data;
+﻿using AcademicRecords.Backend;
+using AcademicRecords.Database.Data;
 using AcademicRecords.Database.Models;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using System.Globalization;
+using System.Text;
+using System.Text.RegularExpressions;
 
 namespace AcademicRecords.Tests
 {
@@ -356,6 +359,167 @@ namespace AcademicRecords.Tests
             });
 
             Assert.ThrowsAsync<DbUpdateException>(async () => await database.SaveChangesAsync());
+        }
+
+        [Test]
+        public void WamIsWeightedByCreditsAndIgnoresUngradedEnrollments()
+        {
+            var enrollments = new[]
+            {
+                new GradedEnrollment(70m, 6m, true),
+                new GradedEnrollment(90m, 3m, true),
+                new GradedEnrollment(100m, 6m, false),
+                new GradedEnrollment(null, 6m, true)
+            };
+
+            var result = StudentStatisticsCalculator.CalculateWam(enrollments);
+
+            Assert.That(result.Value, Is.EqualTo(76.6666666667m).Within(0.000000001m));
+            Assert.That(result.GradedEnrollmentCount, Is.EqualTo(2));
+            Assert.That(result.TotalCredits, Is.EqualTo(9m));
+        }
+
+        [Test]
+        public void GpaUsesTheAustralianSevenPointScale()
+        {
+            var enrollments = new[]
+            {
+                new GradedEnrollment(85m, 6m, true),
+                new GradedEnrollment(75m, 3m, true),
+                new GradedEnrollment(65m, 1m, true),
+                new GradedEnrollment(50m, 1m, true),
+                new GradedEnrollment(49.99m, 1m, true)
+            };
+
+            var result = StudentStatisticsCalculator.CalculateGpa(enrollments);
+
+            Assert.That(result.Value, Is.EqualTo(5.75m).Within(0.000000001m));
+            Assert.That(StudentStatisticsCalculator.GradePoints(85m), Is.EqualTo(7m));
+            Assert.That(StudentStatisticsCalculator.GradePoints(75m), Is.EqualTo(6m));
+            Assert.That(StudentStatisticsCalculator.GradePoints(65m), Is.EqualTo(5m));
+            Assert.That(StudentStatisticsCalculator.GradePoints(50m), Is.EqualTo(4m));
+            Assert.That(StudentStatisticsCalculator.GradePoints(49.99m), Is.EqualTo(0m));
+        }
+
+        [Test]
+        public void TranscriptDataFactoryBuildsSectionsAndDisplayResults()
+        {
+            var profile = new StudentStatisticsProfile
+            {
+                StudentId = "STU-TRANSCRIPT-1",
+                FirstName = "Alec",
+                LastName = "Steele",
+                DegreeCode = "C10476",
+                Degree = "Bachelor of Computing Science",
+                Status = "Active",
+                Major = "Enterprise Software Development",
+                Enrollments =
+                [
+                    new StudentStatisticsEnrollment
+                    {
+                        CourseCode = "CPAI1001",
+                        CourseTitle = "Programming Fundamentals",
+                        AcademicYear = 2026,
+                        TermCode = "SPR",
+                        Status = "Enrolled",
+                        Credits = 6,
+                        IsFinalized = false
+                    },
+                    new StudentStatisticsEnrollment
+                    {
+                        CourseCode = "CPAI1002",
+                        CourseTitle = "Database Foundations",
+                        AcademicYear = 2025,
+                        TermCode = "AUT",
+                        Status = "Passed",
+                        GradeType = "Mark",
+                        GradeValue = 94,
+                        Credits = 6,
+                        IsFinalized = true
+                    },
+                    new StudentStatisticsEnrollment
+                    {
+                        CourseCode = "CPAI1003",
+                        CourseTitle = "Web Development",
+                        AcademicYear = 2025,
+                        TermCode = "SPR",
+                        Status = "Completed",
+                        GradeType = "Ungraded",
+                        Credits = 6,
+                        IsFinalized = true
+                    },
+                    new StudentStatisticsEnrollment
+                    {
+                        CourseCode = "CPAI2001",
+                        CourseTitle = "Software Design",
+                        AcademicYear = 2025,
+                        TermCode = "SUM",
+                        Status = "Failed",
+                        GradeType = "Mark",
+                        GradeValue = 40,
+                        Credits = 6,
+                        IsFinalized = true
+                    }
+                ]
+            };
+
+            var transcript = TranscriptDataFactory.Create(profile, new DateTime(2026, 8, 25, 16, 5, 3));
+
+            Assert.That(transcript.InstitutionName, Is.EqualTo("Campus Pulse AI"));
+            Assert.That(transcript.StudentName, Is.EqualTo("Alec Steele"));
+            Assert.That(transcript.EnrolledSubjects, Has.Count.EqualTo(1));
+            Assert.That(transcript.EnrolledSubjects[0].Mark, Is.Null);
+            Assert.That(transcript.CompletedSubjects, Has.Count.EqualTo(3));
+            Assert.That(transcript.CompletedSubjects[0].Result, Is.EqualTo("HIGH DISTINCTION"));
+            Assert.That(transcript.CompletedSubjects[1].Result, Is.EqualTo("PASS - NOT GRADED"));
+            Assert.That(transcript.CompletedSubjects[2].Result, Is.EqualTo("FAIL"));
+            Assert.That(transcript.TotalCreditPointsGained, Is.EqualTo(12m));
+             Assert.That(transcript.Gpa, Is.EqualTo(3.5m));
+             Assert.That(transcript.Wam, Is.EqualTo(67m));
+        }
+
+        [Test]
+        public void TranscriptPdfGeneratorProducesMultiPagePdfWithoutWatermark()
+        {
+            var subjects = Enumerable.Range(1, 24)
+                .Select(index => new TranscriptSubject(
+                    $"CPAI{index:0000}",
+                    "A deliberately long subject title for checking transcript row wrapping and page breaks",
+                    2026,
+                    "AUT",
+                    "COMPLETED",
+                    "HIGH DISTINCTION",
+                    90,
+                    6,
+                    6,
+                    true))
+                .ToList();
+            var transcript = new TranscriptData(
+                 "Campus Pulse AI",
+                "Online Student Record",
+                new DateTime(2026, 8, 25, 16, 5, 3),
+                "STU-TRANSCRIPT-1",
+                "Alec",
+                "Steele",
+                "C10476",
+                "Bachelor of Computing Science",
+                "Active",
+                "Enterprise Software Development",
+                [],
+                subjects,
+                6.71m,
+                88.06m,
+                144,
+                "This is an e-record produced by this student for personal use.");
+
+            var pdf = new TranscriptPdfGenerator().Generate(transcript);
+            var pdfContent = Encoding.Latin1.GetString(pdf);
+            var pageCount = Regex.Matches(pdfContent, @"/Type\s*/Page\b").Count;
+
+            Assert.That(pdf, Is.Not.Empty);
+            Assert.That(Encoding.ASCII.GetString(pdf, 0, 5), Is.EqualTo("%PDF-"));
+            Assert.That(pageCount, Is.GreaterThanOrEqualTo(2));
+            Assert.That(pdfContent.ToLowerInvariant(), Does.Not.Contain("watermark"));
         }
 
         private static AcademicRecordsDbContext CreateDatabase(SqliteConnection connection) =>
