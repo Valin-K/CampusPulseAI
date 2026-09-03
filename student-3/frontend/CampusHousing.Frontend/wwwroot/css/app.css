@@ -14,6 +14,7 @@ html, body { min-height: 100%; }
 .housing-user-selector { display: flex; align-items: center; gap: .6rem; }
 .housing-user-selector label { color: #627d98; font-size: .78rem; font-weight: 700; }
 .housing-user-selector select { border: 1px solid #bcccdc; border-radius: 7px; padding: .45rem .6rem; color: #243b53; background: #fff; }
+.content-grid > .surface-card { align-self: stretch; }
  .modal-backdrop { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; padding: 1rem; background: rgb(16 42 67 / 55%); }
  .modal-card { width: min(100%, 30rem); max-width: 30rem; padding: 2rem; border-radius: 12px; background: #fff; box-shadow: 0 1rem 3rem rgb(16 42 67 / 25%); }
 @media (max-width: 700px) { .term-summary { margin-top: 1rem; } .housing-user-selector { align-items: flex-start; flex-direction: column; } }
