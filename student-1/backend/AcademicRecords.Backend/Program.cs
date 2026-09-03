@@ -44,6 +44,38 @@ app.MapGet("/api/users", async (IHttpClientFactory clients, CancellationToken ca
     return Results.Content(content, response.Content.Headers.ContentType?.MediaType ?? "application/json", statusCode: (int)response.StatusCode);
 });
 
+app.MapPut("/api/enrollments/{enrollmentId:int}/grade", async (int enrollmentId, HttpRequest request,
+    IHttpClientFactory clients, CancellationToken cancellationToken) =>
+{
+    using var databaseRequest = new HttpRequestMessage(HttpMethod.Put, $"/api/enrollments/{enrollmentId}/grade")
+    {
+        Content = new StreamContent(request.Body)
+    };
+    databaseRequest.Content.Headers.ContentType = new("application/json");
+    using var response = await clients.CreateClient("academicRecordsDatabase").SendAsync(databaseRequest, cancellationToken);
+    var content = await response.Content.ReadAsStringAsync(cancellationToken);
+    return Results.Content(content, response.Content.Headers.ContentType?.MediaType ?? "application/json", statusCode: (int)response.StatusCode);
+});
+
+app.MapPut("/api/enrollments/{enrollmentId:int}/finalize", async (int enrollmentId, HttpRequest request,
+    IHttpClientFactory clients, CancellationToken cancellationToken) =>
+{
+    using var databaseRequest = new HttpRequestMessage(HttpMethod.Put, $"/api/enrollments/{enrollmentId}/finalize")
+    {
+        Content = new StreamContent(request.Body)
+    };
+    databaseRequest.Content.Headers.ContentType = new("application/json");
+    using var response = await clients.CreateClient("academicRecordsDatabase").SendAsync(databaseRequest, cancellationToken);
+    var content = await response.Content.ReadAsStringAsync(cancellationToken);
+    return Results.Content(content, response.Content.Headers.ContentType?.MediaType ?? "application/json", statusCode: (int)response.StatusCode);
+});
+
+app.MapGet("/api/courses", (IHttpClientFactory clients, CancellationToken cancellationToken) =>
+    ForwardCourseManagementResponseAsync("/api/courses", clients, cancellationToken));
+
+app.MapGet("/api/faculty-assignments", (IHttpClientFactory clients, CancellationToken cancellationToken) =>
+    ForwardCourseManagementResponseAsync("/api/faculty-assignments", clients, cancellationToken));
+
 app.MapGet("/api/students/by-user/{userId:int}", (int userId, IHttpClientFactory clients, CancellationToken cancellationToken) =>
     ForwardStudentResponseAsync($"/api/students/by-user/{userId}", clients, cancellationToken));
 
@@ -133,6 +165,17 @@ app.MapGet("/api/students/{studentId}/transcript.pdf", async (string studentId, 
     var pdf = pdfGenerator.Generate(TranscriptDataFactory.Create(profile, DateTime.Now));
     return Results.File(pdf, "application/pdf", $"transcript-{profile.StudentId}.pdf");
 });
+
+static async Task<IResult> ForwardCourseManagementResponseAsync(
+    string path,
+    IHttpClientFactory clients,
+    CancellationToken cancellationToken)
+{
+    using var response = await clients.CreateClient("courseManagementDatabase")
+        .GetAsync(path, cancellationToken);
+    var content = await response.Content.ReadAsStringAsync(cancellationToken);
+    return Results.Content(content, response.Content.Headers.ContentType?.MediaType ?? "application/json", statusCode: (int)response.StatusCode);
+}
 
 app.MapPut("/api/students/{studentId}", async (string studentId, HttpRequest request, IHttpClientFactory clients, CancellationToken cancellationToken) =>
 {
@@ -246,6 +289,7 @@ static void AddCourseMetadata(JsonObject student, IReadOnlyDictionary<string, Co
 
         enrollment["credits"] = course?.CreditPoints;
         enrollment["courseTitle"] = course?.Name;
+        enrollment["gradeType"] = course?.GradeType;
     }
 }
 
@@ -261,7 +305,8 @@ static StudentStatisticsProfile ApplyCourseMetadata(
                 return enrollment with
                 {
                     CourseTitle = course.Name,
-                    Credits = course.CreditPoints
+                    Credits = course.CreditPoints,
+                    GradeType = course.GradeType
                 };
             }
 
@@ -269,7 +314,7 @@ static StudentStatisticsProfile ApplyCourseMetadata(
         }).ToList()
     };
 
-public sealed record CourseMetadataResponse(string Code, string Name, int CreditPoints);
+public sealed record CourseMetadataResponse(string Code, string Name, int CreditPoints, string GradeType);
 
 public sealed record UserResponse(
     int UserId,

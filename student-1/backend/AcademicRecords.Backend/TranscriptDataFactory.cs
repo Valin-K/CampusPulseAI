@@ -34,6 +34,8 @@ public static class TranscriptDataFactory
     private static TranscriptSubject CreateSubject(StudentStatisticsEnrollment enrollment)
     {
         var isCompleted = enrollment.IsFinalized;
+        var isNotMarked = string.Equals(enrollment.GradeType, "Pass/Fail", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(enrollment.GradeType, "Ungraded", StringComparison.OrdinalIgnoreCase);
         var creditsGained = isCompleted && IsCreditGained(enrollment.Status)
             ? enrollment.Credits
             : isCompleted ? 0 : null;
@@ -45,7 +47,7 @@ public static class TranscriptDataFactory
             enrollment.TermCode ?? enrollment.TermName,
             isCompleted ? enrollment.Status.ToUpperInvariant() : "ENROLLED",
             CreateResult(enrollment),
-            enrollment.GradeValue,
+            isNotMarked ? null : enrollment.GradeValue,
             enrollment.Credits,
             creditsGained,
             isCompleted);
@@ -61,9 +63,9 @@ public static class TranscriptDataFactory
         if (string.Equals(enrollment.GradeType, "Pass/Fail", StringComparison.OrdinalIgnoreCase))
         {
             return string.Equals(enrollment.Status, "Passed", StringComparison.OrdinalIgnoreCase)
-                ? "PASS"
+                ? "PASS - NOT GRADED"
                 : string.Equals(enrollment.Status, "Failed", StringComparison.OrdinalIgnoreCase)
-                    ? "FAIL"
+                    ? "FAIL - NOT GRADED"
                     : enrollment.Status.ToUpperInvariant();
         }
 

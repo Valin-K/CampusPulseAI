@@ -33,7 +33,17 @@ public static class EnrollmentStatusRules
         {
             EnrollmentGradeTypes.Mark when gradeValue >= 50m => Passed,
             EnrollmentGradeTypes.Mark when gradeValue is not null => Failed,
+            EnrollmentGradeTypes.PassFail when gradeValue >= 50m => Passed,
+            EnrollmentGradeTypes.PassFail when gradeValue is not null => Failed,
             EnrollmentGradeTypes.Ungraded => Completed,
+            _ => Completed
+        };
+
+    public static string GetFinalStatus(decimal? gradeValue) =>
+        gradeValue switch
+        {
+            >= 50m => Passed,
+            not null => Failed,
             _ => Completed
         };
 }

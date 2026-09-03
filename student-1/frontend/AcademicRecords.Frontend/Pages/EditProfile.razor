@@ -49,6 +49,10 @@ else if (profile is not null)
             <button class="btn btn-primary" @onclick="SaveAsync" disabled="@isSaving">Save changes</button>
             <a href="/profile/@Role/@UserId/enrollments" class="btn btn-outline-secondary ms-2">View enrollments</a>
         }
+         else if (profile.StaffId is not null)
+         {
+             <a href="/profile/@Role/@UserId/course-assignments" class="btn btn-primary">View course assignments</a>
+         }
     </div>
 }
 
@@ -179,7 +183,7 @@ else if (profile is not null)
         string Email, DateOnly? DateOfBirth, string? PhoneNumber);
 
     private sealed record TermEnrollmentResponse(int EnrollmentId, string CourseCode, int? AcademicTermId, string? TermCode,
-        string? TermName, int EndWeekOfYear, int AcademicYear, string Status, decimal? Credits, decimal? GradeValue, bool IsFinalized);
+        string? TermName, int EndWeekOfYear, int AcademicYear, string Status, decimal? Credits, decimal? GradeValue);
 
     private sealed record UpdateStudentRequest(string FirstName, string LastName, string Email, DateOnly? DateOfBirth,
         string MailingAddress, string EmergencyContactName, string EmergencyContactPhone, string? PhoneNumber,

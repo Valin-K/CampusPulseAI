@@ -200,7 +200,9 @@ else
     private static string GetGradeDisplay(TermEnrollmentResponse enrollment) =>
         enrollment.GradeType is "Pass/Fail" or "Ungraded"
             ? "N/A"
-            : enrollment.IsFinalized ? enrollment.GradeValue?.ToString() ?? "N/A" : "Pending";
+            : enrollment.Status is "Completed" or "Passed" or "Failed"
+                ? enrollment.GradeValue?.ToString() ?? "N/A"
+                : "Pending";
 
     private static string FormatStatistic(decimal? value) => value?.ToString("0.00", CultureInfo.InvariantCulture) ?? "N/A";
 
@@ -232,7 +234,7 @@ else
         List<TermEnrollmentResponse> Enrollments);
 
     private sealed record TermEnrollmentResponse(int EnrollmentId, string CourseCode, int? AcademicTermId, string? TermCode,
-        string? TermName, int StartWeekOfYear, int EndWeekOfYear, int AcademicYear, string Status, decimal? Credits, string GradeType, decimal? GradeValue, bool IsFinalized);
+        string? TermName, int StartWeekOfYear, int EndWeekOfYear, int AcademicYear, string Status, decimal? Credits, string GradeType, decimal? GradeValue);
 
     private sealed record StudentStatisticResponse(string StudentId, string Statistic, decimal? Value,
         int GradedEnrollmentCount, decimal TotalCredits);
