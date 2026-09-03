@@ -38,6 +38,7 @@ public sealed class AcademicRecordsDbContext(DbContextOptions<AcademicRecordsDbC
             entity.Property(student => student.EmergencyContactName).HasColumnName("emergency_contact_name").HasMaxLength(200).IsRequired();
             entity.Property(student => student.EmergencyContactPhone).HasColumnName("emergency_contact_phone").HasMaxLength(30).IsRequired();
             entity.Property(student => student.EnrollmentDate).HasColumnName("enrollment_date").HasColumnType("DATE");
+            entity.Property(student => student.GraduationDate).HasColumnName("graduation_date").HasColumnType("DATE");
             entity.Property(student => student.Degree).HasColumnName("degree").HasMaxLength(100);
             entity.Property(student => student.Major).HasColumnName("major").HasMaxLength(100);
             entity.Property(student => student.SubMajor).HasColumnName("sub_major").HasMaxLength(100);

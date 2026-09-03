@@ -36,6 +36,36 @@ a, .btn-link {
     color: red;
 }
 
+.ai-recommended-action {
+    color: #212529;
+}
+
+.ai-explanation {
+    color: #343a40;
+}
+
+.ai-progress-blurb {
+    color: #343a40;
+}
+
+.ai-analysis-status {
+    background-color: #f3f4f6;
+    border-color: #9ca3af;
+    color: #111827;
+}
+
+.ai-analysis-success {
+    background-color: #d1e7dd;
+    border-color: #a3cfbb;
+    color: #0f5132;
+}
+
+.ai-analysis-failure {
+    background-color: #f8d7da;
+    border-color: #f1aeb5;
+    color: #842029;
+}
+
 #blazor-error-ui {
     color-scheme: light only;
     background: lightyellow;

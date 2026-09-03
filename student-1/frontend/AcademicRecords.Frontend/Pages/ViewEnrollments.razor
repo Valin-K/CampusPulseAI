@@ -110,6 +110,9 @@ else
         <a href="@GetTranscriptUrl()" class="btn btn-primary" target="_blank" rel="noopener noreferrer">
             View transcript PDF
         </a>
+        <a href="/profile/@Role/@UserId/graduation" class="btn btn-outline-primary ms-2">
+            Graduation eligibility
+        </a>
     }
     <a href="/profile/@Role/@UserId" class="btn btn-secondary ms-2">Back to profile</a>
 </div>
@@ -231,7 +234,7 @@ else
     private sealed record StudentProfileResponse(int UserId, string StudentId, string FirstName, string LastName, string Email,
         DateOnly? DateOfBirth, string? PhoneNumber, string MailingAddress, string EmergencyContactName,
         string EmergencyContactPhone, DateOnly? EnrollmentDate, string? Degree, string? Major, string? SubMajor,
-        List<TermEnrollmentResponse> Enrollments);
+        List<TermEnrollmentResponse> Enrollments, DateOnly? GraduationDate = null);
 
     private sealed record TermEnrollmentResponse(int EnrollmentId, string CourseCode, int? AcademicTermId, string? TermCode,
         string? TermName, int StartWeekOfYear, int EndWeekOfYear, int AcademicYear, string Status, decimal? Credits, string GradeType, decimal? GradeValue);

@@ -34,12 +34,6 @@ jobs:
           filters: |
             student2:
               - 'student-2/**'
-              - 'shared/frontend/CampusPulse.Shared.Components/**'
-              - 'Directory.Packages.props'
-              - 'docker-compose.yml'
-              - '.github/docker-compose.student-2.ci.yml'
-              - '.github/student-2-ci-appsettings.json'
-              - '.github/workflows/student-2-ci.yml'
 
       - name: No Student 2 changes
         if: github.event_name != 'workflow_dispatch' && steps.filter.outputs.student2 != 'true'

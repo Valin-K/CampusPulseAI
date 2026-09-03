@@ -314,6 +314,26 @@ app.MapPut("/api/students/{studentId}", async (string studentId, UpdateStudentRe
     return Results.NoContent();
 });
 
+app.MapPut("/api/students/{studentId}/graduation", async (string studentId, GraduationUpdateRequest request,
+    AcademicRecordsDbContext database, CancellationToken cancellationToken) =>
+{
+    var student = await database.Students.SingleOrDefaultAsync(value => value.StudentId == studentId, cancellationToken);
+    if (student is null)
+    {
+        return Results.NotFound("Student was not found.");
+    }
+
+    var today = DateOnly.FromDateTime(DateTime.UtcNow);
+    if (request.GraduationDate > today)
+    {
+        return Results.BadRequest("Graduation date cannot be in the future.");
+    }
+
+    student.GraduationDate = request.GraduationDate;
+    await database.SaveChangesAsync(cancellationToken);
+    return Results.Ok(new GraduationResponse(student.StudentId, request.GraduationDate));
+});
+
 app.Run();
 
 static async Task<string> CreateStudentIdAsync(AcademicRecordsDbContext database, CancellationToken cancellationToken)
@@ -375,7 +395,8 @@ static StudentProfileResponse CreateStudentProfileResponse(Student value) =>
             enrollment.AcademicTermId, enrollment.AcademicTerm?.TermCode, enrollment.AcademicTerm?.TermName,
             enrollment.AcademicTerm?.StartWeekOfYear ?? 0, enrollment.AcademicTerm?.EndWeekOfYear ?? 0,
             enrollment.AcademicYear, enrollment.Status, null,
-            enrollment.GradeValue, enrollment.IsFinalized)).ToList());
+            enrollment.GradeValue, enrollment.IsFinalized)).ToList(),
+        value.GraduationDate);
 
 public sealed record EnrollStudentRequest(string FirstName, string LastName, string Email, DateOnly? DateOfBirth,
     string MailingAddress, string EmergencyContactName, string EmergencyContactPhone, string? PhoneNumber = null,
@@ -391,7 +412,8 @@ public sealed record EnrollStaffRequest(string FirstName, string LastName, strin
 
 public sealed record StudentProfileResponse(int UserId, string StudentId, string FirstName, string LastName, string Email,
     DateOnly? DateOfBirth, string? PhoneNumber, string MailingAddress, string EmergencyContactName, string EmergencyContactPhone,
-    DateOnly? EnrollmentDate, string? Degree, string? Major, string? SubMajor, List<TermEnrollmentResponse> Enrollments);
+    DateOnly? EnrollmentDate, string? Degree, string? Major, string? SubMajor, List<TermEnrollmentResponse> Enrollments,
+    DateOnly? GraduationDate = null);
 
 public sealed record StaffProfileResponse(int UserId, string StaffId, string FirstName, string LastName, string Email,
     DateOnly? DateOfBirth, string? PhoneNumber);
@@ -402,6 +424,10 @@ public sealed record TermEnrollmentResponse(int EnrollmentId, string CourseCode,
 public sealed record UpdateStudentRequest(string FirstName, string LastName, string Email, DateOnly? DateOfBirth,
     string MailingAddress, string EmergencyContactName, string EmergencyContactPhone, string? PhoneNumber = null,
     string? Degree = null, string? Major = null, string? SubMajor = null);
+
+public sealed record GraduationUpdateRequest(DateOnly GraduationDate);
+
+public sealed record GraduationResponse(string StudentId, DateOnly GraduationDate);
 
 public sealed record UserResponse(
     int UserId,

@@ -48,6 +48,7 @@ else if (profile is not null)
         {
             <button class="btn btn-primary" @onclick="SaveAsync" disabled="@isSaving">Save changes</button>
             <a href="/profile/@Role/@UserId/enrollments" class="btn btn-outline-secondary ms-2">View enrollments</a>
+            <a href="/profile/@Role/@UserId/graduation" class="btn btn-outline-primary ms-2">AI progress dashboard</a>
         }
          else if (profile.StaffId is not null)
          {
