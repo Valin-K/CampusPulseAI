@@ -1,69 +1,62 @@
-@page "/profile/{Role}/{UserId:int}"
 @using System.Net.Http.Json
-
-<PageTitle>Profile</PageTitle>
-
-<h1>Profile</h1>
 
 @if (isLoading)
 {
-    <p>Loading profile...</p>
+    <p class="muted">Loading profile...</p>
 }
 else if (loadError is not null)
 {
-    <div class="alert alert-danger">Unable to load profile: @loadError</div>
+    <div class="notice notice-error">Unable to load profile: @loadError</div>
 }
 else if (profile is not null)
 {
     @if (saveError is not null)
     {
-        <div class="alert alert-danger">@saveError</div>
+        <div class="notice notice-error">@saveError</div>
     }
     @if (saveSuccess)
     {
-        <div class="alert alert-success">Profile updated successfully.</div>
+        <div class="notice notice-success" role="status">Profile updated successfully.</div>
     }
-    <div class="row g-3">
-        <div class="col-md-6"><label class="form-label">First name</label><input class="form-control" value="@profile.FirstName" readonly /></div>
-        <div class="col-md-6"><label class="form-label">Last name</label><input class="form-control" value="@profile.LastName" readonly /></div>
-        <div class="col-md-6"><label class="form-label">ID</label><input class="form-control" value="@(profile.StudentId ?? profile.StaffId)" readonly /></div>
-        <div class="col-md-6"><label class="form-label">Role</label><input class="form-control" value="@profile.Role" readonly /></div>
-        <div class="col-md-6"><label class="form-label">Email</label><input class="form-control" value="@profile.Email" readonly /></div>
-        <div class="col-md-6"><label class="form-label">Date of birth</label><input class="form-control" value="@profile.DateOfBirth" readonly /></div>
-        <div class="col-md-6"><label class="form-label">Phone number</label><input class="form-control" value="@profile.PhoneNumber" readonly /></div>
-        @if (profile.StudentId is not null)
-        {
-            <div class="col-md-6"><label class="form-label">Mailing address</label><input class="form-control" value="@profile.MailingAddress" readonly /></div>
-            <div class="col-md-6"><label class="form-label">Emergency contact name</label><input class="form-control" value="@profile.EmergencyContactName" readonly /></div>
-            <div class="col-md-6"><label class="form-label">Emergency contact phone</label><input class="form-control" value="@profile.EmergencyContactPhone" readonly /></div>
-            <div class="col-md-6"><label class="form-label">Enrollment date</label><input class="form-control" value="@profile.EnrollmentDate" readonly /></div>
-            <div class="col-md-6"><label class="form-label">Degree</label><input class="form-control" @bind="editDegree" /></div>
-            <div class="col-md-6"><label class="form-label">Major</label><input class="form-control" @bind="editMajor" /></div>
-            <div class="col-md-6"><label class="form-label">Minor (SubMajor)</label><input class="form-control" @bind="editSubMajor" /></div>
-        }
-    </div>
 
-    <div class="mt-4">
+    <section class="surface-card">
+        <div class="section-heading">
+            <div><span class="eyebrow">@profile.Role profile</span><h2>@profile.FirstName @profile.LastName</h2></div>
+        </div>
+        <div class="form-grid">
+            <label class="field"><span>ID</span><input value="@(profile.StudentId ?? profile.StaffId)" readonly disabled /></label>
+            <label class="field"><span>Role</span><input value="@profile.Role" readonly disabled /></label>
+            <label class="field"><span>First name</span><input value="@profile.FirstName" readonly disabled /></label>
+            <label class="field"><span>Last name</span><input value="@profile.LastName" readonly disabled /></label>
+            <label class="field"><span>Email</span><input value="@profile.Email" readonly disabled /></label>
+            <label class="field"><span>Date of birth</span><input value="@profile.DateOfBirth" readonly disabled /></label>
+            <label class="field"><span>Phone number</span><input value="@profile.PhoneNumber" readonly disabled /></label>
+            @if (profile.StudentId is not null)
+            {
+                <label class="field"><span>Mailing address</span><input value="@profile.MailingAddress" readonly disabled /></label>
+                <label class="field"><span>Emergency contact name</span><input value="@profile.EmergencyContactName" readonly disabled /></label>
+                <label class="field"><span>Emergency contact phone</span><input value="@profile.EmergencyContactPhone" readonly disabled /></label>
+                <label class="field"><span>Enrollment date</span><input value="@profile.EnrollmentDate" readonly disabled /></label>
+                <label class="field"><span>Degree</span><input @bind="editDegree" /></label>
+                <label class="field"><span>Major</span><input @bind="editMajor" /></label>
+                <label class="field"><span>Minor (SubMajor)</span><input @bind="editSubMajor" /></label>
+            }
+        </div>
+
         @if (profile.StudentId is not null)
         {
-            <button class="btn btn-primary" @onclick="SaveAsync" disabled="@isSaving">Save changes</button>
-            <a href="/profile/@Role/@UserId/enrollments" class="btn btn-outline-secondary ms-2">View enrollments</a>
-            <a href="/profile/@Role/@UserId/graduation" class="btn btn-outline-primary ms-2">AI progress dashboard</a>
+            <div class="button-row" style="margin-top: 1rem;">
+                <button class="button button-primary" @onclick="SaveAsync" disabled="@isSaving">@(isSaving ? "Saving..." : "Save changes")</button>
+            </div>
         }
-         else if (profile.StaffId is not null)
-         {
-             <a href="/profile/@Role/@UserId/course-assignments" class="btn btn-primary">View course assignments</a>
-         }
-    </div>
+    </section>
 }
 
-<a href="/" class="btn btn-secondary mt-4">Back to people</a>
-
 @code {
-    [Parameter]
+    [Parameter, EditorRequired]
     public int UserId { get; set; }
 
-    [Parameter]
+    [Parameter, EditorRequired]
     public string Role { get; set; } = string.Empty;
 
     [Inject]
@@ -80,7 +73,7 @@ else if (profile is not null)
     private string? editMajor;
     private string? editSubMajor;
 
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnParametersSetAsync()
     {
         await LoadProfileAsync();
     }
@@ -88,6 +81,7 @@ else if (profile is not null)
     private async Task LoadProfileAsync()
     {
         isLoading = true;
+        loadError = null;
         try
         {
             if (string.Equals(Role, "student", StringComparison.OrdinalIgnoreCase))
@@ -96,7 +90,7 @@ else if (profile is not null)
                 profile = student is null ? null : new UserProfileResponse(student.UserId, student.StudentId, null,
                     student.FirstName, student.LastName, student.Email, "Student", student.DateOfBirth, student.PhoneNumber,
                     student.MailingAddress, student.EmergencyContactName, student.EmergencyContactPhone, student.EnrollmentDate,
-                    student.Degree, student.Major, student.SubMajor, student.Enrollments);
+                    student.Degree, student.Major, student.SubMajor);
 
                 if (profile is not null)
                 {
@@ -110,7 +104,7 @@ else if (profile is not null)
                 var staff = await Http.GetFromJsonAsync<StaffProfileResponse>($"api/staff/by-user/{UserId}");
                 profile = staff is null ? null : new UserProfileResponse(staff.UserId, null, staff.StaffId,
                     staff.FirstName, staff.LastName, staff.Email, "Staff", staff.DateOfBirth, staff.PhoneNumber,
-                    null, null, null, null, null, null, null, []);
+                    null, null, null, null, null, null, null);
             }
             else
             {
@@ -173,7 +167,7 @@ else if (profile is not null)
     private sealed record UserProfileResponse(int UserId, string? StudentId, string? StaffId, string FirstName, string LastName,
         string Email, string Role, DateOnly? DateOfBirth, string? PhoneNumber, string? MailingAddress,
         string? EmergencyContactName, string? EmergencyContactPhone, DateOnly? EnrollmentDate, string? Degree,
-        string? Major, string? SubMajor, List<TermEnrollmentResponse> Enrollments);
+        string? Major, string? SubMajor);
 
     private sealed record StudentProfileResponse(int UserId, string StudentId, string FirstName, string LastName, string Email,
         DateOnly? DateOfBirth, string? PhoneNumber, string MailingAddress, string EmergencyContactName,

@@ -1,0 +1,305 @@
+@using System.Globalization
+@using System.Net.Http.Json
+
+@if (isLoading)
+{
+    <p class="muted">Loading course assignments...</p>
+}
+else if (loadError is not null)
+{
+    <div class="notice notice-error">Unable to load course assignments: @loadError</div>
+}
+else if (staff is null)
+{
+    <div class="notice notice-error">Staff profile not found.</div>
+}
+else if (assignments.Count == 0)
+{
+    <p class="muted">@staff.FirstName @staff.LastName is not assigned to any courses.</p>
+}
+else
+{
+    <section class="surface-card table-panel">
+        <div class="section-heading">
+            <div><span class="eyebrow">Teaching load</span><h2>Assigned courses</h2></div>
+        </div>
+        <div class="responsive-table">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Course Code</th>
+                        <th>Course Name</th>
+                        <th>Level</th>
+                        <th>Credit Points</th>
+                        <th>Status</th>
+                        <th>Teaching Period</th>
+                        <th>Role</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var assignment in assignments)
+                    {
+                        <tr class="@(selectedCourseCode == assignment.Course.Code ? "table-active" : null)">
+                            <td>@assignment.Course.Code</td>
+                            <td>@assignment.Course.Name</td>
+                            <td>@assignment.Course.Level</td>
+                            <td>@assignment.Course.CreditPoints</td>
+                            <td>@(assignment.Course.IsActive ? "Active" : "Inactive")</td>
+                            <td>@assignment.TeachingPeriod</td>
+                            <td>@assignment.Role</td>
+                            <td>
+                                <button class="button button-small @(selectedCourseCode == assignment.Course.Code ? "button-secondary" : "button-primary")"
+                                        @onclick="() => SelectCourse(assignment.Course.Code)">
+                                    @(selectedCourseCode == assignment.Course.Code ? "Hide students" : "View students")
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    @if (selectedCourseCode is not null && selectedCourse is not null)
+    {
+        <section class="surface-card table-panel">
+            <div class="section-heading">
+                <div>
+                    <span class="eyebrow">Grading</span>
+                    <h2>@selectedCourse.Code - @selectedCourse.Name</h2>
+                </div>
+            </div>
+            <p class="muted">Enter a mark from 0 to 100 for each currently enrolled student.</p>
+
+            @if (sessions.Count == 0)
+            {
+                <p class="muted">No students are currently enrolled in this course.</p>
+            }
+            else
+            {
+                @foreach (var session in sessions)
+                {
+                    <h3 style="margin-top: 1rem;">@session.Key</h3>
+                    <div class="responsive-table">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Student ID</th>
+                                    <th>Student Name</th>
+                                    <th>Status</th>
+                                    <th>Grade</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var enrollment in session)
+                                {
+                                    <tr>
+                                        <td>@enrollment.StudentId</td>
+                                        <td>@enrollment.StudentName</td>
+                                        <td>@enrollment.Status</td>
+                                        <td style="min-width: 150px">
+                                            <input class="inline-input" type="number" min="0" max="100" step="0.01"
+                                                   @bind="enrollment.GradeValue" disabled="@(!enrollment.CanEditGrade || enrollment.IsSaving)" />
+                                        </td>
+                                        <td>
+                                            <button class="button button-small button-primary" @onclick="() => SaveGradeAsync(enrollment)" disabled="@(!enrollment.CanEditGrade || enrollment.IsSaving)">
+                                                @(enrollment.IsSaving ? "Saving..." : "Assign grade")
+                                            </button>
+                                            @if (enrollment.SaveError is not null)
+                                            {
+                                                <div class="text-danger small mt-1">@enrollment.SaveError</div>
+                                            }
+                                            else if (enrollment.SaveSucceeded)
+                                            {
+                                                <div class="text-success small mt-1">Saved</div>
+                                            }
+                                            @if (!enrollment.CanEditGrade && enrollment.IsFutureCourse)
+                                            {
+                                                <div class="text-muted small mt-1">Available when the course starts.</div>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            }
+        </section>
+    }
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public int UserId { get; set; }
+
+    [Inject]
+    private HttpClient Http { get; set; } = default!;
+
+    private StaffProfileResponse? staff;
+    private List<AssignmentRow> assignments = [];
+    private bool isLoading = true;
+    private string? loadError;
+
+    private string? selectedCourseCode;
+    private CourseResponse? selectedCourse;
+    private List<IGrouping<string, GradeEnrollment>> sessions = [];
+
+    protected override async Task OnParametersSetAsync()
+    {
+        isLoading = true;
+        loadError = null;
+        selectedCourseCode = null;
+        selectedCourse = null;
+        sessions = [];
+        try
+        {
+            staff = await Http.GetFromJsonAsync<StaffProfileResponse>($"api/staff/by-user/{UserId}");
+            if (staff is null)
+            {
+                return;
+            }
+
+            var assignmentsTask = Http.GetFromJsonAsync<IReadOnlyList<FacultyAssignmentResponse>>("api/faculty-assignments");
+            var coursesTask = Http.GetFromJsonAsync<IReadOnlyList<CourseResponse>>("api/courses");
+            await Task.WhenAll(assignmentsTask, coursesTask);
+
+            var coursesById = (await coursesTask ?? []).ToDictionary(course => course.Id);
+            assignments = (await assignmentsTask ?? [])
+                .Where(assignment => string.Equals(assignment.StaffEmail, staff.Email, StringComparison.OrdinalIgnoreCase))
+                .Where(assignment => coursesById.ContainsKey(assignment.CourseId))
+                .Select(assignment => new AssignmentRow(assignment, coursesById[assignment.CourseId]))
+                .OrderBy(assignment => assignment.Course.Code)
+                .ThenBy(assignment => assignment.TeachingPeriod)
+                .ToList();
+        }
+        catch (HttpRequestException exception)
+        {
+            loadError = exception.Message;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task SelectCourse(string courseCode)
+    {
+        if (selectedCourseCode == courseCode)
+        {
+            selectedCourseCode = null;
+            selectedCourse = null;
+            sessions = [];
+            return;
+        }
+
+        selectedCourseCode = courseCode;
+        selectedCourse = assignments.FirstOrDefault(a => a.Course.Code == courseCode)?.Course;
+        sessions = [];
+
+        if (selectedCourse is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var students = await Http.GetFromJsonAsync<IReadOnlyList<StudentProfileResponse>>("api/students") ?? [];
+            sessions = students
+                .SelectMany(student => student.Enrollments
+                    .Where(enrollment => string.Equals(enrollment.CourseCode, selectedCourse.Code, StringComparison.OrdinalIgnoreCase)
+                        && enrollment.Status == "In Progress")
+                    .Select(enrollment => new GradeEnrollment(student, enrollment)))
+                .GroupBy(enrollment => $"{enrollment.TermName ?? "Session"} ({enrollment.TermCode ?? "-"}) - {enrollment.AcademicYear}")
+                .OrderBy(session => session.Key)
+                .ToList();
+        }
+        catch (HttpRequestException exception)
+        {
+            loadError = exception.Message;
+        }
+    }
+
+    private async Task SaveGradeAsync(GradeEnrollment enrollment)
+    {
+        enrollment.SaveError = null;
+        enrollment.SaveSucceeded = false;
+        enrollment.IsSaving = true;
+        try
+        {
+            var response = await Http.PutAsJsonAsync($"api/enrollments/{enrollment.EnrollmentId}/grade",
+                new GradeEntryRequest(enrollment.GradeValue));
+            if (!response.IsSuccessStatusCode)
+            {
+                enrollment.SaveError = await response.Content.ReadAsStringAsync();
+                return;
+            }
+
+            enrollment.SaveSucceeded = true;
+        }
+        catch (HttpRequestException exception)
+        {
+            enrollment.SaveError = exception.Message;
+        }
+        finally
+        {
+            enrollment.IsSaving = false;
+        }
+    }
+
+    private sealed record AssignmentRow(FacultyAssignmentResponse Assignment, CourseResponse Course)
+    {
+        public string Role => Assignment.Role;
+        public string TeachingPeriod => Assignment.TeachingPeriod;
+    }
+
+    private sealed record StaffProfileResponse(int UserId, string StaffId, string FirstName, string LastName,
+        string Email, DateOnly? DateOfBirth, string? PhoneNumber);
+
+    private sealed record FacultyAssignmentResponse(int Id, int CourseId, string CourseCode, string StaffName,
+        string StaffEmail, string Role, string TeachingPeriod);
+
+    private sealed record CourseResponse(int Id, string Code, string Name, string Description, int CreditPoints,
+        int Level, bool IsActive, string GradeType, string? SyllabusFileName);
+
+    private sealed class GradeEnrollment(StudentProfileResponse student, TermEnrollmentResponse enrollment)
+    {
+        public int EnrollmentId => enrollment.EnrollmentId;
+        public string StudentId => student.StudentId;
+        public string StudentName => $"{student.FirstName} {student.LastName}";
+        public string? TermCode => enrollment.TermCode;
+        public string? TermName => enrollment.TermName;
+        public int AcademicYear => enrollment.AcademicYear;
+        public string Status { get; set; } = enrollment.Status;
+        public decimal? GradeValue { get; set; } = enrollment.GradeValue;
+        public bool IsSaving { get; set; }
+        public bool IsFutureCourse => DateOnly.FromDateTime(DateTime.UtcNow) < StartDate;
+        public bool CanEditGrade => DateOnly.FromDateTime(DateTime.UtcNow) >= StartDate
+            && DateOnly.FromDateTime(DateTime.UtcNow) <= EndDate;
+        private DateOnly StartDate => DateOnly.FromDateTime(
+            ISOWeek.ToDateTime(AcademicYear, enrollment.StartWeekOfYear, DayOfWeek.Monday));
+        private DateOnly EndDate
+        {
+            get
+            {
+                var endYear = enrollment.EndWeekOfYear < enrollment.StartWeekOfYear ? AcademicYear + 1 : AcademicYear;
+                return DateOnly.FromDateTime(ISOWeek.ToDateTime(endYear, enrollment.EndWeekOfYear, DayOfWeek.Sunday));
+            }
+        }
+        public bool SaveSucceeded { get; set; }
+        public string? SaveError { get; set; }
+    }
+
+    private sealed record StudentProfileResponse(int UserId, string StudentId, string FirstName, string LastName,
+        string Email, DateOnly? DateOfBirth, string? PhoneNumber, string MailingAddress, string EmergencyContactName,
+        string EmergencyContactPhone, DateOnly? EnrollmentDate, string? Degree, string? Major, string? SubMajor,
+        List<TermEnrollmentResponse> Enrollments);
+
+    private sealed record TermEnrollmentResponse(int EnrollmentId, string CourseCode, int? AcademicTermId,
+        string? TermCode, string? TermName, int StartWeekOfYear, int EndWeekOfYear, int AcademicYear,
+        string Status, string GradeType, decimal? GradeValue);
+
+    private sealed record GradeEntryRequest(decimal? GradeValue);
+}

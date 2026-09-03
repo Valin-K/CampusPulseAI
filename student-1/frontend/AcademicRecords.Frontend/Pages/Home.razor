@@ -1,47 +1,122 @@
 ﻿@page "/"
 
-<PageTitle>Academic Records</PageTitle>
+<PageTitle>Select user | Academic Records</PageTitle>
 
-<h2>People</h2>
+<header class="dashboard-hero">
+    <div>
+        <span class="eyebrow">Academic records</span>
+        <h1>Select a user</h1>
+        <p>Choose a student to manage enrollments and graduation, or a staff member to grade courses and finalize graduations.</p>
+    </div>
+    <div class="term-summary">
+        <span>Directory</span>
+        <strong>@(people?.Count ?? 0) people</strong>
+        <small>Students and staff</small>
+    </div>
+</header>
 
-@if (people is null && error is null)
-{
-    <p>Loading...</p>
-}
-else if (error is not null)
-{
-    <p class="text-danger">Unable to load people: @error</p>
-}
-else
-{
-    <table class="table table-striped">
-        <thead>
-            <tr>
-                <th>Name</th>
-                <th>ID</th>
-                <th>Role</th>
-                <th>Email</th>
-                <th></th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var person in people!)
-            {
-                <tr>
-                    <td>@person.FirstName @person.LastName</td>
-                    <td>@(person.StudentId ?? person.StaffId)</td>
-                    <td>@person.Role</td>
-                    <td>@person.Email</td>
-                    <td><a class="btn btn-outline-primary btn-sm" href="profile/@person.Role.ToLowerInvariant()/@person.UserId">Edit profile</a></td>
-                </tr>
-            }
-        </tbody>
-    </table>
-}
+<CampusSectionTabs Items="userTypeTabs" @bind-ActiveKey="activeTab" AriaLabel="User type" />
+
+<section class="surface-card table-panel">
+    <div class="section-heading">
+        <div>
+            <span class="eyebrow">@(IsStudentTab ? "Students" : "Staff")</span>
+            <h2>@(IsStudentTab ? "Student directory" : "Staff directory")</h2>
+        </div>
+        <a class="button button-primary" href="new-user">+ New @(IsStudentTab ? "student" : "staff member")</a>
+    </div>
+
+    <div class="form-stack" style="max-width: 24rem; margin-bottom: 1rem;">
+        <label class="field">
+            <span>Filter by name, ID, or email</span>
+            <input @bind="filter" @bind:event="oninput" placeholder="Type to filter..." />
+        </label>
+    </div>
+
+    @if (people is null && error is null)
+    {
+        <p class="muted">Loading people...</p>
+    }
+    else if (error is not null)
+    {
+        <div class="notice notice-error">Unable to load people: @error</div>
+    }
+    else
+    {
+        var filtered = FilteredPeople.ToList();
+        if (filtered.Count == 0)
+        {
+            <p class="muted">No @(IsStudentTab ? "students" : "staff members") match the current filter.</p>
+        }
+        else
+        {
+            <div class="responsive-table">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>ID</th>
+                            <th>Email</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var person in filtered)
+                        {
+                            <tr>
+                                <td><strong>@person.FirstName @person.LastName</strong></td>
+                                <td>@(person.StudentId ?? person.StaffId)</td>
+                                <td>@person.Email</td>
+                                <td>
+                                    <a class="button button-small button-primary" href="@GetViewHref(person)">Open</a>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    }
+</section>
 
 @code {
     private IReadOnlyList<PersonResponse>? people;
     private string? error;
+    private string activeTab = "students";
+    private string filter = string.Empty;
+
+    private static readonly IReadOnlyList<CampusTabItem> userTypeTabs =
+    [
+        new("students", "Students", "Enrollments and graduation"),
+        new("staff", "Staff", "Grading and registrar")
+    ];
+
+    private bool IsStudentTab => activeTab == "students";
+
+    private IEnumerable<PersonResponse> FilteredPeople
+    {
+        get
+        {
+            var source = people ?? [];
+            var roleFiltered = source.Where(person =>
+                string.Equals(person.Role, IsStudentTab ? "Student" : "Staff", StringComparison.OrdinalIgnoreCase));
+
+            if (string.IsNullOrWhiteSpace(filter))
+            {
+                return roleFiltered;
+            }
+
+            var term = filter.Trim();
+            return roleFiltered.Where(person =>
+                person.FirstName.Contains(term, StringComparison.OrdinalIgnoreCase)
+                || person.LastName.Contains(term, StringComparison.OrdinalIgnoreCase)
+                || (person.StudentId ?? person.StaffId ?? string.Empty).Contains(term, StringComparison.OrdinalIgnoreCase)
+                || person.Email.Contains(term, StringComparison.OrdinalIgnoreCase));
+        }
+    }
+
+    private string GetViewHref(PersonResponse person) =>
+        IsStudentTab ? $"students/{person.UserId}" : $"staff/{person.UserId}";
 
     protected override async Task OnInitializedAsync()
     {
@@ -66,5 +141,4 @@ else
         string Role,
         string? StudentId,
         string? StaffId);
-
 }

@@ -1,0 +1,81 @@
+@page "/staff/{UserId:int}"
+@using System.Net.Http.Json
+
+<PageTitle>Staff | Academic Records</PageTitle>
+
+@if (staff is null && loadError is null)
+{
+    <p class="muted">Loading staff member...</p>
+}
+else if (loadError is not null)
+{
+    <div class="notice notice-error">Unable to load staff member: @loadError</div>
+}
+else if (staff is not null)
+{
+    <header class="dashboard-hero">
+        <div>
+            <span class="eyebrow">Staff</span>
+            <h1>@staff.FirstName @staff.LastName</h1>
+            <p>Staff ID @staff.StaffId</p>
+        </div>
+        <div class="term-summary">
+            <span>Staff ID</span>
+            <strong>@staff.StaffId</strong>
+            <small>@staff.Email</small>
+        </div>
+    </header>
+
+    <CampusSectionTabs Items="tabs" @bind-ActiveKey="activeTab" AriaLabel="Staff sections" />
+
+    @if (activeTab == "grading")
+    {
+        <GradingPanel UserId="UserId" />
+    }
+    else if (activeTab == "registrar-graduation")
+    {
+        <RegistrarGraduationPanel />
+    }
+    else
+    {
+        <EditProfilePanel UserId="UserId" Role="staff" />
+    }
+}
+
+@code {
+    [Parameter]
+    public int UserId { get; set; }
+
+    [Inject]
+    private HttpClient Http { get; set; } = default!;
+
+    private static readonly IReadOnlyList<CampusTabItem> tabs =
+    [
+        new("grading", "Grading", "Assigned courses and grade entry"),
+        new("registrar-graduation", "Registrar Graduation", "Finalize eligible students"),
+        new("profile", "Edit Profile", "Contact details")
+    ];
+
+    private string activeTab = "grading";
+    private StaffHeader? staff;
+    private string? loadError;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        loadError = null;
+        try
+        {
+            staff = await Http.GetFromJsonAsync<StaffHeader>($"api/staff/by-user/{UserId}");
+            if (staff is null)
+            {
+                loadError = "Staff member not found.";
+            }
+        }
+        catch (HttpRequestException exception)
+        {
+            loadError = exception.Message;
+        }
+    }
+
+    private sealed record StaffHeader(int UserId, string StaffId, string FirstName, string LastName, string Email);
+}

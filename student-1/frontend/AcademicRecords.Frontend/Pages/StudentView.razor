@@ -1,0 +1,82 @@
+@page "/students/{UserId:int}"
+@using System.Net.Http.Json
+
+<PageTitle>Student | Academic Records</PageTitle>
+
+@if (student is null && loadError is null)
+{
+    <p class="muted">Loading student...</p>
+}
+else if (loadError is not null)
+{
+    <div class="notice notice-error">Unable to load student: @loadError</div>
+}
+else if (student is not null)
+{
+    <header class="dashboard-hero">
+        <div>
+            <span class="eyebrow">Student</span>
+            <h1>@student.FirstName @student.LastName</h1>
+            <p>Student ID @student.StudentId · @(student.Degree ?? "Degree not specified")</p>
+        </div>
+        <div class="term-summary">
+            <span>Student ID</span>
+            <strong>@student.StudentId</strong>
+            <small>@student.Email</small>
+        </div>
+    </header>
+
+    <CampusSectionTabs Items="tabs" @bind-ActiveKey="activeTab" AriaLabel="Student sections" />
+
+    @if (activeTab == "enrollments")
+    {
+        <EnrollmentsPanel UserId="UserId" />
+    }
+    else if (activeTab == "graduation")
+    {
+        <GraduationPanel UserId="UserId" />
+    }
+    else
+    {
+        <EditProfilePanel UserId="UserId" Role="student" />
+    }
+}
+
+@code {
+    [Parameter]
+    public int UserId { get; set; }
+
+    [Inject]
+    private HttpClient Http { get; set; } = default!;
+
+    private static readonly IReadOnlyList<CampusTabItem> tabs =
+    [
+        new("enrollments", "Enrollments", "Courses, WAM and GPA"),
+        new("graduation", "Graduation", "Eligibility and AI progress"),
+        new("profile", "Edit Profile", "Degree and contact details")
+    ];
+
+    private string activeTab = "enrollments";
+    private StudentHeader? student;
+    private string? loadError;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        loadError = null;
+        try
+        {
+            student = await Http.GetFromJsonAsync<StudentHeader>($"api/students/by-user/{UserId}");
+            if (student is null)
+            {
+                loadError = "Student not found.";
+            }
+        }
+        catch (HttpRequestException exception)
+        {
+            loadError = exception.Message;
+        }
+    }
+
+    private sealed record StudentHeader(int UserId, string StudentId, string FirstName, string LastName,
+        string Email, string? Degree);
+}

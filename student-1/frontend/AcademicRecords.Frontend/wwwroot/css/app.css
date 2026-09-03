@@ -36,6 +36,23 @@ a, .btn-link {
     color: red;
 }
 
+.muted {
+    color: #627d98;
+}
+
+.inline-input {
+    border: 1px solid #cdd5e2;
+    border-radius: 5px;
+    padding: .4rem;
+    font: inherit;
+    max-width: 170px;
+}
+
+.table-panel {
+    margin-top: 1rem;
+    overflow: auto;
+}
+
 .ai-recommended-action {
     color: #212529;
 }
