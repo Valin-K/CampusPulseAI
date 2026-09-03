@@ -22,16 +22,23 @@ public static class CampusHousingSeedData
         if (!await db.DormRooms.AnyAsync())
         {
             db.DormRooms.AddRange(
-                new DormRoom { Id = 1, Building = "Maple Hall", RoomNumber = "101", Capacity = 2 },
-                new DormRoom { Id = 2, Building = "Maple Hall", RoomNumber = "102", Capacity = 2 },
-                new DormRoom { Id = 3, Building = "Oak Hall", RoomNumber = "201", Capacity = 4 },
-                new DormRoom { Id = 4, Building = "Oak Hall", RoomNumber = "202", Capacity = 4 },
-                new DormRoom { Id = 5, Building = "Cedar Hall", RoomNumber = "301", Capacity = 2 },
-                new DormRoom { Id = 6, Building = "Cedar Hall", RoomNumber = "302", Capacity = 2 },
-                new DormRoom { Id = 7, Building = "Pine Hall", RoomNumber = "401", Capacity = 1 },
-                new DormRoom { Id = 8, Building = "Pine Hall", RoomNumber = "402", Capacity = 1 },
-                new DormRoom { Id = 9, Building = "Birch Hall", RoomNumber = "501", Capacity = 4 },
-                new DormRoom { Id = 10, Building = "Birch Hall", RoomNumber = "502", Capacity = 4 });
+                new DormRoom { Id = 1, Building = "Maple Hall", RoomNumber = "101", Capacity = 2, IsAvailable = true },
+                new DormRoom { Id = 2, Building = "Maple Hall", RoomNumber = "102", Capacity = 2, IsAvailable = true },
+                new DormRoom { Id = 3, Building = "Oak Hall", RoomNumber = "201", Capacity = 4, IsAvailable = true },
+                new DormRoom { Id = 4, Building = "Oak Hall", RoomNumber = "202", Capacity = 4, IsAvailable = true },
+                new DormRoom { Id = 5, Building = "Cedar Hall", RoomNumber = "301", Capacity = 2, IsAvailable = true },
+                new DormRoom { Id = 6, Building = "Cedar Hall", RoomNumber = "302", Capacity = 2, IsAvailable = true },
+                new DormRoom { Id = 7, Building = "Pine Hall", RoomNumber = "401", Capacity = 1, IsAvailable = true },
+                new DormRoom { Id = 8, Building = "Pine Hall", RoomNumber = "402", Capacity = 1, IsAvailable = true },
+                new DormRoom { Id = 9, Building = "Birch Hall", RoomNumber = "501", Capacity = 4, IsAvailable = true },
+                new DormRoom { Id = 10, Building = "Birch Hall", RoomNumber = "502", Capacity = 4, IsAvailable = true });
+            await db.SaveChangesAsync();
+        }
+
+        var mapleHallTwo = await db.DormRooms.SingleOrDefaultAsync(room => room.Id == 2 && room.Building == "Maple Hall" && room.RoomNumber == "102");
+        if (mapleHallTwo is not null && !mapleHallTwo.IsAvailable)
+        {
+            mapleHallTwo.IsAvailable = true;
             await db.SaveChangesAsync();
         }
 
