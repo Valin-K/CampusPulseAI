@@ -16,6 +16,10 @@ builder.Services.AddHttpClient("billingDatabase", client =>
 {
     client.BaseAddress = new Uri(builder.Configuration["Services:InvoiceDatabase"] ?? "http://financialaidbilling.database:8080");
 }).AddHttpMessageHandler<DatabaseStartupRetryHandler>();
+builder.Services.AddHttpClient("academicRecords", client =>
+{
+    client.BaseAddress = new Uri(builder.Configuration["Services:AcademicRecordsBackend"] ?? "http://academicrecords.backend:8080");
+});
 builder.Services.AddScoped<GeminiScholarshipService>();
 var geminiApiKey = builder.Configuration["GEMINI_API_KEY"];
 
@@ -34,6 +38,10 @@ var app = builder.Build();
 
 app.MapOpenApi();
 app.UseCors();
+
+app.MapGet("/api/students", async (IHttpClientFactory clients, CancellationToken cancellationToken) =>
+    await (await clients.CreateClient("academicRecords").GetAsync("/api/students", cancellationToken))
+        .ToResultAsync(cancellationToken));
 
 var invoices = app.MapGroup("/api/invoices");
 
@@ -76,20 +84,27 @@ scholarships.MapPut("/{id:int}", async (int id, ScholarshipRequest request, IHtt
 scholarships.MapDelete("/{id:int}", async (int id, IHttpClientFactory clients, CancellationToken cancellationToken) =>
     await (await clients.CreateClient("billingDatabase").DeleteAsync($"/api/scholarships/{id}", cancellationToken)).ToResultAsync(cancellationToken));
 
-scholarships.MapPost("/recommendations/student/4", async (GeminiScholarshipService service, CancellationToken cancellationToken) =>
+scholarships.MapPost("/recommendations/student/{userId:int}", async (int userId, IHttpClientFactory clients, GeminiScholarshipService service, CancellationToken cancellationToken) =>
 {
-    var profile = new StudentProfile(
-        4,
-        "Avery Morgan",
-        "Engineering",
-        3.62m,
-        3,
-        true,
-        ["sustainable infrastructure", "community service", "technology"]);
-
     try
     {
-        return Results.Ok(await service.RecommendAsync(profile, cancellationToken));
+        var profile = await clients.CreateClient("academicRecords")
+            .GetFromJsonAsync<AcademicStudentProfile>($"/api/students/by-user/{userId}", cancellationToken);
+        if (profile is null)
+        {
+            return Results.NotFound("Student information was not found.");
+        }
+
+        var yearLevel = profile.EnrollmentDate is null
+            ? 1
+            : Math.Max(1, DateTime.UtcNow.Year - profile.EnrollmentDate.Value.Year + 1);
+        var student = new StudentProfile(
+            profile.UserId,
+            $"{profile.FirstName} {profile.LastName}",
+            string.IsNullOrWhiteSpace(profile.Major) ? "Undeclared" : profile.Major,
+            yearLevel);
+
+        return Results.Ok(await service.RecommendAsync(student, cancellationToken));
     }
     catch (InvalidOperationException exception)
     {
@@ -97,7 +112,7 @@ scholarships.MapPost("/recommendations/student/4", async (GeminiScholarshipServi
     }
     catch (HttpRequestException)
     {
-        return Results.Problem("The scholarship recommendation service is unavailable.", statusCode: StatusCodes.Status503ServiceUnavailable);
+        return Results.Problem("Student information or the scholarship recommendation service is unavailable.", statusCode: StatusCodes.Status503ServiceUnavailable);
     }
 });
 

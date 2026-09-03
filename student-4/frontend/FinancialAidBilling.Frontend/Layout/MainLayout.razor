@@ -1,9 +1,71 @@
 ﻿@inherits LayoutComponentBase
+@inject FinancialAidUserContext UserContext
 
 <CampusShell PageName="Financial Aid &amp; Billing"
              SectionLabel="Student finance"
-             UserName="Avery Morgan"
-             UserDetails="Engineering · Student 4"
-             UserInitials="AM">
-    @Body
+             UserName="@(UserContext.CurrentUser?.FullName ?? "")"
+             UserDetails="@(UserContext.CurrentUser is null ? "" : $"{UserContext.CurrentUser.StudyDescriptor} · {UserContext.CurrentUser.StudentId}")"
+             UserInitials="@(UserContext.CurrentUser?.Initials ?? "")">
+    <UserSelector>
+        @if (!UserContext.IsInitialized)
+        {
+            <span role="status">Loading students...</span>
+        }
+        else if (UserContext.IsAvailable)
+        {
+            <div class="financial-aid-user-selector">
+                <label for="financial-aid-user-select">Viewing as</label>
+                <select id="financial-aid-user-select"
+                        value="@UserContext.CurrentUser!.UserId"
+                        @onchange="ChangeUserAsync"
+                        aria-label="Choose which student to view financial information for">
+                    @foreach (var user in UserContext.Users)
+                    {
+                        <option value="@user.UserId">@user.FullName (@user.StudentId)</option>
+                    }
+                </select>
+            </div>
+        }
+        else
+        {
+            <span>Student information unavailable</span>
+        }
+    </UserSelector>
+    <ChildContent>
+        @if (!UserContext.IsInitialized)
+        {
+            <div class="notice" role="status">Loading student information...</div>
+        }
+        else if (!UserContext.IsAvailable)
+        {
+            <div class="notice notice-error" role="alert">
+                <p>@(UserContext.ErrorMessage ?? "Student information could not be loaded.")</p>
+                <button class="button button-secondary" @onclick="RetryAsync">Try again</button>
+            </div>
+        }
+        else
+        {
+            @Body
+        }
+    </ChildContent>
 </CampusShell>
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        await UserContext.InitializeAsync();
+    }
+
+    private async Task ChangeUserAsync(ChangeEventArgs args)
+    {
+        if (int.TryParse(args.Value?.ToString(), out var userId) && userId != UserContext.CurrentUser?.UserId)
+        {
+            await UserContext.SelectUserAsync(userId);
+        }
+    }
+
+    private async Task RetryAsync()
+    {
+        await UserContext.InitializeAsync(forceRefresh: true);
+    }
+}
