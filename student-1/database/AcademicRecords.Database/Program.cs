@@ -34,16 +34,10 @@ app.MapGet("/api/users", async (AcademicRecordsDbContext database, CancellationT
 
 app.MapGet("/api/students/by-user/{userId:int}", async (int userId, AcademicRecordsDbContext database, CancellationToken cancellationToken) =>
 {
-    var student = await database.Students.AsNoTracking()
-        .Where(value => value.UserId == userId)
-        .Select(value => new StudentProfileResponse(value.UserId, value.StudentId, value.FirstName, value.LastName, value.Email,
-            value.DateOfBirth, value.PhoneNumber, value.MailingAddress, value.EmergencyContactName, value.EmergencyContactPhone,
-            value.EnrollmentDate, value.Degree, value.Major, value.SubMajor,
-            value.Enrollments.Select(enrollment => new TermEnrollmentResponse(enrollment.EnrollmentId, enrollment.CourseCode,
-                enrollment.AcademicTermId, enrollment.AcademicTerm!.TermCode, enrollment.AcademicTerm.TermName,
-                enrollment.AcademicTerm.StartWeekOfYear, enrollment.AcademicTerm.EndWeekOfYear, enrollment.AcademicYear, enrollment.Status,
-                GradeTypePlaceholder.Get(enrollment.CourseCode), enrollment.GradeValue, enrollment.IsFinalized)).ToList()))
-        .SingleOrDefaultAsync(cancellationToken);
+    var value = await database.Students.AsNoTracking()
+        .Include(student => student.Enrollments).ThenInclude(enrollment => enrollment.AcademicTerm)
+        .SingleOrDefaultAsync(student => student.UserId == userId, cancellationToken);
+    var student = value is null ? null : CreateStudentProfileResponse(value);
 
     return student is null ? Results.NotFound() : Results.Ok(student);
 });
@@ -102,17 +96,11 @@ app.MapPost("/api/staff/enroll", async (EnrollStaffRequest request, AcademicReco
 });
 
 app.MapGet("/api/students", async (AcademicRecordsDbContext database, CancellationToken cancellationToken) =>
-    await database.Students.AsNoTracking()
+    (await database.Students.AsNoTracking()
+        .Include(student => student.Enrollments).ThenInclude(enrollment => enrollment.AcademicTerm)
         .OrderBy(value => value.LastName)
         .ThenBy(value => value.FirstName)
-        .Select(value => new StudentProfileResponse(value.UserId, value.StudentId, value.FirstName, value.LastName, value.Email,
-            value.DateOfBirth, value.PhoneNumber, value.MailingAddress, value.EmergencyContactName, value.EmergencyContactPhone,
-            value.EnrollmentDate, value.Degree, value.Major, value.SubMajor,
-            value.Enrollments.Select(enrollment => new TermEnrollmentResponse(enrollment.EnrollmentId, enrollment.CourseCode,
-                enrollment.AcademicTermId, enrollment.AcademicTerm!.TermCode, enrollment.AcademicTerm.TermName,
-                enrollment.AcademicTerm.StartWeekOfYear, enrollment.AcademicTerm.EndWeekOfYear, enrollment.AcademicYear, enrollment.Status,
-                GradeTypePlaceholder.Get(enrollment.CourseCode), enrollment.GradeValue, enrollment.IsFinalized)).ToList()))
-        .ToListAsync(cancellationToken));
+        .ToListAsync(cancellationToken)).Select(CreateStudentProfileResponse));
 
 app.MapPost("/api/students/enroll", async (EnrollStudentRequest request, AcademicRecordsDbContext database, CancellationToken cancellationToken) =>
 {
@@ -164,14 +152,6 @@ app.MapPost("/api/students/enroll", async (EnrollStudentRequest request, Academi
             CourseCode = request.CourseCode!.Trim(),
             AcademicTermId = request.AcademicTermId,
             AcademicYear = request.AcademicYear ?? DateTime.UtcNow.Year,
-            Status = requestedTerm is null
-                ? EnrollmentStatusRules.Enrolled
-                : EnrollmentStatusRules.GetStatus(
-                    EnrollmentStatusRules.GetSessionDates(request.AcademicYear ?? DateTime.UtcNow.Year,
-                        requestedTerm.StartWeekOfYear, requestedTerm.EndWeekOfYear).StartDate,
-                    EnrollmentStatusRules.GetSessionDates(request.AcademicYear ?? DateTime.UtcNow.Year,
-                        requestedTerm.StartWeekOfYear, requestedTerm.EndWeekOfYear).EndDate,
-                    DateOnly.FromDateTime(DateTime.UtcNow))
         });
     }
 
@@ -204,13 +184,7 @@ app.MapPost("/api/students/{studentId}/enrollments", async (string studentId, Ad
         StudentId = student.UserId,
         CourseCode = request.CourseCode.Trim(),
         AcademicTermId = request.AcademicTermId,
-        AcademicYear = request.AcademicYear ?? DateTime.UtcNow.Year,
-        Status = EnrollmentStatusRules.GetStatus(
-            EnrollmentStatusRules.GetSessionDates(request.AcademicYear ?? DateTime.UtcNow.Year,
-                requestedTerm.StartWeekOfYear, requestedTerm.EndWeekOfYear).StartDate,
-            EnrollmentStatusRules.GetSessionDates(request.AcademicYear ?? DateTime.UtcNow.Year,
-                requestedTerm.StartWeekOfYear, requestedTerm.EndWeekOfYear).EndDate,
-            DateOnly.FromDateTime(DateTime.UtcNow))
+        AcademicYear = request.AcademicYear ?? DateTime.UtcNow.Year
     };
     database.Enrollments.Add(enrollment);
     await database.SaveChangesAsync(cancellationToken);
@@ -266,27 +240,22 @@ app.MapPut("/api/enrollments/{enrollmentId:int}/grade", async (int enrollmentId,
     return Results.Ok(new { enrollment.EnrollmentId, enrollment.GradeValue, enrollment.Status, enrollment.GradeDate });
 });
 
-app.MapPut("/api/enrollments/{enrollmentId:int}/finalize", async (int enrollmentId, FinalizeGradeRequest request,
+app.MapPut("/api/enrollments/{enrollmentId:int}/finalize", async (int enrollmentId,
     AcademicRecordsDbContext database, CancellationToken cancellationToken) =>
 {
-    if (request.Status is not (EnrollmentStatusRules.Completed or EnrollmentStatusRules.Passed or EnrollmentStatusRules.Failed))
-    {
-        return Results.BadRequest("Final status must be Completed, Passed, or Failed.");
-    }
-
     var enrollment = await database.Enrollments
+        .Include(value => value.AcademicTerm)
         .SingleOrDefaultAsync(value => value.EnrollmentId == enrollmentId, cancellationToken);
     if (enrollment is null)
     {
         return Results.NotFound("Enrollment was not found.");
     }
 
-    if ((request.Status is EnrollmentStatusRules.Passed or EnrollmentStatusRules.Failed) && enrollment.GradeValue is null)
+    if (EnrollmentStatusRules.GetGradeType(enrollment.CourseCode) == EnrollmentStatusRules.EnrollmentGradeTypes.Mark && enrollment.GradeValue is null)
     {
         return Results.BadRequest("A grade must be assigned before the enrollment can be finalized.");
     }
 
-    enrollment.Status = request.Status;
     enrollment.GradeDate = DateOnly.FromDateTime(DateTime.UtcNow);
     enrollment.IsFinalized = true;
     await database.SaveChangesAsync(cancellationToken);
@@ -296,16 +265,10 @@ app.MapPut("/api/enrollments/{enrollmentId:int}/finalize", async (int enrollment
 
 app.MapGet("/api/students/{studentId}", async (string studentId, AcademicRecordsDbContext database, CancellationToken cancellationToken) =>
 {
-    var student = await database.Set<Student>().AsNoTracking()
-        .Where(value => value.StudentId == studentId)
-        .Select(value => new StudentProfileResponse(value.UserId, value.StudentId, value.FirstName, value.LastName, value.Email,
-            value.DateOfBirth, value.PhoneNumber, value.MailingAddress, value.EmergencyContactName, value.EmergencyContactPhone,
-            value.EnrollmentDate, value.Degree, value.Major, value.SubMajor,
-            value.Enrollments.Select(enrollment => new TermEnrollmentResponse(enrollment.EnrollmentId, enrollment.CourseCode,
-                enrollment.AcademicTermId, enrollment.AcademicTerm!.TermCode, enrollment.AcademicTerm.TermName,
-                enrollment.AcademicTerm.StartWeekOfYear, enrollment.AcademicTerm.EndWeekOfYear, enrollment.AcademicYear, enrollment.Status,
-                GradeTypePlaceholder.Get(enrollment.CourseCode), enrollment.GradeValue, enrollment.IsFinalized)).ToList()))
-        .SingleOrDefaultAsync(cancellationToken);
+    var value = await database.Set<Student>().AsNoTracking()
+        .Include(student => student.Enrollments).ThenInclude(enrollment => enrollment.AcademicTerm)
+        .SingleOrDefaultAsync(student => student.StudentId == studentId, cancellationToken);
+    var student = value is null ? null : CreateStudentProfileResponse(value);
     return student is null ? Results.NotFound() : Results.Ok(student);
 });
 
@@ -409,14 +372,19 @@ static bool IsValidPhoneNumber(string phoneNumber)
     return cleaned.Length == 10 && cleaned.StartsWith("0");
 }
 
+static StudentProfileResponse CreateStudentProfileResponse(Student value) =>
+    new(value.UserId, value.StudentId, value.FirstName, value.LastName, value.Email,
+        value.DateOfBirth, value.PhoneNumber, value.MailingAddress, value.EmergencyContactName, value.EmergencyContactPhone,
+        value.EnrollmentDate, value.Degree, value.Major, value.SubMajor,
+        value.Enrollments.Select(enrollment => new TermEnrollmentResponse(enrollment.EnrollmentId, enrollment.CourseCode,
+            enrollment.AcademicTermId, enrollment.AcademicTerm?.TermCode, enrollment.AcademicTerm?.TermName,
+            enrollment.AcademicTerm?.StartWeekOfYear ?? 0, enrollment.AcademicTerm?.EndWeekOfYear ?? 0,
+            enrollment.AcademicYear, enrollment.Status, GradeTypePlaceholder.Get(enrollment.CourseCode),
+            enrollment.GradeValue, enrollment.IsFinalized)).ToList());
+
 public static class GradeTypePlaceholder
 {
-    public static string Get(string courseCode) => courseCode switch
-    {
-        "CPAI1002" or "CPAI2002" => EnrollmentStatusRules.EnrollmentGradeTypes.PassFail,
-        "CPAI1003" => EnrollmentStatusRules.EnrollmentGradeTypes.Ungraded,
-        _ => EnrollmentStatusRules.EnrollmentGradeTypes.Mark
-    };
+    public static string Get(string courseCode) => EnrollmentStatusRules.GetGradeType(courseCode);
 }
 
 public sealed record EnrollStudentRequest(string FirstName, string LastName, string Email, DateOnly? DateOfBirth,
@@ -427,8 +395,6 @@ public sealed record EnrollStudentRequest(string FirstName, string LastName, str
 public sealed record AddEnrollmentRequest(string CourseCode, int AcademicTermId, int? AcademicYear = null);
 
 public sealed record GradeEntryRequest(decimal? GradeValue);
-
-public sealed record FinalizeGradeRequest(string Status);
 
 public sealed record EnrollStaffRequest(string FirstName, string LastName, string Email, DateOnly? DateOfBirth,
     string? PhoneNumber = null);

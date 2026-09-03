@@ -38,7 +38,6 @@ public static class AcademicRecordsSeedData
             {
                 var expected = seededEnrollments[existing.EnrollmentId - 1];
                 existing.CourseCode = expected.CourseCode;
-                existing.Status = expected.Status;
                 existing.GradeValue = expected.GradeValue;
                 existing.GradeDate = expected.GradeDate;
                 existing.IsFinalized = expected.IsFinalized;
@@ -120,16 +119,11 @@ public static class AcademicRecordsSeedData
                 CourseCode = CourseCodes[courseIndex],
                 AcademicTermId = academicTermId,
                 AcademicYear = academicYear,
-                Status = isCompleted
-                    ? courseIndex switch
-                    {
-                        1 or 4 => studentIndex % 2 == 0 ? EnrollmentStatusRules.Passed : EnrollmentStatusRules.Failed,
-                        2 => EnrollmentStatusRules.Completed,
-                        _ => EnrollmentStatusRules.GetFinalStatus(gradeType,
-                            65m + studentIndex + courseIndex * 5)
-                    }
-                    : status,
-                GradeValue = isCompleted && courseIndex is not (1 or 2 or 4) ? 65m + studentIndex + courseIndex * 5 : null,
+                GradeValue = isCompleted && courseIndex != 2
+                    ? courseIndex is 1 or 4
+                        ? studentIndex % 2 == 0 ? 50m : 49m
+                        : 65m + studentIndex + courseIndex * 5
+                    : null,
                 GradeDate = isCompleted ? endDate : null,
                 IsFinalized = isCompleted
             };

@@ -169,8 +169,7 @@ else
             var finalStatus = course?.GradeType == "Ungraded"
                 ? "Completed"
                 : enrollment.GradeValue >= 50 ? "Passed" : "Failed";
-            var response = await Http.PutAsJsonAsync($"api/enrollments/{enrollment.EnrollmentId}/finalize",
-                new FinalizeGradeRequest(finalStatus));
+            var response = await Http.PutAsync($"api/enrollments/{enrollment.EnrollmentId}/finalize", null);
             if (!response.IsSuccessStatusCode)
             {
                 enrollment.SaveError = await response.Content.ReadAsStringAsync();
@@ -234,5 +233,4 @@ else
 
     private sealed record GradeEntryRequest(decimal? GradeValue);
 
-    private sealed record FinalizeGradeRequest(string Status);
 }

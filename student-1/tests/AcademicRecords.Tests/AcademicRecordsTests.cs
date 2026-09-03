@@ -39,8 +39,8 @@ namespace AcademicRecords.Tests
             await database.SaveChangesAsync();
 
             database.Enrollments.AddRange(
-                new Enrollment { StudentId = student.UserId, CourseCode = "CS101", AcademicTermId = 13, AcademicYear = 2026, Status = "Enrolled" },
-                new Enrollment { StudentId = student.UserId, CourseCode = "CS102", AcademicTermId = 14, AcademicYear = 2026, Status = "Enrolled" });
+                new Enrollment { StudentId = student.UserId, CourseCode = "CS101", AcademicTermId = 13, AcademicYear = 2026 },
+                new Enrollment { StudentId = student.UserId, CourseCode = "CS102", AcademicTermId = 14, AcademicYear = 2026 });
             await database.SaveChangesAsync();
 
             var profile = await database.Students.Include(value => value.Enrollments)
@@ -75,9 +75,9 @@ namespace AcademicRecords.Tests
             database.AcademicTerms.Add(new AcademicTerm { TermId = 13, TermCode = "2026-T1", TermName = "2026 Term 1", StartWeekOfYear = 1, EndWeekOfYear = 13, IsActive = true });
             await database.SaveChangesAsync();
 
-            database.Enrollments.Add(new Enrollment { StudentId = student.UserId, CourseCode = "ZZ999", AcademicTermId = 13, AcademicYear = 2026, Status = "Enrolled" });
+            database.Enrollments.Add(new Enrollment { StudentId = student.UserId, CourseCode = "ZZ999", AcademicTermId = 13, AcademicYear = 2026 });
             await database.SaveChangesAsync();
-            database.Enrollments.Add(new Enrollment { StudentId = student.UserId, CourseCode = "ZZ999", AcademicTermId = 13, AcademicYear = 2026, Status = "Enrolled" });
+            database.Enrollments.Add(new Enrollment { StudentId = student.UserId, CourseCode = "ZZ999", AcademicTermId = 13, AcademicYear = 2026 });
 
             Assert.ThrowsAsync<DbUpdateException>(async () => await database.SaveChangesAsync());
         }
@@ -301,7 +301,7 @@ namespace AcademicRecords.Tests
             {
                 CourseCode = "CS101",
                 AcademicYear = 2026,
-                Status = EnrollmentStatusRules.InProgress
+                AcademicTerm = new AcademicTerm { StartWeekOfYear = 1, EndWeekOfYear = 52 }
             };
             database.Enrollments.Add(enrollment);
             await database.SaveChangesAsync();
@@ -328,14 +328,13 @@ namespace AcademicRecords.Tests
             {
                 CourseCode = "CS101",
                 AcademicYear = 2026,
-                Status = EnrollmentStatusRules.Enrolled
+                AcademicTerm = new AcademicTerm { StartWeekOfYear = 1, EndWeekOfYear = 52 }
             };
             database.Enrollments.Add(enrollment);
             await database.SaveChangesAsync();
 
             enrollment.GradeValue = 49.99m;
             enrollment.GradeDate = DateOnly.FromDateTime(DateTime.UtcNow);
-            enrollment.Status = EnrollmentStatusRules.GetFinalStatus(EnrollmentStatusRules.EnrollmentGradeTypes.Mark, enrollment.GradeValue);
             enrollment.IsFinalized = true;
             await database.SaveChangesAsync();
 
@@ -411,7 +410,15 @@ namespace AcademicRecords.Tests
                         _ => enrollment.GradeValue >= 50m ? "Passed" : enrollment.GradeValue is null ? "Completed" : "Failed"
                     }
                     : startDate > today ? "Enrolled" : "In Progress";
-                Assert.That(enrollment.Status, Is.EqualTo(expectedStatus));
+                var calculatedEnrollment = new Enrollment
+                {
+                    CourseCode = enrollment.CourseCode,
+                    AcademicYear = enrollment.AcademicYear,
+                    AcademicTerm = term,
+                    GradeValue = enrollment.GradeValue,
+                    IsFinalized = enrollment.IsFinalized
+                };
+                Assert.That(calculatedEnrollment.Status, Is.EqualTo(expectedStatus));
                 Assert.That(enrollment.IsFinalized, Is.EqualTo(endDate < today));
                 Assert.That(enrollment.GradeDate is null || enrollment.GradeDate <= today, Is.True);
             }
@@ -422,7 +429,7 @@ namespace AcademicRecords.Tests
         }
 
         [Test]
-        public async Task InvalidEnrollmentStatusAndGradeStateIsRejected()
+        public async Task EnrollmentStatusIsCalculatedInsteadOfPersisted()
         {
             await using var connection = new SqliteConnection("Data Source=:memory:");
             await connection.OpenAsync();
@@ -449,11 +456,14 @@ namespace AcademicRecords.Tests
                 StudentId = student.UserId,
                 CourseCode = "CS999",
                 AcademicYear = 2026,
-                Status = "Completed",
                 IsFinalized = false
             });
 
-            Assert.ThrowsAsync<DbUpdateException>(async () => await database.SaveChangesAsync());
+            await database.SaveChangesAsync();
+
+            var saved = await database.Enrollments.SingleAsync();
+            Assert.That(saved.Status, Is.EqualTo(EnrollmentStatusRules.Enrolled));
+            Assert.That((await database.Database.SqlQueryRaw<string>("SELECT name AS Value FROM pragma_table_info('Enrollments') WHERE name = 'status'").ToListAsync()), Is.Empty);
         }
 
         [Test]
