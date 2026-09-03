@@ -1,0 +1,192 @@
+@namespace EventScheduling.Frontend.Components
+@inject EventSchedulingApiClient Api
+@inject CurrentUser CurrentUser
+@inject IJSRuntime JS
+
+<div class="assistant-chat">
+    <ol class="chat-log" aria-live="polite" @ref="logRef">
+        @foreach (var turn in turns)
+        {
+            <li class="chat-turn @(turn.Role == "user" ? "is-user" : "is-assistant")">
+                <div class="chat-bubble">@turn.Text</div>
+
+                @if (turn.Proposal is { } proposal)
+                {
+                    <div class="proposal-card">
+                        <span class="eyebrow">Proposed booking</span>
+                        <strong>@proposal.ResourceName</strong>
+                        <ul class="proposal-detail">
+                            <li>@(proposal.Kind == ResourceType.Room ? "Room" : "Equipment")</li>
+                            <li>@proposal.StartUtc.ToString("dddd, MMM d")</li>
+                            <li>@proposal.StartUtc.ToString("h:mm tt") – @proposal.EndUtc.ToString("h:mm tt")</li>
+                        </ul>
+                        @if (!string.IsNullOrWhiteSpace(proposal.Rationale))
+                        {
+                            <p class="proposal-why">@proposal.Rationale</p>
+                        }
+
+                        @if (turn.ProposalHandled)
+                        {
+                            <p class="proposal-done">@turn.ProposalOutcome</p>
+                        }
+                        else
+                        {
+                            <div class="proposal-actions">
+                                <button type="button" class="button button-primary"
+                                        disabled="@isBusy"
+                                        @onclick="() => ConfirmAsync(turn)">
+                                    @(confirmingTurn == turn ? "Booking…" : "Confirm booking")
+                                </button>
+                                <button type="button" class="button button-secondary"
+                                        disabled="@isBusy"
+                                        @onclick="() => DismissProposal(turn)">
+                                    Not now
+                                </button>
+                            </div>
+                        }
+                    </div>
+                }
+            </li>
+        }
+
+        @if (isThinking)
+        {
+            <li class="chat-turn is-assistant">
+                <div class="chat-bubble is-thinking">The assistant is thinking…</div>
+            </li>
+        }
+    </ol>
+
+    @if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <div class="notice notice-error" role="alert">@errorMessage</div>
+    }
+
+    <form class="chat-input-row" @onsubmit="SendAsync" @onsubmit:preventDefault="true">
+        <input type="text" class="chat-input" @bind="draft" @bind:event="oninput"
+               placeholder="e.g. Book a quiet room for 4 tomorrow 2–4pm"
+               maxlength="1000" disabled="@isBusy" aria-label="Message the scheduling assistant" />
+        <button type="submit" class="button button-primary"
+                disabled="@(isBusy || string.IsNullOrWhiteSpace(draft))">
+            Send
+        </button>
+    </form>
+    <p class="chat-hint">The assistant only sees your own bookings and campus room/equipment options. It never creates a booking without your confirmation.</p>
+</div>
+
+@code {
+    private const int MaxHistory = 20;
+
+    private readonly List<Turn> turns = new()
+    {
+        new Turn("assistant",
+            "Hi! I can help you find a room, hire equipment, or answer questions about your own bookings. What do you need?")
+    };
+
+    private string draft = string.Empty;
+    private bool isThinking;
+    private Turn? confirmingTurn;
+    private string? errorMessage;
+    private ElementReference logRef;
+    private int lastRenderedCount;
+
+    private bool isBusy => isThinking || confirmingTurn is not null;
+
+    protected override async Task OnInitializedAsync() => await CurrentUser.LoadAsync();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (turns.Count != lastRenderedCount || isThinking)
+        {
+            lastRenderedCount = turns.Count;
+            try
+            {
+                await JS.InvokeVoidAsync("campusPulseScroll.toEnd", logRef);
+            }
+            catch (JSException)
+            {
+                // scroll helper not available (e.g. a stale cached script) - not critical
+            }
+        }
+    }
+
+    private async Task SendAsync()
+    {
+        var text = draft.Trim();
+        if (text.Length == 0 || isBusy)
+        {
+            return;
+        }
+
+        turns.Add(new Turn("user", text));
+        draft = string.Empty;
+        errorMessage = null;
+        isThinking = true;
+
+        var request = new AssistantChatRequest(
+            CurrentUser.UserId,
+            turns
+                .TakeLast(MaxHistory)
+                .Select(turn => new AssistantMessage(turn.Role, turn.Text))
+                .ToList());
+
+        var result = await Api.AskAssistantAsync(request);
+        isThinking = false;
+
+        if (result is { Success: true, Response: { } response })
+        {
+            turns.Add(new Turn("assistant", response.Reply, response.Proposal));
+        }
+        else
+        {
+            errorMessage = result.Error ?? "The assistant could not answer right now.";
+        }
+    }
+
+    private async Task ConfirmAsync(Turn turn)
+    {
+        if (turn.Proposal is not { } proposal || turn.ProposalHandled || isBusy)
+        {
+            return;
+        }
+
+        confirmingTurn = turn;
+        errorMessage = null;
+
+        var request = proposal.Kind == ResourceType.Room
+            ? new BookingRequest(CurrentUser.UserId, proposal.ResourceId, null, proposal.ResourceName,
+                proposal.StartUtc, proposal.EndUtc, BookingStatus.Confirmed, IsStaff: CurrentUser.IsStaff)
+            : new BookingRequest(CurrentUser.UserId, null, proposal.ResourceId, proposal.ResourceName,
+                proposal.StartUtc, proposal.EndUtc, BookingStatus.Confirmed, IsStaff: CurrentUser.IsStaff);
+
+        var result = await Api.CreateBookingAsync(request);
+        confirmingTurn = null;
+
+        if (result.Success)
+        {
+            turn.ProposalHandled = true;
+            turn.ProposalOutcome = $"Booked — {proposal.ResourceName} on {proposal.StartUtc:MMM d}.";
+            turns.Add(new Turn("assistant", turn.ProposalOutcome));
+        }
+        else
+        {
+            var reason = result.Error ?? "The booking could not be created.";
+            turns.Add(new Turn("assistant", $"That didn't go through: {reason}"));
+        }
+    }
+
+    private void DismissProposal(Turn turn)
+    {
+        turn.ProposalHandled = true;
+        turn.ProposalOutcome = "Dismissed.";
+    }
+
+    private sealed class Turn(string role, string text, ProposedBooking? proposal = null)
+    {
+        public string Role { get; } = role;
+        public string Text { get; } = text;
+        public ProposedBooking? Proposal { get; } = proposal;
+        public bool ProposalHandled { get; set; }
+        public string? ProposalOutcome { get; set; }
+    }
+}
