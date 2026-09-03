@@ -18,7 +18,6 @@ public sealed class GeminiScholarshipService(IHttpClientFactory clients, IConfig
             .GetFromJsonAsync<List<ScholarshipResponse>>("/api/scholarships", cancellationToken) ?? [];
         var matches = scholarships
             .Where(scholarship => scholarship.IsActive)
-            .Where(scholarship => scholarship.MinimumGpa <= profile.Gpa)
             .Where(scholarship => scholarship.MinimumYearLevel <= profile.YearLevel)
             .Where(scholarship => MajorMatches(profile.Major, scholarship.EligibleMajor))
             .OrderByDescending(scholarship => scholarship.AwardAmount)
@@ -46,10 +45,7 @@ public sealed class GeminiScholarshipService(IHttpClientFactory clients, IConfig
             Student ID: {profile.StudentId}
             Name: {profile.Name}
             Major: {profile.Major}
-            GPA: {profile.Gpa:F2}
             Year level: {profile.YearLevel}
-            First-generation: {profile.IsFirstGeneration}
-            Interests: {string.Join(", ", profile.Interests)}
 
             Scholarship matches ({matches.Count}):
             {context}
