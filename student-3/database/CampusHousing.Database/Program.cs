@@ -95,6 +95,7 @@ app.MapPut("/api/allocations/{id:int}", async (int id, HousingAllocation input, 
     if (!newRoom.IsAvailable || occupied >= newRoom.Capacity) return Results.Conflict(new { message = "The selected room is not available." });
     var oldRoomId = allocation.DormRoomId;
     allocation.DormRoomId = input.DormRoomId; allocation.StudentId = input.StudentId; allocation.StudentName = input.StudentName; allocation.RoommatePreference = input.RoommatePreference;
+    if (oldRoomId != input.DormRoomId) allocation.AllocatedAt = DateTime.UtcNow;
     await db.SaveChangesAsync();
     if (oldRoomId != input.DormRoomId)
     {
