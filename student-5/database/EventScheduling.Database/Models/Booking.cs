@@ -74,7 +74,8 @@ public sealed record BookingRequest(
     string ResourceName,
     DateTime StartUtc,
     DateTime EndUtc,
-    BookingStatus Status)
+    BookingStatus Status,
+    bool IsStaff = false)
 {
     public string? Validate()
     {

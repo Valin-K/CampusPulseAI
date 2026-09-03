@@ -18,7 +18,7 @@
     </div>
 
     <div class="availability-scale">
-        <span>7 am</span><span>12 pm</span><span>5 pm</span><span>10 pm</span>
+        <span>12 am</span><span>6 am</span><span>12 pm</span><span>6 pm</span><span>12 am</span>
     </div>
 
     @if (dayBookings.Count == 0)
@@ -39,8 +39,9 @@
 </div>
 
 @code {
-    private const int OpenHour = 7;
-    private const int CloseHour = 22;
+    // Full 24-hour day so bookings at any time (including overnight or early hours) are shown.
+    private const int OpenHour = 0;
+    private const int CloseHour = 24;
     private const double WindowMinutes = (CloseHour - OpenHour) * 60;
 
     [Parameter, EditorRequired] public IReadOnlyList<BookingResponse> Bookings { get; set; } = [];
@@ -57,7 +58,7 @@
         dayBookings = Bookings
             .Where(booking => booking.RoomId == RoomId
                               && DateOnly.FromDateTime(booking.StartUtc) == Date
-                              && booking.Status is not (BookingStatus.Cancelled or BookingStatus.Completed))
+                              && booking.Status is not (BookingStatus.Cancelled or BookingStatus.Completed or BookingStatus.Returned))
             .OrderBy(booking => booking.StartUtc)
             .ToList();
 

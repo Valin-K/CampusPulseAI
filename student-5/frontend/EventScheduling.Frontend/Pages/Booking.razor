@@ -23,8 +23,24 @@ else if (saved)
 {
     <section class="surface-card" aria-label="Booking confirmed">
         <div class="notice notice-success" role="status">
-            Your @(isRoom ? "room booking" : "equipment hire") is confirmed. It's on your calendar now.
+            @if (recurringResult is { } summary)
+            {
+                <text>@summary.Created of @summary.Total reservations for @room!.Name are on your calendar.</text>
+            }
+            else
+            {
+                <text>Your @(isRoom ? "room booking" : "equipment hire") is confirmed. It's on your calendar now.</text>
+            }
         </div>
+        @if (recurringResult is { Failures.Count: > 0 } failed)
+        {
+            <ul class="occurrence-list occurrence-list-standalone">
+                @foreach (var failure in failed.Failures)
+                {
+                    <li class="occurrence is-clash">@failure</li>
+                }
+            </ul>
+        }
         <div class="button-row">
             <button type="button" class="button button-primary" @onclick='() => Nav.NavigateTo("/calendar")'>View my calendar</button>
             <button type="button" class="button button-secondary" @onclick='() => Nav.NavigateTo("/search")'>Book something else</button>
@@ -48,7 +64,7 @@ else
         {
             <div class="section-heading">
                 <div>
-                    <span class="eyebrow">Study room</span>
+                    <span class="eyebrow">@room.KindLabel</span>
                     <h2>@room.Name</h2>
                 </div>
                 <span class="status-badge paid">Seats @room.Capacity</span>
@@ -74,7 +90,7 @@ else
         <div class="section-heading">
             <div>
                 <span class="eyebrow">Schedule</span>
-                <h2>@(isRoom ? "Choose your slot" : "Schedule your hire")</h2>
+                <h2>@(isRecurring ? "Set the class schedule" : isRoom ? "Choose your slot" : "Schedule your hire")</h2>
             </div>
         </div>
 
@@ -83,7 +99,82 @@ else
             <div class="notice notice-error" role="alert">@errorMessage</div>
         }
 
-        @if (isRoom)
+        @if (isRoom && isRecurring)
+        {
+            <label class="field">
+                <span>@(recurringWeeks > 1 || recurringDays.Count != 1 ? "Series starts" : "Date")</span>
+                <input type="date" min="@todayIso" @bind="date" @bind:event="onchange" />
+            </label>
+
+            @if (DateInPast)
+            {
+                <p class="booking-hint is-bad">Pick today or a later date.</p>
+            }
+
+            @if (date is not null && !DateInPast)
+            {
+                <div class="form-grid">
+                    <label class="field">
+                        <span>Start time</span>
+                        <input type="time" @bind="startTime" @bind:event="onchange" />
+                    </label>
+                    <label class="field">
+                        <span>End time</span>
+                        <input type="time" @bind="endTime" @bind:event="onchange" />
+                    </label>
+                </div>
+
+                <fieldset class="field recurrence-days">
+                    <legend>Days of the week</legend>
+                    <div class="day-toggle-row">
+                        @foreach (var day in WeekDays)
+                        {
+                            <label class="day-toggle @(recurringDays.Contains(day) ? "is-on" : null)">
+                                <input type="checkbox"
+                                       checked="@recurringDays.Contains(day)"
+                                       @onchange="e => ToggleDay(day, (bool)(e.Value ?? false))" />
+                                <span>@day.ToString().Substring(0, 3)</span>
+                            </label>
+                        }
+                    </div>
+                </fieldset>
+
+                <label class="field recurrence-weeks">
+                    <span>Repeat for (weeks)</span>
+                    <input type="number" min="1" max="13" step="1" @bind="recurringWeeks" @bind:event="onchange" />
+                </label>
+
+                <RoomAvailability Bookings="allBookings" Date="date.Value" RoomId="room!.Id"
+                                  ProposedStart="startTime" ProposedEnd="endTime" />
+
+                @if (RecurrenceReady)
+                {
+                    <div class="recurrence-preview">
+                        <details class="occurrence-disclosure">
+                            <summary>
+                                <span class="eyebrow">@occurrences.Count reservation@(occurrences.Count == 1 ? "" : "s")</span>
+                                <span class="occurrence-disclosure-hint">View dates</span>
+                            </summary>
+                            <ul class="occurrence-list">
+                                @foreach (var slot in occurrences)
+                                {
+                                    <li class="occurrence @(slot.Clashes ? "is-clash" : "is-ok")">
+                                        @slot.Date.ToString("ddd, MMM d")
+                                        <span>@(slot.Clashes ? "clashes with an existing booking" : "available")</span>
+                                    </li>
+                                }
+                            </ul>
+                        </details>
+                        <p class="booking-hint @(RecurrenceValid ? "is-ok" : "is-bad")">@RecurrenceMessage</p>
+                    </div>
+                }
+                else if (startTime is not null && endTime is not null)
+                {
+                    <p class="booking-hint is-bad">@RecurrenceMessage</p>
+                }
+            }
+        }
+        else if (isRoom)
         {
             <label class="field">
                 <span>Date</span>
@@ -149,7 +240,7 @@ else
 
         <div class="button-row">
             <button type="button" class="button button-primary" disabled="@(!CanSubmit)" @onclick="SubmitAsync">
-                @(isSaving ? "Saving…" : (isRoom ? "Confirm booking" : "Confirm hire"))
+                @(isSaving ? "Saving…" : SubmitLabel)
             </button>
             <button type="button" class="button button-secondary" @onclick='() => Nav.NavigateTo("/search")'>Cancel</button>
         </div>
@@ -175,7 +266,19 @@ else
     private bool saved;
     private string? errorMessage;
 
+    // Recurring room bookings (teaching staff only): same time slot on chosen weekdays for N weeks.
+    private static readonly DayOfWeek[] WeekDays =
+    {
+        DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday,
+        DayOfWeek.Friday, DayOfWeek.Saturday, DayOfWeek.Sunday
+    };
+
+    private readonly HashSet<DayOfWeek> recurringDays = new();
+    private int recurringWeeks = 1;
+    private RecurringBookingResult? recurringResult;
+
     private bool isRoom => room is not null;
+    private bool isRecurring => isRoom && CurrentUser.IsStaff;
     private string todayIso => DateTime.Today.ToString("yyyy-MM-dd");
     private bool DateInPast => date is { } picked && picked < DateOnly.FromDateTime(DateTime.Today);
 
@@ -186,6 +289,7 @@ else
     private string HeroSubtitle => (saved, room, equipment) switch
     {
         (true, _, _) => "You're all set.",
+        (_, { } r, _) when isRecurring => $"Set a weekly schedule to hold {r.Name} for your class.",
         (_, { } r, _) => $"Pick a date and time for {r.Name}.",
         (_, _, { } e) => $"Choose when you'd like to pick up the {e.Name}.",
         _ => "Choose what you'd like to book."
@@ -238,11 +342,127 @@ else
         }
     }
 
+    private sealed record OccurrenceSlot(DateOnly Date, bool Clashes);
+
+    // Every dated occurrence the recurrence settings produce, earliest first.
+    private List<OccurrenceSlot> occurrences => BuildOccurrences();
+
+    private List<OccurrenceSlot> BuildOccurrences()
+    {
+        var result = new List<OccurrenceSlot>();
+
+        if (date is not { } anchor || recurringDays.Count == 0
+            || startTime is not { } start || endTime is not { } end || end <= start)
+        {
+            return result;
+        }
+
+        var weeks = Math.Clamp(recurringWeeks, 1, 13);
+        // Monday of the week the start date falls in.
+        var weekStart = anchor.AddDays(-(((int)anchor.DayOfWeek + 6) % 7));
+
+        for (var week = 0; week < weeks; week++)
+        {
+            foreach (var day in WeekDays)
+            {
+                if (!recurringDays.Contains(day))
+                {
+                    continue;
+                }
+
+                var occurrenceDate = weekStart.AddDays(week * 7 + ((int)day + 6) % 7);
+                if (occurrenceDate < anchor)
+                {
+                    continue;
+                }
+
+                result.Add(new OccurrenceSlot(occurrenceDate, OccurrenceClashes(occurrenceDate, start, end)));
+            }
+        }
+
+        return result.OrderBy(slot => slot.Date).ToList();
+    }
+
+    private bool OccurrenceClashes(DateOnly day, TimeOnly start, TimeOnly end) =>
+        allBookings.Any(booking =>
+            booking.RoomId == room!.Id
+            && DateOnly.FromDateTime(booking.StartUtc) == day
+            && booking.Status is not (BookingStatus.Cancelled or BookingStatus.Completed or BookingStatus.Returned)
+            && start < TimeOnly.FromDateTime(booking.EndUtc)
+            && TimeOnly.FromDateTime(booking.StartUtc) < end);
+
+    private void ToggleDay(DayOfWeek day, bool on)
+    {
+        if (on)
+        {
+            recurringDays.Add(day);
+        }
+        else
+        {
+            recurringDays.Remove(day);
+        }
+    }
+
+    private bool RecurrenceReady =>
+        isRecurring && date is not null && !DateInPast
+        && startTime is not null && endTime is not null && endTime > startTime
+        && recurringDays.Count > 0 && occurrences.Count > 0;
+
+    private bool RecurrenceValid => RecurrenceReady && occurrences.TrueForAll(slot => !slot.Clashes);
+
+    private string RecurrenceMessage
+    {
+        get
+        {
+            if (startTime is null || endTime is null)
+            {
+                return "Choose a start and end time.";
+            }
+
+            if (endTime <= startTime)
+            {
+                return "End time must be after the start time.";
+            }
+
+            if (recurringDays.Count == 0)
+            {
+                return "Pick at least one day of the week.";
+            }
+
+            var slots = occurrences;
+            if (slots.Count == 0)
+            {
+                return "That schedule produces no dates. Check the start date and selected days.";
+            }
+
+            var clashes = slots.Count(slot => slot.Clashes);
+            return clashes > 0
+                ? $"{clashes} of {slots.Count} dates clash with an existing booking — adjust the time or days."
+                : $"All {slots.Count} dates are free.";
+        }
+    }
+
+    private string SubmitLabel => isRecurring
+        ? RecurrenceReady
+            ? $"Confirm {occurrences.Count} reservation{(occurrences.Count == 1 ? "" : "s")}"
+            : "Confirm reservations"
+        : isRoom ? "Confirm booking" : "Confirm hire";
+
     private bool CanSubmit
     {
         get
         {
-            if (isSaving || StartUtc is null || DateInPast)
+            if (isSaving)
+            {
+                return false;
+            }
+
+            if (isRecurring)
+            {
+                return RecurrenceValid;
+            }
+
+            if (StartUtc is null || DateInPast)
             {
                 return false;
             }
@@ -255,6 +475,8 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        await CurrentUser.LoadAsync();
+
         if (DateOnly.TryParse(DateParam, out var parsed))
         {
             date = parsed;
@@ -288,7 +510,7 @@ else
 
     private async Task SubmitAsync()
     {
-        if (!CanSubmit || StartUtc is not { } start || EndUtc is not { } end)
+        if (!CanSubmit)
         {
             return;
         }
@@ -296,9 +518,40 @@ else
         isSaving = true;
         errorMessage = null;
 
+        if (isRecurring)
+        {
+            var requests = occurrences
+                .Select(slot => new BookingRequest(
+                    CurrentUser.UserId, room!.Id, null, room.Name,
+                    slot.Date.ToDateTime(startTime!.Value, DateTimeKind.Utc),
+                    slot.Date.ToDateTime(endTime!.Value, DateTimeKind.Utc),
+                    BookingStatus.Confirmed, IsStaff: true))
+                .ToList();
+
+            recurringResult = await Api.CreateBookingsAsync(requests);
+            isSaving = false;
+
+            if (recurringResult.Created > 0)
+            {
+                saved = true;
+            }
+            else
+            {
+                errorMessage = recurringResult.Failures.FirstOrDefault() ?? "The reservations could not be created.";
+            }
+
+            return;
+        }
+
+        if (StartUtc is not { } start || EndUtc is not { } end)
+        {
+            isSaving = false;
+            return;
+        }
+
         var request = isRoom
-            ? new BookingRequest(CurrentUser.UserId, room!.Id, null, room.Name, start, end, BookingStatus.Confirmed)
-            : new BookingRequest(CurrentUser.UserId, null, equipment!.Id, equipment.Name, start, end, BookingStatus.Confirmed);
+            ? new BookingRequest(CurrentUser.UserId, room!.Id, null, room.Name, start, end, BookingStatus.Confirmed, IsStaff: CurrentUser.IsStaff)
+            : new BookingRequest(CurrentUser.UserId, null, equipment!.Id, equipment.Name, start, end, BookingStatus.Confirmed, IsStaff: CurrentUser.IsStaff);
 
         var result = await Api.CreateBookingAsync(request);
         isSaving = false;

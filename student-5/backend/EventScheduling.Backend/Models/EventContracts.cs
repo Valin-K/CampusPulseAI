@@ -2,18 +2,27 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace EventScheduling.Backend.Models;
 
+public enum RoomKind
+{
+    Study,
+    Lab,
+    Lecture
+}
+
 public sealed record RoomRequest(
     string Name,
     string Location,
     int Capacity,
-    string Description);
+    string Description,
+    RoomKind Kind = RoomKind.Study);
 
 public sealed record RoomResponse(
     int Id,
     string Name,
     string Location,
     int Capacity,
-    string Description);
+    string Description,
+    RoomKind Kind);
 
 public sealed record RefEquipmentRequest(
     string Name,
@@ -71,7 +80,8 @@ public sealed record BookingRequest(
     string ResourceName,
     DateTime StartUtc,
     DateTime EndUtc,
-    BookingStatus Status);
+    BookingStatus Status,
+    bool IsStaff = false);
 
 public sealed record BookingResponse(
     int Id,

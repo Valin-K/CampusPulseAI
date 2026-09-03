@@ -45,9 +45,9 @@
 .booking-strip-card {
     flex: 0 0 15.5rem;
     scroll-snap-align: start;
-    display: grid;
+    display: flex;
+    flex-direction: column;
     gap: .5rem;
-    align-content: start;
     padding: 1.1rem;
     border: 1px solid var(--university-border);
     border-radius: var(--radius-md);
@@ -70,6 +70,12 @@
     color: var(--university-muted);
 }
 
+/* "In use" pill for an equipment hire that is currently running. */
+.booking-strip-topline .status-badge.inuse {
+    color: var(--university-blue);
+    background: var(--university-sky);
+}
+
 .booking-strip-card h3 {
     margin: 0;
 }
@@ -78,4 +84,19 @@
     margin: 0;
     font-size: .82rem;
     color: var(--university-muted);
+}
+
+.booking-strip-actions {
+    margin-top: auto;
+    display: flex;
+    justify-content: flex-end;
+    padding-top: .35rem;
+}
+
+/* Smaller than the day-schedule cards to suit the narrow strip card. */
+.booking-strip-actions .button {
+    min-height: 1.95rem;
+    padding: .3rem .7rem;
+    font-size: .78rem;
+    font-weight: 750;
 }

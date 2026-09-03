@@ -52,7 +52,10 @@
                         <td>@booking.ResourceType</td>
                         <td>@booking.StartUtc.ToString("MMM d, yyyy h:mmtt")</td>
                         <td>@booking.EndUtc.ToString("MMM d, yyyy h:mmtt")</td>
-                        <td><span class="status-badge @booking.Status.ToString().ToLowerInvariant()">@booking.Status</span></td>
+                        <td>
+                            @{ var status = booking.DisplayStatus(); }
+                            <span class="status-badge booking-status status-@status.CssName()">@status.Label()</span>
+                        </td>
                     </tr>
                 }
             </tbody>
@@ -78,6 +81,7 @@
 
     protected override async Task OnInitializedAsync()
     {
+        await CurrentUser.LoadAsync();
         try
         {
             var bookings = await Api.GetBookingsAsync();

@@ -53,6 +53,18 @@ public sealed class EventSchedulingApiClient(HttpClient httpClient)
         }
     }
 
+    public async Task<List<UserProfile>> GetUsersAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await httpClient.GetFromJsonAsync<List<UserProfile>>("/api/users", cancellationToken) ?? [];
+        }
+        catch (HttpRequestException)
+        {
+            return [];
+        }
+    }
+
     public async Task<BookingResult> CreateBookingAsync(BookingRequest request, CancellationToken cancellationToken = default)
     {
         try
@@ -76,15 +88,34 @@ public sealed class EventSchedulingApiClient(HttpClient httpClient)
         }
     }
 
-    // Equipment return: unit is freed, booking status becomes Returned, record is kept.
+    public async Task<RecurringBookingResult> CreateBookingsAsync(
+        IReadOnlyList<BookingRequest> requests, CancellationToken cancellationToken = default)
+    {
+        var created = 0;
+        var failures = new List<string>();
+
+        foreach (var request in requests)
+        {
+            var result = await CreateBookingAsync(request, cancellationToken);
+            if (result.Success)
+            {
+                created++;
+            }
+            else
+            {
+                failures.Add($"{request.StartUtc:ddd MMM d} · {result.Error}");
+            }
+        }
+
+        return new RecurringBookingResult(created, requests.Count, failures);
+    }
+
     public Task<BookingResult> ReturnBookingAsync(int id, CancellationToken cancellationToken = default) =>
         PostBookingActionAsync($"/api/bookings/{id}/return", cancellationToken);
 
-    // Room end: the room is freed for that time, booking status becomes Completed, record is kept.
     public Task<BookingResult> EndBookingAsync(int id, CancellationToken cancellationToken = default) =>
         PostBookingActionAsync($"/api/bookings/{id}/end", cancellationToken);
 
-    // Cancel: the booking is deleted outright and any held equipment unit is freed.
     public async Task<BookingResult> CancelBookingAsync(int id, CancellationToken cancellationToken = default)
     {
         try

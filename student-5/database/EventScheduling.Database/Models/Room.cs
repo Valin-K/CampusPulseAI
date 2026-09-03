@@ -1,4 +1,10 @@
 namespace EventScheduling.Database.Models;
+public enum RoomKind
+{
+    Study,
+    Lab,
+    Lecture
+}
 
 public sealed class Room
 {
@@ -7,6 +13,8 @@ public sealed class Room
     public string Location { get; set; } = string.Empty;
     public int Capacity { get; set; }
     public string Description { get; set; } = string.Empty;
+    public RoomKind Kind { get; set; } = RoomKind.Study;
+    public bool IsStaffRoom => Kind is RoomKind.Lab or RoomKind.Lecture;
 
     public void UpdateFrom(RoomRequest request)
     {
@@ -14,16 +22,18 @@ public sealed class Room
         Location = request.Location.Trim();
         Capacity = request.Capacity;
         Description = request.Description.Trim();
+        Kind = request.Kind;
     }
 
-    public RoomResponse ToResponse() => new(Id, Name, Location, Capacity, Description);
+    public RoomResponse ToResponse() => new(Id, Name, Location, Capacity, Description, Kind);
 }
 
 public sealed record RoomRequest(
     string Name,
     string Location,
     int Capacity,
-    string Description)
+    string Description,
+    RoomKind Kind = RoomKind.Study)
 {
     public string? Validate()
     {
@@ -50,7 +60,8 @@ public sealed record RoomRequest(
         Name = Name.Trim(),
         Location = Location.Trim(),
         Capacity = Capacity,
-        Description = Description.Trim()
+        Description = Description.Trim(),
+        Kind = Kind
     };
 }
 
@@ -59,4 +70,5 @@ public sealed record RoomResponse(
     string Name,
     string Location,
     int Capacity,
-    string Description);
+    string Description,
+    RoomKind Kind);

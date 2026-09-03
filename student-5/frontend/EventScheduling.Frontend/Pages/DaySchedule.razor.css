@@ -9,6 +9,11 @@
     background: #e8f7f2;
 }
 
+.day-status.status-inuse {
+    color: var(--university-blue);
+    background: var(--university-sky);
+}
+
 .day-status.status-pending {
     color: #9a6700;
     background: #fff6d8;
@@ -20,8 +25,9 @@
     background: #fff0ee;
 }
 
+/* Finished: window has passed, nothing left to do. Muted slate so it reads as "done / archived". */
 .day-status.status-completed {
-    color: var(--university-navy);
+    color: #475569;
     background: #eef2f7;
 }
 

@@ -13,9 +13,9 @@
         repeating-linear-gradient(
             90deg,
             transparent,
-            transparent calc(100% / 15 - 1px),
-            var(--university-border) calc(100% / 15 - 1px),
-            var(--university-border) calc(100% / 15));
+            transparent calc(100% / 4 - 1px),
+            var(--university-border) calc(100% / 4 - 1px),
+            var(--university-border) calc(100% / 4));
     background-color: var(--university-surface);
     overflow: hidden;
 }

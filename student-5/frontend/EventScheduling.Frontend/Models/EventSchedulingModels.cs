@@ -6,6 +6,13 @@ public enum ResourceType
     Equipment
 }
 
+public enum RoomKind
+{
+    Study,
+    Lab,
+    Lecture
+}
+
 public enum BookingStatus
 {
     Pending,
@@ -13,7 +20,8 @@ public enum BookingStatus
     Cancelled,
     Completed,
     Overdue,
-    Returned
+    Returned,
+    InUse
 }
 
 public enum EquipmentStatus
@@ -36,7 +44,6 @@ public sealed record BookingResponse(
     DateTime EndUtc,
     BookingStatus Status);
 
-// Sent to POST /api/bookings. The server resolves the equipment unit; the client never sends EquipmentId.
 public sealed record BookingRequest(
     int StudentId,
     int? RoomId,
@@ -44,16 +51,62 @@ public sealed record BookingRequest(
     string ResourceName,
     DateTime StartUtc,
     DateTime EndUtc,
-    BookingStatus Status);
+    BookingStatus Status,
+    bool IsStaff = false);
 
 public sealed record BookingResult(bool Success, BookingResponse? Booking, string? Error);
+
+public sealed record RecurringBookingResult(int Created, int Total, IReadOnlyList<string> Failures)
+{
+    public bool AllCreated => Created == Total && Total > 0;
+}
+
+public static class BookingStatusView
+{
+    public static BookingStatus DisplayStatus(this BookingResponse booking)
+    {
+        var now = DateTime.Now;
+
+        if (booking.Status is BookingStatus.Confirmed
+            && booking.ResourceType == ResourceType.Equipment
+            && booking.EquipmentId is not null
+            && now >= booking.StartUtc && now < booking.EndUtc)
+        {
+            return BookingStatus.InUse;
+        }
+
+        if (booking.Status is BookingStatus.Pending or BookingStatus.Confirmed && now > booking.EndUtc)
+        {
+            return BookingStatus.Completed;
+        }
+
+        return booking.Status;
+    }
+
+    public static string Label(this BookingStatus status) =>
+        status == BookingStatus.InUse ? "In use" : status.ToString();
+
+    public static string CssName(this BookingStatus status) =>
+        status.ToString().ToLowerInvariant();
+}
 
 public sealed record RoomResponse(
     int Id,
     string Name,
     string Location,
     int Capacity,
-    string Description);
+    string Description,
+    RoomKind Kind = RoomKind.Study)
+{
+    public bool IsStaffRoom => Kind is RoomKind.Lab or RoomKind.Lecture;
+
+    public string KindLabel => Kind switch
+    {
+        RoomKind.Lab => "Lab room",
+        RoomKind.Lecture => "Lecture room",
+        _ => "Study room"
+    };
+}
 
 public sealed record RefEquipmentResponse(
     int Id,
@@ -69,7 +122,6 @@ public sealed record EquipmentResponse(
     EquipmentStatus Status,
     int? CreatedByStaffId);
 
-// A user from the Academic Records (student-1) directory, proxied via /api/users/{id}.
 public sealed record UserProfile(
     int UserId,
     string FirstName,
@@ -80,6 +132,11 @@ public sealed record UserProfile(
     string? StaffId)
 {
     public string FullName => $"{FirstName} {LastName}".Trim();
+
+    public string Descriptor =>
+        StudentId is { } studentId ? $"Student {studentId}"
+        : StaffId is { } staffId ? $"Staff {staffId}"
+        : Role;
 
     public string Initials
     {
