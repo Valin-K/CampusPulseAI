@@ -181,6 +181,10 @@ The workflows execute on GitHub, not inside Docker Desktop. Use the **GitHub Act
 - `Directory.Packages.props`: centrally managed NuGet package versions.
 - `.github/workflows`: GitHub Actions CI and deployment workflows.
 
+## Documentation
+
+- [Student 3 — Campus Housing & Maintenance plan and traceability report](docs/reports/student-3-campus-housing-maintenance-plan.md)
+
 ## Troubleshooting
 
 ### Docker Compose is unavailable in Visual Studio
