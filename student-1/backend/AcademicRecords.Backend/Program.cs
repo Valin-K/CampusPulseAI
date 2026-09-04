@@ -1,6 +1,7 @@
 using System.Net.Http.Json;
 using System.Text.Json.Nodes;
 using AcademicRecords.Backend;
+using AcademicRecords.Backend.Services;
 using QuestPDF.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -15,7 +16,18 @@ builder.Services.AddHttpClient("courseManagementDatabase", client =>
 {
     client.BaseAddress = new Uri(builder.Configuration["Services:CourseManagementDatabase"] ?? "http://coursemanagement.database:8080");
 });
+var geminiApiKey = builder.Configuration["GEMINI_API_KEY"] ?? builder.Configuration["Gemini:ApiKey"];
+builder.Services.AddHttpClient("gemini", client =>
+{
+    client.BaseAddress = new Uri("https://generativelanguage.googleapis.com/");
+    client.Timeout = TimeSpan.FromSeconds(90);
+    if (!string.IsNullOrWhiteSpace(geminiApiKey))
+    {
+        client.DefaultRequestHeaders.Add("x-goog-api-key", geminiApiKey);
+    }
+});
 builder.Services.AddSingleton<ITranscriptPdfGenerator, TranscriptPdfGenerator>();
+builder.Services.AddScoped<GeminiAcademicProgressService>();
 builder.Services.AddCors(options => options.AddPolicy("Frontend", policy => policy
     .WithOrigins("http://localhost:5062", "http://localhost:8081")
     .AllowAnyHeader()
@@ -48,19 +60,6 @@ app.MapPut("/api/enrollments/{enrollmentId:int}/grade", async (int enrollmentId,
     IHttpClientFactory clients, CancellationToken cancellationToken) =>
 {
     using var databaseRequest = new HttpRequestMessage(HttpMethod.Put, $"/api/enrollments/{enrollmentId}/grade")
-    {
-        Content = new StreamContent(request.Body)
-    };
-    databaseRequest.Content.Headers.ContentType = new("application/json");
-    using var response = await clients.CreateClient("academicRecordsDatabase").SendAsync(databaseRequest, cancellationToken);
-    var content = await response.Content.ReadAsStringAsync(cancellationToken);
-    return Results.Content(content, response.Content.Headers.ContentType?.MediaType ?? "application/json", statusCode: (int)response.StatusCode);
-});
-
-app.MapPut("/api/enrollments/{enrollmentId:int}/finalize", async (int enrollmentId, HttpRequest request,
-    IHttpClientFactory clients, CancellationToken cancellationToken) =>
-{
-    using var databaseRequest = new HttpRequestMessage(HttpMethod.Put, $"/api/enrollments/{enrollmentId}/finalize")
     {
         Content = new StreamContent(request.Body)
     };
@@ -122,6 +121,18 @@ app.MapPost("/api/staff/enroll", async (HttpRequest request, IHttpClientFactory 
     return Results.Content(content, response.Content.Headers.ContentType?.MediaType ?? "application/json", statusCode: (int)response.StatusCode);
 });
 
+app.MapPut("/api/staff/{staffId}", async (string staffId, HttpRequest request, IHttpClientFactory clients, CancellationToken cancellationToken) =>
+{
+    using var databaseRequest = new HttpRequestMessage(HttpMethod.Put, $"/api/staff/{Uri.EscapeDataString(staffId)}")
+    {
+        Content = new StreamContent(request.Body)
+    };
+    databaseRequest.Content.Headers.ContentType = new("application/json");
+    using var response = await clients.CreateClient("academicRecordsDatabase").SendAsync(databaseRequest, cancellationToken);
+    var content = await response.Content.ReadAsStringAsync(cancellationToken);
+    return Results.Content(content, response.Content.Headers.ContentType?.MediaType ?? "application/json", statusCode: (int)response.StatusCode);
+});
+
 app.MapPost("/api/students/{studentId}/enrollments", async (string studentId, HttpRequest request, IHttpClientFactory clients, CancellationToken cancellationToken) =>
 {
     using var databaseRequest = new HttpRequestMessage(HttpMethod.Post, $"/api/students/{Uri.EscapeDataString(studentId)}/enrollments")
@@ -142,6 +153,49 @@ app.MapGet("/api/students/{studentId}/wam", async (string studentId, IHttpClient
 
 app.MapGet("/api/students/{studentId}/gpa", async (string studentId, IHttpClientFactory clients, CancellationToken cancellationToken) =>
     await GetStudentStatisticAsync(studentId, true, clients, cancellationToken));
+
+app.MapGet("/api/students/{studentId}/eligibility", async (string studentId, IHttpClientFactory clients, CancellationToken cancellationToken) =>
+{
+    using var response = await clients.CreateClient("academicRecordsDatabase")
+        .GetAsync($"/api/students/{Uri.EscapeDataString(studentId)}", cancellationToken);
+    if (!response.IsSuccessStatusCode)
+    {
+        var content = await response.Content.ReadAsStringAsync(cancellationToken);
+        return Results.Content(content, response.Content.Headers.ContentType?.MediaType ?? "application/json", statusCode: (int)response.StatusCode);
+    }
+
+    var profile = await response.Content.ReadFromJsonAsync<StudentStatisticsProfile>(cancellationToken);
+    if (profile is null)
+    {
+        return Results.Problem("The student profile response was invalid.");
+    }
+
+    var courses = await GetCourseMetadataAsync(clients, cancellationToken);
+    profile = ApplyCourseMetadata(profile, courses);
+    return Results.Ok(GraduationEligibilityCalculator.Calculate(profile));
+});
+
+app.MapPost("/api/students/{studentId}/ai-analysis", async (string studentId,
+    IHttpClientFactory clients, GeminiAcademicProgressService service, CancellationToken cancellationToken) =>
+{
+    using var response = await clients.CreateClient("academicRecordsDatabase")
+        .GetAsync($"/api/students/{Uri.EscapeDataString(studentId)}", cancellationToken);
+    if (!response.IsSuccessStatusCode)
+    {
+        var content = await response.Content.ReadAsStringAsync(cancellationToken);
+        return Results.Content(content, response.Content.Headers.ContentType?.MediaType ?? "application/json", statusCode: (int)response.StatusCode);
+    }
+
+    var profile = await response.Content.ReadFromJsonAsync<StudentStatisticsProfile>(cancellationToken);
+    if (profile is null)
+    {
+        return Results.Problem("The student profile response was invalid.");
+    }
+
+    var courses = await GetCourseMetadataAsync(clients, cancellationToken);
+    var analysis = await service.AnalyzeAsync(ApplyCourseMetadata(profile, courses), cancellationToken);
+    return Results.Ok(analysis);
+});
 
 app.MapGet("/api/students/{studentId}/transcript.pdf", async (string studentId, IHttpClientFactory clients,
     ITranscriptPdfGenerator pdfGenerator, CancellationToken cancellationToken) =>
@@ -185,6 +239,21 @@ app.MapPut("/api/students/{studentId}", async (string studentId, HttpRequest req
     };
     databaseRequest.Content.Headers.ContentType = new("application/json");
     using var response = await clients.CreateClient("academicRecordsDatabase").SendAsync(databaseRequest, cancellationToken);
+    var content = await response.Content.ReadAsStringAsync(cancellationToken);
+    return Results.Content(content, response.Content.Headers.ContentType?.MediaType ?? "application/json", statusCode: (int)response.StatusCode);
+});
+
+app.MapPut("/api/students/{studentId}/graduation", async (string studentId, HttpRequest request,
+    IHttpClientFactory clients, CancellationToken cancellationToken) =>
+{
+    using var databaseRequest = new HttpRequestMessage(HttpMethod.Put,
+        $"/api/students/{Uri.EscapeDataString(studentId)}/graduation")
+    {
+        Content = new StreamContent(request.Body)
+    };
+    databaseRequest.Content.Headers.ContentType = new("application/json");
+    using var response = await clients.CreateClient("academicRecordsDatabase")
+        .SendAsync(databaseRequest, cancellationToken);
     var content = await response.Content.ReadAsStringAsync(cancellationToken);
     return Results.Content(content, response.Content.Headers.ContentType?.MediaType ?? "application/json", statusCode: (int)response.StatusCode);
 });

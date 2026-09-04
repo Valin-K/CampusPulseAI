@@ -1,125 +1,119 @@
-@page "/profile/{Role}/{UserId:int}/enrollments"
 @using System.Globalization
 @using System.Net.Http.Json
 
-<PageTitle>Enrollments</PageTitle>
-
-<h1>Course Enrollments</h1>
-
 @if (isLoading)
 {
-    <p>Loading enrollments...</p>
+    <p class="muted">Loading enrollments...</p>
 }
 else if (loadError is not null)
 {
-    <div class="alert alert-danger">Unable to load enrollments: @loadError</div>
+    <div class="notice notice-error">Unable to load enrollments: @loadError</div>
 }
 else
 {
-    <div class="row mb-4">
-        <div class="col-md-6 mb-3 mb-md-0">
-            <div class="card h-100">
-                <div class="card-body">
-                    <h2 class="card-title h5">WAM</h2>
-                    <p class="display-6 mb-0">@FormatStatistic(wam?.Value)</p>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-6">
-            <div class="card h-100">
-                <div class="card-body">
-                    <h2 class="card-title h5">GPA</h2>
-                    <p class="display-6 mb-0">@FormatStatistic(gpa?.Value)</p>
-                </div>
-            </div>
-        </div>
+    <div class="metric-grid">
+        <CampusMetricCard Label="WAM" Value="@FormatStatistic(wam?.Value)" Detail="Weighted average mark" />
+        <CampusMetricCard Label="GPA" Value="@FormatStatistic(gpa?.Value)" Detail="Grade point average" Tone="green" />
+        <CampusMetricCard Label="Credit points gained" Value="@FormatCreditPoints()" Detail="Earned from passed and completed courses" Tone="gold" />
     </div>
 
-    <h2>Current and Future Enrollments</h2>
-    @if (currentEnrollments.Count == 0)
-    {
-        <p>No current enrollments.</p>
-    }
-    else
-    {
-        <table class="table table-striped">
-            <thead>
-                <tr>
-                    <th>Course Code</th>
-                    <th>Term</th>
-                    <th>Academic Year</th>
-                    <th>Status</th>
-                    <th>Credits</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var enrollment in currentEnrollments)
-                {
-                    <tr>
-                        <td>@enrollment.CourseCode</td>
-                        <td>@enrollment.TermName (@enrollment.TermCode)</td>
-                        <td>@enrollment.AcademicYear</td>
-                        <td>@enrollment.Status</td>
-                        <td>@enrollment.Credits</td>
-                    </tr>
-                }
-            </tbody>
-        </table>
-    }
+    <section class="surface-card table-panel">
+        <div class="section-heading">
+            <div><span class="eyebrow">Current and future</span><h2>Current and future enrollments</h2></div>
+        </div>
+        @if (currentEnrollments.Count == 0)
+        {
+            <p class="muted">No current enrollments.</p>
+        }
+        else
+        {
+            <div class="responsive-table">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Course Code</th>
+                            <th>Course Name</th>
+                            <th>Term</th>
+                            <th>Academic Year</th>
+                            <th>Status</th>
+                            <th>Credits</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var enrollment in currentEnrollments)
+                        {
+                            <tr>
+                                <td>@enrollment.CourseCode</td>
+                                <td>@(enrollment.CourseTitle ?? enrollment.CourseCode)</td>
+                                <td>@enrollment.TermName (@enrollment.TermCode)</td>
+                                <td>@enrollment.AcademicYear</td>
+                                <td>@enrollment.Status</td>
+                                <td>@enrollment.Credits</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </section>
 
-    <h2>Past Enrollments</h2>
-    @if (pastEnrollments.Count == 0)
+    <section class="surface-card table-panel">
+        <div class="section-heading">
+            <div><span class="eyebrow">History</span><h2>Past enrollments</h2></div>
+        </div>
+        @if (pastEnrollments.Count == 0)
+        {
+            <p class="muted">No past enrollments.</p>
+        }
+        else
+        {
+            <div class="responsive-table">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Course Code</th>
+                            <th>Course Name</th>
+                            <th>Term</th>
+                            <th>Academic Year</th>
+                            <th>Status</th>
+                            <th>Credits</th>
+                            <th>Grade Type</th>
+                            <th>Grade</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var enrollment in pastEnrollments)
+                        {
+                            <tr>
+                                <td>@enrollment.CourseCode</td>
+                                <td>@(enrollment.CourseTitle ?? enrollment.CourseCode)</td>
+                                <td>@enrollment.TermName (@enrollment.TermCode)</td>
+                                <td>@enrollment.AcademicYear</td>
+                                <td>@enrollment.Status</td>
+                                <td>@enrollment.Credits</td>
+                                <td>@enrollment.GradeType</td>
+                                <td>@GetGradeDisplay(enrollment)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </section>
+
+    @if (studentId is not null)
     {
-        <p>No past enrollments.</p>
-    }
-    else
-    {
-        <table class="table table-striped">
-            <thead>
-                <tr>
-                    <th>Course Code</th>
-                    <th>Term</th>
-                    <th>Academic Year</th>
-                    <th>Status</th>
-                    <th>Credits</th>
-                    <th>Grade Type</th>
-                    <th>Grade</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var enrollment in pastEnrollments)
-                {
-                    <tr>
-                        <td>@enrollment.CourseCode</td>
-                        <td>@enrollment.TermName (@enrollment.TermCode)</td>
-                        <td>@enrollment.AcademicYear</td>
-                        <td>@enrollment.Status</td>
-                        <td>@enrollment.Credits</td>
-                        <td>@enrollment.GradeType</td>
-                        <td>@GetGradeDisplay(enrollment)</td>
-                    </tr>
-                }
-            </tbody>
-        </table>
+        <div class="button-row" style="margin-top: 1rem;">
+            <a href="@GetTranscriptUrl()" class="button button-primary" target="_blank" rel="noopener noreferrer">
+                Download transcript PDF
+            </a>
+        </div>
     }
 }
 
-<div class="mt-4">
-    @if (studentId is not null)
-    {
-        <a href="@GetTranscriptUrl()" class="btn btn-primary" target="_blank" rel="noopener noreferrer">
-            View transcript PDF
-        </a>
-    }
-    <a href="/profile/@Role/@UserId" class="btn btn-secondary ms-2">Back to profile</a>
-</div>
-
 @code {
-    [Parameter]
+    [Parameter, EditorRequired]
     public int UserId { get; set; }
-
-    [Parameter]
-    public string Role { get; set; } = string.Empty;
 
     [Inject]
     private HttpClient Http { get; set; } = default!;
@@ -131,9 +125,12 @@ else
     private List<TermEnrollmentResponse> pastEnrollments = [];
     private StudentStatisticResponse? wam;
     private StudentStatisticResponse? gpa;
+    private decimal? creditPointsGained;
 
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnParametersSetAsync()
     {
+        isLoading = true;
+        loadError = null;
         try
         {
             var student = await Http.GetFromJsonAsync<StudentProfileResponse>($"api/students/by-user/{UserId}");
@@ -176,6 +173,10 @@ else
                 .OrderBy(enrollment => GetTermStartDate(enrollment.AcademicYear, enrollment.StartWeekOfYear))
                 .ThenBy(enrollment => enrollment.CourseCode)
                 .ToList();
+
+            creditPointsGained = student.Enrollments
+                .Where(enrollment => enrollment.Status is "Passed" or "Completed")
+                .Sum(enrollment => enrollment.Credits ?? 0m);
         }
         catch (HttpRequestException exception)
         {
@@ -204,6 +205,8 @@ else
                 ? enrollment.GradeValue?.ToString() ?? "N/A"
                 : "Pending";
 
+    private string FormatCreditPoints() => creditPointsGained?.ToString("0.##", CultureInfo.InvariantCulture) ?? "N/A";
+
     private static string FormatStatistic(decimal? value) => value?.ToString("0.00", CultureInfo.InvariantCulture) ?? "N/A";
 
     private string GetTranscriptUrl()
@@ -231,9 +234,9 @@ else
     private sealed record StudentProfileResponse(int UserId, string StudentId, string FirstName, string LastName, string Email,
         DateOnly? DateOfBirth, string? PhoneNumber, string MailingAddress, string EmergencyContactName,
         string EmergencyContactPhone, DateOnly? EnrollmentDate, string? Degree, string? Major, string? SubMajor,
-        List<TermEnrollmentResponse> Enrollments);
+        List<TermEnrollmentResponse> Enrollments, DateOnly? GraduationDate = null);
 
-    private sealed record TermEnrollmentResponse(int EnrollmentId, string CourseCode, int? AcademicTermId, string? TermCode,
+    private sealed record TermEnrollmentResponse(int EnrollmentId, string CourseCode, string? CourseTitle, int? AcademicTermId, string? TermCode,
         string? TermName, int StartWeekOfYear, int EndWeekOfYear, int AcademicYear, string Status, decimal? Credits, string GradeType, decimal? GradeValue);
 
     private sealed record StudentStatisticResponse(string StudentId, string Statistic, decimal? Value,

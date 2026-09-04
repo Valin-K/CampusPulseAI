@@ -35,12 +35,6 @@ jobs:
           filters: |
             student3:
               - 'student-3/**'
-              - 'shared/frontend/CampusPulse.Shared.Components/**'
-              - 'Directory.Packages.props'
-              - 'global.json'
-              - 'docker-compose.yml'
-              - 'docker/frontend/CampusHousing.Dockerfile'
-              - '.github/workflows/student-3.yml'
 
       - name: Setup .NET 10
         if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.student3 == 'true'
@@ -95,8 +89,8 @@ jobs:
         shell: bash
         run: |
           docker compose -f docker-compose.yml -p student-3-ci config --quiet
-          docker compose -f docker-compose.yml -p student-3-ci build campushousing.database campushousing.backend campushousing.frontend
-          docker compose -f docker-compose.yml -p student-3-ci up --detach --wait --no-build campushousing.database campushousing.backend campushousing.frontend
+          docker compose -f docker-compose.yml -p student-3-ci build academicrecords.database campushousing.database campushousing.backend campushousing.frontend
+          docker compose -f docker-compose.yml -p student-3-ci up --detach --wait --no-build academicrecords.database campushousing.database campushousing.backend campushousing.frontend
 
       - name: Smoke test Student 3 containers
         if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.student3 == 'true'
@@ -130,7 +124,7 @@ jobs:
         shell: bash
         run: |
           docker compose -f docker-compose.yml -p student-3-ci ps
-          docker compose -f docker-compose.yml -p student-3-ci logs --no-color campushousing.database campushousing.backend campushousing.frontend
+          docker compose -f docker-compose.yml -p student-3-ci logs --no-color academicrecords.database campushousing.database campushousing.backend campushousing.frontend
 
       - name: Remove Student 3 containers
         if: always() && (github.event_name == 'workflow_dispatch' || steps.filter.outputs.student3 == 'true')

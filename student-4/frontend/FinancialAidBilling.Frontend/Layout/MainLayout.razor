@@ -5,7 +5,8 @@
              SectionLabel="Student finance"
              UserName="@(UserContext.CurrentUser?.FullName ?? "")"
              UserDetails="@(UserContext.CurrentUser is null ? "" : $"{UserContext.CurrentUser.StudyDescriptor} · {UserContext.CurrentUser.StudentId}")"
-             UserInitials="@(UserContext.CurrentUser?.Initials ?? "")">
+             UserInitials="@(UserContext.CurrentUser?.Initials ?? "")"
+             HomeHref="http://localhost:8080">
     <UserSelector>
         @if (!UserContext.IsInitialized)
         {

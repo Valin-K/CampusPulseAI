@@ -1,8 +1,10 @@
 ﻿using AcademicRecords.Backend;
+using AcademicRecords.Backend.Services;
 using AcademicRecords.Database.Data;
 using AcademicRecords.Database.Models;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -49,6 +51,37 @@ namespace AcademicRecords.Tests
             Assert.That(profile.StudentId, Is.EqualTo("STU-PERMANENT-1"));
             Assert.That(profile.Enrollments, Has.Count.EqualTo(2));
             Assert.That(profile.UserId, Is.GreaterThan(0));
+        }
+
+        [Test]
+        public async Task AcademicProgressAnalysisReportsMissingApiKey()
+        {
+            var service = new GeminiAcademicProgressService(null!, new ConfigurationBuilder().Build());
+            var profile = new StudentStatisticsProfile
+            {
+                StudentId = "AI-TEST-1",
+                Enrollments =
+                [
+                    new StudentStatisticsEnrollment
+                    {
+                        AcademicYear = 2026,
+                        TermCode = "T1",
+                        CourseCode = "CS101",
+                        Status = "Passed",
+                        GradeValue = 75,
+                        Credits = 12,
+                        IsFinalized = true
+                    }
+                ]
+            };
+
+            var result = await service.AnalyzeAsync(profile, CancellationToken.None);
+
+            Assert.That(result.Succeeded, Is.False);
+            Assert.That(result.Status, Is.EqualTo("Failed"));
+            Assert.That(result.Message, Does.Contain("GEMINI_API_KEY"));
+            Assert.That(result.Metrics.EarnedCredits, Is.EqualTo(12));
+            Assert.That(result.Metrics.CreditsRemaining, Is.EqualTo(132));
         }
 
         [Test]
@@ -335,7 +368,6 @@ namespace AcademicRecords.Tests
 
             enrollment.GradeValue = 49.99m;
             enrollment.GradeDate = DateOnly.FromDateTime(DateTime.UtcNow);
-            enrollment.IsFinalized = true;
             await database.SaveChangesAsync();
 
             var saved = await database.Enrollments.SingleAsync();
@@ -355,10 +387,10 @@ namespace AcademicRecords.Tests
                     StartWeekOfYear = 1,
                     EndWeekOfYear = ISOWeek.GetWeekOfYear(today.ToDateTime(TimeOnly.MinValue))
                 },
-                GradeValue = 95m,
-                IsFinalized = true
+                GradeValue = 95m
             };
 
+            Assert.That(enrollment.IsFinalized, Is.False);
             Assert.That(enrollment.Status, Is.EqualTo(EnrollmentStatusRules.InProgress));
         }
 
@@ -415,7 +447,7 @@ namespace AcademicRecords.Tests
                 var endYear = term.EndWeekOfYear < term.StartWeekOfYear ? enrollment.AcademicYear + 1 : enrollment.AcademicYear;
                 var endDate = DateOnly.FromDateTime(ISOWeek.ToDateTime(endYear, term.EndWeekOfYear, DayOfWeek.Sunday));
 
-                var expectedFinalized = enrollment.IsFinalized;
+                var expectedFinalized = endDate < today;
                 var expectedStatus = startDate > today
                     ? EnrollmentStatusRules.Enrolled
                     : endDate >= today
@@ -428,11 +460,10 @@ namespace AcademicRecords.Tests
                     CourseCode = enrollment.CourseCode,
                     AcademicYear = enrollment.AcademicYear,
                     AcademicTerm = term,
-                    GradeValue = enrollment.GradeValue,
-                    IsFinalized = enrollment.IsFinalized
+                    GradeValue = enrollment.GradeValue
                 };
                 Assert.That(calculatedEnrollment.Status, Is.EqualTo(expectedStatus));
-                Assert.That(enrollment.IsFinalized, Is.EqualTo(expectedFinalized));
+                Assert.That(calculatedEnrollment.IsFinalized, Is.EqualTo(expectedFinalized));
                 Assert.That(enrollment.GradeDate is null || enrollment.GradeDate <= today, Is.True);
             }
 
@@ -468,8 +499,7 @@ namespace AcademicRecords.Tests
             {
                 StudentId = student.UserId,
                 CourseCode = "CS999",
-                AcademicYear = 2026,
-                IsFinalized = false
+                AcademicYear = 2026
             });
 
             await database.SaveChangesAsync();
@@ -640,6 +670,102 @@ namespace AcademicRecords.Tests
             Assert.That(pageCount, Is.GreaterThanOrEqualTo(2));
             Assert.That(pdfContent.ToLowerInvariant(), Does.Not.Contain("watermark"));
         }
+
+        [Test]
+        public void InsufficientCreditsAreReportedBeforeActiveCourses()
+        {
+            var profile = CreateEligibilityProfile(
+                ("CPAI1001", "Passed", 120, true),
+                ("CPAI2001", "Enrolled", 6, false));
+
+            var result = GraduationEligibilityCalculator.Calculate(profile);
+
+            Assert.That(result.IsEligible, Is.False);
+            Assert.That(result.EarnedCreditPoints, Is.EqualTo(120m));
+            Assert.That(result.OutstandingRequirements, Has.Count.EqualTo(1));
+            Assert.That(result.OutstandingRequirements[0], Does.StartWith("Insufficient credit points:"));
+        }
+
+        [Test]
+        public void ActiveCoursesAreReportedAfterCreditRequirementIsMet()
+        {
+            var profile = CreateEligibilityProfile(
+                ("CPAI1001", "Passed", 144, true),
+                ("CPAI2001", "In Progress", 6, false));
+
+            var result = GraduationEligibilityCalculator.Calculate(profile);
+
+            Assert.That(result.IsEligible, Is.False);
+            Assert.That(result.EarnedCreditPoints, Is.EqualTo(144m));
+            Assert.That(result.OutstandingRequirements, Has.Count.EqualTo(1));
+            Assert.That(result.OutstandingRequirements[0], Does.StartWith("Active courses must be completed:"));
+        }
+
+        [Test]
+        public void FailedSubjectsDoNotContributeCreditPoints()
+        {
+            var profile = CreateEligibilityProfile(
+                ("CPAI1001", "Passed", 138, true),
+                ("CPAI2001", "Failed", 12, true));
+
+            var result = GraduationEligibilityCalculator.Calculate(profile);
+
+            Assert.That(result.IsEligible, Is.False);
+            Assert.That(result.EarnedCreditPoints, Is.EqualTo(138m));
+            Assert.That(result.OutstandingRequirements[0], Does.StartWith("Insufficient credit points:"));
+        }
+
+        [Test]
+        public void Exactly144CreditsWithNoActiveCoursesIsEligible()
+        {
+            var result = GraduationEligibilityCalculator.Calculate(
+                CreateEligibilityProfile(("CPAI1001", "Completed", 144, true)));
+
+            Assert.That(result.IsEligible, Is.True);
+            Assert.That(result.OutstandingRequirements, Is.Empty);
+        }
+
+        [Test]
+        public async Task GraduationDatePersistsInStudentSchema()
+        {
+            await using var connection = new SqliteConnection("Data Source=:memory:");
+            await connection.OpenAsync();
+            await using var database = CreateDatabase(connection);
+            await database.Database.EnsureCreatedAsync();
+
+            database.Students.Add(new Student
+            {
+                StudentId = "STU-GRAD-1",
+                FirstName = "Graduating",
+                LastName = "Student",
+                Email = "graduating@example.edu",
+                DateOfBirth = new(2000, 1, 1),
+                Status = "ACT",
+                MailingAddress = "1 Campus Way",
+                EmergencyContactName = "Contact Person",
+                EmergencyContactPhone = "0400000000",
+                GraduationDate = new(2026, 12, 1)
+            });
+            await database.SaveChangesAsync();
+
+            var saved = await database.Students.SingleAsync(value => value.StudentId == "STU-GRAD-1");
+
+            Assert.That(saved.GraduationDate, Is.EqualTo(new DateOnly(2026, 12, 1)));
+        }
+
+        private static StudentStatisticsProfile CreateEligibilityProfile(
+            params (string CourseCode, string Status, decimal Credits, bool IsFinalized)[] enrollments) =>
+            new StudentStatisticsProfile
+            {
+                StudentId = "STU-ELIGIBILITY-1",
+                Enrollments = enrollments.Select(enrollment => new StudentStatisticsEnrollment
+                {
+                    CourseCode = enrollment.CourseCode,
+                    Status = enrollment.Status,
+                    Credits = enrollment.Credits,
+                    IsFinalized = enrollment.IsFinalized
+                }).ToList()
+            };
 
         private static AcademicRecordsDbContext CreateDatabase(SqliteConnection connection) =>
             new(new DbContextOptionsBuilder<AcademicRecordsDbContext>().UseSqlite(connection).Options);

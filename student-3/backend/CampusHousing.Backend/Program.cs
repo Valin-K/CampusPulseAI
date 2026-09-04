@@ -4,6 +4,8 @@ builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 var databaseUrl = builder.Configuration["Services:CampusHousingDatabase"] ?? "http://localhost:5093";
 builder.Services.AddHttpClient("CampusHousingDatabase", client => client.BaseAddress = new Uri(databaseUrl.TrimEnd('/') + "/"));
+var academicRecordsUrl = builder.Configuration["Services:AcademicRecordsDatabase"] ?? "http://localhost:5021";
+builder.Services.AddHttpClient("AcademicRecordsDatabase", client => client.BaseAddress = new Uri(academicRecordsUrl.TrimEnd('/') + "/"));
 builder.Services.AddHttpClient("gemini", client =>
 {
     client.BaseAddress = new Uri("https://generativelanguage.googleapis.com/");

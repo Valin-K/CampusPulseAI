@@ -34,13 +34,6 @@ jobs:
           filters: |
             student1:
               - 'student-1/**'
-              - 'docker-compose.yml'
-              - 'docker-compose.override.yml'
-              - 'docker/frontend/AcademicRecords.Dockerfile'
-              - 'Directory.Packages.props'
-              - 'global.json'
-              - '.dockerignore'
-              - '.github/workflows/student-1-ci.yml'
 
       - name: Verify preinstalled .NET SDK
         if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.student1 == 'true'

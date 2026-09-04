@@ -1,0 +1,189 @@
+@using System.Net.Http.Json
+
+<CampusSectionTabs Items="userTypeTabs" @bind-ActiveKey="activeTab" AriaLabel="New user type" />
+
+@if (IsStudentTab)
+{
+    <section class="surface-card">
+        <div class="section-heading">
+            <div><span class="eyebrow">New student</span><h2>Enroll a new student</h2></div>
+        </div>
+        <p class="muted">Enroll a new student in Academic Records.</p>
+
+        <EditForm Model="enrollment" OnValidSubmit="EnrollStudent">
+            <div class="form-grid">
+                <label class="field"><span>First name</span><InputText @bind-Value="enrollment.FirstName" required /></label>
+                <label class="field"><span>Last name</span><InputText @bind-Value="enrollment.LastName" required /></label>
+                <label class="field"><span>Email</span><InputText type="email" @bind-Value="enrollment.Email" required /></label>
+                <label class="field"><span>Date of birth</span><InputDate @bind-Value="enrollment.DateOfBirth" /></label>
+                <label class="field"><span>Phone number</span><InputText @bind-Value="enrollment.PhoneNumber" /></label>
+                <label class="field"><span>Mailing address</span><InputText @bind-Value="enrollment.MailingAddress" required /></label>
+                <label class="field"><span>Emergency contact name</span><InputText @bind-Value="enrollment.EmergencyContactName" required /></label>
+                <label class="field"><span>Emergency contact phone</span><InputText @bind-Value="enrollment.EmergencyContactPhone" required /></label>
+                <label class="field"><span>Degree</span><InputText @bind-Value="enrollment.Degree" /></label>
+                <label class="field"><span>Major</span><InputText @bind-Value="enrollment.Major" /></label>
+            </div>
+            <div class="button-row" style="margin-top: 1rem;">
+                <button type="submit" class="button button-primary" disabled="@submitting">@(submitting ? "Enrolling..." : "Enroll student")</button>
+            </div>
+        </EditForm>
+
+        @if (createdStudentId is not null)
+        {
+            <div class="notice notice-success" role="status" style="margin-top: 1rem;">Student enrolled. Permanent student ID: <strong>@createdStudentId</strong></div>
+        }
+        @if (enrollmentError is not null)
+        {
+            <div class="notice notice-error" style="margin-top: 1rem;">Unable to enroll student: @enrollmentError</div>
+        }
+    </section>
+}
+else
+{
+    <section class="surface-card">
+        <div class="section-heading">
+            <div><span class="eyebrow">New staff member</span><h2>Add a new staff member</h2></div>
+        </div>
+        <p class="muted">Add a new staff member to Academic Records.</p>
+
+        <EditForm Model="staffMember" OnValidSubmit="EnrollStaff">
+            <div class="form-grid">
+                <label class="field"><span>First name</span><InputText @bind-Value="staffMember.FirstName" required /></label>
+                <label class="field"><span>Last name</span><InputText @bind-Value="staffMember.LastName" required /></label>
+                <label class="field"><span>Email</span><InputText type="email" @bind-Value="staffMember.Email" required /></label>
+                <label class="field"><span>Date of birth</span><InputDate @bind-Value="staffMember.DateOfBirth" /></label>
+                <label class="field"><span>Phone number</span><InputText @bind-Value="staffMember.PhoneNumber" /></label>
+            </div>
+            <div class="button-row" style="margin-top: 1rem;">
+                <button type="submit" class="button button-primary" disabled="@submitting">@(submitting ? "Adding..." : "Add staff member")</button>
+            </div>
+        </EditForm>
+
+        @if (createdStaffId is not null)
+        {
+            <div class="notice notice-success" role="status" style="margin-top: 1rem;">Staff member added. Permanent staff ID: <strong>@createdStaffId</strong></div>
+        }
+        @if (staffError is not null)
+        {
+            <div class="notice notice-error" style="margin-top: 1rem;">Unable to add staff member: @staffError</div>
+        }
+    </section>
+}
+
+@code {
+    [Parameter]
+    public string InitialTab { get; set; } = "students";
+
+    private string activeTab = "students";
+
+    private static readonly IReadOnlyList<CampusTabItem> userTypeTabs =
+    [
+        new("students", "Student", "Enroll a new student"),
+        new("staff", "Staff", "Add a new staff member")
+    ];
+
+    private bool IsStudentTab => activeTab == "students";
+
+    private EnrollmentModel enrollment = new();
+    private string? createdStudentId;
+    private string? enrollmentError;
+
+    private StaffModel staffMember = new();
+    private string? createdStaffId;
+    private string? staffError;
+
+    private bool submitting;
+
+    [Inject]
+    private HttpClient Http { get; set; } = default!;
+
+    protected override void OnParametersSet()
+    {
+        activeTab = string.Equals(InitialTab, "staff", StringComparison.OrdinalIgnoreCase) ? "staff" : "students";
+    }
+
+    private async Task EnrollStudent()
+    {
+        submitting = true;
+        createdStudentId = null;
+        enrollmentError = null;
+        try
+        {
+            using var response = await Http.PostAsJsonAsync("api/students/enroll", enrollment);
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<EnrollmentResponse>();
+                createdStudentId = result?.StudentId;
+                enrollment = new();
+            }
+            else
+            {
+                enrollmentError = await response.Content.ReadAsStringAsync();
+            }
+        }
+        catch (HttpRequestException exception)
+        {
+            enrollmentError = exception.Message;
+        }
+        finally
+        {
+            submitting = false;
+        }
+    }
+
+    private async Task EnrollStaff()
+    {
+        submitting = true;
+        createdStaffId = null;
+        staffError = null;
+        try
+        {
+            using var response = await Http.PostAsJsonAsync("api/staff/enroll", staffMember);
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<StaffResponse>();
+                createdStaffId = result?.StaffId;
+                staffMember = new();
+            }
+            else
+            {
+                staffError = await response.Content.ReadAsStringAsync();
+            }
+        }
+        catch (HttpRequestException exception)
+        {
+            staffError = exception.Message;
+        }
+        finally
+        {
+            submitting = false;
+        }
+    }
+
+    private sealed record EnrollmentResponse(string StudentId, int UserId);
+
+    private sealed record StaffResponse(string StaffId, int UserId);
+
+    private sealed class EnrollmentModel
+    {
+        public string FirstName { get; set; } = string.Empty;
+        public string LastName { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public DateOnly DateOfBirth { get; set; } = new(2000, 1, 1);
+        public string MailingAddress { get; set; } = string.Empty;
+        public string EmergencyContactName { get; set; } = string.Empty;
+        public string EmergencyContactPhone { get; set; } = string.Empty;
+        public string? PhoneNumber { get; set; }
+        public string? Degree { get; set; }
+        public string? Major { get; set; }
+    }
+
+    private sealed class StaffModel
+    {
+        public string FirstName { get; set; } = string.Empty;
+        public string LastName { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public DateOnly DateOfBirth { get; set; } = new(1990, 1, 1);
+        public string? PhoneNumber { get; set; }
+    }
+}
