@@ -157,6 +157,106 @@ dotnet run --project .\student-5\backend\EventScheduling.Backend\EventScheduling
 
 The local Event Scheduling backend uses `http://localhost:5021` when started with its `http` launch profile. Frontend projects are Blazor WebAssembly applications and are normally easiest to run through Visual Studio or their project launch profile.
 
+## Run the shared agentic loop
+
+The agentic loop is a Python implementation of the **Plan -> Act -> Observe -> Adapt -> Verify** workflow. It validates the entire CampusPulseAI solution (all five student services, shared infrastructure, Docker Compose, and live HTTP endpoints) using one or more OpenRouter models.
+
+### Configure the API key
+
+1. Copy the environment template to `.env` in the repository root:
+
+   ```powershell
+   Copy-Item .env.template .env
+   ```
+
+2. Replace the placeholder API key in `.env` with your actual OpenRouter key:
+
+   ```powershell
+   (Get-Content .env) `
+       -replace 'OPENROUTER_API_KEY=sk-or-v1-your-key-here', `
+                'OPENROUTER_API_KEY=sk-or-v1-your-actual-key' `
+       | Set-Content .env
+   ```
+
+   The `.env` file is ignored by Git and is never written to evidence files.
+
+3. (Optional) Override the default model or provider in `.env`:
+
+   ```text
+   AGENTIC_MODEL=qwen/qwen3.8-27b
+   AGENTIC_PROVIDER=openrouter
+   GEMINI_MODEL=gemini-3.5-flash
+   ```
+
+   The loop uses OpenRouter by default. If your OpenRouter key hits its limit, the loop automatically falls back to Gemini when `GEMINI_API_KEY` is available.
+
+### Approved context
+
+The loop reads an approved project-context file so the agents stay grounded in
+facts about the existing solution:
+
+```text
+docs\release-0\agentic-loop-context\campuspulseai-context.txt
+```
+
+See [docs\release-0\campuspulseai-agentic-loop-learning-guide.md](docs/release-0/campuspulseai-agentic-loop-learning-guide.md) for a full explanation of the workflow.
+
+### Install Python dependencies
+
+From the repository root:
+
+```powershell
+pip install -r scripts\agentic-loop\requirements.txt
+```
+
+### Run a review-only loop
+
+```powershell
+python scripts\agentic-loop\agentic_loop.py `
+    --context docs\release-0\agentic-loop-context\campuspulseai-context.txt
+```
+
+This runs the deterministic checks, calls the AI planning/implementation/review agents, and writes a timestamped evidence file to `docs\release-0\agentic-loop-evidence\`. It does not modify source code.
+
+### Run with a specific focus
+
+```powershell
+python scripts\agentic-loop\agentic_loop.py `
+    --context docs\release-0\agentic-loop-context\campuspulseai-context.txt `
+    --focus architecture
+```
+
+Valid focuses: `implementation`, `database`, `architecture`, `devops`.
+
+### Apply an approved adaptation
+
+After reviewing the plan and the implementation proposal, apply a patch that has been approved by a human:
+
+```powershell
+python scripts\agentic-loop\agentic_loop.py `
+    --context docs\release-0\agentic-loop-context\campuspulseai-context.txt `
+    --approved-patch C:\path\to\approved-change.patch `
+    --approval-text "Approved after reviewing the plan, tests, and patch." `
+    --apply
+```
+
+The script validates that the patch only targets files inside the repository, applies it with `git apply`, and then reruns the same deterministic checks to verify the change.
+
+### Evidence
+
+Each run writes one JSON file under `docs\release-0\agentic-loop-evidence\`. The file records:
+
+- the exact model identifiers used;
+- every prompt sent to the AI agents;
+- raw AI outputs;
+- the project context supplied to the agents;
+- all deterministic check results (build, test, Docker Compose, HTTP smoke tests);
+- human approval text and applied patch targets;
+- branch and commit identifiers;
+- any error that caused the run to fail.
+
+API keys are never recorded in evidence files.
+
 ## GitHub Actions files in Visual Studio
 
 The workflow definitions are stored in `.github/workflows/`. This repository currently contains workflows for each student project, integration, and cloud deployment.

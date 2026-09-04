@@ -1,0 +1,41 @@
+CampusPulseAI approved project context
+======================================
+
+CampusPulseAI is an existing .NET 10 campus-services solution. The repository
+already contains the following working artifacts:
+
+- `CampusPulseAI.slnx` with all projects.
+- `Directory.Packages.props` centrally managing NuGet package versions.
+- `docker-compose.yml` defining all backend APIs, databases, frontends, and
+  AI services (MCP server, multi-agent server, RAG server).
+- `shared/frontend` containing shared Blazor components and UI assets.
+- `student-1` through `student-5`, each with a backend API, Blazor WebAssembly
+  frontend, database project, and test project.
+- `scripts/agentic-loop/agentic_loop.py` implementing the shared agentic loop.
+
+Student services and ownership:
+- student-1 / AcademicRecords: student records, transcripts, academic history.
+- student-2 / CourseManagement: course catalogue, enrolment gates, syllabus handling.
+- student-3 / CampusHousing: housing placements, maintenance requests.
+- student-4 / FinancialAidBilling: invoices, payments, billing integrations.
+- student-5 / EventScheduling: campus events, scheduling, room bookings.
+
+Deterministic validation already passes:
+- `dotnet restore CampusPulseAI.slnx` succeeds.
+- `dotnet build CampusPulseAI.slnx` succeeds.
+- `dotnet test CampusPulseAI.slnx` succeeds (all student test projects pass).
+- `docker compose config --quiet` succeeds.
+
+Live HTTP smoke tests against local backend ports are skipped when the services
+are not running; this is expected in a review-only loop.
+
+Agentic loop rules:
+- Use only the context above.
+- Do not propose replacing existing files such as `docker-compose.yml` or
+  `Directory.Packages.props` with invented content.
+- Do not invent business rules, dependencies, endpoints, or services not
+  explicitly covered by this context.
+- Do not suggest external service meshes, API gateways, or service-discovery
+  tools that are not already part of the approved infrastructure.
+- If the existing implementation already satisfies the goal, state that no
+  code adaptation is needed.
