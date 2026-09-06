@@ -1,4 +1,5 @@
 using EventScheduling.Frontend.Models;
+using Microsoft.JSInterop;
 
 namespace EventScheduling.Frontend.Services;
 
@@ -51,11 +52,30 @@ public static class BookingActions
         return null;
     }
 
-    public static Task<BookingResult> RunAsync(EventSchedulingApiClient api, BookingResponse booking, BookingCardAction action) =>
+    public static Task<BookingResult> RunAsync(
+        EventSchedulingApiClient api, IJSRuntime js, BookingResponse booking, BookingCardAction action) =>
         action.Kind switch
         {
-            BookingActionKind.Return => api.ReturnBookingAsync(booking.Id),
+            BookingActionKind.Return => ReturnWithNoteAsync(api, js, booking),
             BookingActionKind.End => api.EndBookingAsync(booking.Id),
             _ => api.CancelBookingAsync(booking)
         };
+
+    // FR-21: ask for an optional note on the equipment's condition before
+    // completing the return, so damage can be traced back to this loan.
+    private static async Task<BookingResult> ReturnWithNoteAsync(
+        EventSchedulingApiClient api, IJSRuntime js, BookingResponse booking)
+    {
+        string? note = null;
+        try
+        {
+            note = await js.InvokeAsync<string?>("prompt", "Note on the equipment's condition (optional):");
+        }
+        catch (JSException)
+        {
+            // Prompt unavailable in this context - return without a note.
+        }
+
+        return await api.ReturnBookingAsync(booking.Id, note);
+    }
 }

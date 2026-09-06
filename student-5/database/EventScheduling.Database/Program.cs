@@ -398,6 +398,14 @@ bookings.MapPost("/", async (BookingRequest request, EventSchedulingDbContext da
             });
         }
 
+        if (!BookingRules.HasCapacity(request.AttendeeCount, room.Capacity))
+        {
+            return Results.ValidationProblem(new Dictionary<string, string[]>
+            {
+                ["booking"] = [$"This room seats {room.Capacity}, which is fewer than the {request.AttendeeCount} attendees given."]
+            });
+        }
+
         if (await RoomHasClashAsync(database, request.RoomId.Value, request.StartUtc, request.EndUtc, null, cancellationToken))
         {
             return Results.ValidationProblem(new Dictionary<string, string[]>
@@ -406,7 +414,10 @@ bookings.MapPost("/", async (BookingRequest request, EventSchedulingDbContext da
             });
         }
     }
-    else
+
+    // FR-20: not an "else" - equipment can be requested alongside a room in the
+    // same booking, or entirely on its own.
+    if (request.RefEquipmentId is not null)
     {
         if (!await database.RefEquipment.AnyAsync(type => type.Id == request.RefEquipmentId, cancellationToken))
         {
@@ -453,6 +464,18 @@ bookings.MapPut("/{id:int}", async (int id, BookingRequest request, EventSchedul
         return Results.NotFound();
     }
 
+    var wasActive = booking.Status is not (BookingStatus.Cancelled or BookingStatus.Completed or BookingStatus.Returned);
+
+    // FR-12: the cut off for changing or cancelling a still-active booking is its
+    // own start time - once it has begun there is nothing left to give back.
+    if (wasActive && !BookingRules.IsBeforeCutoff(booking.StartUtc, DateTime.UtcNow))
+    {
+        return Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            ["booking"] = ["This booking has already started and can no longer be changed or cancelled."]
+        });
+    }
+
     if (request.RoomId is not null
         && await RoomHasClashAsync(database, request.RoomId.Value, request.StartUtc, request.EndUtc, id, cancellationToken))
     {
@@ -462,7 +485,6 @@ bookings.MapPut("/{id:int}", async (int id, BookingRequest request, EventSchedul
         });
     }
 
-    var wasActive = booking.Status is not (BookingStatus.Cancelled or BookingStatus.Completed or BookingStatus.Returned);
     booking.UpdateFrom(request);
 
     if (request.Status == BookingStatus.Cancelled && wasActive)
@@ -475,8 +497,13 @@ bookings.MapPut("/{id:int}", async (int id, BookingRequest request, EventSchedul
     return Results.Ok(booking.ToResponse());
 });
 
-bookings.MapPost("/{id:int}/return", async (int id, EventSchedulingDbContext database, CancellationToken cancellationToken) =>
+bookings.MapPost("/{id:int}/return", async (int id, ReturnRequest? request, EventSchedulingDbContext database, CancellationToken cancellationToken) =>
 {
+    if (request?.Validate() is { } returnError)
+    {
+        return Results.ValidationProblem(new Dictionary<string, string[]> { ["booking"] = [returnError] });
+    }
+
     var booking = await database.Bookings.SingleOrDefaultAsync(item => item.Id == id, cancellationToken);
     if (booking is null)
     {
@@ -492,6 +519,7 @@ bookings.MapPost("/{id:int}/return", async (int id, EventSchedulingDbContext dat
     }
 
     await ReleaseEquipmentUnitAsync(database, booking, cancellationToken);
+    booking.ReturnConditionNotes = Booking.NormalizeNotes(request?.ConditionNotes);
     booking.Status = BookingStatus.Returned;
     await database.SaveChangesAsync(cancellationToken);
 
