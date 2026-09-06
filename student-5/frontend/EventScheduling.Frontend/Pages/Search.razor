@@ -105,7 +105,8 @@
         <div class="result-list">
             @foreach (var item in FilteredEquipment)
             {
-                <div class="result-row" role="button" tabindex="0" @onclick="() => SelectItem(item.Id, item.Name)">
+                <div class="result-row" role="button" tabindex="0" @onclick="() => SelectItem(item.Id, item.Name)"
+                     @onkeydown="e => ActivateOnEnterOrSpace(e, item.Id, item.Name)">
                     <div class="result-row-head">
                         <strong>@item.Name</strong>
                         <span class="result-row-meta">@item.AvailableCount available</span>
@@ -125,7 +126,8 @@
         <div class="result-list">
             @foreach (var room in FilteredRooms)
             {
-                <div class="result-row" role="button" tabindex="0" @onclick="() => SelectItem(room.Id, room.Name)">
+                <div class="result-row" role="button" tabindex="0" @onclick="() => SelectItem(room.Id, room.Name)"
+                     @onkeydown="e => ActivateOnEnterOrSpace(e, room.Id, room.Name)">
                     <div class="result-row-head">
                         <strong>@room.Name</strong>
                         <span class="result-row-meta">Seats @room.Capacity</span>
@@ -291,7 +293,6 @@
 
     private Task ChangeResourceTypeAsync(string key)
     {
-        // The date is a shared "when do you want it" and carries across tabs.
         ResetTypeFilters();
         Nav.NavigateTo($"/search?type={key}{DateSuffix}", replace: true);
         return Task.CompletedTask;
@@ -321,4 +322,12 @@
 
     private void SelectItem(int id, string name) =>
         Nav.NavigateTo($"/book?type={resourceType}&itemId={id}&itemName={Uri.EscapeDataString(name)}{DateSuffix}");
+
+    private void ActivateOnEnterOrSpace(KeyboardEventArgs e, int id, string name)
+    {
+        if (e.Key is "Enter" or " ")
+        {
+            SelectItem(id, name);
+        }
+    }
 }

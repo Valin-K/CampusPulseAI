@@ -28,7 +28,9 @@ var geminiApiKey = builder.Configuration["GEMINI_API_KEY"];
 builder.Services.AddHttpClient("gemini", client =>
 {
     client.BaseAddress = new Uri("https://generativelanguage.googleapis.com/");
-    client.Timeout = TimeSpan.FromSeconds(90);
+    // NFR-02: the assistant must return within 10 seconds - a slower response
+    // becomes a 503 the frontend surfaces, rather than an unbounded wait.
+    client.Timeout = TimeSpan.FromSeconds(10);
 
     if (!string.IsNullOrWhiteSpace(geminiApiKey))
     {
