@@ -66,6 +66,17 @@
                 <span>Date of use</span>
                 <input type="date" min="@todayIso" @bind="selectedDate" />
             </label>
+            @if (selectedDate is not null)
+            {
+                <label class="field">
+                    <span>From</span>
+                    <input type="time" @bind="windowStart" />
+                </label>
+                <label class="field">
+                    <span>Until</span>
+                    <input type="time" @bind="windowEnd" />
+                </label>
+            }
         }
 
         @if (HasActiveFilters)
@@ -135,6 +146,7 @@
 
     private readonly List<RoomResponse> rooms = [];
     private readonly List<RefEquipmentResponse> equipment = [];
+    private readonly List<BookingResponse> bookings = [];
 
     private string resourceType = "room";
     private string searchText = string.Empty;
@@ -142,6 +154,8 @@
     private string buildingFilter = string.Empty;
     private int? minSeats;
     private DateOnly? selectedDate;
+    private TimeOnly? windowStart;
+    private TimeOnly? windowEnd;
 
     private string? errorMessage;
     private bool isLoading = true;
@@ -160,7 +174,7 @@
 
     private bool HasActiveFilters =>
         searchText.Length > 0 || categoryFilter.Length > 0 || buildingFilter.Length > 0
-        || minSeats is not null || selectedDate is not null;
+        || minSeats is not null || selectedDate is not null || windowStart is not null || windowEnd is not null;
 
     private IEnumerable<string> Buildings => VisibleRooms
         .Select(BuildingOf)
@@ -180,7 +194,23 @@
             || room.Location.Contains(searchText, StringComparison.OrdinalIgnoreCase))
         && (buildingFilter.Length == 0
             || string.Equals(BuildingOf(room), buildingFilter, StringComparison.OrdinalIgnoreCase))
-        && (minSeats is not { } min || room.Capacity >= min));
+        && (minSeats is not { } min || room.Capacity >= min)
+        && IsFreeInWindow(room));
+
+    private bool IsFreeInWindow(RoomResponse room)
+    {
+        if (selectedDate is not { } date || windowStart is not { } start || windowEnd is not { } end || end <= start)
+        {
+            return true;
+        }
+
+        return !bookings.Any(booking =>
+            booking.RoomId == room.Id
+            && DateOnly.FromDateTime(booking.StartUtc) == date
+            && booking.Status is not (BookingStatus.Cancelled or BookingStatus.Completed or BookingStatus.Returned)
+            && start < TimeOnly.FromDateTime(booking.EndUtc)
+            && TimeOnly.FromDateTime(booking.StartUtc) < end);
+    }
 
     private IEnumerable<RefEquipmentResponse> FilteredEquipment => equipment.Where(item =>
         (searchText.Length == 0
@@ -212,11 +242,14 @@
         {
             var roomsTask = Api.GetRoomsAsync();
             var equipmentTask = Api.GetRefEquipmentAsync();
-            await Task.WhenAll(roomsTask, equipmentTask);
+            var bookingsTask = Api.GetBookingsAsync();
+            await Task.WhenAll(roomsTask, equipmentTask, bookingsTask);
             rooms.Clear();
             rooms.AddRange(await roomsTask);
             equipment.Clear();
             equipment.AddRange(await equipmentTask);
+            bookings.Clear();
+            bookings.AddRange(await bookingsTask);
         }
         catch (HttpRequestException)
         {
@@ -240,6 +273,8 @@
     {
         ResetTypeFilters();
         selectedDate = null;
+        windowStart = null;
+        windowEnd = null;
     }
 
     private void ResetTypeFilters()

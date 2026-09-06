@@ -22,12 +22,19 @@ using (var scope = app.Services.CreateScope())
 
 var rooms = app.MapGroup("/api/rooms");
 
-rooms.MapGet("/", async (EventSchedulingDbContext database, CancellationToken cancellationToken) =>
-    await database.Rooms
-        .AsNoTracking()
+rooms.MapGet("/", async (bool? includeInactive, EventSchedulingDbContext database, CancellationToken cancellationToken) =>
+{
+    var query = database.Rooms.AsNoTracking();
+    if (includeInactive is not true)
+    {
+        query = query.Where(room => room.IsActive);
+    }
+
+    return await query
         .OrderBy(room => room.Name)
         .Select(room => room.ToResponse())
-        .ToListAsync(cancellationToken));
+        .ToListAsync(cancellationToken);
+});
 
 rooms.MapGet("/{id:int}", async (int id, EventSchedulingDbContext database, CancellationToken cancellationToken) =>
 {
@@ -341,11 +348,39 @@ bookings.MapPost("/", async (BookingRequest request, EventSchedulingDbContext da
         return Results.ValidationProblem(new Dictionary<string, string[]> { ["booking"] = [error] });
     }
 
-    if (request.StartUtc.Date < DateTime.UtcNow.Date.AddDays(-1))
+    var nowUtc = DateTime.UtcNow;
+
+    if (request.StartUtc.Date < nowUtc.Date.AddDays(-1))
     {
         return Results.ValidationProblem(new Dictionary<string, string[]>
         {
             ["booking"] = ["Bookings can't start on a past date."]
+        });
+    }
+
+    // Notice period: a room needs to be locked in ahead of time, not the instant
+    // someone walks up to it.
+    if (request.RoomId is not null && request.StartUtc < nowUtc.Add(Booking.MinBookingNotice))
+    {
+        return Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            ["booking"] = [$"Room bookings need at least {Booking.MinBookingNotice.TotalMinutes:0} minutes' notice."]
+        });
+    }
+
+    // Booking quota: caps how many reservations one person can hold at once so a
+    // single account can't tie up every room/unit. Only current-or-upcoming
+    // bookings count - a completed history doesn't count against the limit.
+    var activeBookingCount = await database.Bookings.CountAsync(
+        existing => existing.StudentId == request.StudentId
+            && existing.EndUtc >= nowUtc
+            && (existing.Status == BookingStatus.Pending || existing.Status == BookingStatus.Confirmed),
+        cancellationToken);
+    if (activeBookingCount >= Booking.MaxActiveBookingsPerStudent)
+    {
+        return Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            ["booking"] = [$"You already have {Booking.MaxActiveBookingsPerStudent} active bookings. Cancel or complete one before making another."]
         });
     }
 
