@@ -133,12 +133,24 @@ static Task<bool> RoomHasClashAsync(EventSchedulingDbContext database, int roomI
 
 var refEquipment = app.MapGroup("/api/refequipment");
 
-refEquipment.MapGet("/", async (EventSchedulingDbContext database, CancellationToken cancellationToken) =>
+refEquipment.MapGet("/", async (DateTime? availableFrom, DateTime? availableTo, EventSchedulingDbContext database, CancellationToken cancellationToken) =>
 {
     var types = await database.RefEquipment
         .AsNoTracking()
         .OrderBy(item => item.Name)
         .ToListAsync(cancellationToken);
+
+    if (availableFrom is { } from && availableTo is { } to && to > from)
+    {
+        var responses = new List<RefEquipmentResponse>(types.Count);
+        foreach (var type in types)
+        {
+            var count = await BookingRules.CountAvailableEquipmentUnitsAsync(database, type.Id, from, to, cancellationToken);
+            responses.Add(type.ToResponse(count));
+        }
+
+        return responses;
+    }
 
     var counts = await database.Equipment
         .AsNoTracking()
@@ -152,7 +164,7 @@ refEquipment.MapGet("/", async (EventSchedulingDbContext database, CancellationT
         .ToList();
 });
 
-refEquipment.MapGet("/{id:int}", async (int id, EventSchedulingDbContext database, CancellationToken cancellationToken) =>
+refEquipment.MapGet("/{id:int}", async (int id, DateTime? availableFrom, DateTime? availableTo, EventSchedulingDbContext database, CancellationToken cancellationToken) =>
 {
     var type = await database.RefEquipment.AsNoTracking().SingleOrDefaultAsync(item => item.Id == id, cancellationToken);
     if (type is null)
@@ -160,7 +172,11 @@ refEquipment.MapGet("/{id:int}", async (int id, EventSchedulingDbContext databas
         return Results.NotFound();
     }
 
-    return Results.Ok(type.ToResponse(await AvailableCountAsync(database, id, cancellationToken)));
+    var count = availableFrom is { } from && availableTo is { } to && to > from
+        ? await BookingRules.CountAvailableEquipmentUnitsAsync(database, id, from, to, cancellationToken)
+        : await AvailableCountAsync(database, id, cancellationToken);
+
+    return Results.Ok(type.ToResponse(count));
 });
 
 refEquipment.MapPost("/", async (RefEquipmentRequest request, EventSchedulingDbContext database, CancellationToken cancellationToken) =>

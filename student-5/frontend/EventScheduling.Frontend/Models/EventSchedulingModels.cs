@@ -10,7 +10,8 @@ public enum RoomKind
 {
     Study,
     Lab,
-    Lecture
+    Lecture,
+    Collaborative
 }
 
 public enum BookingStatus
@@ -59,7 +60,6 @@ public sealed record BookingRequest(
     int? AttendeeCount = null,
     string? ConditionNotes = null);
 
-// FR-21: an optional note on the equipment's condition, taken at return time.
 public sealed record ReturnRequest(string? ConditionNotes);
 
 public sealed record BookingResult(bool Success, BookingResponse? Booking, string? Error);
@@ -106,7 +106,8 @@ public sealed record RoomResponse(
     string Description,
     RoomKind Kind = RoomKind.Study,
     bool IsActive = true,
-    string OpeningHours = "")
+    string OpeningHours = "",
+    bool IsAccessible = false)
 {
     public bool IsStaffRoom => Kind is RoomKind.Lab or RoomKind.Lecture;
 
@@ -114,6 +115,7 @@ public sealed record RoomResponse(
     {
         RoomKind.Lab => "Lab room",
         RoomKind.Lecture => "Lecture room",
+        RoomKind.Collaborative => "Collaborative room",
         _ => "Study room"
     };
 }

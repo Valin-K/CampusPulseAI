@@ -115,6 +115,98 @@ public sealed class BookingRulesTests
         Status = status
     };
 
+    [Test]
+    public async Task CountAvailableEquipmentUnitsAsync_ExcludesAUnitBookedForAnOverlappingWindow()
+    {
+        await using var context = await DatabaseTestContext.CreateAsync();
+        var type = new RefEquipment { Name = "Portable Projector", Category = "Presentation", Description = "x" };
+        context.Database.RefEquipment.Add(type);
+        await context.Database.SaveChangesAsync();
+
+        var unit1 = new Equipment { RefEquipmentId = type.Id, SerialNumber = "PRJ-001", Status = EquipmentStatus.AVL };
+        var unit2 = new Equipment { RefEquipmentId = type.Id, SerialNumber = "PRJ-002", Status = EquipmentStatus.AVL };
+        context.Database.Equipment.AddRange(unit1, unit2);
+        await context.Database.SaveChangesAsync();
+
+        context.Database.Bookings.Add(new Booking
+        {
+            StudentId = 4,
+            RefEquipmentId = type.Id,
+            EquipmentId = unit1.Id,
+            ResourceName = "Portable Projector",
+            StartUtc = NowUtc,
+            EndUtc = NowUtc.AddDays(3),
+            Status = BookingStatus.Confirmed
+        });
+        await context.Database.SaveChangesAsync();
+
+        var count = await BookingRules.CountAvailableEquipmentUnitsAsync(
+            context.Database, type.Id, NowUtc.AddDays(1), NowUtc.AddDays(2), CancellationToken.None);
+
+        Assert.That(count, Is.EqualTo(1));
+    }
+
+    [Test]
+    public async Task CountAvailableEquipmentUnitsAsync_IgnoresACancelledBookingOnTheOnlyUnit()
+    {
+        await using var context = await DatabaseTestContext.CreateAsync();
+        var type = new RefEquipment { Name = "Portable Projector", Category = "Presentation", Description = "x" };
+        context.Database.RefEquipment.Add(type);
+        await context.Database.SaveChangesAsync();
+
+        var unit = new Equipment { RefEquipmentId = type.Id, SerialNumber = "PRJ-001", Status = EquipmentStatus.AVL };
+        context.Database.Equipment.Add(unit);
+        await context.Database.SaveChangesAsync();
+
+        context.Database.Bookings.Add(new Booking
+        {
+            StudentId = 4,
+            RefEquipmentId = type.Id,
+            EquipmentId = unit.Id,
+            ResourceName = "Portable Projector",
+            StartUtc = NowUtc,
+            EndUtc = NowUtc.AddDays(3),
+            Status = BookingStatus.Cancelled
+        });
+        await context.Database.SaveChangesAsync();
+
+        var count = await BookingRules.CountAvailableEquipmentUnitsAsync(
+            context.Database, type.Id, NowUtc.AddDays(1), NowUtc.AddDays(2), CancellationToken.None);
+
+        Assert.That(count, Is.EqualTo(1));
+    }
+
+    [Test]
+    public async Task CountAvailableEquipmentUnitsAsync_ExcludesUnitsInMaintenanceOrRetired()
+    {
+        await using var context = await DatabaseTestContext.CreateAsync();
+        var type = new RefEquipment { Name = "Portable Projector", Category = "Presentation", Description = "x" };
+        context.Database.RefEquipment.Add(type);
+        await context.Database.SaveChangesAsync();
+
+        context.Database.Equipment.AddRange(
+            new Equipment { RefEquipmentId = type.Id, SerialNumber = "PRJ-001", Status = EquipmentStatus.AVL },
+            new Equipment { RefEquipmentId = type.Id, SerialNumber = "PRJ-002", Status = EquipmentStatus.MTC },
+            new Equipment { RefEquipmentId = type.Id, SerialNumber = "PRJ-003", Status = EquipmentStatus.RET });
+        await context.Database.SaveChangesAsync();
+
+        var count = await BookingRules.CountAvailableEquipmentUnitsAsync(
+            context.Database, type.Id, NowUtc, NowUtc.AddDays(1), CancellationToken.None);
+
+        Assert.That(count, Is.EqualTo(1));
+    }
+
+    [Test]
+    public async Task CountAvailableEquipmentUnitsAsync_ReturnsZeroForAnUnknownEquipmentType()
+    {
+        await using var context = await DatabaseTestContext.CreateAsync();
+
+        var count = await BookingRules.CountAvailableEquipmentUnitsAsync(
+            context.Database, refEquipmentId: 999, NowUtc, NowUtc.AddDays(1), CancellationToken.None);
+
+        Assert.That(count, Is.Zero);
+    }
+
     private sealed class DatabaseTestContext(
         SqliteConnection connection,
         EventSchedulingDbContext database) : IAsyncDisposable
