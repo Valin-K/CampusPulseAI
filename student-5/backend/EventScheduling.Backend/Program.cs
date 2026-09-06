@@ -22,6 +22,20 @@ builder.Services.AddHttpClient<IAcademicRecordsClient, AcademicRecordsClient>(cl
         ?? "http://academicrecords.database:8080");
 });
 
+builder.Services.AddScoped<IBookingAssistantService, GeminiBookingAssistantService>();
+
+var geminiApiKey = builder.Configuration["GEMINI_API_KEY"];
+builder.Services.AddHttpClient("gemini", client =>
+{
+    client.BaseAddress = new Uri("https://generativelanguage.googleapis.com/");
+    client.Timeout = TimeSpan.FromSeconds(90);
+
+    if (!string.IsNullOrWhiteSpace(geminiApiKey))
+    {
+        client.DefaultRequestHeaders.Add("x-goog-api-key", geminiApiKey);
+    }
+});
+
 var app = builder.Build();
 
 app.MapOpenApi();

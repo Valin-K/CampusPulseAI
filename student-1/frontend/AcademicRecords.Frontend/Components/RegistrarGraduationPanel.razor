@@ -1,0 +1,212 @@
+@using System.Net.Http.Json
+
+<section class="surface-card table-panel">
+    <div class="section-heading">
+        <div><span class="eyebrow">Registrar</span><h2>Registrar graduation</h2></div>
+    </div>
+    <p class="muted">Students currently meeting the graduation eligibility requirements.</p>
+
+    @if (isLoading)
+    {
+        <p class="muted">Loading eligible students...</p>
+    }
+    else if (loadError is not null)
+    {
+        <div class="notice notice-error">Unable to load eligible students: @loadError</div>
+    }
+    else if (students.Count == 0)
+    {
+        <p class="muted">There are no students currently eligible for graduation.</p>
+    }
+    else
+    {
+        <div class="responsive-table">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Student</th>
+                        <th>Student ID</th>
+                        <th>Degree</th>
+                        <th>WAM</th>
+                        <th>GPA</th>
+                        <th>Academic record</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var student in students)
+                    {
+                        <tr>
+                            <td>@student.FirstName @student.LastName</td>
+                            <td>@student.StudentId</td>
+                            <td>@(student.Degree ?? "Not specified")</td>
+                            <td>@FormatStatistic(student.Wam)</td>
+                            <td>@FormatStatistic(student.Gpa)</td>
+                            <td>
+                                <a href="@GetTranscriptUrl(student.StudentId)" target="_blank" rel="noopener noreferrer">
+                                    View PDF
+                                </a>
+                            </td>
+                            <td>
+                                @if (student.IsFinalizing)
+                                {
+                                    <span>Finalizing...</span>
+                                }
+                                else
+                                {
+                                    <button class="button button-small button-primary" @onclick="() => FinalizeGraduationAsync(student)">
+                                        Finalize graduation
+                                    </button>
+                                }
+                                @if (student.FinalizeError is not null)
+                                {
+                                    <div class="text-danger small mt-1">@student.FinalizeError</div>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>
+
+@code {
+    [Inject]
+    private HttpClient Http { get; set; } = default!;
+
+    private bool isLoading = true;
+    private string? loadError;
+    private List<EligibleStudent> students = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var profiles = await Http.GetFromJsonAsync<List<StudentProfileResponse>>("api/students") ?? [];
+            var eligibleStudents = await Task.WhenAll(profiles.Select(GetEligibleStudentAsync));
+            students = eligibleStudents
+                .Where(student => student is not null)
+                .Select(student => student!)
+                .OrderBy(student => student.LastName)
+                .ThenBy(student => student.FirstName)
+                .ToList();
+        }
+        catch (HttpRequestException exception)
+        {
+            loadError = exception.Message;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task<EligibleStudent?> GetEligibleStudentAsync(StudentProfileResponse profile)
+    {
+        if (profile.GraduationDate is not null)
+        {
+            return null;
+        }
+
+        var studentId = Uri.EscapeDataString(profile.StudentId);
+        var eligibility = await Http.GetFromJsonAsync<GraduationEligibilityResponse>(
+            $"api/students/{studentId}/eligibility");
+        if (eligibility is null || !eligibility.IsEligible)
+        {
+            return null;
+        }
+
+        var wamTask = Http.GetFromJsonAsync<StudentStatisticResponse>($"api/students/{studentId}/wam");
+        var gpaTask = Http.GetFromJsonAsync<StudentStatisticResponse>($"api/students/{studentId}/gpa");
+        await Task.WhenAll(wamTask, gpaTask);
+
+        return new EligibleStudent(
+            profile.StudentId,
+            profile.FirstName,
+            profile.LastName,
+            profile.Degree,
+            (await wamTask)?.Value,
+            (await gpaTask)?.Value);
+    }
+
+    private async Task FinalizeGraduationAsync(EligibleStudent student)
+    {
+        student.IsFinalizing = true;
+        student.FinalizeError = null;
+        try
+        {
+            var response = await Http.PutAsJsonAsync(
+                $"api/students/{Uri.EscapeDataString(student.StudentId)}/graduation",
+                new GraduationUpdateRequest(DateOnly.FromDateTime(DateTime.UtcNow)));
+            if (!response.IsSuccessStatusCode)
+            {
+                student.FinalizeError = await response.Content.ReadAsStringAsync();
+                return;
+            }
+
+            students.Remove(student);
+        }
+        catch (HttpRequestException exception)
+        {
+            student.FinalizeError = exception.Message;
+        }
+        finally
+        {
+            student.IsFinalizing = false;
+        }
+    }
+
+    private string GetTranscriptUrl(string studentId)
+    {
+        var baseAddress = Http.BaseAddress
+            ?? throw new InvalidOperationException("The Academic Records API base address is not configured.");
+        return new Uri(baseAddress,
+            $"api/students/{Uri.EscapeDataString(studentId)}/transcript.pdf").ToString();
+    }
+
+    private static string FormatStatistic(decimal? value) =>
+        value?.ToString("0.00") ?? "N/A";
+
+    private sealed class EligibleStudent(
+        string studentId,
+        string firstName,
+        string lastName,
+        string? degree,
+        decimal? wam,
+        decimal? gpa)
+    {
+        public string StudentId { get; } = studentId;
+        public string FirstName { get; } = firstName;
+        public string LastName { get; } = lastName;
+        public string? Degree { get; } = degree;
+        public decimal? Wam { get; } = wam;
+        public decimal? Gpa { get; } = gpa;
+        public bool IsFinalizing { get; set; }
+        public string? FinalizeError { get; set; }
+    }
+
+    private sealed record StudentProfileResponse
+    {
+        public string StudentId { get; init; } = string.Empty;
+        public string FirstName { get; init; } = string.Empty;
+        public string LastName { get; init; } = string.Empty;
+        public string? Degree { get; init; }
+        public DateOnly? GraduationDate { get; init; }
+    }
+
+    private sealed record GraduationEligibilityResponse(
+        bool IsEligible,
+        decimal EarnedCreditPoints,
+        decimal RequiredCreditPoints,
+        List<string> OutstandingRequirements);
+
+    private sealed record StudentStatisticResponse(
+        string StudentId,
+        string Statistic,
+        decimal? Value,
+        int GradedEnrollmentCount,
+        decimal TotalCredits);
+
+    private sealed record GraduationUpdateRequest(DateOnly GraduationDate);
+}

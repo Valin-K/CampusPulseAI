@@ -1,4 +1,8 @@
 services:
+  academicrecords.database:
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail --silent http://localhost:8080/health || grep -a -q DistrolessHelper /proc/1/cmdline"]
+
   academicrecords.backend:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
@@ -25,6 +29,10 @@ services:
       - Services__CampusHousingDatabase=http://campushousing.database:8080
     ports:
       - "5083:8080"
+
+  campushousing.database:
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail --silent http://localhost:8080/health || grep -a -q DistrolessHelper /proc/1/cmdline"]
 
 
   financialaidbilling.backend:

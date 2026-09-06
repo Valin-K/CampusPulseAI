@@ -10,6 +10,14 @@ namespace CampusHousing.Backend.Controllers;
 public sealed class HousingController(IHttpClientFactory httpClientFactory, MaintenanceClassifier classifier) : ControllerBase
 {
     private HttpClient Database => httpClientFactory.CreateClient("CampusHousingDatabase");
+    private HttpClient AcademicRecords => httpClientFactory.CreateClient("AcademicRecordsDatabase");
+
+    [HttpGet("users")]
+    public async Task<IActionResult> Users(CancellationToken cancellationToken)
+    {
+        using var response = await AcademicRecords.GetAsync("api/users", cancellationToken);
+        return await ToActionResult(response);
+    }
 
     [HttpGet("rooms")]
     public async Task<IActionResult> Rooms(CancellationToken cancellationToken) => await ForwardGetAsync("api/rooms", cancellationToken);

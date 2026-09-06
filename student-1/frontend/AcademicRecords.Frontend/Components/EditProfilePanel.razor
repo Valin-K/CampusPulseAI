@@ -1,0 +1,220 @@
+@using System.Net.Http.Json
+
+@if (isLoading)
+{
+    <p class="muted">Loading profile...</p>
+}
+else if (loadError is not null)
+{
+    <div class="notice notice-error">Unable to load profile: @loadError</div>
+}
+else if (profile is not null)
+{
+    @if (saveError is not null)
+    {
+        <div class="notice notice-error">@saveError</div>
+    }
+    @if (saveSuccess)
+    {
+        <div class="notice notice-success" role="status">Profile updated successfully.</div>
+    }
+
+    <section class="surface-card">
+        <div class="section-heading">
+            <div><span class="eyebrow">@profile.Role profile</span><h2>@profile.FirstName @profile.LastName</h2></div>
+        </div>
+        <div class="form-grid">
+            <label class="field"><span>ID</span><input value="@(profile.StudentId ?? profile.StaffId)" readonly disabled /></label>
+            <label class="field"><span>Role</span><input value="@profile.Role" readonly disabled /></label>
+            <label class="field"><span>First name</span><input @bind="editFirstName" /></label>
+            <label class="field"><span>Last name</span><input @bind="editLastName" /></label>
+            <label class="field"><span>Email</span><input type="email" @bind="editEmail" /></label>
+            <label class="field"><span>Date of birth</span><input type="date" @bind="editDateOfBirth" /></label>
+            <label class="field"><span>Phone number</span><input @bind="editPhoneNumber" /></label>
+            @if (profile.StudentId is not null)
+            {
+                <label class="field"><span>Mailing address</span><input @bind="editMailingAddress" /></label>
+                <label class="field"><span>Emergency contact name</span><input @bind="editEmergencyContactName" /></label>
+                <label class="field"><span>Emergency contact phone</span><input @bind="editEmergencyContactPhone" /></label>
+                <label class="field"><span>Enrollment date</span><input value="@profile.EnrollmentDate" readonly disabled /></label>
+                <label class="field"><span>Degree</span><input @bind="editDegree" /></label>
+                <label class="field"><span>Major</span><input @bind="editMajor" /></label>
+                <label class="field"><span>Minor (SubMajor)</span><input @bind="editSubMajor" /></label>
+            }
+        </div>
+
+        <div class="button-row" style="margin-top: 1rem;">
+            <button class="button button-primary" @onclick="SaveAsync" disabled="@isSaving">@(isSaving ? "Saving..." : "Save changes")</button>
+        </div>
+    </section>
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public int UserId { get; set; }
+
+    [Parameter, EditorRequired]
+    public string Role { get; set; } = string.Empty;
+
+    [Inject]
+    private HttpClient Http { get; set; } = default!;
+
+    private UserProfileResponse? profile;
+    private bool isLoading = true;
+    private string? loadError;
+    private bool isSaving;
+    private string? saveError;
+    private bool saveSuccess;
+
+    private string? editFirstName;
+    private string? editLastName;
+    private string? editEmail;
+    private DateOnly? editDateOfBirth;
+    private string? editPhoneNumber;
+    private string? editMailingAddress;
+    private string? editEmergencyContactName;
+    private string? editEmergencyContactPhone;
+    private string? editDegree;
+    private string? editMajor;
+    private string? editSubMajor;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadProfileAsync();
+    }
+
+    private async Task LoadProfileAsync()
+    {
+        isLoading = true;
+        loadError = null;
+        try
+        {
+            if (string.Equals(Role, "student", StringComparison.OrdinalIgnoreCase))
+            {
+                var student = await Http.GetFromJsonAsync<StudentProfileResponse>($"api/students/by-user/{UserId}");
+                profile = student is null ? null : new UserProfileResponse(student.UserId, student.StudentId, null,
+                    student.FirstName, student.LastName, student.Email, "Student", student.DateOfBirth, student.PhoneNumber,
+                    student.MailingAddress, student.EmergencyContactName, student.EmergencyContactPhone, student.EnrollmentDate,
+                    student.Degree, student.Major, student.SubMajor);
+
+                if (profile is not null)
+                {
+                    editMailingAddress = profile.MailingAddress;
+                    editEmergencyContactName = profile.EmergencyContactName;
+                    editEmergencyContactPhone = profile.EmergencyContactPhone;
+                    editDegree = profile.Degree;
+                    editMajor = profile.Major;
+                    editSubMajor = profile.SubMajor;
+                }
+            }
+            else if (string.Equals(Role, "staff", StringComparison.OrdinalIgnoreCase))
+            {
+                var staff = await Http.GetFromJsonAsync<StaffProfileResponse>($"api/staff/by-user/{UserId}");
+                profile = staff is null ? null : new UserProfileResponse(staff.UserId, null, staff.StaffId,
+                    staff.FirstName, staff.LastName, staff.Email, "Staff", staff.DateOfBirth, staff.PhoneNumber,
+                    null, null, null, null, null, null, null);
+            }
+            else
+            {
+                loadError = "Unknown profile role.";
+            }
+
+            if (profile is not null)
+            {
+                editFirstName = profile.FirstName;
+                editLastName = profile.LastName;
+                editEmail = profile.Email;
+                editDateOfBirth = profile.DateOfBirth;
+                editPhoneNumber = profile.PhoneNumber;
+            }
+            else
+            {
+                loadError ??= "Profile not found.";
+            }
+        }
+        catch (HttpRequestException exception)
+        {
+            loadError = exception.Message;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        if (profile is null)
+        {
+            return;
+        }
+
+        isSaving = true;
+        saveError = null;
+        saveSuccess = false;
+        try
+        {
+            HttpResponseMessage response;
+            if (profile.StudentId is not null)
+            {
+                var request = new UpdateStudentRequest(editFirstName ?? string.Empty, editLastName ?? string.Empty,
+                    editEmail ?? string.Empty, editDateOfBirth,
+                    editMailingAddress ?? string.Empty, editEmergencyContactName ?? string.Empty,
+                    editEmergencyContactPhone ?? string.Empty, editPhoneNumber,
+                    editDegree, editMajor, editSubMajor);
+                response = await Http.PutAsJsonAsync($"api/students/{profile.StudentId}", request);
+            }
+            else if (profile.StaffId is not null)
+            {
+                var request = new UpdateStaffRequest(editFirstName ?? string.Empty, editLastName ?? string.Empty,
+                    editEmail ?? string.Empty, editDateOfBirth, editPhoneNumber);
+                response = await Http.PutAsJsonAsync($"api/staff/{profile.StaffId}", request);
+            }
+            else
+            {
+                return;
+            }
+
+            if (response.IsSuccessStatusCode)
+            {
+                saveSuccess = true;
+                await LoadProfileAsync();
+            }
+            else
+            {
+                saveError = await response.Content.ReadAsStringAsync();
+            }
+        }
+        catch (HttpRequestException exception)
+        {
+            saveError = exception.Message;
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private sealed record UserProfileResponse(int UserId, string? StudentId, string? StaffId, string FirstName, string LastName,
+        string Email, string Role, DateOnly? DateOfBirth, string? PhoneNumber, string? MailingAddress,
+        string? EmergencyContactName, string? EmergencyContactPhone, DateOnly? EnrollmentDate, string? Degree,
+        string? Major, string? SubMajor);
+
+    private sealed record StudentProfileResponse(int UserId, string StudentId, string FirstName, string LastName, string Email,
+        DateOnly? DateOfBirth, string? PhoneNumber, string MailingAddress, string EmergencyContactName,
+        string EmergencyContactPhone, DateOnly? EnrollmentDate, string? Degree, string? Major, string? SubMajor,
+        List<TermEnrollmentResponse> Enrollments);
+
+    private sealed record StaffProfileResponse(int UserId, string StaffId, string FirstName, string LastName,
+        string Email, DateOnly? DateOfBirth, string? PhoneNumber);
+
+    private sealed record TermEnrollmentResponse(int EnrollmentId, string CourseCode, int? AcademicTermId, string? TermCode,
+        string? TermName, int EndWeekOfYear, int AcademicYear, string Status, decimal? Credits, decimal? GradeValue);
+
+    private sealed record UpdateStudentRequest(string FirstName, string LastName, string Email, DateOnly? DateOfBirth,
+        string MailingAddress, string EmergencyContactName, string EmergencyContactPhone, string? PhoneNumber,
+        string? Degree, string? Major, string? SubMajor);
+
+    private sealed record UpdateStaffRequest(string FirstName, string LastName, string Email, DateOnly? DateOfBirth,
+        string? PhoneNumber);
+}

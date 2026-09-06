@@ -41,7 +41,6 @@ public static class AcademicRecordsSeedData
                 existing.CourseCode = expected.CourseCode;
                 existing.GradeValue = expected.GradeValue;
                 existing.GradeDate = expected.GradeDate;
-                existing.IsFinalized = expected.IsFinalized;
             }
 
             database.Enrollments.AddRange(seededEnrollments
@@ -122,8 +121,7 @@ public static class AcademicRecordsSeedData
                         ? studentIndex % 2 == 0 ? 50m : 49m
                         : 65m + studentIndex + courseIndex * 5
                     : null,
-                GradeDate = isCompleted ? studentIndex == 0 ? today : endDate : null,
-                IsFinalized = isCompleted
+                GradeDate = isCompleted ? studentIndex == 0 ? today : endDate : null
             };
         })),
         .. Enumerable.Range(0, 5).Select(courseIndex =>
@@ -141,8 +139,7 @@ public static class AcademicRecordsSeedData
                 AcademicTermId = academicTermId,
                 AcademicYear = academicYear,
                 GradeValue = courseIndex == 2 ? null : 70m + courseIndex,
-                GradeDate = DateOnly.FromDateTime(DateTime.UtcNow),
-                IsFinalized = true
+                GradeDate = DateOnly.FromDateTime(DateTime.UtcNow)
             };
         }),
         new()
