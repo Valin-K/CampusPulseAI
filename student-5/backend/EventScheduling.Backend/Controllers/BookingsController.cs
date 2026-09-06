@@ -57,9 +57,9 @@ public sealed class BookingsController(
     }
 
     [HttpPost("{id:int}/return")]
-    public async Task<IActionResult> Return(int id, CancellationToken cancellationToken)
+    public async Task<IActionResult> Return(int id, [FromBody] ReturnRequest? request, CancellationToken cancellationToken)
     {
-        var response = await DatabaseClient.PostAsync($"/api/bookings/{id}/return", content: null, cancellationToken);
+        var response = await DatabaseClient.PostAsJsonAsync($"/api/bookings/{id}/return", request, cancellationToken);
         return await response.ToActionResultAsync(cancellationToken);
     }
 

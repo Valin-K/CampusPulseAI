@@ -81,7 +81,9 @@ public sealed record BookingRequest(
     DateTime StartUtc,
     DateTime EndUtc,
     BookingStatus Status,
-    bool IsStaff = false);
+    bool IsStaff = false,
+    int? AttendeeCount = null,
+    string? ConditionNotes = null);
 
 public sealed record BookingResponse(
     int Id,
@@ -93,7 +95,12 @@ public sealed record BookingResponse(
     string ResourceName,
     DateTime StartUtc,
     DateTime EndUtc,
-    BookingStatus Status);
+    BookingStatus Status,
+    int? AttendeeCount = null,
+    string? CheckOutConditionNotes = null,
+    string? ReturnConditionNotes = null);
+
+public sealed record ReturnRequest(string? ConditionNotes);
 
 public static class HttpResponseMessageExtensions
 {

@@ -51,6 +51,8 @@ public sealed class EventSchedulingDbContext(DbContextOptions<EventSchedulingDbC
             entity.HasKey(booking => booking.Id);
             entity.Property(booking => booking.ResourceName).HasMaxLength(120).IsRequired();
             entity.Property(booking => booking.Status).HasConversion<string>().HasMaxLength(16).IsRequired();
+            entity.Property(booking => booking.CheckOutConditionNotes).HasMaxLength(Booking.MaxConditionNotesLength);
+            entity.Property(booking => booking.ReturnConditionNotes).HasMaxLength(Booking.MaxConditionNotesLength);
             entity.HasIndex(booking => booking.StudentId);
             entity.HasOne<Room>()
                 .WithMany()

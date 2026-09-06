@@ -15,4 +15,7 @@ public static class BookingRules
                 && booking.EndUtc >= nowUtc
                 && (booking.Status == BookingStatus.Pending || booking.Status == BookingStatus.Confirmed),
             cancellationToken);
+
+    public static bool HasCapacity(int? attendeeCount, int roomCapacity) =>
+        attendeeCount is not int count || count <= roomCapacity;
 }

@@ -42,7 +42,10 @@ public sealed record BookingResponse(
     string ResourceName,
     DateTime StartUtc,
     DateTime EndUtc,
-    BookingStatus Status);
+    BookingStatus Status,
+    int? AttendeeCount = null,
+    string? CheckOutConditionNotes = null,
+    string? ReturnConditionNotes = null);
 
 public sealed record BookingRequest(
     int StudentId,
@@ -52,7 +55,12 @@ public sealed record BookingRequest(
     DateTime StartUtc,
     DateTime EndUtc,
     BookingStatus Status,
-    bool IsStaff = false);
+    bool IsStaff = false,
+    int? AttendeeCount = null,
+    string? ConditionNotes = null);
+
+// FR-21: an optional note on the equipment's condition, taken at return time.
+public sealed record ReturnRequest(string? ConditionNotes);
 
 public sealed record BookingResult(bool Success, BookingResponse? Booking, string? Error);
 

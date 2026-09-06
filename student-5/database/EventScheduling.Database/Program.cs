@@ -398,6 +398,14 @@ bookings.MapPost("/", async (BookingRequest request, EventSchedulingDbContext da
             });
         }
 
+        if (!BookingRules.HasCapacity(request.AttendeeCount, room.Capacity))
+        {
+            return Results.ValidationProblem(new Dictionary<string, string[]>
+            {
+                ["booking"] = [$"This room seats {room.Capacity}, which is fewer than the {request.AttendeeCount} attendees given."]
+            });
+        }
+
         if (await RoomHasClashAsync(database, request.RoomId.Value, request.StartUtc, request.EndUtc, null, cancellationToken))
         {
             return Results.ValidationProblem(new Dictionary<string, string[]>
@@ -475,8 +483,13 @@ bookings.MapPut("/{id:int}", async (int id, BookingRequest request, EventSchedul
     return Results.Ok(booking.ToResponse());
 });
 
-bookings.MapPost("/{id:int}/return", async (int id, EventSchedulingDbContext database, CancellationToken cancellationToken) =>
+bookings.MapPost("/{id:int}/return", async (int id, ReturnRequest? request, EventSchedulingDbContext database, CancellationToken cancellationToken) =>
 {
+    if (request?.Validate() is { } returnError)
+    {
+        return Results.ValidationProblem(new Dictionary<string, string[]> { ["booking"] = [returnError] });
+    }
+
     var booking = await database.Bookings.SingleOrDefaultAsync(item => item.Id == id, cancellationToken);
     if (booking is null)
     {
@@ -492,6 +505,7 @@ bookings.MapPost("/{id:int}/return", async (int id, EventSchedulingDbContext dat
     }
 
     await ReleaseEquipmentUnitAsync(database, booking, cancellationToken);
+    booking.ReturnConditionNotes = Booking.NormalizeNotes(request?.ConditionNotes);
     booking.Status = BookingStatus.Returned;
     await database.SaveChangesAsync(cancellationToken);
 

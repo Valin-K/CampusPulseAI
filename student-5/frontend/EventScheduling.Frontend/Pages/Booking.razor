@@ -99,6 +99,14 @@ else
             <div class="notice notice-error" role="alert">@errorMessage</div>
         }
 
+        @if (isRoom)
+        {
+            <label class="day-toggle @(wantsRecurring ? "is-on" : null)">
+                <input type="checkbox" checked="@wantsRecurring" @onchange="e => wantsRecurring = (bool)(e.Value ?? false)" />
+                <span>Repeat this booking weekly</span>
+            </label>
+        }
+
         @if (isRoom && isRecurring)
         {
             <label class="field">
@@ -143,6 +151,15 @@ else
                     <span>Repeat for (weeks)</span>
                     <input type="number" min="1" max="13" step="1" @bind="recurringWeeks" @bind:event="onchange" />
                 </label>
+
+                <label class="field">
+                    <span>Number of attendees (optional)</span>
+                    <input type="number" min="1" max="@room!.Capacity" step="1" placeholder="Any" @bind="attendeeCount" @bind:event="onchange" />
+                </label>
+                @if (attendeeCount is not null)
+                {
+                    <p class="booking-hint @(AttendeeCountValid ? "is-ok" : "is-bad")">@AttendeeCountMessage</p>
+                }
 
                 <RoomAvailability Bookings="allBookings" Date="date.Value" RoomId="room!.Id"
                                   ProposedStart="startTime" ProposedEnd="endTime" />
@@ -206,6 +223,15 @@ else
                 {
                     <p class="booking-hint @(RoomSlotValid ? "is-ok" : "is-bad")">@RoomSlotMessage</p>
                 }
+
+                <label class="field">
+                    <span>Number of attendees (optional)</span>
+                    <input type="number" min="1" max="@room!.Capacity" step="1" placeholder="Any" @bind="attendeeCount" @bind:event="onchange" />
+                </label>
+                @if (attendeeCount is not null)
+                {
+                    <p class="booking-hint @(AttendeeCountValid ? "is-ok" : "is-bad")">@AttendeeCountMessage</p>
+                }
             }
         }
         else
@@ -231,6 +257,12 @@ else
                 <input type="text" value="@ReturnText" readonly disabled />
             </label>
             <p class="booking-hint">Equipment hires run for 7 days from the hire date and time.</p>
+
+            <label class="field">
+                <span>Condition at pickup (optional)</span>
+                <textarea maxlength="500" placeholder="e.g. Minor scuff on the case, otherwise fine."
+                          @bind="checkOutConditionNotes" @bind:event="oninput"></textarea>
+            </label>
 
             @if (equipment!.AvailableCount == 0)
             {
@@ -260,6 +292,8 @@ else
     private DateOnly? date;
     private TimeOnly? startTime;
     private TimeOnly? endTime;
+    private int? attendeeCount;
+    private string checkOutConditionNotes = string.Empty;
 
     private bool isLoading = true;
     private bool isSaving;
@@ -278,8 +312,10 @@ else
     private int recurringWeeks = 1;
     private RecurringBookingResult? recurringResult;
 
+    private bool wantsRecurring;
+
     private bool isRoom => room is not null;
-    private bool isRecurring => isRoom;
+    private bool isRecurring => isRoom && wantsRecurring;
     private string todayIso => DateTime.Today.ToString("yyyy-MM-dd");
     private bool DateInPast => date is { } picked && picked < DateOnly.FromDateTime(DateTime.Today);
 
@@ -342,6 +378,17 @@ else
             return RoomSlotValid ? "This slot is available." : "This clashes with an existing booking.";
         }
     }
+
+    // FR-09: an attendee count over the room's capacity blocks submission client-side;
+    // the server checks it again regardless.
+    private bool AttendeeCountValid => attendeeCount is not { } count || (isRoom && count > 0 && count <= room!.Capacity);
+
+    private string AttendeeCountMessage => attendeeCount switch
+    {
+        <= 0 => "Enter at least 1 attendee.",
+        { } count when isRoom && count > room!.Capacity => $"This room seats {room.Capacity}.",
+        _ => "Fits within this room's capacity."
+    };
 
     private sealed record OccurrenceSlot(DateOnly Date, bool Clashes);
 
@@ -460,7 +507,7 @@ else
 
             if (isRecurring)
             {
-                return RecurrenceValid;
+                return RecurrenceValid && AttendeeCountValid;
             }
 
             if (StartUtc is null || DateInPast)
@@ -469,7 +516,7 @@ else
             }
 
             return isRoom
-                ? RoomSlotValid
+                ? RoomSlotValid && AttendeeCountValid
                 : equipment!.AvailableCount > 0;
         }
     }
@@ -526,7 +573,7 @@ else
                     CurrentUser.UserId, room!.Id, null, room.Name,
                     slot.Date.ToDateTime(startTime!.Value, DateTimeKind.Utc),
                     slot.Date.ToDateTime(endTime!.Value, DateTimeKind.Utc),
-                    BookingStatus.Confirmed, IsStaff: CurrentUser.IsStaff))
+                    BookingStatus.Confirmed, IsStaff: CurrentUser.IsStaff, AttendeeCount: attendeeCount))
                 .ToList();
 
             recurringResult = await Api.CreateBookingsAsync(requests);
@@ -551,8 +598,10 @@ else
         }
 
         var request = isRoom
-            ? new BookingRequest(CurrentUser.UserId, room!.Id, null, room.Name, start, end, BookingStatus.Confirmed, IsStaff: CurrentUser.IsStaff)
-            : new BookingRequest(CurrentUser.UserId, null, equipment!.Id, equipment.Name, start, end, BookingStatus.Confirmed, IsStaff: CurrentUser.IsStaff);
+            ? new BookingRequest(CurrentUser.UserId, room!.Id, null, room.Name, start, end, BookingStatus.Confirmed,
+                IsStaff: CurrentUser.IsStaff, AttendeeCount: attendeeCount)
+            : new BookingRequest(CurrentUser.UserId, null, equipment!.Id, equipment.Name, start, end, BookingStatus.Confirmed,
+                IsStaff: CurrentUser.IsStaff, ConditionNotes: checkOutConditionNotes);
 
         var result = await Api.CreateBookingAsync(request);
         isSaving = false;

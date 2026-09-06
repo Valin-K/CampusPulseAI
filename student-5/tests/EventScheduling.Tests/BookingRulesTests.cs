@@ -32,6 +32,28 @@ public sealed class BookingRulesTests
     }
 
     [Test]
+    public void HasCapacity_AllowsAnAttendeeCountAtOrBelowRoomCapacity()
+    {
+        Assert.Multiple(() =>
+        {
+            Assert.That(BookingRules.HasCapacity(4, roomCapacity: 4), Is.True);
+            Assert.That(BookingRules.HasCapacity(3, roomCapacity: 4), Is.True);
+        });
+    }
+
+    [Test]
+    public void HasCapacity_RejectsAnAttendeeCountOverRoomCapacity()
+    {
+        Assert.That(BookingRules.HasCapacity(5, roomCapacity: 4), Is.False);
+    }
+
+    [Test]
+    public void HasCapacity_SkipsTheCheckWhenNoAttendeeCountIsGiven()
+    {
+        Assert.That(BookingRules.HasCapacity(null, roomCapacity: 1), Is.True);
+    }
+
+    [Test]
     public async Task CountActiveBookingsAsync_CountsOnlyPendingOrConfirmedBookingsThatHaveNotYetEnded()
     {
         await using var context = await DatabaseTestContext.CreateAsync();

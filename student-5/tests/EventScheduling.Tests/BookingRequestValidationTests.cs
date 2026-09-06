@@ -13,9 +13,12 @@ public sealed class BookingRequestValidationTests
         string resourceName = "Study Room 101",
         DateTime? start = null,
         DateTime? end = null,
-        BookingStatus status = BookingStatus.Confirmed) =>
+        BookingStatus status = BookingStatus.Confirmed,
+        int? attendeeCount = null,
+        string? conditionNotes = null) =>
         new(studentId, roomId, refEquipmentId, resourceName,
-            start ?? Start, end ?? Start.AddHours(2), status);
+            start ?? Start, end ?? Start.AddHours(2), status,
+            AttendeeCount: attendeeCount, ConditionNotes: conditionNotes);
 
     [Test]
     public void Validate_PassesForAWellFormedRoomBooking()
@@ -130,5 +133,73 @@ public sealed class BookingRequestValidationTests
             Assert.That(booking.Status, Is.EqualTo(BookingStatus.Confirmed));
             Assert.That(booking.EquipmentId, Is.Null);
         });
+    }
+
+    // FR-09: attendee count.
+
+    [TestCase(0)]
+    [TestCase(-1)]
+    public void Validate_RejectsNonPositiveAttendeeCount(int count)
+    {
+        Assert.That(Room(attendeeCount: count).Validate(), Is.EqualTo("Attendee count must be greater than zero."));
+    }
+
+    [Test]
+    public void Validate_PassesForAPositiveAttendeeCount()
+    {
+        Assert.That(Room(attendeeCount: 4).Validate(), Is.Null);
+    }
+
+    [Test]
+    public void Validate_RejectsAttendeeCountOnAnEquipmentBooking()
+    {
+        var request = Room(roomId: null, refEquipmentId: 3, resourceName: "Portable Projector", attendeeCount: 4);
+
+        Assert.That(request.Validate(), Is.EqualTo("Attendee count only applies to room bookings."));
+    }
+
+    [Test]
+    public void ToBooking_CopiesTheAttendeeCount()
+    {
+        Assert.That(Room(attendeeCount: 6).ToBooking().AttendeeCount, Is.EqualTo(6));
+    }
+
+    // FR-21: condition notes.
+
+    [Test]
+    public void Validate_RejectsConditionNotesOverTheMaxLength()
+    {
+        var request = Room(roomId: null, refEquipmentId: 3, resourceName: "Portable Projector",
+            conditionNotes: new string('x', Booking.MaxConditionNotesLength + 1));
+
+        Assert.That(request.Validate(),
+            Is.EqualTo($"Condition notes must be {Booking.MaxConditionNotesLength} characters or fewer."));
+    }
+
+    [Test]
+    public void Validate_PassesForConditionNotesAtTheMaxLength()
+    {
+        var request = Room(roomId: null, refEquipmentId: 3, resourceName: "Portable Projector",
+            conditionNotes: new string('x', Booking.MaxConditionNotesLength));
+
+        Assert.That(request.Validate(), Is.Null);
+    }
+
+    [Test]
+    public void ToBooking_TrimsAndCopiesConditionNotesAsCheckOutNotes()
+    {
+        var booking = Room(roomId: null, refEquipmentId: 3, resourceName: "Portable Projector",
+            conditionNotes: "  Small scuff on the case.  ").ToBooking();
+
+        Assert.That(booking.CheckOutConditionNotes, Is.EqualTo("Small scuff on the case."));
+    }
+
+    [Test]
+    public void ToBooking_TreatsWhitespaceOnlyConditionNotesAsNull()
+    {
+        var booking = Room(roomId: null, refEquipmentId: 3, resourceName: "Portable Projector",
+            conditionNotes: "   ").ToBooking();
+
+        Assert.That(booking.CheckOutConditionNotes, Is.Null);
     }
 }

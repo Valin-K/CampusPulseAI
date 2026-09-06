@@ -110,8 +110,27 @@ public sealed class EventSchedulingApiClient(HttpClient httpClient)
         return new RecurringBookingResult(created, requests.Count, failures);
     }
 
-    public Task<BookingResult> ReturnBookingAsync(int id, CancellationToken cancellationToken = default) =>
-        PostBookingActionAsync($"/api/bookings/{id}/return", cancellationToken);
+    // FR-21: conditionNotes is the equipment's condition at return, optional.
+    public async Task<BookingResult> ReturnBookingAsync(int id, string? conditionNotes = null, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var response = await httpClient.PostAsJsonAsync(
+                $"/api/bookings/{id}/return", new ReturnRequest(conditionNotes), cancellationToken);
+            if (response.IsSuccessStatusCode)
+            {
+                var booking = await response.Content.ReadFromJsonAsync<BookingResponse>(cancellationToken);
+                return new BookingResult(true, booking, null);
+            }
+
+            var problem = await response.Content.ReadFromJsonAsync<ProblemResponse>(cancellationToken);
+            return new BookingResult(false, null, FirstError(problem) ?? "The return could not be recorded.");
+        }
+        catch (HttpRequestException)
+        {
+            return new BookingResult(false, null, "The Event Scheduling service is unavailable.");
+        }
+    }
 
     public Task<BookingResult> EndBookingAsync(int id, CancellationToken cancellationToken = default) =>
         PostBookingActionAsync($"/api/bookings/{id}/end", cancellationToken);
@@ -127,7 +146,9 @@ public sealed class EventSchedulingApiClient(HttpClient httpClient)
                 booking.ResourceName,
                 booking.StartUtc,
                 booking.EndUtc,
-                BookingStatus.Cancelled);
+                BookingStatus.Cancelled,
+                AttendeeCount: booking.AttendeeCount,
+                ConditionNotes: booking.CheckOutConditionNotes);
 
             var response = await httpClient.PutAsJsonAsync($"/api/bookings/{booking.Id}", request, cancellationToken);
             if (response.IsSuccessStatusCode)
