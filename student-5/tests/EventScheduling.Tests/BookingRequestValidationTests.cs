@@ -54,14 +54,14 @@ public sealed class BookingRequestValidationTests
     public void Validate_RejectsBookingWithNeitherRoomNorEquipment()
     {
         Assert.That(Room(roomId: null, refEquipmentId: null).Validate(),
-            Is.EqualTo("Exactly one of room or equipment type must be specified."));
+            Is.EqualTo("At least one of room or equipment type must be specified."));
     }
 
+    // FR-20: equipment can be booked alongside a room, not only on its own.
     [Test]
-    public void Validate_RejectsBookingWithBothRoomAndEquipment()
+    public void Validate_AllowsBookingWithBothRoomAndEquipmentTogether()
     {
-        Assert.That(Room(roomId: 1, refEquipmentId: 3).Validate(),
-            Is.EqualTo("Exactly one of room or equipment type must be specified."));
+        Assert.That(Room(roomId: 1, refEquipmentId: 3).Validate(), Is.Null);
     }
 
     [TestCase("")]
@@ -156,6 +156,14 @@ public sealed class BookingRequestValidationTests
         var request = Room(roomId: null, refEquipmentId: 3, resourceName: "Portable Projector", attendeeCount: 4);
 
         Assert.That(request.Validate(), Is.EqualTo("Attendee count only applies to room bookings."));
+    }
+
+    [Test]
+    public void Validate_AllowsAttendeeCountOnARoomBookingThatAlsoIncludesEquipment()
+    {
+        var request = Room(roomId: 1, refEquipmentId: 3, attendeeCount: 4);
+
+        Assert.That(request.Validate(), Is.Null);
     }
 
     [Test]

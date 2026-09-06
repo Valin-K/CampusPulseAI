@@ -20,6 +20,10 @@ public sealed class Room
     // history intact - deleting the row would null out every past Booking.RoomId.
     public bool IsActive { get; set; } = true;
 
+    // FR-01: descriptive opening hours (e.g. "Mon-Fri 7am-10pm"). Informational
+    // only - it is not enforced against booking times.
+    public string OpeningHours { get; set; } = string.Empty;
+
     public void UpdateFrom(RoomRequest request)
     {
         Name = request.Name.Trim();
@@ -28,9 +32,10 @@ public sealed class Room
         Description = request.Description.Trim();
         Kind = request.Kind;
         IsActive = request.IsActive;
+        OpeningHours = request.OpeningHours.Trim();
     }
 
-    public RoomResponse ToResponse() => new(Id, Name, Location, Capacity, Description, Kind, IsActive);
+    public RoomResponse ToResponse() => new(Id, Name, Location, Capacity, Description, Kind, IsActive, OpeningHours);
 }
 
 public sealed record RoomRequest(
@@ -39,7 +44,8 @@ public sealed record RoomRequest(
     int Capacity,
     string Description,
     RoomKind Kind = RoomKind.Study,
-    bool IsActive = true)
+    bool IsActive = true,
+    string OpeningHours = "")
 {
     public string? Validate()
     {
@@ -58,6 +64,11 @@ public sealed record RoomRequest(
             return "Capacity must be greater than zero.";
         }
 
+        if (OpeningHours.Length > 100)
+        {
+            return "Opening hours must be 100 characters or fewer.";
+        }
+
         return null;
     }
 
@@ -68,7 +79,8 @@ public sealed record RoomRequest(
         Capacity = Capacity,
         Description = Description.Trim(),
         Kind = Kind,
-        IsActive = IsActive
+        IsActive = IsActive,
+        OpeningHours = OpeningHours.Trim()
     };
 }
 
@@ -79,4 +91,5 @@ public sealed record RoomResponse(
     int Capacity,
     string Description,
     RoomKind Kind,
-    bool IsActive = true);
+    bool IsActive = true,
+    string OpeningHours = "");

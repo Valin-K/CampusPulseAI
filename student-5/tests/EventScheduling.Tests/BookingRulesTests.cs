@@ -54,6 +54,24 @@ public sealed class BookingRulesTests
     }
 
     [Test]
+    public void IsBeforeCutoff_AllowsChangingABookingThatHasNotStartedYet()
+    {
+        Assert.That(BookingRules.IsBeforeCutoff(NowUtc.AddMinutes(1), NowUtc), Is.True);
+    }
+
+    [Test]
+    public void IsBeforeCutoff_RejectsABookingThatHasAlreadyStarted()
+    {
+        Assert.That(BookingRules.IsBeforeCutoff(NowUtc, NowUtc), Is.False);
+    }
+
+    [Test]
+    public void IsBeforeCutoff_RejectsABookingThatHasAlreadyEnded()
+    {
+        Assert.That(BookingRules.IsBeforeCutoff(NowUtc.AddHours(-2), NowUtc), Is.False);
+    }
+
+    [Test]
     public async Task CountActiveBookingsAsync_CountsOnlyPendingOrConfirmedBookingsThatHaveNotYetEnded()
     {
         await using var context = await DatabaseTestContext.CreateAsync();

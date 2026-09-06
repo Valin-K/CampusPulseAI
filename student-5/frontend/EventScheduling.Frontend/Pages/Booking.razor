@@ -69,7 +69,13 @@ else
                 </div>
                 <span class="status-badge paid">Seats @room.Capacity</span>
             </div>
-            <ul class="detail-list"><li>@room.Location</li></ul>
+            <ul class="detail-list">
+                <li>@room.Location</li>
+                @if (!string.IsNullOrWhiteSpace(room.OpeningHours))
+                {
+                    <li>Open @room.OpeningHours</li>
+                }
+            </ul>
             <p>@room.Description</p>
         }
         else if (equipment is not null)

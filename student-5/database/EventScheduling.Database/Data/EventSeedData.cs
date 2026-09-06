@@ -156,14 +156,16 @@ public static class EventSeedData
         await database.SaveChangesAsync();
     }
 
-    private static Room Room(int id, string name, string location, int capacity, string description, RoomKind kind) => new()
+    private static Room Room(int id, string name, string location, int capacity, string description, RoomKind kind,
+        string openingHours = "Mon-Fri 7am-10pm, Sat-Sun 9am-6pm") => new()
     {
         Id = id,
         Name = name,
         Location = location,
         Capacity = capacity,
         Description = description,
-        Kind = kind
+        Kind = kind,
+        OpeningHours = openingHours
     };
 
     private static RefEquipment RefEquipment(int id, string name, string category, string description) => new()

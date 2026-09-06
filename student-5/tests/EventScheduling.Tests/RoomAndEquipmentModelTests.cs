@@ -24,9 +24,15 @@ public sealed class RoomAndEquipmentModelTests
         Assert.That(new Room().IsActive, Is.True);
     }
 
+    [Test]
+    public void Room_DefaultsToNoOpeningHours()
+    {
+        Assert.That(new Room().OpeningHours, Is.Empty);
+    }
+
     private static RoomRequest RoomRequest(string name = "Study Room 9", string location = "Library",
-        int capacity = 4, RoomKind kind = RoomKind.Study) =>
-        new(name, location, capacity, "A room.", kind);
+        int capacity = 4, RoomKind kind = RoomKind.Study, string openingHours = "") =>
+        new(name, location, capacity, "A room.", kind, OpeningHours: openingHours);
 
     [Test]
     public void RoomRequest_Validate_PassesForAWellFormedRoom()
@@ -84,6 +90,48 @@ public sealed class RoomAndEquipmentModelTests
         var room = new RoomRequest("Study Room 9", "Library", 4, "A room.", RoomKind.Study, IsActive: false).ToRoom();
 
         Assert.That(room.IsActive, Is.False);
+    }
+
+    // FR-01: opening hours.
+
+    [Test]
+    public void RoomRequest_Validate_RejectsOpeningHoursOver100Characters()
+    {
+        Assert.That(RoomRequest(openingHours: new string('x', 101)).Validate(),
+            Is.EqualTo("Opening hours must be 100 characters or fewer."));
+    }
+
+    [Test]
+    public void RoomRequest_Validate_PassesForOpeningHoursAt100Characters()
+    {
+        Assert.That(RoomRequest(openingHours: new string('x', 100)).Validate(), Is.Null);
+    }
+
+    [Test]
+    public void RoomRequest_ToRoom_TrimsAndCopiesOpeningHours()
+    {
+        var room = new RoomRequest("Study Room 9", "Library", 4, "A room.", OpeningHours: "  Mon-Fri 8am-8pm  ")
+            .ToRoom();
+
+        Assert.That(room.OpeningHours, Is.EqualTo("Mon-Fri 8am-8pm"));
+    }
+
+    [Test]
+    public void Room_UpdateFrom_CopiesOpeningHours()
+    {
+        var room = new Room { Name = "Study Room 9", Location = "Library", Capacity = 4, Description = "A room." };
+
+        room.UpdateFrom(new RoomRequest("Study Room 9", "Library", 4, "A room.", OpeningHours: "9am-5pm"));
+
+        Assert.That(room.OpeningHours, Is.EqualTo("9am-5pm"));
+    }
+
+    [Test]
+    public void Room_ToResponse_IncludesOpeningHours()
+    {
+        var room = new Room { Name = "Study Room 9", Location = "Library", Capacity = 4, Description = "x", OpeningHours = "24/7" };
+
+        Assert.That(room.ToResponse().OpeningHours, Is.EqualTo("24/7"));
     }
 
     [Test]

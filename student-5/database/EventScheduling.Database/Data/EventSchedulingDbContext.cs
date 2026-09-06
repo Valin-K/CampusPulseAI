@@ -21,6 +21,7 @@ public sealed class EventSchedulingDbContext(DbContextOptions<EventSchedulingDbC
             entity.Property(room => room.Description).HasMaxLength(500);
             entity.Property(room => room.Kind).HasConversion<string>().HasMaxLength(16).IsRequired();
             entity.Property(room => room.IsActive).HasDefaultValue(true).IsRequired();
+            entity.Property(room => room.OpeningHours).HasMaxLength(100).HasDefaultValue(string.Empty).IsRequired();
         });
 
         modelBuilder.Entity<RefEquipment>(entity =>

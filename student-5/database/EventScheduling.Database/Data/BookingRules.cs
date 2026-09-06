@@ -18,4 +18,7 @@ public static class BookingRules
 
     public static bool HasCapacity(int? attendeeCount, int roomCapacity) =>
         attendeeCount is not int count || count <= roomCapacity;
+
+    public static bool IsBeforeCutoff(DateTime bookingStartUtc, DateTime nowUtc) =>
+        bookingStartUtc > nowUtc;
 }

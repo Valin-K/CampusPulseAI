@@ -104,7 +104,9 @@ public sealed record RoomResponse(
     string Location,
     int Capacity,
     string Description,
-    RoomKind Kind = RoomKind.Study)
+    RoomKind Kind = RoomKind.Study,
+    bool IsActive = true,
+    string OpeningHours = "")
 {
     public bool IsStaffRoom => Kind is RoomKind.Lab or RoomKind.Lecture;
 
