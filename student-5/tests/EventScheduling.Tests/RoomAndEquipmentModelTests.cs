@@ -93,8 +93,6 @@ public sealed class RoomAndEquipmentModelTests
         Assert.That(room.IsActive, Is.False);
     }
 
-    // FR-01: opening hours.
-
     [Test]
     public void RoomRequest_Validate_RejectsOpeningHoursOver100Characters()
     {
@@ -134,8 +132,6 @@ public sealed class RoomAndEquipmentModelTests
 
         Assert.That(room.ToResponse().OpeningHours, Is.EqualTo("24/7"));
     }
-
-    // FR-05: accessibility.
 
     [Test]
     public void Room_DefaultsToNotAccessible()

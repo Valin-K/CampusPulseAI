@@ -82,10 +82,7 @@ public sealed class EventSchedulingApiClient(HttpClient httpClient)
             }
 
             var problem = await response.Content.ReadFromJsonAsync<ProblemResponse>(cancellationToken);
-            var message = problem?.Errors?.Values.SelectMany(messages => messages).FirstOrDefault()
-                ?? problem?.Detail
-                ?? "The booking could not be created.";
-            return new BookingResult(false, null, message);
+            return new BookingResult(false, null, FormatError(problem) ?? "The booking could not be created.");
         }
         catch (HttpRequestException)
         {
@@ -115,7 +112,6 @@ public sealed class EventSchedulingApiClient(HttpClient httpClient)
         return new RecurringBookingResult(created, requests.Count, failures);
     }
 
-    // FR-21: conditionNotes is the equipment's condition at return, optional.
     public async Task<BookingResult> ReturnBookingAsync(int id, string? conditionNotes = null, CancellationToken cancellationToken = default)
     {
         try
@@ -129,7 +125,7 @@ public sealed class EventSchedulingApiClient(HttpClient httpClient)
             }
 
             var problem = await response.Content.ReadFromJsonAsync<ProblemResponse>(cancellationToken);
-            return new BookingResult(false, null, FirstError(problem) ?? "The return could not be recorded.");
+            return new BookingResult(false, null, FormatError(problem) ?? "The return could not be recorded.");
         }
         catch (HttpRequestException)
         {
@@ -162,7 +158,7 @@ public sealed class EventSchedulingApiClient(HttpClient httpClient)
             }
 
             var problem = await response.Content.ReadFromJsonAsync<ProblemResponse>(cancellationToken);
-            return new BookingResult(false, null, FirstError(problem) ?? "The booking could not be cancelled.");
+            return new BookingResult(false, null, FormatError(problem) ?? "The booking could not be cancelled.");
         }
         catch (HttpRequestException)
         {
@@ -186,7 +182,7 @@ public sealed class EventSchedulingApiClient(HttpClient httpClient)
 
             var problem = await response.Content.ReadFromJsonAsync<ProblemResponse>(cancellationToken);
             return new AssistantResult(false, null,
-                FirstError(problem) ?? "The assistant could not answer right now.");
+                FormatError(problem) ?? "The assistant could not answer right now.");
         }
         catch (HttpRequestException)
         {
@@ -206,7 +202,7 @@ public sealed class EventSchedulingApiClient(HttpClient httpClient)
             }
 
             var problem = await response.Content.ReadFromJsonAsync<ProblemResponse>(cancellationToken);
-            return new BookingResult(false, null, FirstError(problem) ?? "The action could not be completed.");
+            return new BookingResult(false, null, FormatError(problem) ?? "The action could not be completed.");
         }
         catch (HttpRequestException)
         {
@@ -214,8 +210,24 @@ public sealed class EventSchedulingApiClient(HttpClient httpClient)
         }
     }
 
-    private static string? FirstError(ProblemResponse? problem) =>
-        problem?.Errors?.Values.SelectMany(messages => messages).FirstOrDefault() ?? problem?.Detail;
+    private static string? FormatError(ProblemResponse? problem)
+    {
+        var message = problem?.Errors?.Values.SelectMany(messages => messages).FirstOrDefault() ?? problem?.Detail;
+        if (message is null)
+        {
+            return null;
+        }
 
-    private sealed record ProblemResponse(string? Detail, Dictionary<string, string[]>? Errors);
+        var label = problem?.Category switch
+        {
+            "Clash" => "Scheduling conflict",
+            "RuleBreach" => "Booking rule",
+            "Outage" => "Service unavailable",
+            _ => null
+        };
+
+        return label is null ? message : $"{label}: {message}";
+    }
+
+    private sealed record ProblemResponse(string? Detail, Dictionary<string, string[]>? Errors, string? Category);
 }

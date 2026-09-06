@@ -32,7 +32,6 @@ public static class BookingActions
             return null;
         }
 
-        // Room booking.
         if (booking.Status is not (BookingStatus.Pending or BookingStatus.Confirmed))
         {
             return null;
@@ -61,8 +60,6 @@ public static class BookingActions
             _ => api.CancelBookingAsync(booking)
         };
 
-    // FR-21: ask for an optional note on the equipment's condition before
-    // completing the return, so damage can be traced back to this loan.
     private static async Task<BookingResult> ReturnWithNoteAsync(
         EventSchedulingApiClient api, IJSRuntime js, BookingResponse booking)
     {
@@ -73,7 +70,6 @@ public static class BookingActions
         }
         catch (JSException)
         {
-            // Prompt unavailable in this context - return without a note.
         }
 
         return await api.ReturnBookingAsync(booking.Id, note);

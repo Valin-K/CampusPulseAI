@@ -81,13 +81,13 @@ public sealed class BookingRulesTests
         await context.Database.SaveChangesAsync();
 
         context.Database.Bookings.AddRange(
-            MakeBooking(room.Id, studentId: 4, status: BookingStatus.Confirmed, endUtc: NowUtc.AddDays(1)),   // counts
-            MakeBooking(room.Id, studentId: 4, status: BookingStatus.Pending, endUtc: NowUtc.AddHours(2)),     // counts
-            MakeBooking(room.Id, studentId: 4, status: BookingStatus.Cancelled, endUtc: NowUtc.AddDays(1)),    // wrong status
-            MakeBooking(room.Id, studentId: 4, status: BookingStatus.Completed, endUtc: NowUtc.AddDays(1)),    // wrong status
-            MakeBooking(room.Id, studentId: 4, status: BookingStatus.Returned, endUtc: NowUtc.AddDays(1)),     // wrong status
-            MakeBooking(room.Id, studentId: 4, status: BookingStatus.Confirmed, endUtc: NowUtc.AddHours(-1)),  // already ended
-            MakeBooking(room.Id, studentId: 14, status: BookingStatus.Confirmed, endUtc: NowUtc.AddDays(1)));  // different student
+            MakeBooking(room.Id, studentId: 4, status: BookingStatus.Confirmed, endUtc: NowUtc.AddDays(1)),
+            MakeBooking(room.Id, studentId: 4, status: BookingStatus.Pending, endUtc: NowUtc.AddHours(2)),
+            MakeBooking(room.Id, studentId: 4, status: BookingStatus.Cancelled, endUtc: NowUtc.AddDays(1)),
+            MakeBooking(room.Id, studentId: 4, status: BookingStatus.Completed, endUtc: NowUtc.AddDays(1)),
+            MakeBooking(room.Id, studentId: 4, status: BookingStatus.Returned, endUtc: NowUtc.AddDays(1)),
+            MakeBooking(room.Id, studentId: 4, status: BookingStatus.Confirmed, endUtc: NowUtc.AddHours(-1)),
+            MakeBooking(room.Id, studentId: 14, status: BookingStatus.Confirmed, endUtc: NowUtc.AddDays(1)));
         await context.Database.SaveChangesAsync();
 
         var count = await BookingRules.CountActiveBookingsAsync(context.Database, studentId: 4, NowUtc, CancellationToken.None);
@@ -114,6 +114,74 @@ public sealed class BookingRulesTests
         EndUtc = endUtc,
         Status = status
     };
+
+
+    [Test]
+    public async Task HasRoomClashAsync_DoesNotClashWhenTheExistingBookingEndsExactlyWhenTheNewOneStarts()
+    {
+        await using var context = await DatabaseTestContext.CreateAsync();
+        var room = await SeedRoomAsync(context);
+        var fourteenHundred = new DateTime(2030, 6, 1, 14, 0, 0, DateTimeKind.Utc);
+
+        await SeedRoomBookingAsync(context, room.Id, fourteenHundred.AddHours(-1), fourteenHundred);
+
+        var clashes = await BookingRules.HasRoomClashAsync(
+            context.Database, room.Id, fourteenHundred, fourteenHundred.AddHours(1), excludeBookingId: null, CancellationToken.None);
+
+        Assert.That(clashes, Is.False);
+    }
+
+    [Test]
+    public async Task HasRoomClashAsync_DoesNotClashWhenTheNewBookingEndsExactlyWhenTheExistingOneStarts()
+    {
+        await using var context = await DatabaseTestContext.CreateAsync();
+        var room = await SeedRoomAsync(context);
+        var fourteenHundred = new DateTime(2030, 6, 1, 14, 0, 0, DateTimeKind.Utc);
+
+        await SeedRoomBookingAsync(context, room.Id, fourteenHundred, fourteenHundred.AddHours(1));
+
+        var clashes = await BookingRules.HasRoomClashAsync(
+            context.Database, room.Id, fourteenHundred.AddHours(-1), fourteenHundred, excludeBookingId: null, CancellationToken.None);
+
+        Assert.That(clashes, Is.False);
+    }
+
+    [Test]
+    public async Task HasRoomClashAsync_ClashesWhenTheWindowsOverlapByEvenAMinute()
+    {
+        await using var context = await DatabaseTestContext.CreateAsync();
+        var room = await SeedRoomAsync(context);
+        var fourteenHundred = new DateTime(2030, 6, 1, 14, 0, 0, DateTimeKind.Utc);
+
+        await SeedRoomBookingAsync(context, room.Id, fourteenHundred.AddHours(-1), fourteenHundred.AddMinutes(1));
+
+        var clashes = await BookingRules.HasRoomClashAsync(
+            context.Database, room.Id, fourteenHundred, fourteenHundred.AddHours(1), excludeBookingId: null, CancellationToken.None);
+
+        Assert.That(clashes, Is.True);
+    }
+
+    private static async Task<Room> SeedRoomAsync(DatabaseTestContext context)
+    {
+        var room = new Room { Name = "Study Room 101", Location = "Library", Capacity = 4, Description = "x" };
+        context.Database.Rooms.Add(room);
+        await context.Database.SaveChangesAsync();
+        return room;
+    }
+
+    private static async Task SeedRoomBookingAsync(DatabaseTestContext context, int roomId, DateTime startUtc, DateTime endUtc)
+    {
+        context.Database.Bookings.Add(new Booking
+        {
+            StudentId = 4,
+            RoomId = roomId,
+            ResourceName = "Study Room 101",
+            StartUtc = startUtc,
+            EndUtc = endUtc,
+            Status = BookingStatus.Confirmed
+        });
+        await context.Database.SaveChangesAsync();
+    }
 
     [Test]
     public async Task CountAvailableEquipmentUnitsAsync_ExcludesAUnitBookedForAnOverlappingWindow()

@@ -25,7 +25,6 @@
     background: #fff0ee;
 }
 
-/* Finished: window has passed, nothing left to do. Muted slate so it reads as "done / archived". */
 .day-status.status-completed {
     color: #475569;
     background: #eef2f7;

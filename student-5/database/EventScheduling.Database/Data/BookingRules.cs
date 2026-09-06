@@ -21,6 +21,49 @@ public static class BookingRules
 
     public static bool IsBeforeCutoff(DateTime bookingStartUtc, DateTime nowUtc) =>
         bookingStartUtc > nowUtc;
+    public static Task<bool> HasRoomClashAsync(EventSchedulingDbContext database, int roomId, DateTime startUtc, DateTime endUtc,
+        int? excludeBookingId, CancellationToken cancellationToken)
+    {
+        var query = database.Bookings.Where(other =>
+            other.RoomId == roomId
+            && other.Status != BookingStatus.Cancelled
+            && other.Status != BookingStatus.Completed
+            && other.Status != BookingStatus.Returned
+            && startUtc < other.EndUtc
+            && other.StartUtc < endUtc);
+
+        if (excludeBookingId is int excludeId)
+        {
+            query = query.Where(other => other.Id != excludeId);
+        }
+
+        return query.AnyAsync(cancellationToken);
+    }
+
+    public static async Task<bool> TryCommitRoomBookingAsync(
+        EventSchedulingDbContext database, Booking booking, CancellationToken cancellationToken)
+    {
+        await database.Database.ExecuteSqlRawAsync("PRAGMA busy_timeout = 5000;", cancellationToken);
+
+        await using var transaction = await database.Database.BeginTransactionAsync(cancellationToken);
+
+        database.Bookings.Add(booking);
+        await database.SaveChangesAsync(cancellationToken);
+
+        var stillClashes = await HasRoomClashAsync(
+            database, booking.RoomId!.Value, booking.StartUtc, booking.EndUtc,
+            excludeBookingId: booking.Id, cancellationToken);
+
+        if (stillClashes)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return false;
+        }
+
+        await transaction.CommitAsync(cancellationToken);
+        return true;
+    }
+
     public static async Task<int> CountAvailableEquipmentUnitsAsync(
         EventSchedulingDbContext database, int refEquipmentId, DateTime startUtc, DateTime endUtc,
         CancellationToken cancellationToken)
