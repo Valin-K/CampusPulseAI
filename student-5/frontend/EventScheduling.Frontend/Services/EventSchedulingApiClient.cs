@@ -116,11 +116,20 @@ public sealed class EventSchedulingApiClient(HttpClient httpClient)
     public Task<BookingResult> EndBookingAsync(int id, CancellationToken cancellationToken = default) =>
         PostBookingActionAsync($"/api/bookings/{id}/end", cancellationToken);
 
-    public async Task<BookingResult> CancelBookingAsync(int id, CancellationToken cancellationToken = default)
+    public async Task<BookingResult> CancelBookingAsync(BookingResponse booking, CancellationToken cancellationToken = default)
     {
         try
         {
-            var response = await httpClient.DeleteAsync($"/api/bookings/{id}", cancellationToken);
+            var request = new BookingRequest(
+                booking.StudentId,
+                booking.RoomId,
+                booking.RefEquipmentId,
+                booking.ResourceName,
+                booking.StartUtc,
+                booking.EndUtc,
+                BookingStatus.Cancelled);
+
+            var response = await httpClient.PutAsJsonAsync($"/api/bookings/{booking.Id}", request, cancellationToken);
             if (response.IsSuccessStatusCode)
             {
                 return new BookingResult(true, null, null);

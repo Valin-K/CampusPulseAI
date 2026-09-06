@@ -93,9 +93,27 @@ public sealed class BookingRequestValidationTests
     }
 
     [Test]
-    public void Validate_AllowsRoomBookingLongerThanSevenDays()
+    public void Validate_RejectsRoomBookingLongerThanMaxDuration()
     {
-        var request = Room(start: Start, end: Start.AddDays(30));
+        var request = Room(start: Start, end: Start.Add(Booking.MaxRoomBookingDuration).AddMinutes(1));
+
+        Assert.That(request.Validate(),
+            Is.EqualTo($"A single room booking can run for at most {Booking.MaxRoomBookingDuration.TotalHours:0.#} hours."));
+    }
+
+    [Test]
+    public void Validate_AllowsRoomBookingUpToMaxDuration()
+    {
+        var request = Room(start: Start, end: Start.Add(Booking.MaxRoomBookingDuration));
+
+        Assert.That(request.Validate(), Is.Null);
+    }
+
+    [Test]
+    public void Validate_EquipmentHireIsNotSubjectToTheRoomDurationCap()
+    {
+        var request = Room(roomId: null, refEquipmentId: 3, resourceName: "Portable Projector",
+            start: Start, end: Start.AddDays(7));
 
         Assert.That(request.Validate(), Is.Null);
     }

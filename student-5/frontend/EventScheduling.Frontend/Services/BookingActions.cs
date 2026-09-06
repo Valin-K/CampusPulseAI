@@ -56,6 +56,6 @@ public static class BookingActions
         {
             BookingActionKind.Return => api.ReturnBookingAsync(booking.Id),
             BookingActionKind.End => api.EndBookingAsync(booking.Id),
-            _ => api.CancelBookingAsync(booking.Id)
+            _ => api.CancelBookingAsync(booking)
         };
 }

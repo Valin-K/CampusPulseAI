@@ -90,7 +90,7 @@ else
         <div class="section-heading">
             <div>
                 <span class="eyebrow">Schedule</span>
-                <h2>@(isRecurring ? "Set the class schedule" : isRoom ? "Choose your slot" : "Schedule your hire")</h2>
+                <h2>@(isRecurring ? "Set the weekly schedule" : isRoom ? "Choose your slot" : "Schedule your hire")</h2>
             </div>
         </div>
 
@@ -266,7 +266,8 @@ else
     private bool saved;
     private string? errorMessage;
 
-    // Recurring room bookings (teaching staff only): same time slot on chosen weekdays for N weeks.
+    // Recurring room bookings: same time slot on chosen weekdays for N weeks. Available
+    // to students booking a Study room and staff booking a Lab/Lecture room alike.
     private static readonly DayOfWeek[] WeekDays =
     {
         DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday,
@@ -278,7 +279,7 @@ else
     private RecurringBookingResult? recurringResult;
 
     private bool isRoom => room is not null;
-    private bool isRecurring => isRoom && CurrentUser.IsStaff;
+    private bool isRecurring => isRoom;
     private string todayIso => DateTime.Today.ToString("yyyy-MM-dd");
     private bool DateInPast => date is { } picked && picked < DateOnly.FromDateTime(DateTime.Today);
 
@@ -289,7 +290,7 @@ else
     private string HeroSubtitle => (saved, room, equipment) switch
     {
         (true, _, _) => "You're all set.",
-        (_, { } r, _) when isRecurring => $"Set a weekly schedule to hold {r.Name} for your class.",
+        (_, { } r, _) when isRecurring => $"Set a weekly schedule to hold {r.Name}.",
         (_, { } r, _) => $"Pick a date and time for {r.Name}.",
         (_, _, { } e) => $"Choose when you'd like to pick up the {e.Name}.",
         _ => "Choose what you'd like to book."
@@ -525,7 +526,7 @@ else
                     CurrentUser.UserId, room!.Id, null, room.Name,
                     slot.Date.ToDateTime(startTime!.Value, DateTimeKind.Utc),
                     slot.Date.ToDateTime(endTime!.Value, DateTimeKind.Utc),
-                    BookingStatus.Confirmed, IsStaff: true))
+                    BookingStatus.Confirmed, IsStaff: CurrentUser.IsStaff))
                 .ToList();
 
             recurringResult = await Api.CreateBookingsAsync(requests);

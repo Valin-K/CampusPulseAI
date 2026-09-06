@@ -1,3 +1,4 @@
+using EventScheduling.Backend.Clients;
 using EventScheduling.Backend.Models;
 using Microsoft.AspNetCore.Mvc;
 
@@ -5,7 +6,9 @@ namespace EventScheduling.Backend.Controllers;
 
 [ApiController]
 [Route("api/bookings")]
-public sealed class BookingsController(IHttpClientFactory httpClientFactory) : ControllerBase
+public sealed class BookingsController(
+    IHttpClientFactory httpClientFactory,
+    IAcademicRecordsClient academicRecords) : ControllerBase
 {
     private HttpClient DatabaseClient => httpClientFactory.CreateClient("eventDatabase");
 
@@ -26,6 +29,21 @@ public sealed class BookingsController(IHttpClientFactory httpClientFactory) : C
     [HttpPost]
     public async Task<IActionResult> Create(BookingRequest request, CancellationToken cancellationToken)
     {
+        try
+        {
+            var users = await academicRecords.GetUsersAsync(cancellationToken);
+            if (!users.Any(user => user.UserId == request.StudentId))
+            {
+                ModelState.AddModelError("booking",
+                    "The booking could not be verified against a current student or staff record.");
+                return ValidationProblem(ModelState);
+            }
+        }
+        catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException)
+        {
+            // Academic Records is down - let the database tier's own validation decide.
+        }
+
         var response = await DatabaseClient.PostAsJsonAsync("/api/bookings", request, cancellationToken);
         return await response.ToActionResultAsync(cancellationToken);
     }
