@@ -5,10 +5,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace EventScheduling.Tests;
 
-// Checks the mapping in EventSchedulingDbContext.OnModelCreating against the real
-// SQLite schema: enums stored as readable strings, and the delete behaviours the
-// booking rules rely on (equipment types can't be deleted out from under a unit;
-// deleting a room or a unit detaches its bookings rather than removing them).
 public sealed class EventSchedulingDbContextTests
 {
     private static RefEquipment RefEquipmentType(string name = "HDMI Adapter") =>

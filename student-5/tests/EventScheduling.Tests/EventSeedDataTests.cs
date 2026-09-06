@@ -4,9 +4,6 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
 namespace EventScheduling.Tests;
-
-// Runs the production seeder against an empty database and checks the catalogue it
-// produces and the invariants the booking rules depend on.
 public sealed class EventSeedDataTests
 {
     [Test]
