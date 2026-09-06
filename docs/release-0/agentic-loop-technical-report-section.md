@@ -16,7 +16,26 @@ CampusPulseAI implements a shared Agentic AI loop that follows the required **Pl
 | **Adapt** | A human decides whether to apply a patch. The loop never auto-applies changes. | Approved patch + human approval text, or a decision that no adaptation is required. |
 | **Verify** | If a patch is applied, the deterministic checks run again to confirm the change did not break anything. | Updated check results. |
 
-### 1.3 Shared Scope
+### 1.3 Workflow Diagram
+
+```mermaid
+flowchart LR
+    A[Plan] --> B[Act]
+    B --> C[Observe]
+    C --> D{Changes?}
+    D -->|No| E[Done]
+    D -->|Yes| F[Human Review]
+    F -->|Approve| G[Adapt]
+    G --> H[Verify]
+    H --> E
+    F -->|Reject| E
+
+    style A fill:#e1f5fe
+    style C fill:#fff3e0
+    style G fill:#e8f5e9
+```
+
+### 1.4 Shared Scope
 
 The loop validates the following integrated components:
 
