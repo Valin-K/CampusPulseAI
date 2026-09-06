@@ -23,21 +23,13 @@ public sealed class Booking
         Status = request.Status;
     }
 
-    // Equipment can be hired for at most this long before it is considered overdue.
     public static readonly TimeSpan MaxEquipmentHire = TimeSpan.FromDays(7);
 
-    // A single room reservation can run for at most this long (a booking that needs
-    // longer should be made as separate/recurring reservations instead).
     public static readonly TimeSpan MaxRoomBookingDuration = TimeSpan.FromHours(4);
 
-    // Room bookings must be made at least this far ahead of their start time.
     public static readonly TimeSpan MinBookingNotice = TimeSpan.FromMinutes(30);
 
-    // A student/staff member can hold at most this many current-or-upcoming (Pending
-    // or Confirmed) bookings at once, across rooms and equipment combined. Set well
-    // above what a normal weekly recurring series or a busy demo account needs -
-    // this exists to stop runaway/duplicate booking, not to ration normal use.
-    public const int MaxActiveBookingsPerStudent = 20;
+    public const int MaxActiveBookingsPerStudent = 120;
 
     public BookingResponse ToResponse()
     {
