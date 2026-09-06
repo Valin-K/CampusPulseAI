@@ -15,7 +15,6 @@ public sealed class AssistantChatRequest
 
 public sealed class AssistantMessage
 {
-    // "user" or "assistant".
     [Required]
     [RegularExpression("user|assistant")]
     public required string Role { get; set; }

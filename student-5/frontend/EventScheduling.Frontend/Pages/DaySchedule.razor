@@ -106,7 +106,6 @@ else
     private int? busyId;
     private readonly List<DayBookingEntry> dayBookings = [];
 
-    // Local date, to match the calendar grid and how booking times are displayed.
     private static DateOnly Today => DateOnly.FromDateTime(DateTime.Today);
     private bool isPast => day < Today;
     private bool isToday => day == Today;

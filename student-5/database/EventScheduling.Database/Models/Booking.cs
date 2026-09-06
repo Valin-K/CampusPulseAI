@@ -109,8 +109,6 @@ public sealed record BookingRequest(
             return "Overdue, Completed and Returned are managed by the system and cannot be set directly.";
         }
 
-        // FR-20: equipment can be booked on its own or alongside a room, so only
-        // "neither" is rejected here - both may be set together.
         if (!RoomId.HasValue && !RefEquipmentId.HasValue)
         {
             return "At least one of room or equipment type must be specified.";

@@ -81,13 +81,13 @@ public sealed class BookingRulesTests
         await context.Database.SaveChangesAsync();
 
         context.Database.Bookings.AddRange(
-            MakeBooking(room.Id, studentId: 4, status: BookingStatus.Confirmed, endUtc: NowUtc.AddDays(1)),   // counts
-            MakeBooking(room.Id, studentId: 4, status: BookingStatus.Pending, endUtc: NowUtc.AddHours(2)),     // counts
-            MakeBooking(room.Id, studentId: 4, status: BookingStatus.Cancelled, endUtc: NowUtc.AddDays(1)),    // wrong status
-            MakeBooking(room.Id, studentId: 4, status: BookingStatus.Completed, endUtc: NowUtc.AddDays(1)),    // wrong status
-            MakeBooking(room.Id, studentId: 4, status: BookingStatus.Returned, endUtc: NowUtc.AddDays(1)),     // wrong status
-            MakeBooking(room.Id, studentId: 4, status: BookingStatus.Confirmed, endUtc: NowUtc.AddHours(-1)),  // already ended
-            MakeBooking(room.Id, studentId: 14, status: BookingStatus.Confirmed, endUtc: NowUtc.AddDays(1)));  // different student
+            MakeBooking(room.Id, studentId: 4, status: BookingStatus.Confirmed, endUtc: NowUtc.AddDays(1)),
+            MakeBooking(room.Id, studentId: 4, status: BookingStatus.Pending, endUtc: NowUtc.AddHours(2)),
+            MakeBooking(room.Id, studentId: 4, status: BookingStatus.Cancelled, endUtc: NowUtc.AddDays(1)),
+            MakeBooking(room.Id, studentId: 4, status: BookingStatus.Completed, endUtc: NowUtc.AddDays(1)),
+            MakeBooking(room.Id, studentId: 4, status: BookingStatus.Returned, endUtc: NowUtc.AddDays(1)),
+            MakeBooking(room.Id, studentId: 4, status: BookingStatus.Confirmed, endUtc: NowUtc.AddHours(-1)),
+            MakeBooking(room.Id, studentId: 14, status: BookingStatus.Confirmed, endUtc: NowUtc.AddDays(1)));
         await context.Database.SaveChangesAsync();
 
         var count = await BookingRules.CountActiveBookingsAsync(context.Database, studentId: 4, NowUtc, CancellationToken.None);

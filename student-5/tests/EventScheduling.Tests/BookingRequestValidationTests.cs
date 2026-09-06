@@ -57,7 +57,6 @@ public sealed class BookingRequestValidationTests
             Is.EqualTo("At least one of room or equipment type must be specified."));
     }
 
-    // FR-20: equipment can be booked alongside a room, not only on its own.
     [Test]
     public void Validate_AllowsBookingWithBothRoomAndEquipmentTogether()
     {
@@ -135,8 +134,6 @@ public sealed class BookingRequestValidationTests
         });
     }
 
-    // FR-09: attendee count.
-
     [TestCase(0)]
     [TestCase(-1)]
     public void Validate_RejectsNonPositiveAttendeeCount(int count)
@@ -171,8 +168,6 @@ public sealed class BookingRequestValidationTests
     {
         Assert.That(Room(attendeeCount: 6).ToBooking().AttendeeCount, Is.EqualTo(6));
     }
-
-    // FR-21: condition notes.
 
     [Test]
     public void Validate_RejectsConditionNotesOverTheMaxLength()

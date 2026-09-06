@@ -70,7 +70,6 @@
     color: var(--university-muted);
 }
 
-/* "In use" pill for an equipment hire that is currently running. */
 .booking-strip-topline .status-badge.inuse {
     color: var(--university-blue);
     background: var(--university-sky);
@@ -93,7 +92,6 @@
     padding-top: .35rem;
 }
 
-/* Smaller than the day-schedule cards to suit the narrow strip card. */
 .booking-strip-actions .button {
     min-height: 1.95rem;
     padding: .3rem .7rem;

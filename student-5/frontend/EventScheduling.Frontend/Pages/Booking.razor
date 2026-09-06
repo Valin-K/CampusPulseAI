@@ -306,8 +306,6 @@ else
     private bool saved;
     private string? errorMessage;
 
-    // Recurring room bookings: same time slot on chosen weekdays for N weeks. Available
-    // to students booking a Study room and staff booking a Lab/Lecture room alike.
     private static readonly DayOfWeek[] WeekDays =
     {
         DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday,
@@ -385,8 +383,6 @@ else
         }
     }
 
-    // FR-09: an attendee count over the room's capacity blocks submission client-side;
-    // the server checks it again regardless.
     private bool AttendeeCountValid => attendeeCount is not { } count || (isRoom && count > 0 && count <= room!.Capacity);
 
     private string AttendeeCountMessage => attendeeCount switch
@@ -398,7 +394,6 @@ else
 
     private sealed record OccurrenceSlot(DateOnly Date, bool Clashes);
 
-    // Every dated occurrence the recurrence settings produce, earliest first.
     private List<OccurrenceSlot> occurrences => BuildOccurrences();
 
     private List<OccurrenceSlot> BuildOccurrences()
@@ -412,7 +407,6 @@ else
         }
 
         var weeks = Math.Clamp(recurringWeeks, 1, 13);
-        // Monday of the week the start date falls in.
         var weekStart = anchor.AddDays(-(((int)anchor.DayOfWeek + 6) % 7));
 
         for (var week = 0; week < weeks; week++)
