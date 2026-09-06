@@ -358,9 +358,7 @@ bookings.MapPost("/", async (BookingRequest request, EventSchedulingDbContext da
         });
     }
 
-    // Notice period: a room needs to be locked in ahead of time, not the instant
-    // someone walks up to it.
-    if (request.RoomId is not null && request.StartUtc < nowUtc.Add(Booking.MinBookingNotice))
+    if (request.RoomId is not null && !BookingRules.HasSufficientNotice(request.StartUtc, nowUtc))
     {
         return Results.ValidationProblem(new Dictionary<string, string[]>
         {
@@ -368,14 +366,7 @@ bookings.MapPost("/", async (BookingRequest request, EventSchedulingDbContext da
         });
     }
 
-    // Booking quota: caps how many reservations one person can hold at once so a
-    // single account can't tie up every room/unit. Only current-or-upcoming
-    // bookings count - a completed history doesn't count against the limit.
-    var activeBookingCount = await database.Bookings.CountAsync(
-        existing => existing.StudentId == request.StudentId
-            && existing.EndUtc >= nowUtc
-            && (existing.Status == BookingStatus.Pending || existing.Status == BookingStatus.Confirmed),
-        cancellationToken);
+    var activeBookingCount = await BookingRules.CountActiveBookingsAsync(database, request.StudentId, nowUtc, cancellationToken);
     if (activeBookingCount >= Booking.MaxActiveBookingsPerStudent)
     {
         return Results.ValidationProblem(new Dictionary<string, string[]>

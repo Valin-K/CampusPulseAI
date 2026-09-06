@@ -34,9 +34,10 @@ public sealed class BookingsController(
             var users = await academicRecords.GetUsersAsync(cancellationToken);
             if (!users.Any(user => user.UserId == request.StudentId))
             {
-                ModelState.AddModelError("booking",
-                    "The booking could not be verified against a current student or staff record.");
-                return ValidationProblem(ModelState);
+                return Problem(
+                    "The booking could not be verified against a current student or staff record.",
+                    statusCode: StatusCodes.Status400BadRequest,
+                    title: "Booking rejected");
             }
         }
         catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException)
