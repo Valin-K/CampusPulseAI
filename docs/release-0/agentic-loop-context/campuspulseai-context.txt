@@ -2,7 +2,7 @@ CampusPulseAI approved project context
 ======================================
 
 CampusPulseAI is an existing .NET 10 campus-services solution. The repository
-already contains the following working artifacts:
+already contains the following working artefacts:
 
 - `CampusPulseAI.slnx` with all projects.
 - `Directory.Packages.props` centrally managing NuGet package versions.

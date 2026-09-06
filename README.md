@@ -9,7 +9,7 @@ Install the following on Windows before opening the solution:
 1. **Visual Studio Community 2026** (18.9 or later)
    - Install the **ASP.NET and web development** workload.
    - In the Visual Studio Installer, also ensure **Container Development Tools** is installed. This provides Visual Studio Container Tools and the Docker Compose integration.
-   - Sign in to Visual Studio if your Community license requires it.
+   - Sign in to Visual Studio if your Community licence requires it.
 
 2. **.NET SDK 10.0.302**
    - The repository pins this SDK in `global.json`.
