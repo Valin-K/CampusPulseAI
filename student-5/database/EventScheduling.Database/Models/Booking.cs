@@ -23,8 +23,13 @@ public sealed class Booking
         Status = request.Status;
     }
 
-    // Equipment can be hired for at most this long before it is considered overdue.
     public static readonly TimeSpan MaxEquipmentHire = TimeSpan.FromDays(7);
+
+    public static readonly TimeSpan MaxRoomBookingDuration = TimeSpan.FromHours(4);
+
+    public static readonly TimeSpan MinBookingNotice = TimeSpan.FromMinutes(30);
+
+    public const int MaxActiveBookingsPerStudent = 120;
 
     public BookingResponse ToResponse()
     {
@@ -107,6 +112,11 @@ public sealed record BookingRequest(
         if (RefEquipmentId.HasValue && EndUtc - StartUtc > Booking.MaxEquipmentHire)
         {
             return "Equipment can be hired for a maximum of 7 days.";
+        }
+
+        if (RoomId.HasValue && EndUtc - StartUtc > Booking.MaxRoomBookingDuration)
+        {
+            return $"A single room booking can run for at most {Booking.MaxRoomBookingDuration.TotalHours:0.#} hours.";
         }
 
         return null;

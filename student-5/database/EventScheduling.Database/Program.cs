@@ -22,12 +22,19 @@ using (var scope = app.Services.CreateScope())
 
 var rooms = app.MapGroup("/api/rooms");
 
-rooms.MapGet("/", async (EventSchedulingDbContext database, CancellationToken cancellationToken) =>
-    await database.Rooms
-        .AsNoTracking()
+rooms.MapGet("/", async (bool? includeInactive, EventSchedulingDbContext database, CancellationToken cancellationToken) =>
+{
+    var query = database.Rooms.AsNoTracking();
+    if (includeInactive is not true)
+    {
+        query = query.Where(room => room.IsActive);
+    }
+
+    return await query
         .OrderBy(room => room.Name)
         .Select(room => room.ToResponse())
-        .ToListAsync(cancellationToken));
+        .ToListAsync(cancellationToken);
+});
 
 rooms.MapGet("/{id:int}", async (int id, EventSchedulingDbContext database, CancellationToken cancellationToken) =>
 {
@@ -341,11 +348,30 @@ bookings.MapPost("/", async (BookingRequest request, EventSchedulingDbContext da
         return Results.ValidationProblem(new Dictionary<string, string[]> { ["booking"] = [error] });
     }
 
-    if (request.StartUtc.Date < DateTime.UtcNow.Date.AddDays(-1))
+    var nowUtc = DateTime.UtcNow;
+
+    if (request.StartUtc.Date < nowUtc.Date.AddDays(-1))
     {
         return Results.ValidationProblem(new Dictionary<string, string[]>
         {
             ["booking"] = ["Bookings can't start on a past date."]
+        });
+    }
+
+    if (request.RoomId is not null && !BookingRules.HasSufficientNotice(request.StartUtc, nowUtc))
+    {
+        return Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            ["booking"] = [$"Room bookings need at least {Booking.MinBookingNotice.TotalMinutes:0} minutes' notice."]
+        });
+    }
+
+    var activeBookingCount = await BookingRules.CountActiveBookingsAsync(database, request.StudentId, nowUtc, cancellationToken);
+    if (activeBookingCount >= Booking.MaxActiveBookingsPerStudent)
+    {
+        return Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            ["booking"] = [$"You already have {Booking.MaxActiveBookingsPerStudent} active bookings. Cancel or complete one before making another."]
         });
     }
 

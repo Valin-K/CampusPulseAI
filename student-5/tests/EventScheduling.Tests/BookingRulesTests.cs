@@ -1,0 +1,104 @@
+using EventScheduling.Database.Data;
+using EventScheduling.Database.Models;
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
+
+namespace EventScheduling.Tests;
+
+public sealed class BookingRulesTests
+{
+    private static readonly DateTime NowUtc = new(2030, 6, 1, 10, 0, 0, DateTimeKind.Utc);
+
+    [Test]
+    public void HasSufficientNotice_RejectsAStartTimeSoonerThanTheMinimumNotice()
+    {
+        var start = NowUtc.Add(Booking.MinBookingNotice).AddMinutes(-1);
+
+        Assert.That(BookingRules.HasSufficientNotice(start, NowUtc), Is.False);
+    }
+
+    [Test]
+    public void HasSufficientNotice_AllowsAStartTimeExactlyAtTheMinimumNotice()
+    {
+        var start = NowUtc.Add(Booking.MinBookingNotice);
+
+        Assert.That(BookingRules.HasSufficientNotice(start, NowUtc), Is.True);
+    }
+
+    [Test]
+    public void HasSufficientNotice_AllowsAStartTimeWellInTheFuture()
+    {
+        Assert.That(BookingRules.HasSufficientNotice(NowUtc.AddDays(1), NowUtc), Is.True);
+    }
+
+    [Test]
+    public async Task CountActiveBookingsAsync_CountsOnlyPendingOrConfirmedBookingsThatHaveNotYetEnded()
+    {
+        await using var context = await DatabaseTestContext.CreateAsync();
+
+        var room = new Room { Name = "Study Room 101", Location = "Library", Capacity = 4, Description = "x" };
+        context.Database.Rooms.Add(room);
+        await context.Database.SaveChangesAsync();
+
+        context.Database.Bookings.AddRange(
+            MakeBooking(room.Id, studentId: 4, status: BookingStatus.Confirmed, endUtc: NowUtc.AddDays(1)),   // counts
+            MakeBooking(room.Id, studentId: 4, status: BookingStatus.Pending, endUtc: NowUtc.AddHours(2)),     // counts
+            MakeBooking(room.Id, studentId: 4, status: BookingStatus.Cancelled, endUtc: NowUtc.AddDays(1)),    // wrong status
+            MakeBooking(room.Id, studentId: 4, status: BookingStatus.Completed, endUtc: NowUtc.AddDays(1)),    // wrong status
+            MakeBooking(room.Id, studentId: 4, status: BookingStatus.Returned, endUtc: NowUtc.AddDays(1)),     // wrong status
+            MakeBooking(room.Id, studentId: 4, status: BookingStatus.Confirmed, endUtc: NowUtc.AddHours(-1)),  // already ended
+            MakeBooking(room.Id, studentId: 14, status: BookingStatus.Confirmed, endUtc: NowUtc.AddDays(1)));  // different student
+        await context.Database.SaveChangesAsync();
+
+        var count = await BookingRules.CountActiveBookingsAsync(context.Database, studentId: 4, NowUtc, CancellationToken.None);
+
+        Assert.That(count, Is.EqualTo(2));
+    }
+
+    [Test]
+    public async Task CountActiveBookingsAsync_ReturnsZeroForAStudentWithNoBookings()
+    {
+        await using var context = await DatabaseTestContext.CreateAsync();
+
+        var count = await BookingRules.CountActiveBookingsAsync(context.Database, studentId: 4, NowUtc, CancellationToken.None);
+
+        Assert.That(count, Is.Zero);
+    }
+
+    private static Booking MakeBooking(int roomId, int studentId, BookingStatus status, DateTime endUtc) => new()
+    {
+        StudentId = studentId,
+        RoomId = roomId,
+        ResourceName = "Study Room 101",
+        StartUtc = endUtc.AddHours(-1),
+        EndUtc = endUtc,
+        Status = status
+    };
+
+    private sealed class DatabaseTestContext(
+        SqliteConnection connection,
+        EventSchedulingDbContext database) : IAsyncDisposable
+    {
+        public EventSchedulingDbContext Database { get; } = database;
+
+        public static async Task<DatabaseTestContext> CreateAsync()
+        {
+            var connection = new SqliteConnection("Data Source=:memory:;Foreign Keys=True");
+            await connection.OpenAsync();
+
+            var options = new DbContextOptionsBuilder<EventSchedulingDbContext>()
+                .UseSqlite(connection)
+                .Options;
+            var database = new EventSchedulingDbContext(options);
+            await database.Database.EnsureCreatedAsync();
+
+            return new DatabaseTestContext(connection, database);
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            await Database.DisposeAsync();
+            await connection.DisposeAsync();
+        }
+    }
+}

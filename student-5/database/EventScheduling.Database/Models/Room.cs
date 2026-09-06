@@ -16,6 +16,10 @@ public sealed class Room
     public RoomKind Kind { get; set; } = RoomKind.Study;
     public bool IsStaffRoom => Kind is RoomKind.Lab or RoomKind.Lecture;
 
+    // A deactivated room drops out of search/booking but keeps its booking
+    // history intact - deleting the row would null out every past Booking.RoomId.
+    public bool IsActive { get; set; } = true;
+
     public void UpdateFrom(RoomRequest request)
     {
         Name = request.Name.Trim();
@@ -23,9 +27,10 @@ public sealed class Room
         Capacity = request.Capacity;
         Description = request.Description.Trim();
         Kind = request.Kind;
+        IsActive = request.IsActive;
     }
 
-    public RoomResponse ToResponse() => new(Id, Name, Location, Capacity, Description, Kind);
+    public RoomResponse ToResponse() => new(Id, Name, Location, Capacity, Description, Kind, IsActive);
 }
 
 public sealed record RoomRequest(
@@ -33,7 +38,8 @@ public sealed record RoomRequest(
     string Location,
     int Capacity,
     string Description,
-    RoomKind Kind = RoomKind.Study)
+    RoomKind Kind = RoomKind.Study,
+    bool IsActive = true)
 {
     public string? Validate()
     {
@@ -61,7 +67,8 @@ public sealed record RoomRequest(
         Location = Location.Trim(),
         Capacity = Capacity,
         Description = Description.Trim(),
-        Kind = Kind
+        Kind = Kind,
+        IsActive = IsActive
     };
 }
 
@@ -71,4 +78,5 @@ public sealed record RoomResponse(
     string Location,
     int Capacity,
     string Description,
-    RoomKind Kind);
+    RoomKind Kind,
+    bool IsActive = true);
