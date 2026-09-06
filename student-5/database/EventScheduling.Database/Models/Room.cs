@@ -3,7 +3,8 @@ public enum RoomKind
 {
     Study,
     Lab,
-    Lecture
+    Lecture,
+    Collaborative
 }
 
 public sealed class Room
@@ -15,14 +16,11 @@ public sealed class Room
     public string Description { get; set; } = string.Empty;
     public RoomKind Kind { get; set; } = RoomKind.Study;
     public bool IsStaffRoom => Kind is RoomKind.Lab or RoomKind.Lecture;
-
-    // A deactivated room drops out of search/booking but keeps its booking
-    // history intact - deleting the row would null out every past Booking.RoomId.
     public bool IsActive { get; set; } = true;
 
-    // FR-01: descriptive opening hours (e.g. "Mon-Fri 7am-10pm"). Informational
-    // only - it is not enforced against booking times.
     public string OpeningHours { get; set; } = string.Empty;
+
+    public bool IsAccessible { get; set; }
 
     public void UpdateFrom(RoomRequest request)
     {
@@ -33,9 +31,10 @@ public sealed class Room
         Kind = request.Kind;
         IsActive = request.IsActive;
         OpeningHours = request.OpeningHours.Trim();
+        IsAccessible = request.IsAccessible;
     }
 
-    public RoomResponse ToResponse() => new(Id, Name, Location, Capacity, Description, Kind, IsActive, OpeningHours);
+    public RoomResponse ToResponse() => new(Id, Name, Location, Capacity, Description, Kind, IsActive, OpeningHours, IsAccessible);
 }
 
 public sealed record RoomRequest(
@@ -45,7 +44,8 @@ public sealed record RoomRequest(
     string Description,
     RoomKind Kind = RoomKind.Study,
     bool IsActive = true,
-    string OpeningHours = "")
+    string OpeningHours = "",
+    bool IsAccessible = false)
 {
     public string? Validate()
     {
@@ -80,7 +80,8 @@ public sealed record RoomRequest(
         Description = Description.Trim(),
         Kind = Kind,
         IsActive = IsActive,
-        OpeningHours = OpeningHours.Trim()
+        OpeningHours = OpeningHours.Trim(),
+        IsAccessible = IsAccessible
     };
 }
 
@@ -92,4 +93,5 @@ public sealed record RoomResponse(
     string Description,
     RoomKind Kind,
     bool IsActive = true,
-    string OpeningHours = "");
+    string OpeningHours = "",
+    bool IsAccessible = false);

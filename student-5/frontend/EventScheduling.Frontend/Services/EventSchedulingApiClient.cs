@@ -26,6 +26,11 @@ public sealed class EventSchedulingApiClient(HttpClient httpClient)
     public async Task<List<RefEquipmentResponse>> GetRefEquipmentAsync(CancellationToken cancellationToken = default) =>
         await httpClient.GetFromJsonAsync<List<RefEquipmentResponse>>("/api/refequipment", cancellationToken) ?? [];
 
+    public async Task<List<RefEquipmentResponse>> GetRefEquipmentAsync(
+        DateTime availableFromUtc, DateTime availableToUtc, CancellationToken cancellationToken = default) =>
+        await httpClient.GetFromJsonAsync<List<RefEquipmentResponse>>(
+            $"/api/refequipment?availableFrom={availableFromUtc:O}&availableTo={availableToUtc:O}", cancellationToken) ?? [];
+
     public async Task<RefEquipmentResponse?> GetRefEquipmentAsync(int id, CancellationToken cancellationToken = default)
     {
         try

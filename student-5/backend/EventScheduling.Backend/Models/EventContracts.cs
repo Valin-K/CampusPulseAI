@@ -6,7 +6,8 @@ public enum RoomKind
 {
     Study,
     Lab,
-    Lecture
+    Lecture,
+    Collaborative
 }
 
 public sealed record RoomRequest(
@@ -16,7 +17,8 @@ public sealed record RoomRequest(
     string Description,
     RoomKind Kind = RoomKind.Study,
     bool IsActive = true,
-    string OpeningHours = "");
+    string OpeningHours = "",
+    bool IsAccessible = false);
 
 public sealed record RoomResponse(
     int Id,
@@ -26,7 +28,8 @@ public sealed record RoomResponse(
     string Description,
     RoomKind Kind,
     bool IsActive = true,
-    string OpeningHours = "");
+    string OpeningHours = "",
+    bool IsAccessible = false);
 
 public sealed record RefEquipmentRequest(
     string Name,

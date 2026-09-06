@@ -7,6 +7,7 @@ public sealed class RoomAndEquipmentModelTests
     [TestCase(RoomKind.Study, false)]
     [TestCase(RoomKind.Lab, true)]
     [TestCase(RoomKind.Lecture, true)]
+    [TestCase(RoomKind.Collaborative, false)]
     public void Room_IsStaffRoom_IsTrueOnlyForLabAndLecture(RoomKind kind, bool expected)
     {
         Assert.That(new Room { Kind = kind }.IsStaffRoom, Is.EqualTo(expected));
@@ -132,6 +133,46 @@ public sealed class RoomAndEquipmentModelTests
         var room = new Room { Name = "Study Room 9", Location = "Library", Capacity = 4, Description = "x", OpeningHours = "24/7" };
 
         Assert.That(room.ToResponse().OpeningHours, Is.EqualTo("24/7"));
+    }
+
+    // FR-05: accessibility.
+
+    [Test]
+    public void Room_DefaultsToNotAccessible()
+    {
+        Assert.That(new Room().IsAccessible, Is.False);
+    }
+
+    [Test]
+    public void RoomRequest_DefaultsToNotAccessible()
+    {
+        Assert.That(RoomRequest().IsAccessible, Is.False);
+    }
+
+    [Test]
+    public void RoomRequest_ToRoom_CarriesThroughAccessible()
+    {
+        var room = new RoomRequest("Study Room 9", "Library", 4, "A room.", IsAccessible: true).ToRoom();
+
+        Assert.That(room.IsAccessible, Is.True);
+    }
+
+    [Test]
+    public void Room_UpdateFrom_CopiesAccessible()
+    {
+        var room = new Room { Name = "Study Room 9", Location = "Library", Capacity = 4, Description = "A room." };
+
+        room.UpdateFrom(new RoomRequest("Study Room 9", "Library", 4, "A room.", IsAccessible: true));
+
+        Assert.That(room.IsAccessible, Is.True);
+    }
+
+    [Test]
+    public void Room_ToResponse_IncludesAccessible()
+    {
+        var room = new Room { Name = "Study Room 9", Location = "Library", Capacity = 4, Description = "x", IsAccessible = true };
+
+        Assert.That(room.ToResponse().IsAccessible, Is.True);
     }
 
     [Test]

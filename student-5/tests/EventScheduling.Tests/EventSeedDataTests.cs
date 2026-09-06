@@ -15,9 +15,10 @@ public sealed class EventSeedDataTests
         Assert.Multiple(() =>
         {
             Assert.That(rooms, Has.Count.EqualTo(15));
-            Assert.That(rooms.Count(room => room.Kind == RoomKind.Study), Is.EqualTo(8));
+            Assert.That(rooms.Count(room => room.Kind == RoomKind.Study), Is.EqualTo(5));
             Assert.That(rooms.Count(room => room.Kind == RoomKind.Lab), Is.EqualTo(4));
             Assert.That(rooms.Count(room => room.Kind == RoomKind.Lecture), Is.EqualTo(3));
+            Assert.That(rooms.Count(room => room.Kind == RoomKind.Collaborative), Is.EqualTo(3));
         });
     }
 

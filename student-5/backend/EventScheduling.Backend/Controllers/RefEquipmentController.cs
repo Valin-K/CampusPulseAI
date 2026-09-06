@@ -12,14 +12,14 @@ public sealed class RefEquipmentController(IHttpClientFactory httpClientFactory)
     [HttpGet]
     public async Task<IActionResult> GetAll(CancellationToken cancellationToken)
     {
-        var response = await DatabaseClient.GetAsync("/api/refequipment", cancellationToken);
+        var response = await DatabaseClient.GetAsync($"/api/refequipment{Request.QueryString}", cancellationToken);
         return await response.ToActionResultAsync(cancellationToken);
     }
 
     [HttpGet("{id:int}")]
     public async Task<IActionResult> GetById(int id, CancellationToken cancellationToken)
     {
-        var response = await DatabaseClient.GetAsync($"/api/refequipment/{id}", cancellationToken);
+        var response = await DatabaseClient.GetAsync($"/api/refequipment/{id}{Request.QueryString}", cancellationToken);
         return await response.ToActionResultAsync(cancellationToken);
     }
 

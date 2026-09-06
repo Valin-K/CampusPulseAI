@@ -13,20 +13,20 @@ public static class EventSeedData
         if (!await database.Rooms.AnyAsync())
         {
             database.Rooms.AddRange(
-                Room(1, "Study Room 101", "Library, Level 1", 4, "Quiet room with a whiteboard, ideal for small group study.", RoomKind.Study),
+                Room(1, "Study Room 101", "Library, Level 1", 4, "Quiet room with a whiteboard, ideal for small group study.", RoomKind.Study, isAccessible: true),
                 Room(2, "Study Room 204", "Library, Level 2", 6, "Booth seating with a wall-mounted display for group work.", RoomKind.Study),
-                Room(3, "Group Pod A", "Student Centre, Level 3", 8, "Open pod with movable furniture and a large screen.", RoomKind.Study),
+                Room(3, "Group Pod A", "Student Centre, Level 3", 8, "Open pod with movable furniture and a large screen.", RoomKind.Collaborative),
                 Room(4, "Silent Study Room 3B", "Library, Level 3", 2, "Single-occupant silent room for focused study.", RoomKind.Study),
-                Room(5, "Collaboration Suite C", "Engineering Building, Level 1", 10, "Large suite with breakout seating and dual displays.", RoomKind.Study),
+                Room(5, "Collaboration Suite C", "Engineering Building, Level 1", 10, "Large suite with breakout seating and dual displays.", RoomKind.Collaborative, isAccessible: true),
                 Room(6, "Study Room 302", "Library, Level 3", 4, "Corner room with natural light and a small whiteboard.", RoomKind.Study),
-                Room(7, "Group Pod B", "Student Centre, Level 3", 8, "Open pod beside Pod A with movable furniture and a screen.", RoomKind.Study),
-                Room(8, "Media Booth 1", "Library, Level 1", 3, "Soundproofed booth for recording and editing group projects.", RoomKind.Study),
+                Room(7, "Group Pod B", "Student Centre, Level 3", 8, "Open pod beside Pod A with movable furniture and a screen.", RoomKind.Collaborative),
+                Room(8, "Media Booth 1", "Library, Level 1", 3, "Soundproofed booth for recording and editing group projects.", RoomKind.Study, isAccessible: true),
                 Room(9, "Computer Lab 1", "Engineering Building, Level 2", 30, "30 workstations with dual monitors for programming classes.", RoomKind.Lab),
                 Room(10, "Computer Lab 2", "Engineering Building, Level 2", 24, "24 workstations configured for networking and security labs.", RoomKind.Lab),
-                Room(11, "Physics Lab", "Science Building, Level 1", 20, "Bench lab with power rigs and measurement equipment.", RoomKind.Lab),
+                Room(11, "Physics Lab", "Science Building, Level 1", 20, "Bench lab with power rigs and measurement equipment.", RoomKind.Lab, isAccessible: true),
                 Room(12, "Chemistry Lab", "Science Building, Level 2", 18, "Wet lab with fume hoods for supervised chemistry practicals.", RoomKind.Lab),
-                Room(13, "Lecture Theatre A", "Central Hall, Ground Floor", 180, "Tiered theatre with a lectern, projector and lecture-capture.", RoomKind.Lecture),
-                Room(14, "Lecture Theatre B", "Central Hall, Level 1", 120, "Tiered theatre with dual projection and a document camera.", RoomKind.Lecture),
+                Room(13, "Lecture Theatre A", "Central Hall, Ground Floor", 180, "Tiered theatre with a lectern, projector and lecture-capture.", RoomKind.Lecture, isAccessible: true),
+                Room(14, "Lecture Theatre B", "Central Hall, Level 1", 120, "Tiered theatre with dual projection and a document camera.", RoomKind.Lecture, isAccessible: true),
                 Room(15, "Seminar Room 210", "Arts Building, Level 2", 40, "Flat-floor seminar room with movable tables and a screen.", RoomKind.Lecture));
         }
 
@@ -157,7 +157,7 @@ public static class EventSeedData
     }
 
     private static Room Room(int id, string name, string location, int capacity, string description, RoomKind kind,
-        string openingHours = "Mon-Fri 7am-10pm, Sat-Sun 9am-6pm") => new()
+        string openingHours = "Mon-Fri 7am-10pm, Sat-Sun 9am-6pm", bool isAccessible = false) => new()
     {
         Id = id,
         Name = name,
@@ -165,7 +165,8 @@ public static class EventSeedData
         Capacity = capacity,
         Description = description,
         Kind = kind,
-        OpeningHours = openingHours
+        OpeningHours = openingHours,
+        IsAccessible = isAccessible
     };
 
     private static RefEquipment RefEquipment(int id, string name, string category, string description) => new()

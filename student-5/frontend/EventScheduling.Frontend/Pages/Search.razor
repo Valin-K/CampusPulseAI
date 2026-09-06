@@ -43,8 +43,15 @@
             </label>
             <label class="field">
                 <span>Hire date</span>
-                <input type="date" min="@todayIso" @bind="selectedDate" />
+                <input type="date" min="@todayIso" @bind="selectedDate" @bind:event="onchange" @bind:after="RefreshEquipmentAvailabilityAsync" />
             </label>
+            @if (selectedDate is not null)
+            {
+                <label class="field">
+                    <span>Hire time</span>
+                    <input type="time" @bind="windowStart" @bind:event="onchange" @bind:after="RefreshEquipmentAvailabilityAsync" />
+                </label>
+            }
         }
         else
         {
@@ -61,6 +68,10 @@
             <label class="field">
                 <span>Min. seats</span>
                 <input type="number" min="1" step="1" placeholder="Any" @bind="minSeats" />
+            </label>
+            <label class="day-toggle @(accessibleOnly ? "is-on" : null)">
+                <input type="checkbox" checked="@accessibleOnly" @onchange="e => accessibleOnly = (bool)(e.Value ?? false)" />
+                <span>Wheelchair accessible only</span>
             </label>
             <label class="field">
                 <span>Date of use</span>
@@ -81,7 +92,7 @@
 
         @if (HasActiveFilters)
         {
-            <button type="button" class="button button-secondary" @onclick="ClearFilters">Clear filters</button>
+            <button type="button" class="button button-secondary" @onclick="ClearFiltersAsync">Clear filters</button>
         }
     </div>
 
@@ -134,7 +145,7 @@
 @code {
     private IReadOnlyList<CampusTabItem> resourceTypes =>
     [
-        new("room", "Rooms", CurrentUser.IsStaff ? "Lab and lecture rooms" : "Study rooms and spaces"),
+        new("room", "Rooms", CurrentUser.IsStaff ? "Lab and lecture rooms" : "Study and collaborative rooms"),
         new("equipment", "Equipment", "Hireable equipment")
     ];
 
@@ -153,6 +164,7 @@
     private string categoryFilter = string.Empty;
     private string buildingFilter = string.Empty;
     private int? minSeats;
+    private bool accessibleOnly;
     private DateOnly? selectedDate;
     private TimeOnly? windowStart;
     private TimeOnly? windowEnd;
@@ -165,16 +177,14 @@
     private string RoomsOrEquipmentHeading => resourceType == "equipment"
         ? "Hire equipment"
         : CurrentUser.IsStaff ? "Reserve a teaching room" : "Reserve a study room";
-
-    // Rooms this user is allowed to book: staff see Lab/Lecture, students see Study.
     private IEnumerable<RoomResponse> VisibleRooms =>
-        rooms.Where(room => CurrentUser.IsStaff ? room.IsStaffRoom : room.Kind == RoomKind.Study);
+        rooms.Where(room => CurrentUser.IsStaff ? room.IsStaffRoom : room.Kind is RoomKind.Study or RoomKind.Collaborative);
 
     private string DateSuffix => selectedDate is { } date ? $"&date={date:yyyy-MM-dd}" : string.Empty;
 
     private bool HasActiveFilters =>
         searchText.Length > 0 || categoryFilter.Length > 0 || buildingFilter.Length > 0
-        || minSeats is not null || selectedDate is not null || windowStart is not null || windowEnd is not null;
+        || minSeats is not null || accessibleOnly || selectedDate is not null || windowStart is not null || windowEnd is not null;
 
     private IEnumerable<string> Buildings => VisibleRooms
         .Select(BuildingOf)
@@ -195,6 +205,7 @@
         && (buildingFilter.Length == 0
             || string.Equals(BuildingOf(room), buildingFilter, StringComparison.OrdinalIgnoreCase))
         && (minSeats is not { } min || room.Capacity >= min)
+        && (!accessibleOnly || room.IsAccessible)
         && IsFreeInWindow(room));
 
     private bool IsFreeInWindow(RoomResponse room)
@@ -261,6 +272,23 @@
         }
     }
 
+    private async Task RefreshEquipmentAvailabilityAsync()
+    {
+        try
+        {
+            var refreshed = selectedDate is { } date && windowStart is { } time
+                ? await Api.GetRefEquipmentAsync(date.ToDateTime(time, DateTimeKind.Utc), date.ToDateTime(time, DateTimeKind.Utc).AddDays(7))
+                : await Api.GetRefEquipmentAsync();
+
+            equipment.Clear();
+            equipment.AddRange(refreshed);
+        }
+        catch (HttpRequestException)
+        {
+            errorMessage = "The Event Scheduling service is unavailable.";
+        }
+    }
+
     private Task ChangeResourceTypeAsync(string key)
     {
         // The date is a shared "when do you want it" and carries across tabs.
@@ -269,12 +297,17 @@
         return Task.CompletedTask;
     }
 
-    private void ClearFilters()
+    private async Task ClearFiltersAsync()
     {
         ResetTypeFilters();
         selectedDate = null;
         windowStart = null;
         windowEnd = null;
+
+        if (resourceType == "equipment")
+        {
+            await RefreshEquipmentAvailabilityAsync();
+        }
     }
 
     private void ResetTypeFilters()
@@ -283,6 +316,7 @@
         categoryFilter = string.Empty;
         buildingFilter = string.Empty;
         minSeats = null;
+        accessibleOnly = false;
     }
 
     private void SelectItem(int id, string name) =>

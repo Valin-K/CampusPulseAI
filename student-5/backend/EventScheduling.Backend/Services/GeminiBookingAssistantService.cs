@@ -46,7 +46,7 @@ public sealed class GeminiBookingAssistantService(
         var bookableRooms = (await roomsTask ?? [])
             .Where(room => isStaff
                 ? room.Kind is RoomKind.Lab or RoomKind.Lecture
-                : room.Kind == RoomKind.Study)
+                : room.Kind is RoomKind.Study or RoomKind.Collaborative)
             .OrderBy(room => room.Name)
             .ToList();
         var bookableRoomIds = bookableRooms.Select(room => room.Id).ToHashSet();
