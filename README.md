@@ -180,15 +180,17 @@ The agentic loop is a Python implementation of the **Plan -> Act -> Observe -> A
 
    The `.env` file is ignored by Git and is never written to evidence files.
 
-3. (Optional) Override the default model or provider in `.env`:
+3. (Optional) Override per-stage models in `.env`:
 
    ```text
-   AGENTIC_MODEL=qwen/qwen3.8-27b
+   AGENTIC_PLAN_MODEL=qwen/qwen3.8-27b
+   AGENTIC_ACT_MODEL=qwen/qwen3.8-27b
+   AGENTIC_REVIEW_MODEL=gemini-3.5-flash
    AGENTIC_PROVIDER=openrouter
    GEMINI_MODEL=gemini-3.5-flash
    ```
 
-   The loop uses OpenRouter by default. If your OpenRouter key hits its limit, the loop automatically falls back to Gemini when `GEMINI_API_KEY` is available.
+   Setting a stage model to a Gemini model name routes only that stage to Gemini; other stages stay on OpenRouter. If your OpenRouter key hits its limit, the loop automatically falls back to Gemini when `GEMINI_API_KEY` is available.
 
 ### Approved context
 

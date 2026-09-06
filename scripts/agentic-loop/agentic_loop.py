@@ -437,16 +437,21 @@ def call_ai(
     temperature: float = 0.2,
 ) -> tuple[str | None, str | None, dict[str, Any]]:
     """
-    Call the configured AI provider.
+    Call the configured AI provider/model.
 
-    Returns a tuple of (content, error, metadata). When the primary provider is
+    Returns a tuple of (content, error, metadata). A stage can be routed to
+    Gemini explicitly by setting its model ID to a Gemini model name
+    (e.g. AGENTIC_REVIEW_MODEL=gemini-3.5-flash). When the primary provider is
     OpenRouter and it fails for key/limit reasons, Gemini is tried automatically
     if GEMINI_API_KEY is available.
     """
     metadata: dict[str, Any] = {"primaryProvider": provider, "primaryModel": model}
 
-    if provider == "gemini":
-        gemini_model = GEMINI_MODEL
+    # Detect explicit Gemini model selection per stage.
+    is_gemini_model = model.startswith("gemini-")
+
+    if provider == "gemini" or is_gemini_model:
+        gemini_model = GEMINI_MODEL if not is_gemini_model else model
         content, error = call_gemini(
             gemini_model, system_prompt, user_prompt, max_tokens, temperature
         )

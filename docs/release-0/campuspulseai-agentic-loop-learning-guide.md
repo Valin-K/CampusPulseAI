@@ -1,7 +1,5 @@
 # CampusPulseAI Shared Agentic Loop Learning Guide
 
-This guide explains the shared agentic loop for the whole CampusPulseAI solution.
-
 ## The simple idea
 
 The loop follows the DevOps feedback cycle:
@@ -31,22 +29,34 @@ solution:
 - `shared/frontend` shared Blazor components
 - Root-level `docker-compose.yml` and `Directory.Packages.props`
 
-## AI providers and models
+## Multi-model setup used in this run
 
-The script is provider-agnostic:
+| Stage | Provider | Model |
+|---|---|---|
+| Plan | OpenRouter | `qwen/qwen3.8-27b` |
+| Act | OpenRouter | `qwen/qwen3.8-27b` |
+| Observe (review) | Google Gemini | `gemini-3.5-flash` |
 
-- **Primary provider**: OpenRouter (default), configured with `OPENROUTER_API_KEY`.
-  The default model is `qwen/qwen3.8-27b`.
-- **Fallback provider**: Google Gemini, configured with `GEMINI_API_KEY`. The
-  default model is `gemini-3.5-flash`.
+Two models are used to satisfy the multi-model workflow requirement:
 
-If OpenRouter returns a key/limit error (401, 403, 429), the loop automatically
-falls back to Gemini when a Gemini key is available. You can also force Gemini
-by setting `AGENTIC_PROVIDER=gemini` in `.env`.
+- **Qwen 3.8 27B** (via OpenRouter) plans the validation and proposes implementation
+  changes.
+- **Gemini 3.5 Flash** (via the existing CampusPulseAI Gemini API key) independently
+  reviews the Qwen proposal against the deterministic evidence.
+
+The model for each stage is controlled by environment variables in `.env`:
+
+```text
+AGENTIC_PLAN_MODEL=qwen/qwen3.8-27b
+AGENTIC_ACT_MODEL=qwen/qwen3.8-27b
+AGENTIC_REVIEW_MODEL=gemini-3.5-flash
+```
+
+Setting a stage model to a Gemini model name (prefix `gemini-`) automatically
+routes that stage to the Gemini provider, while other stages continue to use
+OpenRouter.
 
 ## Deterministic checks
-
-AI outputs are opinions. The following checks produce objective evidence:
 
 | Check | Purpose |
 |---|---|
@@ -116,9 +126,17 @@ python scripts\agentic-loop\agentic_loop.py `
     --context docs\release-0\agentic-loop-context\campuspulseai-context.txt
 ```
 
-## Release 0 limitation
+## Release 0 result
 
-Live HTTP smoke tests are skipped when the backend services are not running
-locally. The deterministic build, test, and Docker Compose checks still prove
-that the solution is structurally sound. For a full end-to-end validation, run
-the services with `docker compose up` before the loop.
+This review-only loop ran on 2026-09-06. All deterministic checks passed:
+
+- `dotnet restore` succeeded.
+- `dotnet build` succeeded.
+- `dotnet test` succeeded with 172 tests passing across the five student services.
+- `docker compose config --quiet` succeeded.
+- Live HTTP smoke tests were skipped because the backend services were not running
+  locally.
+
+Both the Qwen implementation agent and the Gemini review agent concluded that
+**no code adaptation is needed** — the existing implementation already satisfies
+the goal.
