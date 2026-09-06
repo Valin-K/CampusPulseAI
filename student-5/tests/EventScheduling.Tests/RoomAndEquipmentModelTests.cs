@@ -18,6 +18,12 @@ public sealed class RoomAndEquipmentModelTests
         Assert.That(new Room().Kind, Is.EqualTo(RoomKind.Study));
     }
 
+    [Test]
+    public void Room_DefaultsToActive()
+    {
+        Assert.That(new Room().IsActive, Is.True);
+    }
+
     private static RoomRequest RoomRequest(string name = "Study Room 9", string location = "Library",
         int capacity = 4, RoomKind kind = RoomKind.Study) =>
         new(name, location, capacity, "A room.", kind);
@@ -64,6 +70,38 @@ public sealed class RoomAndEquipmentModelTests
             Assert.That(room.Description, Is.EqualTo("Bench lab"));
             Assert.That(room.Kind, Is.EqualTo(RoomKind.Lab));
         });
+    }
+
+    [Test]
+    public void RoomRequest_DefaultsToActive()
+    {
+        Assert.That(RoomRequest().IsActive, Is.True);
+    }
+
+    [Test]
+    public void RoomRequest_ToRoom_CarriesThroughAnInactiveFlag()
+    {
+        var room = new RoomRequest("Study Room 9", "Library", 4, "A room.", RoomKind.Study, IsActive: false).ToRoom();
+
+        Assert.That(room.IsActive, Is.False);
+    }
+
+    [Test]
+    public void Room_UpdateFrom_CanDeactivateARoomWithoutChangingItsIdentity()
+    {
+        var room = new Room { Name = "Study Room 9", Location = "Library", Capacity = 4, Description = "A room." };
+
+        room.UpdateFrom(new RoomRequest("Study Room 9", "Library", 4, "A room.", RoomKind.Study, IsActive: false));
+
+        Assert.That(room.IsActive, Is.False);
+    }
+
+    [Test]
+    public void Room_ToResponse_IncludesTheActiveFlag()
+    {
+        var room = new Room { Name = "Study Room 9", Location = "Library", Capacity = 4, Description = "x", IsActive = false };
+
+        Assert.That(room.ToResponse().IsActive, Is.False);
     }
 
     [Test]
