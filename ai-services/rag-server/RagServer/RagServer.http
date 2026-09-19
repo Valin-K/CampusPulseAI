@@ -1,6 +1,47 @@
 @RagServer_HostAddress = http://localhost:5267
+@Collection = coursemanagement
 
-GET {{RagServer_HostAddress}}/weatherforecast/
+GET {{RagServer_HostAddress}}/health
 Accept: application/json
 
 ###
+
+GET {{RagServer_HostAddress}}/api/rag/collections
+Accept: application/json
+
+###
+
+# Ingest: the calling service sends its own domain text. The server chunks, embeds and stores it.
+POST {{RagServer_HostAddress}}/api/rag/{{Collection}}/documents
+Content-Type: application/json
+
+{
+  "documents": [
+    {
+      "id": "COMP1001",
+      "text": "COMP1001 Introduction to Programming is a first-year core course worth 6 credit points. It has no prerequisites. Assessment is two assignments worth 30 percent each and a final exam worth 40 percent. The course is offered in Autumn and Spring sessions.",
+      "metadata": { "courseCode": "COMP1001", "source": "course-catalogue" }
+    },
+    {
+      "id": "COMP2002",
+      "text": "COMP2002 Data Structures and Algorithms is a second-year course worth 6 credit points. Students must have passed COMP1001 before enrolling. It is offered in Autumn only.",
+      "metadata": { "courseCode": "COMP2002", "source": "course-catalogue" }
+    }
+  ]
+}
+
+###
+
+# Answer: retrieve the closest chunks, build a grounded prompt and generate a response.
+POST {{RagServer_HostAddress}}/api/rag/{{Collection}}/answer
+Content-Type: application/json
+
+{
+  "question": "What do I need before I can enrol in Data Structures and Algorithms?",
+  "topK": 3,
+  "instructions": "You are the Course Management assistant. Refer to courses by their course code."
+}
+
+###
+
+DELETE {{RagServer_HostAddress}}/api/rag/{{Collection}}

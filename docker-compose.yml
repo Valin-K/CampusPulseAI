@@ -25,6 +25,8 @@ services:
       ASPNETCORE_HTTP_PORTS: 8080
       Services__AcademicRecordsDatabase: http://academicrecords.database:8080
       Services__CourseManagementDatabase: http://coursemanagement.database:8080
+      Services__McpServer: http://host.docker.internal:5268
+      Services__RagServer: http://host.docker.internal:5267
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
     ports:
       - "5020:8080"
@@ -39,6 +41,8 @@ services:
     environment:
       - Services__AcademicRecordsDatabase=http://academicrecords.database:8080
       - Services__CourseManagementDatabase=http://coursemanagement.database:8080
+      - Services__McpServer=http://host.docker.internal:5268
+      - Services__RagServer=http://host.docker.internal:5267
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
     depends_on:
       - academicrecords.database
@@ -67,6 +71,8 @@ services:
       ASPNETCORE_HTTP_PORTS: 8080
       Services__CampusHousingDatabase: http://campushousing.database:8080
       Services__AcademicRecordsDatabase: http://academicrecords.database:8080
+      Services__McpServer: http://host.docker.internal:5268
+      Services__RagServer: http://host.docker.internal:5267
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
     ports:
       - "5083:8080"
@@ -104,6 +110,8 @@ services:
       ASPNETCORE_HTTP_PORTS: 8080
       Services__InvoiceDatabase: http://financialaidbilling.database:8080
       Services__AcademicRecordsBackend: http://academicrecords.backend:8080
+      Services__McpServer: http://host.docker.internal:5268
+      Services__RagServer: http://host.docker.internal:5267
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
     ports:
       - "8089:8080"
@@ -132,6 +140,8 @@ services:
       ASPNETCORE_HTTP_PORTS: 8080
       Services__EventDatabase: http://eventscheduling.database:8080
       Services__AcademicRecordsDatabase: http://academicrecords.database:8080
+      Services__McpServer: http://host.docker.internal:5268
+      Services__RagServer: http://host.docker.internal:5267
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
     ports:
       - "8090:8080"
@@ -150,26 +160,6 @@ services:
       ASPNETCORE_HTTP_PORTS: 8080
       ConnectionStrings__EventScheduling: Data Source=/app/data/event-scheduling.db
 
-
-  mcpserver:
-    image: ${DOCKER_REGISTRY-}mcpserver
-    build:
-      context: .
-      dockerfile: ai-services/mcp-server/McpServer/Dockerfile
-
-
-  multiagentserver:
-    image: ${DOCKER_REGISTRY-}multiagentserver
-    build:
-      context: .
-      dockerfile: ai-services/multi-agent-server/MultiAgentServer/Dockerfile
-
-
-  ragserver:
-    image: ${DOCKER_REGISTRY-}ragserver
-    build:
-      context: .
-      dockerfile: ai-services/rag-server/RagServer/Dockerfile
 
   academicrecords.frontend:
     image: ${DOCKER_REGISTRY-}academicrecordsfrontend
