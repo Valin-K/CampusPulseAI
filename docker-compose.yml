@@ -26,6 +26,7 @@ services:
       Services__AcademicRecordsDatabase: http://academicrecords.database:8080
       Services__CourseManagementDatabase: http://coursemanagement.database:8080
       Services__McpServer: http://host.docker.internal:5268
+      Services__RagServer: http://host.docker.internal:5267
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
     ports:
       - "5020:8080"
@@ -41,6 +42,7 @@ services:
       - Services__AcademicRecordsDatabase=http://academicrecords.database:8080
       - Services__CourseManagementDatabase=http://coursemanagement.database:8080
       - Services__McpServer=http://host.docker.internal:5268
+      - Services__RagServer=http://host.docker.internal:5267
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
     depends_on:
       - academicrecords.database
@@ -70,6 +72,7 @@ services:
       Services__CampusHousingDatabase: http://campushousing.database:8080
       Services__AcademicRecordsDatabase: http://academicrecords.database:8080
       Services__McpServer: http://host.docker.internal:5268
+      Services__RagServer: http://host.docker.internal:5267
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
     ports:
       - "5083:8080"
@@ -108,6 +111,7 @@ services:
       Services__InvoiceDatabase: http://financialaidbilling.database:8080
       Services__AcademicRecordsBackend: http://academicrecords.backend:8080
       Services__McpServer: http://host.docker.internal:5268
+      Services__RagServer: http://host.docker.internal:5267
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
     ports:
       - "8089:8080"
@@ -137,6 +141,7 @@ services:
       Services__EventDatabase: http://eventscheduling.database:8080
       Services__AcademicRecordsDatabase: http://academicrecords.database:8080
       Services__McpServer: http://host.docker.internal:5268
+      Services__RagServer: http://host.docker.internal:5267
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
     ports:
       - "8090:8080"
