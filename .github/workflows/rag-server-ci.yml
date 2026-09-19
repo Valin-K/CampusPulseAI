@@ -1,0 +1,88 @@
+name: Shared RAG Server CI
+
+on:
+  push:
+    paths:
+      - "ai-services/rag-server/**"
+      - "CampusPulseAI.slnx"
+      - "Directory.Packages.props"
+      - ".github/workflows/rag-server-ci.yml"
+  pull_request:
+    paths:
+      - "ai-services/rag-server/**"
+      - "CampusPulseAI.slnx"
+      - "Directory.Packages.props"
+      - ".github/workflows/rag-server-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-rag-server:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore RAG server
+        run: dotnet restore ai-services/rag-server/RagServer/RagServer.csproj
+
+      - name: Build RAG server
+        run: dotnet build ai-services/rag-server/RagServer/RagServer.csproj --configuration Release --no-restore --nologo
+
+      # Runs without GEMINI_API_KEY on purpose: the server falls back to a local hashed
+      # embedding and reports generation_unavailable, so the whole ingest and retrieve
+      # path is exercised without a secret.
+      - name: Smoke test RAG endpoints
+        shell: bash
+        run: |
+          set -euo pipefail
+          dotnet run --project ai-services/rag-server/RagServer/RagServer.csproj --configuration Release --no-build --urls http://localhost:5267 > rag-server.log 2>&1 &
+          server_pid=$!
+          trap 'kill $server_pid' EXIT
+
+          for attempt in {1..20}; do
+            if curl --silent --fail http://localhost:5267/health > /dev/null; then
+              break
+            fi
+            sleep 1
+          done
+
+          curl --silent --fail http://localhost:5267/health
+          curl --silent --fail http://localhost:5267/api/rag/collections
+
+          ingest=$(curl --silent --fail \
+            -H "Content-Type: application/json" \
+            -d '{"documents":[{"id":"ci-doc","text":"Course enrolment closes on 14 March each year. Late enrolment requires approval from the faculty office.","metadata":{"source":"ci"}}]}' \
+            http://localhost:5267/api/rag/coursemanagement/documents)
+          echo "$ingest"
+          test "$(printf '%s' "$ingest" | jq --raw-output '.chunks')" -ge 1
+
+          answer=$(curl --silent --fail \
+            -H "Content-Type: application/json" \
+            -d '{"question":"When does course enrolment close?","topK":2,"minimumConfidence":0}' \
+            http://localhost:5267/api/rag/coursemanagement/answer)
+          echo "$answer"
+          test "$(printf '%s' "$answer" | jq --raw-output '.status')" = "generation_unavailable"
+          test "$(printf '%s' "$answer" | jq --raw-output '.sources | length')" -ge 1
+          test "$(printf '%s' "$answer" | jq --raw-output '.sources[0].documentId')" = "ci-doc"
+
+          status=$(curl --silent --output /dev/null --write-out '%{http_code}' \
+            -H "Content-Type: application/json" \
+            -d '{"question":"anything"}' \
+            http://localhost:5267/api/rag/not-a-collection/answer)
+          test "$status" = "404"
+
+          curl --silent --fail -X DELETE http://localhost:5267/api/rag/coursemanagement
+
+      - name: Show server log on failure
+        if: failure()
+        run: cat rag-server.log
