@@ -11,6 +11,9 @@ public sealed class Booking
     public DateTime StartUtc { get; set; }
     public DateTime EndUtc { get; set; }
     public BookingStatus Status { get; set; }
+    public int? AttendeeCount { get; set; }
+    public string? CheckOutConditionNotes { get; set; }
+    public string? ReturnConditionNotes { get; set; }
 
     public void UpdateFrom(BookingRequest request)
     {
@@ -21,10 +24,22 @@ public sealed class Booking
         StartUtc = request.StartUtc;
         EndUtc = request.EndUtc;
         Status = request.Status;
+        AttendeeCount = request.AttendeeCount;
+        CheckOutConditionNotes = NormalizeNotes(request.ConditionNotes);
     }
 
-    // Equipment can be hired for at most this long before it is considered overdue.
     public static readonly TimeSpan MaxEquipmentHire = TimeSpan.FromDays(7);
+
+    public static readonly TimeSpan MaxRoomBookingDuration = TimeSpan.FromHours(4);
+
+    public static readonly TimeSpan MinBookingNotice = TimeSpan.FromMinutes(30);
+
+    public const int MaxActiveBookingsPerStudent = 120;
+
+    public const int MaxConditionNotesLength = 500;
+
+    internal static string? NormalizeNotes(string? notes) =>
+        string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
 
     public BookingResponse ToResponse()
     {
@@ -47,7 +62,10 @@ public sealed class Booking
             ResourceName,
             StartUtc,
             EndUtc,
-            status);
+            status,
+            AttendeeCount,
+            CheckOutConditionNotes,
+            ReturnConditionNotes);
     }
 }
 
@@ -75,7 +93,9 @@ public sealed record BookingRequest(
     DateTime StartUtc,
     DateTime EndUtc,
     BookingStatus Status,
-    bool IsStaff = false)
+    bool IsStaff = false,
+    int? AttendeeCount = null,
+    string? ConditionNotes = null)
 {
     public string? Validate()
     {
@@ -89,9 +109,9 @@ public sealed record BookingRequest(
             return "Overdue, Completed and Returned are managed by the system and cannot be set directly.";
         }
 
-        if (RoomId.HasValue == RefEquipmentId.HasValue)
+        if (!RoomId.HasValue && !RefEquipmentId.HasValue)
         {
-            return "Exactly one of room or equipment type must be specified.";
+            return "At least one of room or equipment type must be specified.";
         }
 
         if (string.IsNullOrWhiteSpace(ResourceName) || ResourceName.Trim().Length > 120)
@@ -109,6 +129,26 @@ public sealed record BookingRequest(
             return "Equipment can be hired for a maximum of 7 days.";
         }
 
+        if (RoomId.HasValue && EndUtc - StartUtc > Booking.MaxRoomBookingDuration)
+        {
+            return $"A single room booking can run for at most {Booking.MaxRoomBookingDuration.TotalHours:0.#} hours.";
+        }
+
+        if (AttendeeCount is <= 0)
+        {
+            return "Attendee count must be greater than zero.";
+        }
+
+        if (!RoomId.HasValue && AttendeeCount.HasValue)
+        {
+            return "Attendee count only applies to room bookings.";
+        }
+
+        if (ConditionNotes is { Length: > Booking.MaxConditionNotesLength })
+        {
+            return $"Condition notes must be {Booking.MaxConditionNotesLength} characters or fewer.";
+        }
+
         return null;
     }
 
@@ -120,7 +160,9 @@ public sealed record BookingRequest(
         ResourceName = ResourceName.Trim(),
         StartUtc = StartUtc,
         EndUtc = EndUtc,
-        Status = Status
+        Status = Status,
+        AttendeeCount = AttendeeCount,
+        CheckOutConditionNotes = Booking.NormalizeNotes(ConditionNotes)
     };
 }
 
@@ -134,4 +176,15 @@ public sealed record BookingResponse(
     string ResourceName,
     DateTime StartUtc,
     DateTime EndUtc,
-    BookingStatus Status);
+    BookingStatus Status,
+    int? AttendeeCount = null,
+    string? CheckOutConditionNotes = null,
+    string? ReturnConditionNotes = null);
+
+public sealed record ReturnRequest(string? ConditionNotes)
+{
+    public string? Validate() =>
+        ConditionNotes is { Length: > Booking.MaxConditionNotesLength }
+            ? $"Condition notes must be {Booking.MaxConditionNotesLength} characters or fewer."
+            : null;
+}

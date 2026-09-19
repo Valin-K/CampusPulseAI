@@ -3,7 +3,8 @@ public enum RoomKind
 {
     Study,
     Lab,
-    Lecture
+    Lecture,
+    Collaborative
 }
 
 public sealed class Room
@@ -15,6 +16,11 @@ public sealed class Room
     public string Description { get; set; } = string.Empty;
     public RoomKind Kind { get; set; } = RoomKind.Study;
     public bool IsStaffRoom => Kind is RoomKind.Lab or RoomKind.Lecture;
+    public bool IsActive { get; set; } = true;
+
+    public string OpeningHours { get; set; } = string.Empty;
+
+    public bool IsAccessible { get; set; }
 
     public void UpdateFrom(RoomRequest request)
     {
@@ -23,9 +29,12 @@ public sealed class Room
         Capacity = request.Capacity;
         Description = request.Description.Trim();
         Kind = request.Kind;
+        IsActive = request.IsActive;
+        OpeningHours = request.OpeningHours.Trim();
+        IsAccessible = request.IsAccessible;
     }
 
-    public RoomResponse ToResponse() => new(Id, Name, Location, Capacity, Description, Kind);
+    public RoomResponse ToResponse() => new(Id, Name, Location, Capacity, Description, Kind, IsActive, OpeningHours, IsAccessible);
 }
 
 public sealed record RoomRequest(
@@ -33,7 +42,10 @@ public sealed record RoomRequest(
     string Location,
     int Capacity,
     string Description,
-    RoomKind Kind = RoomKind.Study)
+    RoomKind Kind = RoomKind.Study,
+    bool IsActive = true,
+    string OpeningHours = "",
+    bool IsAccessible = false)
 {
     public string? Validate()
     {
@@ -52,6 +64,11 @@ public sealed record RoomRequest(
             return "Capacity must be greater than zero.";
         }
 
+        if (OpeningHours.Length > 100)
+        {
+            return "Opening hours must be 100 characters or fewer.";
+        }
+
         return null;
     }
 
@@ -61,7 +78,10 @@ public sealed record RoomRequest(
         Location = Location.Trim(),
         Capacity = Capacity,
         Description = Description.Trim(),
-        Kind = Kind
+        Kind = Kind,
+        IsActive = IsActive,
+        OpeningHours = OpeningHours.Trim(),
+        IsAccessible = IsAccessible
     };
 }
 
@@ -71,4 +91,7 @@ public sealed record RoomResponse(
     string Location,
     int Capacity,
     string Description,
-    RoomKind Kind);
+    RoomKind Kind,
+    bool IsActive = true,
+    string OpeningHours = "",
+    bool IsAccessible = false);

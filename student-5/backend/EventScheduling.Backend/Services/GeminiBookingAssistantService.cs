@@ -46,7 +46,7 @@ public sealed class GeminiBookingAssistantService(
         var bookableRooms = (await roomsTask ?? [])
             .Where(room => isStaff
                 ? room.Kind is RoomKind.Lab or RoomKind.Lecture
-                : room.Kind == RoomKind.Study)
+                : room.Kind is RoomKind.Study or RoomKind.Collaborative)
             .OrderBy(room => room.Name)
             .ToList();
         var bookableRoomIds = bookableRooms.Select(room => room.Id).ToHashSet();
@@ -81,7 +81,7 @@ public sealed class GeminiBookingAssistantService(
             .OrderBy(booking => booking.RoomId).ThenBy(booking => booking.StartUtc)
             .ToList();
 
-        var prompt = BuildPrompt(user, isStaff, bookableRooms, equipment, myUpcoming, myPast, busySlots, now, request.Messages);
+        var prompt = BuildPrompt(isStaff, bookableRooms, equipment, myUpcoming, myPast, busySlots, now, request.Messages);
         var geminiRequest = new GeminiGenerateRequest([new GeminiContent([new GeminiPart(prompt)])]);
 
         using var response = await clients.CreateClient("gemini")
@@ -167,7 +167,6 @@ public sealed class GeminiBookingAssistantService(
     }
 
     private static string BuildPrompt(
-        AcademicRecordsUser user,
         bool isStaff,
         IReadOnlyList<RoomResponse> bookableRooms,
         IReadOnlyList<RefEquipmentResponse> equipment,
@@ -179,7 +178,6 @@ public sealed class GeminiBookingAssistantService(
     {
         var culture = CultureInfo.InvariantCulture;
         var role = isStaff ? "Teaching staff" : "Student";
-        var firstName = user.FirstName.Trim();
 
         var rooms = bookableRooms.Count == 0
             ? "  - (none available to you)"
@@ -214,24 +212,26 @@ public sealed class GeminiBookingAssistantService(
         You are the Event & Facility Scheduling assistant for CampusPulse University.
 
         STRICT SCOPE. You may only help with:
-          (a) questions about {firstName}'s own bookings, listed below, and
-          (b) campus room and equipment scheduling for {firstName} - availability,
+          (a) questions about the user's own bookings, listed below, and
+          (b) campus room and equipment scheduling for the user - availability,
               capacity, location, hire rules, and setting up a new booking.
         If the user asks about anything else (other people, other university
         services, general knowledge, coding, personal opinions, etc.) reply briefly
         that you can only help with their own bookings and campus scheduling, and do
         not answer the off-topic part.
 
-        You never see other users' identities or booking details. The busy times
-        below are anonymous - treat each slot only as "unavailable".
+        You never see the user's name or any other user's identity or booking
+        details. The busy times below are anonymous - treat each slot only as
+        "unavailable".
 
         You cannot create a booking yourself. When you have a specific room or piece
         of equipment, a date and a time, PROPOSE the booking and the user confirms
         it in the app.
 
         Scheduling rules:
-          - {firstName} is {role}. Students book Study rooms only; teaching staff
-            book Lab and Lecture rooms only. Only the rooms listed below are valid.
+          - The user's role is {role}. Students book Study rooms only; teaching
+            staff book Lab and Lecture rooms only. Only the rooms listed below are
+            valid.
           - A room booking has a start and end time on a single day.
           - An equipment hire lasts at most 7 days from pickup (return = pickup + 7 days).
           - Never propose a start time before {now}.
@@ -241,18 +241,18 @@ public sealed class GeminiBookingAssistantService(
 
         Current campus time: {now}. Times you produce use this same clock.
 
-        User: {firstName} {user.LastName.Trim()} - {role}
+        User's role: {role}
 
-        Rooms {firstName} can book:
+        Rooms the user can book:
         {rooms}
 
         Equipment catalogue (units free right now):
         {equipmentLines}
 
-        {firstName}'s current and upcoming bookings:
+        The user's current and upcoming bookings:
         {upcomingBookings}
 
-        {firstName}'s recent past bookings (history - do not treat these as still active):
+        The user's recent past bookings (history - do not treat these as still active):
         {pastBookings}
 
         Room availability - anonymous busy slots for the bookable rooms:

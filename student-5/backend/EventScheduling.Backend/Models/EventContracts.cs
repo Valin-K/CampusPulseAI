@@ -6,7 +6,8 @@ public enum RoomKind
 {
     Study,
     Lab,
-    Lecture
+    Lecture,
+    Collaborative
 }
 
 public sealed record RoomRequest(
@@ -14,7 +15,10 @@ public sealed record RoomRequest(
     string Location,
     int Capacity,
     string Description,
-    RoomKind Kind = RoomKind.Study);
+    RoomKind Kind = RoomKind.Study,
+    bool IsActive = true,
+    string OpeningHours = "",
+    bool IsAccessible = false);
 
 public sealed record RoomResponse(
     int Id,
@@ -22,7 +26,10 @@ public sealed record RoomResponse(
     string Location,
     int Capacity,
     string Description,
-    RoomKind Kind);
+    RoomKind Kind,
+    bool IsActive = true,
+    string OpeningHours = "",
+    bool IsAccessible = false);
 
 public sealed record RefEquipmentRequest(
     string Name,
@@ -81,7 +88,9 @@ public sealed record BookingRequest(
     DateTime StartUtc,
     DateTime EndUtc,
     BookingStatus Status,
-    bool IsStaff = false);
+    bool IsStaff = false,
+    int? AttendeeCount = null,
+    string? ConditionNotes = null);
 
 public sealed record BookingResponse(
     int Id,
@@ -93,7 +102,12 @@ public sealed record BookingResponse(
     string ResourceName,
     DateTime StartUtc,
     DateTime EndUtc,
-    BookingStatus Status);
+    BookingStatus Status,
+    int? AttendeeCount = null,
+    string? CheckOutConditionNotes = null,
+    string? ReturnConditionNotes = null);
+
+public sealed record ReturnRequest(string? ConditionNotes);
 
 public static class HttpResponseMessageExtensions
 {

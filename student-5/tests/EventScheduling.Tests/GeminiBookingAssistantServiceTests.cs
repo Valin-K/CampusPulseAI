@@ -27,7 +27,6 @@ public sealed class GeminiBookingAssistantServiceTests
             Assert.That(response.Proposal.ResourceId, Is.EqualTo(1));
             Assert.That(response.Proposal.ResourceName, Is.EqualTo("Study Room 101"));
             Assert.That(gemini.RequestBody, Does.Contain("STRICT SCOPE"));
-            Assert.That(gemini.RequestBody, Does.Contain("Ryan"));
             Assert.That(gemini.RequestBody, Does.Contain("Study Room 101"));
             Assert.That(gemini.RequestBody, Does.Not.Contain("Computer Lab 1"));
             Assert.That(gemini.RequestBody, Does.Contain("book a quiet room for 4"));
@@ -46,6 +45,23 @@ public sealed class GeminiBookingAssistantServiceTests
         {
             Assert.That(gemini.RequestBody, Does.Contain("Computer Lab 1"));
             Assert.That(gemini.RequestBody, Does.Not.Contain("Study Room 101"));
+        });
+    }
+
+    [Test]
+    public async Task ChatNeverSendsTheUsersNameOrIdentifierToTheLanguageModel()
+    {
+        var gemini = new RecordingHttpMessageHandler(Ok(GeminiEnvelope("""{"message":"ok","proposal":null}""")));
+        var service = CreateService(gemini);
+
+        await service.ChatAsync(Request(4, "what can I book?"), CancellationToken.None);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(gemini.RequestBody, Does.Not.Contain("Ryan"));
+            Assert.That(gemini.RequestBody, Does.Not.Contain("Takayasu"));
+            Assert.That(gemini.RequestBody, Does.Not.Contain("STU004"));
+            Assert.That(gemini.RequestBody, Does.Not.Contain("ryan@example.edu"));
         });
     }
 

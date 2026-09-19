@@ -20,6 +20,9 @@ public sealed class EventSchedulingDbContext(DbContextOptions<EventSchedulingDbC
             entity.Property(room => room.Location).HasMaxLength(120).IsRequired();
             entity.Property(room => room.Description).HasMaxLength(500);
             entity.Property(room => room.Kind).HasConversion<string>().HasMaxLength(16).IsRequired();
+            entity.Property(room => room.IsActive).HasDefaultValue(true).IsRequired();
+            entity.Property(room => room.OpeningHours).HasMaxLength(100).HasDefaultValue(string.Empty).IsRequired();
+            entity.Property(room => room.IsAccessible).HasDefaultValue(false).IsRequired();
         });
 
         modelBuilder.Entity<RefEquipment>(entity =>
@@ -50,6 +53,8 @@ public sealed class EventSchedulingDbContext(DbContextOptions<EventSchedulingDbC
             entity.HasKey(booking => booking.Id);
             entity.Property(booking => booking.ResourceName).HasMaxLength(120).IsRequired();
             entity.Property(booking => booking.Status).HasConversion<string>().HasMaxLength(16).IsRequired();
+            entity.Property(booking => booking.CheckOutConditionNotes).HasMaxLength(Booking.MaxConditionNotesLength);
+            entity.Property(booking => booking.ReturnConditionNotes).HasMaxLength(Booking.MaxConditionNotesLength);
             entity.HasIndex(booking => booking.StudentId);
             entity.HasOne<Room>()
                 .WithMany()

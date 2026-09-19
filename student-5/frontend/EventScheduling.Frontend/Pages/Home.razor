@@ -2,6 +2,7 @@
 @inject EventSchedulingApiClient Api
 @inject CurrentUser CurrentUser
 @inject NavigationManager Nav
+@inject IJSRuntime JS
 
 <PageTitle>Event & Facility Scheduling</PageTitle>
 
@@ -148,7 +149,7 @@
     private async Task RunCardActionAsync(BookingResponse booking, BookingCardAction action)
     {
         busyBookingId = booking.Id;
-        var result = await BookingActions.RunAsync(Api, booking, action);
+        var result = await BookingActions.RunAsync(Api, JS, booking, action);
         busyBookingId = null;
 
         if (result.Success)
@@ -163,8 +164,6 @@
 
     private List<DashboardEntry> BuildDashboard()
     {
-        // Booking times are treated as wall-clock throughout this app (displayed without
-        // conversion), so "now" must be local time too - not DateTime.UtcNow.
         var now = DateTime.Now;
         var today = DateOnly.FromDateTime(now);
         var entries = new List<DashboardEntry>();
@@ -184,7 +183,6 @@
 
             var startsToday = DateOnly.FromDateTime(booking.StartUtc) == today;
 
-            // Pending / Confirmed.
             if (now >= booking.StartUtc && now < booking.EndUtc)
             {
                 entries.Add(new DashboardEntry(booking, DashboardCategory.Active));

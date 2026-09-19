@@ -22,12 +22,19 @@ using (var scope = app.Services.CreateScope())
 
 var rooms = app.MapGroup("/api/rooms");
 
-rooms.MapGet("/", async (EventSchedulingDbContext database, CancellationToken cancellationToken) =>
-    await database.Rooms
-        .AsNoTracking()
+rooms.MapGet("/", async (bool? includeInactive, EventSchedulingDbContext database, CancellationToken cancellationToken) =>
+{
+    var query = database.Rooms.AsNoTracking();
+    if (includeInactive is not true)
+    {
+        query = query.Where(room => room.IsActive);
+    }
+
+    return await query
         .OrderBy(room => room.Name)
         .Select(room => room.ToResponse())
-        .ToListAsync(cancellationToken));
+        .ToListAsync(cancellationToken);
+});
 
 rooms.MapGet("/{id:int}", async (int id, EventSchedulingDbContext database, CancellationToken cancellationToken) =>
 {
@@ -88,6 +95,10 @@ static Task<int> AvailableCountAsync(EventSchedulingDbContext database, int refE
     database.Equipment.CountAsync(
         unit => unit.RefEquipmentId == refEquipmentId && unit.Status == EquipmentStatus.AVL,
         cancellationToken);
+static IResult BookingProblem(string message, string category) =>
+    Results.ValidationProblem(
+        new Dictionary<string, string[]> { ["booking"] = [message] },
+        extensions: new Dictionary<string, object?> { ["category"] = category });
 
 static async Task ReleaseEquipmentUnitAsync(EventSchedulingDbContext database, Booking booking, CancellationToken cancellationToken)
 {
@@ -105,33 +116,26 @@ static async Task ReleaseEquipmentUnitAsync(EventSchedulingDbContext database, B
     booking.EquipmentId = null;
 }
 
-static Task<bool> RoomHasClashAsync(EventSchedulingDbContext database, int roomId, DateTime startUtc, DateTime endUtc,
-    int? excludeBookingId, CancellationToken cancellationToken)
-{
-    var query = database.Bookings.Where(other =>
-        other.RoomId == roomId
-        && other.Status != BookingStatus.Cancelled
-        && other.Status != BookingStatus.Completed
-        && other.Status != BookingStatus.Returned
-        && startUtc < other.EndUtc
-        && other.StartUtc < endUtc);
-
-    if (excludeBookingId is int excludeId)
-    {
-        query = query.Where(other => other.Id != excludeId);
-    }
-
-    return query.AnyAsync(cancellationToken);
-}
-
 var refEquipment = app.MapGroup("/api/refequipment");
 
-refEquipment.MapGet("/", async (EventSchedulingDbContext database, CancellationToken cancellationToken) =>
+refEquipment.MapGet("/", async (DateTime? availableFrom, DateTime? availableTo, EventSchedulingDbContext database, CancellationToken cancellationToken) =>
 {
     var types = await database.RefEquipment
         .AsNoTracking()
         .OrderBy(item => item.Name)
         .ToListAsync(cancellationToken);
+
+    if (availableFrom is { } from && availableTo is { } to && to > from)
+    {
+        var responses = new List<RefEquipmentResponse>(types.Count);
+        foreach (var type in types)
+        {
+            var count = await BookingRules.CountAvailableEquipmentUnitsAsync(database, type.Id, from, to, cancellationToken);
+            responses.Add(type.ToResponse(count));
+        }
+
+        return responses;
+    }
 
     var counts = await database.Equipment
         .AsNoTracking()
@@ -145,7 +149,7 @@ refEquipment.MapGet("/", async (EventSchedulingDbContext database, CancellationT
         .ToList();
 });
 
-refEquipment.MapGet("/{id:int}", async (int id, EventSchedulingDbContext database, CancellationToken cancellationToken) =>
+refEquipment.MapGet("/{id:int}", async (int id, DateTime? availableFrom, DateTime? availableTo, EventSchedulingDbContext database, CancellationToken cancellationToken) =>
 {
     var type = await database.RefEquipment.AsNoTracking().SingleOrDefaultAsync(item => item.Id == id, cancellationToken);
     if (type is null)
@@ -153,7 +157,11 @@ refEquipment.MapGet("/{id:int}", async (int id, EventSchedulingDbContext databas
         return Results.NotFound();
     }
 
-    return Results.Ok(type.ToResponse(await AvailableCountAsync(database, id, cancellationToken)));
+    var count = availableFrom is { } from && availableTo is { } to && to > from
+        ? await BookingRules.CountAvailableEquipmentUnitsAsync(database, id, from, to, cancellationToken)
+        : await AvailableCountAsync(database, id, cancellationToken);
+
+    return Results.Ok(type.ToResponse(count));
 });
 
 refEquipment.MapPost("/", async (RefEquipmentRequest request, EventSchedulingDbContext database, CancellationToken cancellationToken) =>
@@ -338,15 +346,28 @@ bookings.MapPost("/", async (BookingRequest request, EventSchedulingDbContext da
     var error = request.Validate();
     if (error is not null)
     {
-        return Results.ValidationProblem(new Dictionary<string, string[]> { ["booking"] = [error] });
+        return BookingProblem(error, "RuleBreach");
     }
 
-    if (request.StartUtc.Date < DateTime.UtcNow.Date.AddDays(-1))
+    var nowUtc = DateTime.UtcNow;
+
+    if (request.StartUtc.Date < nowUtc.Date.AddDays(-1))
     {
-        return Results.ValidationProblem(new Dictionary<string, string[]>
-        {
-            ["booking"] = ["Bookings can't start on a past date."]
-        });
+        return BookingProblem("Bookings can't start on a past date.", "RuleBreach");
+    }
+
+    if (request.RoomId is not null && !BookingRules.HasSufficientNotice(request.StartUtc, nowUtc))
+    {
+        return BookingProblem(
+            $"Room bookings need at least {Booking.MinBookingNotice.TotalMinutes:0} minutes' notice.", "RuleBreach");
+    }
+
+    var activeBookingCount = await BookingRules.CountActiveBookingsAsync(database, request.StudentId, nowUtc, cancellationToken);
+    if (activeBookingCount >= Booking.MaxActiveBookingsPerStudent)
+    {
+        return BookingProblem(
+            $"You already have {Booking.MaxActiveBookingsPerStudent} active bookings. Cancel or complete one before making another.",
+            "RuleBreach");
     }
 
     var booking = request.ToBooking();
@@ -356,38 +377,36 @@ bookings.MapPost("/", async (BookingRequest request, EventSchedulingDbContext da
         var room = await database.Rooms.AsNoTracking().SingleOrDefaultAsync(item => item.Id == request.RoomId, cancellationToken);
         if (room is null)
         {
-            return Results.ValidationProblem(new Dictionary<string, string[]>
-            {
-                ["booking"] = ["The specified room does not exist."]
-            });
+            return BookingProblem("The specified room does not exist.", "RuleBreach");
         }
 
         if (room.IsStaffRoom != request.IsStaff)
         {
-            return Results.ValidationProblem(new Dictionary<string, string[]>
-            {
-                ["booking"] = [room.IsStaffRoom
+            return BookingProblem(
+                room.IsStaffRoom
                     ? "Lab and lecture rooms can only be booked by teaching staff."
-                    : "Study rooms are booked by students, not teaching staff."]
-            });
+                    : "Study rooms are booked by students, not teaching staff.",
+                "RuleBreach");
         }
 
-        if (await RoomHasClashAsync(database, request.RoomId.Value, request.StartUtc, request.EndUtc, null, cancellationToken))
+        if (!BookingRules.HasCapacity(request.AttendeeCount, room.Capacity))
         {
-            return Results.ValidationProblem(new Dictionary<string, string[]>
-            {
-                ["booking"] = ["This room is already booked during part of that time."]
-            });
+            return BookingProblem(
+                $"This room seats {room.Capacity}, which is fewer than the {request.AttendeeCount} attendees given.",
+                "RuleBreach");
+        }
+
+        if (await BookingRules.HasRoomClashAsync(database, request.RoomId.Value, request.StartUtc, request.EndUtc, null, cancellationToken))
+        {
+            return BookingProblem("This room is already booked during part of that time.", "Clash");
         }
     }
-    else
+
+    if (request.RefEquipmentId is not null)
     {
         if (!await database.RefEquipment.AnyAsync(type => type.Id == request.RefEquipmentId, cancellationToken))
         {
-            return Results.ValidationProblem(new Dictionary<string, string[]>
-            {
-                ["booking"] = ["The specified equipment type does not exist."]
-            });
+            return BookingProblem("The specified equipment type does not exist.", "RuleBreach");
         }
 
         var unit = await database.Equipment
@@ -397,18 +416,25 @@ bookings.MapPost("/", async (BookingRequest request, EventSchedulingDbContext da
 
         if (unit is null)
         {
-            return Results.ValidationProblem(new Dictionary<string, string[]>
-            {
-                ["booking"] = ["No units of this equipment type are currently available."]
-            });
+            return BookingProblem("No units of this equipment type are currently available.", "Clash");
         }
 
         unit.Status = EquipmentStatus.OCC;
         booking.EquipmentId = unit.Id;
     }
 
-    database.Bookings.Add(booking);
-    await database.SaveChangesAsync(cancellationToken);
+    if (request.RoomId is not null)
+    {
+        if (!await BookingRules.TryCommitRoomBookingAsync(database, booking, cancellationToken))
+        {
+            return BookingProblem("This room is already booked during part of that time.", "Clash");
+        }
+    }
+    else
+    {
+        database.Bookings.Add(booking);
+        await database.SaveChangesAsync(cancellationToken);
+    }
 
     return Results.Created($"/api/bookings/{booking.Id}", booking.ToResponse());
 });
@@ -418,7 +444,7 @@ bookings.MapPut("/{id:int}", async (int id, BookingRequest request, EventSchedul
     var error = request.Validate();
     if (error is not null)
     {
-        return Results.ValidationProblem(new Dictionary<string, string[]> { ["booking"] = [error] });
+        return BookingProblem(error, "RuleBreach");
     }
 
     var booking = await database.Bookings.SingleOrDefaultAsync(item => item.Id == id, cancellationToken);
@@ -427,16 +453,19 @@ bookings.MapPut("/{id:int}", async (int id, BookingRequest request, EventSchedul
         return Results.NotFound();
     }
 
-    if (request.RoomId is not null
-        && await RoomHasClashAsync(database, request.RoomId.Value, request.StartUtc, request.EndUtc, id, cancellationToken))
+    var wasActive = booking.Status is not (BookingStatus.Cancelled or BookingStatus.Completed or BookingStatus.Returned);
+
+    if (wasActive && !BookingRules.IsBeforeCutoff(booking.StartUtc, DateTime.UtcNow))
     {
-        return Results.ValidationProblem(new Dictionary<string, string[]>
-        {
-            ["booking"] = ["This room is already booked during part of that time."]
-        });
+        return BookingProblem("This booking has already started and can no longer be changed or cancelled.", "RuleBreach");
     }
 
-    var wasActive = booking.Status is not (BookingStatus.Cancelled or BookingStatus.Completed or BookingStatus.Returned);
+    if (request.RoomId is not null
+        && await BookingRules.HasRoomClashAsync(database, request.RoomId.Value, request.StartUtc, request.EndUtc, id, cancellationToken))
+    {
+        return BookingProblem("This room is already booked during part of that time.", "Clash");
+    }
+
     booking.UpdateFrom(request);
 
     if (request.Status == BookingStatus.Cancelled && wasActive)
@@ -449,8 +478,13 @@ bookings.MapPut("/{id:int}", async (int id, BookingRequest request, EventSchedul
     return Results.Ok(booking.ToResponse());
 });
 
-bookings.MapPost("/{id:int}/return", async (int id, EventSchedulingDbContext database, CancellationToken cancellationToken) =>
+bookings.MapPost("/{id:int}/return", async (int id, ReturnRequest? request, EventSchedulingDbContext database, CancellationToken cancellationToken) =>
 {
+    if (request?.Validate() is { } returnError)
+    {
+        return BookingProblem(returnError, "RuleBreach");
+    }
+
     var booking = await database.Bookings.SingleOrDefaultAsync(item => item.Id == id, cancellationToken);
     if (booking is null)
     {
@@ -459,13 +493,11 @@ bookings.MapPost("/{id:int}/return", async (int id, EventSchedulingDbContext dat
 
     if (booking.EquipmentId is null)
     {
-        return Results.ValidationProblem(new Dictionary<string, string[]>
-        {
-            ["booking"] = ["This booking has no equipment unit to return."]
-        });
+        return BookingProblem("This booking has no equipment unit to return.", "RuleBreach");
     }
 
     await ReleaseEquipmentUnitAsync(database, booking, cancellationToken);
+    booking.ReturnConditionNotes = Booking.NormalizeNotes(request?.ConditionNotes);
     booking.Status = BookingStatus.Returned;
     await database.SaveChangesAsync(cancellationToken);
 
@@ -482,10 +514,7 @@ bookings.MapPost("/{id:int}/end", async (int id, EventSchedulingDbContext databa
 
     if (booking.RoomId is null)
     {
-        return Results.ValidationProblem(new Dictionary<string, string[]>
-        {
-            ["booking"] = ["Only room bookings can be ended."]
-        });
+        return BookingProblem("Only room bookings can be ended.", "RuleBreach");
     }
 
     booking.Status = BookingStatus.Completed;

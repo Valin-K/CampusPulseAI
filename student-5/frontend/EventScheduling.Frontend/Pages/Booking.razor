@@ -69,7 +69,13 @@ else
                 </div>
                 <span class="status-badge paid">Seats @room.Capacity</span>
             </div>
-            <ul class="detail-list"><li>@room.Location</li></ul>
+            <ul class="detail-list">
+                <li>@room.Location</li>
+                @if (!string.IsNullOrWhiteSpace(room.OpeningHours))
+                {
+                    <li>Open @room.OpeningHours</li>
+                }
+            </ul>
             <p>@room.Description</p>
         }
         else if (equipment is not null)
@@ -90,13 +96,21 @@ else
         <div class="section-heading">
             <div>
                 <span class="eyebrow">Schedule</span>
-                <h2>@(isRecurring ? "Set the class schedule" : isRoom ? "Choose your slot" : "Schedule your hire")</h2>
+                <h2>@(isRecurring ? "Set the weekly schedule" : isRoom ? "Choose your slot" : "Schedule your hire")</h2>
             </div>
         </div>
 
         @if (!string.IsNullOrWhiteSpace(errorMessage))
         {
             <div class="notice notice-error" role="alert">@errorMessage</div>
+        }
+
+        @if (isRoom)
+        {
+            <label class="day-toggle @(wantsRecurring ? "is-on" : null)">
+                <input type="checkbox" checked="@wantsRecurring" @onchange="e => wantsRecurring = (bool)(e.Value ?? false)" />
+                <span>Repeat this booking weekly</span>
+            </label>
         }
 
         @if (isRoom && isRecurring)
@@ -143,6 +157,15 @@ else
                     <span>Repeat for (weeks)</span>
                     <input type="number" min="1" max="13" step="1" @bind="recurringWeeks" @bind:event="onchange" />
                 </label>
+
+                <label class="field">
+                    <span>Number of attendees (optional)</span>
+                    <input type="number" min="1" max="@room!.Capacity" step="1" placeholder="Any" @bind="attendeeCount" @bind:event="onchange" />
+                </label>
+                @if (attendeeCount is not null)
+                {
+                    <p class="booking-hint @(AttendeeCountValid ? "is-ok" : "is-bad")">@AttendeeCountMessage</p>
+                }
 
                 <RoomAvailability Bookings="allBookings" Date="date.Value" RoomId="room!.Id"
                                   ProposedStart="startTime" ProposedEnd="endTime" />
@@ -206,6 +229,15 @@ else
                 {
                     <p class="booking-hint @(RoomSlotValid ? "is-ok" : "is-bad")">@RoomSlotMessage</p>
                 }
+
+                <label class="field">
+                    <span>Number of attendees (optional)</span>
+                    <input type="number" min="1" max="@room!.Capacity" step="1" placeholder="Any" @bind="attendeeCount" @bind:event="onchange" />
+                </label>
+                @if (attendeeCount is not null)
+                {
+                    <p class="booking-hint @(AttendeeCountValid ? "is-ok" : "is-bad")">@AttendeeCountMessage</p>
+                }
             }
         }
         else
@@ -231,6 +263,12 @@ else
                 <input type="text" value="@ReturnText" readonly disabled />
             </label>
             <p class="booking-hint">Equipment hires run for 7 days from the hire date and time.</p>
+
+            <label class="field">
+                <span>Condition at pickup (optional)</span>
+                <textarea maxlength="500" placeholder="e.g. Minor scuff on the case, otherwise fine."
+                          @bind="checkOutConditionNotes" @bind:event="oninput"></textarea>
+            </label>
 
             @if (equipment!.AvailableCount == 0)
             {
@@ -260,13 +298,14 @@ else
     private DateOnly? date;
     private TimeOnly? startTime;
     private TimeOnly? endTime;
+    private int? attendeeCount;
+    private string checkOutConditionNotes = string.Empty;
 
     private bool isLoading = true;
     private bool isSaving;
     private bool saved;
     private string? errorMessage;
 
-    // Recurring room bookings (teaching staff only): same time slot on chosen weekdays for N weeks.
     private static readonly DayOfWeek[] WeekDays =
     {
         DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday,
@@ -277,8 +316,10 @@ else
     private int recurringWeeks = 1;
     private RecurringBookingResult? recurringResult;
 
+    private bool wantsRecurring;
+
     private bool isRoom => room is not null;
-    private bool isRecurring => isRoom && CurrentUser.IsStaff;
+    private bool isRecurring => isRoom && wantsRecurring;
     private string todayIso => DateTime.Today.ToString("yyyy-MM-dd");
     private bool DateInPast => date is { } picked && picked < DateOnly.FromDateTime(DateTime.Today);
 
@@ -289,7 +330,7 @@ else
     private string HeroSubtitle => (saved, room, equipment) switch
     {
         (true, _, _) => "You're all set.",
-        (_, { } r, _) when isRecurring => $"Set a weekly schedule to hold {r.Name} for your class.",
+        (_, { } r, _) when isRecurring => $"Set a weekly schedule to hold {r.Name}.",
         (_, { } r, _) => $"Pick a date and time for {r.Name}.",
         (_, _, { } e) => $"Choose when you'd like to pick up the {e.Name}.",
         _ => "Choose what you'd like to book."
@@ -342,9 +383,17 @@ else
         }
     }
 
+    private bool AttendeeCountValid => attendeeCount is not { } count || (isRoom && count > 0 && count <= room!.Capacity);
+
+    private string AttendeeCountMessage => attendeeCount switch
+    {
+        <= 0 => "Enter at least 1 attendee.",
+        { } count when isRoom && count > room!.Capacity => $"This room seats {room.Capacity}.",
+        _ => "Fits within this room's capacity."
+    };
+
     private sealed record OccurrenceSlot(DateOnly Date, bool Clashes);
 
-    // Every dated occurrence the recurrence settings produce, earliest first.
     private List<OccurrenceSlot> occurrences => BuildOccurrences();
 
     private List<OccurrenceSlot> BuildOccurrences()
@@ -358,7 +407,6 @@ else
         }
 
         var weeks = Math.Clamp(recurringWeeks, 1, 13);
-        // Monday of the week the start date falls in.
         var weekStart = anchor.AddDays(-(((int)anchor.DayOfWeek + 6) % 7));
 
         for (var week = 0; week < weeks; week++)
@@ -459,7 +507,7 @@ else
 
             if (isRecurring)
             {
-                return RecurrenceValid;
+                return RecurrenceValid && AttendeeCountValid;
             }
 
             if (StartUtc is null || DateInPast)
@@ -468,7 +516,7 @@ else
             }
 
             return isRoom
-                ? RoomSlotValid
+                ? RoomSlotValid && AttendeeCountValid
                 : equipment!.AvailableCount > 0;
         }
     }
@@ -525,7 +573,7 @@ else
                     CurrentUser.UserId, room!.Id, null, room.Name,
                     slot.Date.ToDateTime(startTime!.Value, DateTimeKind.Utc),
                     slot.Date.ToDateTime(endTime!.Value, DateTimeKind.Utc),
-                    BookingStatus.Confirmed, IsStaff: true))
+                    BookingStatus.Confirmed, IsStaff: CurrentUser.IsStaff, AttendeeCount: attendeeCount))
                 .ToList();
 
             recurringResult = await Api.CreateBookingsAsync(requests);
@@ -550,8 +598,10 @@ else
         }
 
         var request = isRoom
-            ? new BookingRequest(CurrentUser.UserId, room!.Id, null, room.Name, start, end, BookingStatus.Confirmed, IsStaff: CurrentUser.IsStaff)
-            : new BookingRequest(CurrentUser.UserId, null, equipment!.Id, equipment.Name, start, end, BookingStatus.Confirmed, IsStaff: CurrentUser.IsStaff);
+            ? new BookingRequest(CurrentUser.UserId, room!.Id, null, room.Name, start, end, BookingStatus.Confirmed,
+                IsStaff: CurrentUser.IsStaff, AttendeeCount: attendeeCount)
+            : new BookingRequest(CurrentUser.UserId, null, equipment!.Id, equipment.Name, start, end, BookingStatus.Confirmed,
+                IsStaff: CurrentUser.IsStaff, ConditionNotes: checkOutConditionNotes);
 
         var result = await Api.CreateBookingAsync(request);
         isSaving = false;

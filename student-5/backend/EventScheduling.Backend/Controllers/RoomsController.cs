@@ -12,7 +12,7 @@ public sealed class RoomsController(IHttpClientFactory httpClientFactory) : Cont
     [HttpGet]
     public async Task<IActionResult> GetAll(CancellationToken cancellationToken)
     {
-        var response = await DatabaseClient.GetAsync("/api/rooms", cancellationToken);
+        var response = await DatabaseClient.GetAsync($"/api/rooms{Request.QueryString}", cancellationToken);
         return await response.ToActionResultAsync(cancellationToken);
     }
 

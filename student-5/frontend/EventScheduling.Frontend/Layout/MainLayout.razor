@@ -33,6 +33,14 @@
         </div>
     </UserSelector>
     <ChildContent>
+        @if (CurrentUser.IsInitialized && CurrentUser.IsDegraded)
+        {
+            <div class="notice notice-error" role="alert">
+                The student directory is unavailable right now, so we can't confirm who you are.
+                You can still search and book, but you're being shown as a student - if you're
+                teaching staff, some rooms and options won't appear until this is back.
+            </div>
+        }
         @Body
     </ChildContent>
 </CampusShell>

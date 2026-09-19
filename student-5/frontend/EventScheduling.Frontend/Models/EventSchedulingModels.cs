@@ -10,7 +10,8 @@ public enum RoomKind
 {
     Study,
     Lab,
-    Lecture
+    Lecture,
+    Collaborative
 }
 
 public enum BookingStatus
@@ -42,7 +43,10 @@ public sealed record BookingResponse(
     string ResourceName,
     DateTime StartUtc,
     DateTime EndUtc,
-    BookingStatus Status);
+    BookingStatus Status,
+    int? AttendeeCount = null,
+    string? CheckOutConditionNotes = null,
+    string? ReturnConditionNotes = null);
 
 public sealed record BookingRequest(
     int StudentId,
@@ -52,7 +56,11 @@ public sealed record BookingRequest(
     DateTime StartUtc,
     DateTime EndUtc,
     BookingStatus Status,
-    bool IsStaff = false);
+    bool IsStaff = false,
+    int? AttendeeCount = null,
+    string? ConditionNotes = null);
+
+public sealed record ReturnRequest(string? ConditionNotes);
 
 public sealed record BookingResult(bool Success, BookingResponse? Booking, string? Error);
 
@@ -96,7 +104,10 @@ public sealed record RoomResponse(
     string Location,
     int Capacity,
     string Description,
-    RoomKind Kind = RoomKind.Study)
+    RoomKind Kind = RoomKind.Study,
+    bool IsActive = true,
+    string OpeningHours = "",
+    bool IsAccessible = false)
 {
     public bool IsStaffRoom => Kind is RoomKind.Lab or RoomKind.Lecture;
 
@@ -104,6 +115,7 @@ public sealed record RoomResponse(
     {
         RoomKind.Lab => "Lab room",
         RoomKind.Lecture => "Lecture room",
+        RoomKind.Collaborative => "Collaborative room",
         _ => "Study room"
     };
 }

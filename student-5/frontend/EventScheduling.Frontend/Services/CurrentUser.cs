@@ -14,6 +14,8 @@ public sealed class CurrentUser(EventSchedulingApiClient api, IJSRuntime js, Nav
     public UserProfile? Profile { get; private set; }
     public bool IsInitialized { get; private set; }
 
+    public bool IsDegraded { get; private set; }
+
     public int UserId => Profile?.UserId ?? DefaultUserId;
 
     public bool IsStaff => string.Equals(Profile?.Role, "Staff", StringComparison.OrdinalIgnoreCase);
@@ -25,6 +27,7 @@ public sealed class CurrentUser(EventSchedulingApiClient api, IJSRuntime js, Nav
     private async Task<UserProfile?> InitializeAsync()
     {
         Users = await api.GetUsersAsync();
+        IsDegraded = Users.Count == 0;
 
         int? storedId = null;
         try

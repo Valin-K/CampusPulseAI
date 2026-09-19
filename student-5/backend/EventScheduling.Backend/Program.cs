@@ -28,7 +28,7 @@ var geminiApiKey = builder.Configuration["GEMINI_API_KEY"];
 builder.Services.AddHttpClient("gemini", client =>
 {
     client.BaseAddress = new Uri("https://generativelanguage.googleapis.com/");
-    client.Timeout = TimeSpan.FromSeconds(90);
+    client.Timeout = TimeSpan.FromSeconds(10);
 
     if (!string.IsNullOrWhiteSpace(geminiApiKey))
     {

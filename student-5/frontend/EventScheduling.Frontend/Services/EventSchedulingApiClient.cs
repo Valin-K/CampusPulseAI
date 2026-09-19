@@ -26,6 +26,11 @@ public sealed class EventSchedulingApiClient(HttpClient httpClient)
     public async Task<List<RefEquipmentResponse>> GetRefEquipmentAsync(CancellationToken cancellationToken = default) =>
         await httpClient.GetFromJsonAsync<List<RefEquipmentResponse>>("/api/refequipment", cancellationToken) ?? [];
 
+    public async Task<List<RefEquipmentResponse>> GetRefEquipmentAsync(
+        DateTime availableFromUtc, DateTime availableToUtc, CancellationToken cancellationToken = default) =>
+        await httpClient.GetFromJsonAsync<List<RefEquipmentResponse>>(
+            $"/api/refequipment?availableFrom={availableFromUtc:O}&availableTo={availableToUtc:O}", cancellationToken) ?? [];
+
     public async Task<RefEquipmentResponse?> GetRefEquipmentAsync(int id, CancellationToken cancellationToken = default)
     {
         try
@@ -77,10 +82,7 @@ public sealed class EventSchedulingApiClient(HttpClient httpClient)
             }
 
             var problem = await response.Content.ReadFromJsonAsync<ProblemResponse>(cancellationToken);
-            var message = problem?.Errors?.Values.SelectMany(messages => messages).FirstOrDefault()
-                ?? problem?.Detail
-                ?? "The booking could not be created.";
-            return new BookingResult(false, null, message);
+            return new BookingResult(false, null, FormatError(problem) ?? "The booking could not be created.");
         }
         catch (HttpRequestException)
         {
@@ -110,24 +112,53 @@ public sealed class EventSchedulingApiClient(HttpClient httpClient)
         return new RecurringBookingResult(created, requests.Count, failures);
     }
 
-    public Task<BookingResult> ReturnBookingAsync(int id, CancellationToken cancellationToken = default) =>
-        PostBookingActionAsync($"/api/bookings/{id}/return", cancellationToken);
+    public async Task<BookingResult> ReturnBookingAsync(int id, string? conditionNotes = null, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var response = await httpClient.PostAsJsonAsync(
+                $"/api/bookings/{id}/return", new ReturnRequest(conditionNotes), cancellationToken);
+            if (response.IsSuccessStatusCode)
+            {
+                var booking = await response.Content.ReadFromJsonAsync<BookingResponse>(cancellationToken);
+                return new BookingResult(true, booking, null);
+            }
+
+            var problem = await response.Content.ReadFromJsonAsync<ProblemResponse>(cancellationToken);
+            return new BookingResult(false, null, FormatError(problem) ?? "The return could not be recorded.");
+        }
+        catch (HttpRequestException)
+        {
+            return new BookingResult(false, null, "The Event Scheduling service is unavailable.");
+        }
+    }
 
     public Task<BookingResult> EndBookingAsync(int id, CancellationToken cancellationToken = default) =>
         PostBookingActionAsync($"/api/bookings/{id}/end", cancellationToken);
 
-    public async Task<BookingResult> CancelBookingAsync(int id, CancellationToken cancellationToken = default)
+    public async Task<BookingResult> CancelBookingAsync(BookingResponse booking, CancellationToken cancellationToken = default)
     {
         try
         {
-            var response = await httpClient.DeleteAsync($"/api/bookings/{id}", cancellationToken);
+            var request = new BookingRequest(
+                booking.StudentId,
+                booking.RoomId,
+                booking.RefEquipmentId,
+                booking.ResourceName,
+                booking.StartUtc,
+                booking.EndUtc,
+                BookingStatus.Cancelled,
+                AttendeeCount: booking.AttendeeCount,
+                ConditionNotes: booking.CheckOutConditionNotes);
+
+            var response = await httpClient.PutAsJsonAsync($"/api/bookings/{booking.Id}", request, cancellationToken);
             if (response.IsSuccessStatusCode)
             {
                 return new BookingResult(true, null, null);
             }
 
             var problem = await response.Content.ReadFromJsonAsync<ProblemResponse>(cancellationToken);
-            return new BookingResult(false, null, FirstError(problem) ?? "The booking could not be cancelled.");
+            return new BookingResult(false, null, FormatError(problem) ?? "The booking could not be cancelled.");
         }
         catch (HttpRequestException)
         {
@@ -151,7 +182,7 @@ public sealed class EventSchedulingApiClient(HttpClient httpClient)
 
             var problem = await response.Content.ReadFromJsonAsync<ProblemResponse>(cancellationToken);
             return new AssistantResult(false, null,
-                FirstError(problem) ?? "The assistant could not answer right now.");
+                FormatError(problem) ?? "The assistant could not answer right now.");
         }
         catch (HttpRequestException)
         {
@@ -171,7 +202,7 @@ public sealed class EventSchedulingApiClient(HttpClient httpClient)
             }
 
             var problem = await response.Content.ReadFromJsonAsync<ProblemResponse>(cancellationToken);
-            return new BookingResult(false, null, FirstError(problem) ?? "The action could not be completed.");
+            return new BookingResult(false, null, FormatError(problem) ?? "The action could not be completed.");
         }
         catch (HttpRequestException)
         {
@@ -179,8 +210,24 @@ public sealed class EventSchedulingApiClient(HttpClient httpClient)
         }
     }
 
-    private static string? FirstError(ProblemResponse? problem) =>
-        problem?.Errors?.Values.SelectMany(messages => messages).FirstOrDefault() ?? problem?.Detail;
+    private static string? FormatError(ProblemResponse? problem)
+    {
+        var message = problem?.Errors?.Values.SelectMany(messages => messages).FirstOrDefault() ?? problem?.Detail;
+        if (message is null)
+        {
+            return null;
+        }
 
-    private sealed record ProblemResponse(string? Detail, Dictionary<string, string[]>? Errors);
+        var label = problem?.Category switch
+        {
+            "Clash" => "Scheduling conflict",
+            "RuleBreach" => "Booking rule",
+            "Outage" => "Service unavailable",
+            _ => null
+        };
+
+        return label is null ? message : $"{label}: {message}";
+    }
+
+    private sealed record ProblemResponse(string? Detail, Dictionary<string, string[]>? Errors, string? Category);
 }
