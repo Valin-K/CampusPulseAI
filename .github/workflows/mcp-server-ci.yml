@@ -1,0 +1,60 @@
+name: Shared MCP Server CI
+
+on:
+  push:
+    paths:
+      - "ai-services/mcp-server/**"
+      - "CampusPulseAI.slnx"
+      - "Directory.Packages.props"
+      - ".github/workflows/mcp-server-ci.yml"
+  pull_request:
+    paths:
+      - "ai-services/mcp-server/**"
+      - "CampusPulseAI.slnx"
+      - "Directory.Packages.props"
+      - ".github/workflows/mcp-server-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-mcp-server:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      MCP_ENABLED: "true"
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore MCP server
+        run: dotnet restore ai-services/mcp-server/McpServer/McpServer.csproj
+
+      - name: Build MCP server
+        run: dotnet build ai-services/mcp-server/McpServer/McpServer.csproj --configuration Release --no-restore --nologo
+
+      - name: Smoke test MCP endpoints
+        shell: bash
+        run: |
+          dotnet run --project ai-services/mcp-server/McpServer/McpServer.csproj --configuration Release --no-build --urls http://localhost:5268 > mcp-server.log 2>&1 &
+          server_pid=$!
+          trap 'kill $server_pid' EXIT
+          for attempt in {1..20}; do
+            if curl --silent --fail http://localhost:5268/health > /dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          curl --silent --fail http://localhost:5268/health
+          curl --silent --fail http://localhost:5268/api/mcp/tools
+          curl --silent --fail \
+            -H "Content-Type: application/json" \
+            -d '{"tool":"project_files","arguments":{"directory_path":"docs"}}' \
+            http://localhost:5268/api/mcp/tools/call
