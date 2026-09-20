@@ -20,6 +20,15 @@ builder.Services.AddHttpClient("academicRecords", client =>
 {
     client.BaseAddress = new Uri(builder.Configuration["Services:AcademicRecordsBackend"] ?? "http://academicrecords.backend:8080");
 });
+builder.Services.AddHttpClient("mcp", client =>
+{
+    client.BaseAddress = new Uri(builder.Configuration["Services:McpServer"] ?? "http://localhost:5268");
+});
+builder.Services.AddHttpClient("rag", client =>
+{
+    client.BaseAddress = new Uri(builder.Configuration["Services:RagServer"] ?? "http://localhost:5267");
+    client.Timeout = TimeSpan.FromSeconds(90);
+});
 builder.Services.AddScoped<GeminiScholarshipService>();
 var geminiApiKey = builder.Configuration["GEMINI_API_KEY"];
 
@@ -113,6 +122,89 @@ scholarships.MapPost("/recommendations/student/{userId:int}", async (int userId,
     catch (HttpRequestException)
     {
         return Results.Problem("Student information or the scholarship recommendation service is unavailable.", statusCode: StatusCodes.Status503ServiceUnavailable);
+    }
+});
+
+var assistant = app.MapGroup("/api/assistant");
+
+assistant.MapPost("/mcp/integration", async (IHttpClientFactory clients, CancellationToken cancellationToken) =>
+{
+    try
+    {
+        return await (await clients.CreateClient("mcp").PostAsJsonAsync(
+            "/api/mcp/tools/call",
+            new McpToolCallRequest("validate_integration", new Dictionary<string, object?> { ["feature"] = "student-4" }),
+            cancellationToken)).ToResultAsync(cancellationToken);
+    }
+    catch (HttpRequestException)
+    {
+        return Results.Problem(
+            "The shared MCP server is unavailable. Start it on the host at http://localhost:5268 before using this feature.",
+            statusCode: StatusCodes.Status503ServiceUnavailable);
+    }
+    catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
+    {
+        return Results.Problem(
+            "The shared MCP server did not respond in time.",
+            statusCode: StatusCodes.Status504GatewayTimeout);
+    }
+});
+
+assistant.MapPost("/rag/scholarships", async (
+    RagQuestionRequest request,
+    IHttpClientFactory clients,
+    CancellationToken cancellationToken) =>
+{
+    if (string.IsNullOrWhiteSpace(request.Question) || request.Question.Length > 1000)
+    {
+        return Results.BadRequest(new { error = "Ask a scholarship question of up to 1000 characters." });
+    }
+
+    try
+    {
+        using var scholarshipsResponse = await clients.CreateClient("billingDatabase")
+            .GetAsync("/api/scholarships", cancellationToken);
+        if (!scholarshipsResponse.IsSuccessStatusCode)
+        {
+            return await scholarshipsResponse.ToResultAsync(cancellationToken);
+        }
+
+        var scholarships = await scholarshipsResponse.Content.ReadFromJsonAsync<List<ScholarshipResponse>>(cancellationToken)
+            ?? [];
+        var documents = scholarships.Select(scholarship => new RagDocument(
+            $"scholarship-{scholarship.Id}",
+            $"{scholarship.Name}. {scholarship.Description} Award amount: {scholarship.AwardAmount:C0}. "
+                + $"Minimum GPA: {scholarship.MinimumGpa:F2}. Eligible major: {scholarship.EligibleMajor}. "
+                + $"Minimum year level: {scholarship.MinimumYearLevel}. Application deadline: {scholarship.ApplicationDeadline:MMMM d, yyyy}. "
+                + $"Applications are {(scholarship.IsActive ? "open" : "closed")}.",
+            new Dictionary<string, string> { ["scholarshipName"] = scholarship.Name }))
+            .ToList();
+
+        using var ingestResponse = await clients.CreateClient("rag").PostAsJsonAsync(
+            "/api/rag/financialaidbilling/documents",
+            new RagIngestRequest(documents),
+            cancellationToken);
+        if (!ingestResponse.IsSuccessStatusCode)
+        {
+            return await ingestResponse.ToResultAsync(cancellationToken);
+        }
+
+        return await (await clients.CreateClient("rag").PostAsJsonAsync(
+            "/api/rag/financialaidbilling/answer",
+            new RagAnswerRequest(request.Question.Trim(), 4, "You are the Financial Aid & Billing scholarship assistant. Answer only from the scholarship catalogue and cite your sources.", null),
+            cancellationToken)).ToResultAsync(cancellationToken);
+    }
+    catch (HttpRequestException)
+    {
+        return Results.Problem(
+            "The shared RAG server is unavailable. Start it on the host at http://localhost:5267 before using this feature.",
+            statusCode: StatusCodes.Status503ServiceUnavailable);
+    }
+    catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
+    {
+        return Results.Problem(
+            "A shared service did not respond in time.",
+            statusCode: StatusCodes.Status504GatewayTimeout);
     }
 });
 

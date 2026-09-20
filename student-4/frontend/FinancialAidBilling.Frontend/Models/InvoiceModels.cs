@@ -73,6 +73,25 @@ public sealed record ScholarshipResponse(int Id, string Name, string Description
 
 public sealed record ScholarshipRecommendationResponse(int StudentId, int MatchCount, string Recommendation);
 
+public sealed record RagQuestionRequest(string Question);
+
+public sealed record McpIntegrationResponse(string Tool, bool IsError, McpIntegrationResult Result, DateTimeOffset ExecutedAtUtc);
+
+public sealed record McpIntegrationResult(string Feature, bool Valid, IReadOnlyList<string> Checks);
+
+public sealed record RagAnswerResponse(
+    string Collection,
+    string Question,
+    string Status,
+    string? Answer,
+    double Confidence,
+    IReadOnlyList<RagSource> Sources,
+    string Embedder,
+    string? Detail,
+    DateTimeOffset ExecutedAtUtc);
+
+public sealed record RagSource(int Rank, string DocumentId, int ChunkIndex, double Score, string Text, Dictionary<string, string>? Metadata);
+
 public enum InvoiceStatus
 {
     Outstanding,

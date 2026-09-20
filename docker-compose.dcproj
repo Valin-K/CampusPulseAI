@@ -45,6 +45,9 @@
     <None Include="student-5\database\EventScheduling.Database\Dockerfile" />
     <None Include="student-5\database\EventScheduling.Database\EventScheduling.Database.csproj" />
   </ItemGroup>
+  <Target Name="StartLocalAiServices" BeforeTargets="DockerPrepareForLaunch" Condition="'$(BuildingInsideVisualStudio)' == 'true'">
+    <Exec Command="&quot;$(SystemRoot)\System32\WindowsPowerShell\v1.0\powershell.exe&quot; -NoProfile -NonInteractive -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\scripts\launch-local-ai-services.ps1&quot;" />
+  </Target>
   <Target Name="OpenAcademicRecordsFrontend" AfterTargets="DockerPrepareForLaunch" Condition="'$(BuildingInsideVisualStudio)' == 'true'">
     <Exec Command="&quot;$(SystemRoot)\System32\WindowsPowerShell\v1.0\powershell.exe&quot; -NoProfile -NonInteractive -Command &quot;Start-Process -WindowStyle Hidden -FilePath '$(SystemRoot)\System32\WindowsPowerShell\v1.0\powershell.exe' -ArgumentList '-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File','$(MSBuildProjectDirectory)\scripts\launch-compose-browser.ps1'&quot;" />
   </Target>
