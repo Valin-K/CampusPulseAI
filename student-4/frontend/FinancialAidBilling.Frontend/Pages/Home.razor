@@ -98,6 +98,44 @@ else if (activeTab == "scholarships")
         }
     </section>
 
+    <section class="ai-card">
+        <div>
+            <span class="eyebrow">Shared AI services</span>
+            <h2>Scholarship knowledge assistant</h2>
+            <p>Searches this service's scholarship catalogue through the shared RAG server. You can also verify this feature's shared MCP integration.</p>
+        </div>
+        <div class="form-stack">
+            <label class="field">
+                <span>Ask about scholarships</span>
+                <input @bind="ragQuestion" maxlength="1000" placeholder="Which scholarships are open to computing students?" />
+            </label>
+            <div class="button-row">
+                <button class="button button-accent" @onclick="AskScholarshipAssistantAsync" disabled="@isAskingRag">@(isAskingRag ? "Searching…" : "Ask the knowledge assistant")</button>
+                <button class="button button-secondary" @onclick="CheckMcpIntegrationAsync" disabled="@isCheckingMcp">@(isCheckingMcp ? "Checking…" : "Verify MCP integration")</button>
+            </div>
+        </div>
+        @if (mcpIntegration is not null)
+        {
+            <div class="ai-response" role="status"><strong>MCP interaction succeeded</strong><p>Student 4 is registered: @string.Join(", ", mcpIntegration.Result.Checks).</p></div>
+        }
+        @if (ragAnswer is not null)
+        {
+            <div class="ai-response" role="status">
+                <strong>RAG interaction succeeded · @ragAnswer.Status</strong>
+                <p>@(ragAnswer.Answer ?? ragAnswer.Detail ?? "Relevant catalogue passages were retrieved.")</p>
+                @if (ragAnswer.Sources.Count > 0)
+                {
+                    <ul class="detail-list">
+                        @foreach (var source in ragAnswer.Sources)
+                        {
+                            <li>@(source.Metadata?.GetValueOrDefault("scholarshipName") ?? source.DocumentId)</li>
+                        }
+                    </ul>
+                }
+            </div>
+        }
+    </section>
+
     <div class="content-grid">
         <section class="surface-card">
             <div class="section-heading"><div><span class="eyebrow">Available funding</span><h2>Scholarships</h2></div></div>
@@ -177,9 +215,14 @@ else
     private string? successMessage;
     private string? aiRecommendation;
     private int recommendationMatchCount;
+    private string ragQuestion = string.Empty;
+    private McpIntegrationResponse? mcpIntegration;
+    private RagAnswerResponse? ragAnswer;
     private bool isLoading;
     private bool isSaving;
     private bool isRecommending;
+    private bool isCheckingMcp;
+    private bool isAskingRag;
 
     private decimal OutstandingBalance => invoices.Where(item => item.StudentId == StudentId && item.Status != InvoiceStatus.Paid).Sum(item => item.Amount);
     private int OutstandingCount => invoices.Count(item => item.StudentId == StudentId && item.Status != InvoiceStatus.Paid);
@@ -263,6 +306,37 @@ else
         }
         catch (HttpRequestException) { errorMessage = "Gemini is currently unavailable."; }
         finally { isRecommending = false; }
+    }
+
+    private async Task CheckMcpIntegrationAsync()
+    {
+        isCheckingMcp = true; errorMessage = null; mcpIntegration = null;
+        try
+        {
+            using var response = await Http.PostAsync("/api/assistant/mcp/integration", null);
+            if (!response.IsSuccessStatusCode) { errorMessage = await response.Content.ReadAsStringAsync(); return; }
+            mcpIntegration = await response.Content.ReadFromJsonAsync<McpIntegrationResponse>();
+            if (mcpIntegration is null || mcpIntegration.IsError || !mcpIntegration.Result.Valid)
+            {
+                errorMessage = "The MCP integration check did not succeed.";
+            }
+        }
+        catch (HttpRequestException) { errorMessage = "The shared MCP server is currently unavailable."; }
+        finally { isCheckingMcp = false; }
+    }
+
+    private async Task AskScholarshipAssistantAsync()
+    {
+        isAskingRag = true; errorMessage = null; ragAnswer = null;
+        try
+        {
+            using var response = await Http.PostAsJsonAsync("/api/assistant/rag/scholarships", new RagQuestionRequest(ragQuestion));
+            if (!response.IsSuccessStatusCode) { errorMessage = await response.Content.ReadAsStringAsync(); return; }
+            ragAnswer = await response.Content.ReadFromJsonAsync<RagAnswerResponse>();
+            if (ragAnswer is null) { errorMessage = "The RAG server returned an invalid response."; }
+        }
+        catch (HttpRequestException) { errorMessage = "The shared RAG server is currently unavailable."; }
+        finally { isAskingRag = false; }
     }
 
     private async Task SaveAsync(Task<HttpResponseMessage> request, string message)
