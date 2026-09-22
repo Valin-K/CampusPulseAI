@@ -1,3 +1,4 @@
+using CampusPulse.Shared.Rag.Contracts;
 using FinancialAidBilling.Backend.Models;
 using FinancialAidBilling.Backend.Services;
 using System.Net.Http.Json;
