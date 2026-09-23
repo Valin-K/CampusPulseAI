@@ -22,6 +22,12 @@ builder.Services.AddHttpClient<IAcademicRecordsClient, AcademicRecordsClient>(cl
         ?? "http://academicrecords.database:8080");
 });
 
+builder.Services.AddHttpClient<IRagServerClient, RagServerClient>(client =>
+{
+    client.BaseAddress = new Uri(builder.Configuration["Services:RagServer"] ?? "http://localhost:5267");
+    client.Timeout = TimeSpan.FromSeconds(90);
+});
+
 builder.Services.AddScoped<IBookingAssistantService, GeminiBookingAssistantService>();
 
 var geminiApiKey = builder.Configuration["GEMINI_API_KEY"];
