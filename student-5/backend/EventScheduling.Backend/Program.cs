@@ -29,6 +29,7 @@ builder.Services.AddHttpClient<IRagServerClient, RagServerClient>(client =>
 });
 
 builder.Services.AddScoped<IBookingAssistantService, GeminiBookingAssistantService>();
+builder.Services.AddScoped<IEventKnowledgeService, EventKnowledgeService>();
 
 var geminiApiKey = builder.Configuration["GEMINI_API_KEY"];
 builder.Services.AddHttpClient("gemini", client =>
