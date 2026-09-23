@@ -28,6 +28,8 @@ services:
       Services__McpServer: http://host.docker.internal:5268
       Services__RagServer: http://host.docker.internal:5267
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "5020:8080"
     depends_on:
@@ -44,6 +46,8 @@ services:
       - Services__McpServer=http://host.docker.internal:5268
       - Services__RagServer=http://host.docker.internal:5267
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       - academicrecords.database
       - coursemanagement.database
@@ -74,6 +78,8 @@ services:
       Services__McpServer: http://host.docker.internal:5268
       Services__RagServer: http://host.docker.internal:5267
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "5083:8080"
     depends_on:

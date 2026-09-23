@@ -18,6 +18,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\..\shared\backend\CampusPulse.Shared.Rag\CampusPulse.Shared.Rag.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Folder Include="Controllers\" />
     <Content Include="../../../shared/frontend/assets/campus-pulse-logo.svg" Link="campus-pulse-logo.svg">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
