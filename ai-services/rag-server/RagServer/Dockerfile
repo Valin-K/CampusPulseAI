@@ -12,6 +12,7 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 COPY ["Directory.Packages.props", "."]
+COPY ["shared/backend/CampusPulse.Shared.Rag/CampusPulse.Shared.Rag.csproj", "shared/backend/CampusPulse.Shared.Rag/"]
 COPY ["ai-services/rag-server/RagServer/RagServer.csproj", "ai-services/rag-server/RagServer/"]
 RUN dotnet restore "./ai-services/rag-server/RagServer/RagServer.csproj"
 COPY . .

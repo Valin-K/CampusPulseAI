@@ -12,6 +12,7 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 COPY ["Directory.Packages.props", "."]
+COPY ["shared/backend/CampusPulse.Shared.Rag/CampusPulse.Shared.Rag.csproj", "shared/backend/CampusPulse.Shared.Rag/"]
 COPY ["student-4/backend/FinancialAidBilling.Backend/FinancialAidBilling.Backend.csproj", "student-4/backend/FinancialAidBilling.Backend/"]
 RUN dotnet restore "./student-4/backend/FinancialAidBilling.Backend/FinancialAidBilling.Backend.csproj"
 COPY . .

@@ -17,4 +17,8 @@
     <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\shared\backend\CampusPulse.Shared.Rag\CampusPulse.Shared.Rag.csproj" />
+  </ItemGroup>
+
 </Project>

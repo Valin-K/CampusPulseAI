@@ -1,3 +1,7 @@
+using CampusPulse.Shared.Rag.Assistant;
+using CampusPulse.Shared.Rag.Client;
+using CampusPulse.Shared.Rag.Contracts;
+using CampusPulse.Shared.Rag.Generation;
 using FinancialAidBilling.Backend.Models;
 using FinancialAidBilling.Backend.Services;
 using System.Net.Http.Json;
@@ -30,6 +34,14 @@ builder.Services.AddHttpClient("rag", client =>
     client.Timeout = TimeSpan.FromSeconds(90);
 });
 builder.Services.AddScoped<GeminiScholarshipService>();
+builder.Services.AddHttpClient<IRagServerClient, RagServerClient>(client =>
+{
+    client.BaseAddress = new Uri(builder.Configuration["Services:RagServer"] ?? "http://localhost:5267");
+    client.Timeout = TimeSpan.FromSeconds(90);
+});
+builder.Services.AddSingleton<RagCitationParser>();
+builder.Services.AddScoped<RagKnowledgeService>();
+builder.Services.AddScoped<IFinancialAidKnowledgeService, FinancialAidKnowledgeService>();
 var geminiApiKey = builder.Configuration["GEMINI_API_KEY"];
 
 builder.Services.AddHttpClient("gemini", client =>
@@ -204,6 +216,37 @@ assistant.MapPost("/rag/scholarships", async (
     {
         return Results.Problem(
             "A shared service did not respond in time.",
+            statusCode: StatusCodes.Status504GatewayTimeout);
+    }
+});
+
+app.MapPost("/api/ai/knowledge", async (
+    RagQuestionRequest request,
+    IFinancialAidKnowledgeService knowledge,
+    CancellationToken cancellationToken) =>
+{
+    if (string.IsNullOrWhiteSpace(request.Question) || request.Question.Length > 1000)
+    {
+        return Results.BadRequest(new { error = "Ask a question of up to 1000 characters." });
+    }
+
+    try
+    {
+        return Results.Ok(await knowledge.AskAsync(request, cancellationToken));
+    }
+    catch (InvalidOperationException exception)
+    {
+        return Results.Problem(exception.Message, statusCode: StatusCodes.Status503ServiceUnavailable);
+    }
+    catch (HttpRequestException)
+    {
+        return Results.Problem(
+            "The shared RAG server is unavailable. Start it on the host at http://localhost:5267 before using this feature.",
+            statusCode: StatusCodes.Status503ServiceUnavailable);
+    }
+    catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
+    {
+        return Results.Problem("The knowledge assistant did not respond in time.",
             statusCode: StatusCodes.Status504GatewayTimeout);
     }
 });

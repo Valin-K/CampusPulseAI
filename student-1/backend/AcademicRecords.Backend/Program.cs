@@ -1,7 +1,11 @@
 using System.Net.Http.Json;
 using System.Text.Json.Nodes;
 using AcademicRecords.Backend;
+using AcademicRecords.Backend.Models;
 using AcademicRecords.Backend.Services;
+using CampusPulse.Shared.Rag.Assistant;
+using CampusPulse.Shared.Rag.Client;
+using CampusPulse.Shared.Rag.Generation;
 using QuestPDF.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -28,6 +32,14 @@ builder.Services.AddHttpClient("gemini", client =>
 });
 builder.Services.AddSingleton<ITranscriptPdfGenerator, TranscriptPdfGenerator>();
 builder.Services.AddScoped<GeminiAcademicProgressService>();
+builder.Services.AddHttpClient<IRagServerClient, RagServerClient>(client =>
+{
+    client.BaseAddress = new Uri(builder.Configuration["Services:RagServer"] ?? "http://localhost:5267");
+    client.Timeout = TimeSpan.FromSeconds(90);
+});
+builder.Services.AddSingleton<RagCitationParser>();
+builder.Services.AddScoped<RagKnowledgeService>();
+builder.Services.AddScoped<IAcademicKnowledgeService, AcademicKnowledgeService>();
 builder.Services.AddCors(options => options.AddPolicy("Frontend", policy => policy
     .WithOrigins("http://localhost:5062", "http://localhost:8081")
     .AllowAnyHeader()
@@ -256,6 +268,35 @@ app.MapPut("/api/students/{studentId}/graduation", async (string studentId, Http
         .SendAsync(databaseRequest, cancellationToken);
     var content = await response.Content.ReadAsStringAsync(cancellationToken);
     return Results.Content(content, response.Content.Headers.ContentType?.MediaType ?? "application/json", statusCode: (int)response.StatusCode);
+});
+
+app.MapPost("/api/ai/knowledge", async (KnowledgeQuestionRequest request,
+    IAcademicKnowledgeService knowledge, CancellationToken cancellationToken) =>
+{
+    if (string.IsNullOrWhiteSpace(request.Question))
+    {
+        return Results.BadRequest(new { error = "A question is required." });
+    }
+
+    try
+    {
+        return Results.Ok(await knowledge.AskAsync(request, cancellationToken));
+    }
+    catch (InvalidOperationException exception)
+    {
+        return Results.Problem(exception.Message, statusCode: StatusCodes.Status503ServiceUnavailable);
+    }
+    catch (HttpRequestException)
+    {
+        return Results.Problem(
+            "The shared RAG server is unavailable. Start it on the host at http://localhost:5267 before using this feature.",
+            statusCode: StatusCodes.Status503ServiceUnavailable);
+    }
+    catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
+    {
+        return Results.Problem("The knowledge assistant did not respond in time.",
+            statusCode: StatusCodes.Status504GatewayTimeout);
+    }
 });
 
 app.MapControllers();
