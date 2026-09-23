@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Net.Http.Json;
 using CampusPulse.Shared.Rag.Contracts;
 using CampusPulse.Shared.Rag.Generation;
 using EventScheduling.Backend.Clients;
@@ -5,29 +7,115 @@ using EventScheduling.Backend.Models;
 
 namespace EventScheduling.Backend.Services;
 
-public sealed class EventKnowledgeService(IRagServerClient rag) : IEventKnowledgeService
+public sealed class EventKnowledgeService(
+    IHttpClientFactory clients,
+    IRagServerClient rag,
+    RagCitationParser citationParser,
+    ILogger<EventKnowledgeService> logger) : IEventKnowledgeService
 {
     private static readonly RagFeature Feature = RagFeature.EventScheduling;
 
-    public async Task<RagAnswerResponse> AskAsync(
+    public async Task<KnowledgeAnswerResponse> AskAsync(
         KnowledgeQuestionRequest request, CancellationToken cancellationToken)
     {
         var documents = await BuildCorpusAsync(cancellationToken);
         await rag.IngestAsync(Feature.Collection, new RagIngestRequest(documents), cancellationToken);
 
-        // AGENT-MIGRATION: asking the RAG server and interpreting its answer (persona, and the
-        // citation parsing added in Stage 4) move into the multi-agent server. Corpus build and
-        // ingest stay here because this feature owns its data.
+        // AGENT-MIGRATION: asking the RAG server, parsing its citations, and shaping the reply
+        // move into the multi-agent server. Corpus build and ingest stay here because this
+        // feature owns its data.
         var response = await rag.AnswerAsync(
             Feature.Collection,
             new RagAnswerRequest(request.Question.Trim(), TopK: 4, Instructions: Feature.Persona),
             cancellationToken);
+        if (response is null)
+        {
+            throw new InvalidOperationException("The RAG server returned an empty response.");
+        }
 
-        return response ?? throw new InvalidOperationException("The RAG server returned an empty response.");
+        var parsed = citationParser.Parse(response.Answer, response.Sources);
+        return Shape(request.Question.Trim(), response, parsed);
     }
 
-    private static Task<IReadOnlyList<RagDocument>> BuildCorpusAsync(CancellationToken cancellationToken) =>
-        Task.FromResult<IReadOnlyList<RagDocument>>(PolicyDocuments);
+    private static KnowledgeAnswerResponse Shape(
+        string question, RagAnswerResponse response, ParsedRagAnswer parsed)
+    {
+        var reply = response.Status switch
+        {
+            RagStatus.Answered => CitationRenderer.ToText(parsed),
+            RagStatus.InsufficientContext => response.Answer
+                ?? "I do not have enough information in the knowledge base to answer that.",
+            RagStatus.GenerationUnavailable =>
+                "Answer generation is not configured on the server, but I retrieved the relevant passages below.",
+            _ => "I could not generate an answer just now. The passages below are what I retrieved.",
+        };
+
+        var sources = response.Status == RagStatus.Answered
+            ? parsed.Cited.Select(cited => new KnowledgeSource(
+                cited.DisplayNumber, Label(cited.Source), cited.Source.DocumentId, cited.Source.Score))
+            : response.Sources.Select(source => new KnowledgeSource(
+                source.Rank, Label(source), source.DocumentId, source.Score));
+
+        return new KnowledgeAnswerResponse(
+            question, response.Status, reply, response.Confidence, sources.ToList(), response.Embedder);
+    }
+
+    private static string Label(RagSource source) =>
+        source.Metadata?.TryGetValue("title", out var title) == true && !string.IsNullOrWhiteSpace(title)
+            ? title
+            : source.DocumentId;
+
+    private async Task<IReadOnlyList<RagDocument>> BuildCorpusAsync(CancellationToken cancellationToken)
+    {
+        var database = clients.CreateClient("eventDatabase");
+        var roomsTask = database.GetFromJsonAsync<List<RoomResponse>>("/api/rooms", cancellationToken);
+        var equipmentTask = database.GetFromJsonAsync<List<RefEquipmentResponse>>("/api/refequipment", cancellationToken);
+
+        try
+        {
+            await Task.WhenAll(roomsTask, equipmentTask);
+        }
+        catch (HttpRequestException exception)
+        {
+            logger.LogWarning(exception, "Could not load facility data for the knowledge corpus.");
+        }
+        catch (TaskCanceledException exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            logger.LogWarning(exception, "Timed out loading facility data for the knowledge corpus.");
+        }
+
+        var documents = new List<RagDocument>(PolicyDocuments);
+        documents.AddRange((roomsTask.IsCompletedSuccessfully ? roomsTask.Result : null)?.Select(RoomDocument) ?? []);
+        documents.AddRange((equipmentTask.IsCompletedSuccessfully ? equipmentTask.Result : null)?.Select(EquipmentDocument) ?? []);
+        return documents;
+    }
+
+    private static RagDocument RoomDocument(RoomResponse room)
+    {
+        var culture = CultureInfo.InvariantCulture;
+        var text =
+            $"Room {room.Name} is a {room.Kind} room in {room.Location} seating {room.Capacity}. "
+            + $"{room.Description} "
+            + $"It is {(room.IsActive ? "active and bookable" : "currently inactive")}. "
+            + $"{(room.IsAccessible ? "It is wheelchair accessible. " : string.Empty)}"
+            + (string.IsNullOrWhiteSpace(room.OpeningHours) ? string.Empty : $"Opening hours: {room.OpeningHours}.");
+        return new RagDocument(
+            $"room-{room.Id.ToString(culture)}",
+            text,
+            new Dictionary<string, string> { ["title"] = room.Name, ["kind"] = room.Kind.ToString() });
+    }
+
+    private static RagDocument EquipmentDocument(RefEquipmentResponse item)
+    {
+        var culture = CultureInfo.InvariantCulture;
+        var text =
+            $"{item.Name} ({item.Category}): {item.Description} "
+            + $"There are {item.AvailableCount.ToString(culture)} units available to hire.";
+        return new RagDocument(
+            $"equipment-{item.Id.ToString(culture)}",
+            text,
+            new Dictionary<string, string> { ["title"] = item.Name, ["category"] = item.Category });
+    }
 
     private static readonly IReadOnlyList<RagDocument> PolicyDocuments =
     [
