@@ -1,69 +1,29 @@
 using System.Globalization;
 using System.Net.Http.Json;
+using CampusPulse.Shared.Rag.Assistant;
 using CampusPulse.Shared.Rag.Contracts;
 using CampusPulse.Shared.Rag.Generation;
-using EventScheduling.Backend.Clients;
 using EventScheduling.Backend.Models;
 
 namespace EventScheduling.Backend.Services;
 
 public sealed class EventKnowledgeService(
     IHttpClientFactory clients,
-    IRagServerClient rag,
-    RagCitationParser citationParser,
+    RagKnowledgeService knowledge,
     ILogger<EventKnowledgeService> logger) : IEventKnowledgeService
 {
     private static readonly RagFeature Feature = RagFeature.EventScheduling;
 
-    public async Task<KnowledgeAnswerResponse> AskAsync(
+    public async Task<RagAssistantAnswer> AskAsync(
         KnowledgeQuestionRequest request, CancellationToken cancellationToken)
     {
-        var documents = await BuildCorpusAsync(cancellationToken);
-        await rag.IngestAsync(Feature.Collection, new RagIngestRequest(documents), cancellationToken);
+        var corpus = await BuildCorpusAsync(cancellationToken);
 
-        // AGENT-MIGRATION: asking the RAG server, parsing its citations, and shaping the reply
-        // move into the multi-agent server. Corpus build and ingest stay here because this
+        // AGENT-MIGRATION: handing the corpus to the shared RAG assistant (ask + citation parsing)
+        // moves into the multi-agent server; building this feature's corpus stays here because this
         // feature owns its data.
-        var response = await rag.AnswerAsync(
-            Feature.Collection,
-            new RagAnswerRequest(request.Question.Trim(), TopK: 4, Instructions: Feature.Persona),
-            cancellationToken);
-        if (response is null)
-        {
-            throw new InvalidOperationException("The RAG server returned an empty response.");
-        }
-
-        var parsed = citationParser.Parse(response.Answer, response.Sources);
-        return Shape(request.Question.Trim(), response, parsed);
+        return await knowledge.AskAsync(Feature, request.Question, corpus, cancellationToken);
     }
-
-    private static KnowledgeAnswerResponse Shape(
-        string question, RagAnswerResponse response, ParsedRagAnswer parsed)
-    {
-        var reply = response.Status switch
-        {
-            RagStatus.Answered => CitationRenderer.ToText(parsed),
-            RagStatus.InsufficientContext => response.Answer
-                ?? "I do not have enough information in the knowledge base to answer that.",
-            RagStatus.GenerationUnavailable =>
-                "Answer generation is not configured on the server, but I retrieved the relevant passages below.",
-            _ => "I could not generate an answer just now. The passages below are what I retrieved.",
-        };
-
-        var sources = response.Status == RagStatus.Answered
-            ? parsed.Cited.Select(cited => new KnowledgeSource(
-                cited.DisplayNumber, Label(cited.Source), cited.Source.DocumentId, cited.Source.Score))
-            : response.Sources.Select(source => new KnowledgeSource(
-                source.Rank, Label(source), source.DocumentId, source.Score));
-
-        return new KnowledgeAnswerResponse(
-            question, response.Status, reply, response.Confidence, sources.ToList(), response.Embedder);
-    }
-
-    private static string Label(RagSource source) =>
-        source.Metadata?.TryGetValue("title", out var title) == true && !string.IsNullOrWhiteSpace(title)
-            ? title
-            : source.DocumentId;
 
     private async Task<IReadOnlyList<RagDocument>> BuildCorpusAsync(CancellationToken cancellationToken)
     {

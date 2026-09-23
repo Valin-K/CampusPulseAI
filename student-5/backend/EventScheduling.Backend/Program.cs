@@ -1,3 +1,5 @@
+using CampusPulse.Shared.Rag.Assistant;
+using CampusPulse.Shared.Rag.Client;
 using CampusPulse.Shared.Rag.Generation;
 using EventScheduling.Backend.Clients;
 using EventScheduling.Backend.Services;
@@ -31,6 +33,7 @@ builder.Services.AddHttpClient<IRagServerClient, RagServerClient>(client =>
 
 builder.Services.AddScoped<IBookingAssistantService, GeminiBookingAssistantService>();
 builder.Services.AddSingleton<RagCitationParser>();
+builder.Services.AddScoped<RagKnowledgeService>();
 builder.Services.AddScoped<IEventKnowledgeService, EventKnowledgeService>();
 
 var geminiApiKey = builder.Configuration["GEMINI_API_KEY"];

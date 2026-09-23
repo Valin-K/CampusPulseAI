@@ -2,7 +2,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using CampusPulse.Shared.Rag.Contracts;
 
-namespace EventScheduling.Backend.Clients;
+namespace CampusPulse.Shared.Rag.Client;
 
 public sealed class RagServerClient(HttpClient http) : IRagServerClient
 {

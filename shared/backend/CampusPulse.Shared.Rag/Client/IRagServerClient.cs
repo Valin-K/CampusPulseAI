@@ -1,6 +1,6 @@
 using CampusPulse.Shared.Rag.Contracts;
 
-namespace EventScheduling.Backend.Clients;
+namespace CampusPulse.Shared.Rag.Client;
 
 public interface IRagServerClient
 {
