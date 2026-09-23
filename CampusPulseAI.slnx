@@ -24,6 +24,7 @@
   </Folder>
   <Folder Name="/Shared/backend/">
     <Project Path="shared/backend/CampusPulse.Shared.Rag/CampusPulse.Shared.Rag.csproj" />
+    <Project Path="shared/backend/CampusPulse.Shared.Rag.Tests/CampusPulse.Shared.Rag.Tests.csproj" />
   </Folder>
   <Folder Name="/student-1/">
     <Project Path="student-1/backend/AcademicRecords.Backend/AcademicRecords.Backend.csproj" Id="0c465280-c664-4f66-b19e-4b02426e7d58" />
