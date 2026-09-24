@@ -4,9 +4,7 @@ using CampusPulse.Shared.Rag.Generation;
 
 namespace CampusPulse.Shared.Rag.Assistant;
 
-public sealed class RagKnowledgeService(
-    IRagServerClient rag,
-    RagCitationParser citationParser)
+public sealed class RagKnowledgeService(IRagServerClient rag, RagCitationParser citationParser)
 {
     public async Task<RagAssistantAnswer> AskAsync(
         RagFeature feature,
