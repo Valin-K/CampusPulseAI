@@ -30,6 +30,7 @@ builder.Services.AddHttpClient<IRagServerClient, RagServerClient>(client =>
     client.BaseAddress = new Uri(builder.Configuration["Services:RagServer"] ?? "http://localhost:5267");
     client.Timeout = TimeSpan.FromSeconds(90);
 });
+
 builder.Services.AddScoped<IBookingAssistantService, GeminiBookingAssistantService>();
 builder.Services.AddSingleton<RagCitationParser>();
 builder.Services.AddScoped<RagKnowledgeService>();
