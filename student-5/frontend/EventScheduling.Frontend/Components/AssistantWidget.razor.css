@@ -1,6 +1,6 @@
 .assistant-fab {
     position: fixed;
-    right: 1.35rem;
+    left: 1.35rem;
     bottom: 1.35rem;
     z-index: 1200;
     display: inline-flex;
@@ -34,7 +34,7 @@
 
 .assistant-drawer {
     position: fixed;
-    right: 1.35rem;
+    left: 1.35rem;
     bottom: 1.35rem;
     z-index: 1201;
     width: min(380px, calc(100vw - 2.7rem));
