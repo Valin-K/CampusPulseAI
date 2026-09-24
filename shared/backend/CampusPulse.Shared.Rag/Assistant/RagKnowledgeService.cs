@@ -6,8 +6,7 @@ namespace CampusPulse.Shared.Rag.Assistant;
 
 public sealed class RagKnowledgeService(
     IRagServerClient rag,
-    RagCitationParser citationParser,
-    IMcpServerClient mcp)
+    RagCitationParser citationParser)
 {
     public async Task<RagAssistantAnswer> AskAsync(
         RagFeature feature,
@@ -17,7 +16,6 @@ public sealed class RagKnowledgeService(
     {
         var trimmedQuestion = question.Trim();
 
-        await mcp.ValidateIntegrationAsync(feature, cancellationToken);
         await rag.IngestAsync(feature.Collection, new RagIngestRequest(corpus), cancellationToken);
 
         var response = await rag.AnswerAsync(

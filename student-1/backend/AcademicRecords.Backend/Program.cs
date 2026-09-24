@@ -37,10 +37,6 @@ builder.Services.AddHttpClient<IRagServerClient, RagServerClient>(client =>
     client.BaseAddress = new Uri(builder.Configuration["Services:RagServer"] ?? "http://localhost:5267");
     client.Timeout = TimeSpan.FromSeconds(90);
 });
-builder.Services.AddHttpClient<IMcpServerClient, McpServerClient>(client =>
-{
-    client.BaseAddress = new Uri(builder.Configuration["Services:McpServer"] ?? "http://localhost:5268");
-});
 builder.Services.AddSingleton<RagCitationParser>();
 builder.Services.AddScoped<RagKnowledgeService>();
 builder.Services.AddScoped<IAcademicKnowledgeService, AcademicKnowledgeService>();

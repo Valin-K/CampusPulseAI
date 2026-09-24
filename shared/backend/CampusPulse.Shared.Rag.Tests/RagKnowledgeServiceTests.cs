@@ -31,11 +31,6 @@ public sealed class RagKnowledgeServiceTests
         }
     }
 
-    private sealed class FakeMcpServerClient : IMcpServerClient
-    {
-        public Task ValidateIntegrationAsync(RagFeature feature, CancellationToken cancellationToken) => Task.CompletedTask;
-    }
-
     private static RagAnswerResponse Response(
         string status,
         string? answer,
@@ -55,7 +50,7 @@ public sealed class RagKnowledgeServiceTests
         {
             AnswerResult = Response(RagStatus.Answered, "Hire lasts seven days [1].", TwoSources()),
         };
-        var service = new RagKnowledgeService(client, new RagCitationParser(), new FakeMcpServerClient());
+        var service = new RagKnowledgeService(client, new RagCitationParser());
 
         var result = await service.AskAsync(Feature, "How long can I hire equipment for?", Corpus, CancellationToken.None);
 
@@ -77,7 +72,7 @@ public sealed class RagKnowledgeServiceTests
         {
             AnswerResult = Response(RagStatus.Answered, "Answer [1].", TwoSources()),
         };
-        var service = new RagKnowledgeService(client, new RagCitationParser(), new FakeMcpServerClient());
+        var service = new RagKnowledgeService(client, new RagCitationParser());
 
         await service.AskAsync(Feature, "  How long can I hire equipment for?  ", Corpus, CancellationToken.None);
 
@@ -97,7 +92,7 @@ public sealed class RagKnowledgeServiceTests
         {
             AnswerResult = Response(RagStatus.InsufficientContext, null, TwoSources()),
         };
-        var service = new RagKnowledgeService(client, new RagCitationParser(), new FakeMcpServerClient());
+        var service = new RagKnowledgeService(client, new RagCitationParser());
 
         var result = await service.AskAsync(Feature, "What is the wifi password?", Corpus, CancellationToken.None);
 
@@ -115,7 +110,7 @@ public sealed class RagKnowledgeServiceTests
         {
             AnswerResult = Response(RagStatus.GenerationUnavailable, null, TwoSources()),
         };
-        var service = new RagKnowledgeService(client, new RagCitationParser(), new FakeMcpServerClient());
+        var service = new RagKnowledgeService(client, new RagCitationParser());
 
         var result = await service.AskAsync(Feature, "How long can I hire equipment for?", Corpus, CancellationToken.None);
 
@@ -130,7 +125,7 @@ public sealed class RagKnowledgeServiceTests
         {
             AnswerResult = Response(RagStatus.Answered, "Answer [1].", unlabelled),
         };
-        var service = new RagKnowledgeService(client, new RagCitationParser(), new FakeMcpServerClient());
+        var service = new RagKnowledgeService(client, new RagCitationParser());
 
         var result = await service.AskAsync(Feature, "How long?", Corpus, CancellationToken.None);
 
@@ -141,7 +136,7 @@ public sealed class RagKnowledgeServiceTests
     public void AskAsync_ThrowsWhenTheServerReturnsNothing()
     {
         var client = new FakeRagServerClient { AnswerResult = null };
-        var service = new RagKnowledgeService(client, new RagCitationParser(), new FakeMcpServerClient());
+        var service = new RagKnowledgeService(client, new RagCitationParser());
 
         Assert.That(
             async () => await service.AskAsync(Feature, "How long?", Corpus, CancellationToken.None),
