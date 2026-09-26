@@ -1,3 +1,4 @@
+using System.Globalization;
 using AcademicRecords.Backend.Models;
 using CampusPulse.Shared.Rag.Assistant;
 using CampusPulse.Shared.Rag.Contracts;
@@ -15,7 +16,7 @@ public sealed class AcademicKnowledgeService(
     public async Task<RagAssistantAnswer> AskAsync(
         KnowledgeQuestionRequest request, CancellationToken cancellationToken)
     {
-        var corpus = await BuildCorpusAsync(cancellationToken);
+        var corpus = await BuildCorpusAsync(request.UserId, cancellationToken);
 
         // AGENT-MIGRATION: handing the corpus to the shared RAG assistant (ask + citation parsing)
         // moves into the multi-agent server; building this feature's corpus stays here because this
@@ -23,15 +24,18 @@ public sealed class AcademicKnowledgeService(
         return await knowledge.AskAsync(Feature, request.Question, corpus, cancellationToken);
     }
 
-    private async Task<IReadOnlyList<RagDocument>> BuildCorpusAsync(CancellationToken cancellationToken)
+    private async Task<IReadOnlyList<RagDocument>> BuildCorpusAsync(
+        int? userId, CancellationToken cancellationToken)
     {
         var documents = new List<RagDocument>(PolicyDocuments);
+        List<CourseMetadataResponse> courses = [];
 
         try
         {
-            var courses = await clients.CreateClient("courseManagementDatabase")
+            var loadedCourses = await clients.CreateClient("courseManagementDatabase")
                 .GetFromJsonAsync<List<CourseMetadataResponse>>("/api/courses", cancellationToken);
-            documents.AddRange(courses?.Select(CourseDocument) ?? []);
+            courses = loadedCourses ?? [];
+            documents.AddRange(courses.Select(CourseDocument));
         }
         catch (HttpRequestException exception)
         {
@@ -42,7 +46,42 @@ public sealed class AcademicKnowledgeService(
             logger.LogWarning(exception, "Timed out loading the course catalogue for the knowledge corpus.");
         }
 
+        if (userId is > 0)
+        {
+            await AddEnrollmentDocumentsAsync(userId.Value, courses, documents, cancellationToken);
+        }
+
         return documents;
+    }
+
+    private async Task AddEnrollmentDocumentsAsync(
+        int userId,
+        IReadOnlyList<CourseMetadataResponse> courses,
+        List<RagDocument> documents,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var profile = await clients.CreateClient("academicRecordsDatabase")
+                .GetFromJsonAsync<StudentEnrollmentProfile>(
+                    $"/api/students/by-user/{userId}", cancellationToken);
+            if (profile?.Enrollments is null)
+            {
+                return;
+            }
+
+            var coursesByCode = courses.ToDictionary(course => course.Code, StringComparer.OrdinalIgnoreCase);
+            documents.AddRange(profile.Enrollments.Select(enrollment =>
+                EnrollmentDocument(profile.StudentId, enrollment, coursesByCode)));
+        }
+        catch (HttpRequestException exception)
+        {
+            logger.LogWarning(exception, "Could not load student enrollments for the knowledge corpus.");
+        }
+        catch (TaskCanceledException exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            logger.LogWarning(exception, "Timed out loading student enrollments for the knowledge corpus.");
+        }
     }
 
     private static RagDocument CourseDocument(CourseMetadataResponse course) =>
@@ -50,6 +89,37 @@ public sealed class AcademicKnowledgeService(
             $"course-{course.Code}",
             $"Course {course.Code} — {course.Name}. Worth {course.CreditPoints} credit points, graded as {course.GradeType}.",
             new Dictionary<string, string> { ["code"] = course.Code, ["title"] = course.Name });
+
+    private static RagDocument EnrollmentDocument(
+        string studentId,
+        StudentEnrollmentResponse enrollment,
+        IReadOnlyDictionary<string, CourseMetadataResponse> courses)
+    {
+        courses.TryGetValue(enrollment.CourseCode, out var course);
+        var courseTitle = course?.Name ?? enrollment.CourseCode;
+        var term = enrollment.TermName ?? enrollment.TermCode ?? "Unknown term";
+        var credits = course is null
+            ? string.Empty
+            : $" Worth {course.CreditPoints.ToString(CultureInfo.InvariantCulture)} credit points. ";
+        var mark = enrollment.GradeValue is decimal gradeValue
+            ? $" Recorded mark {gradeValue.ToString(CultureInfo.InvariantCulture)}."
+            : string.Empty;
+        var gradeType = course is null ? string.Empty : $" Graded as {course.GradeType}.";
+
+        return new RagDocument(
+            $"enrollment-{enrollment.EnrollmentId}",
+            $"Student {studentId} is enrolled in {courseTitle} ({enrollment.CourseCode}) for {term} "
+            + $"{enrollment.AcademicYear}. Current status: {enrollment.Status}. "
+            + $"{(enrollment.IsFinalized ? "Finalized." : "Not finalized.")}{credits}{mark}{gradeType}",
+            new Dictionary<string, string>
+            {
+                ["studentId"] = studentId,
+                ["courseCode"] = enrollment.CourseCode,
+                ["title"] = courseTitle,
+                ["term"] = term,
+                ["status"] = enrollment.Status
+            });
+    }
 
     private static readonly IReadOnlyList<RagDocument> PolicyDocuments =
     [
@@ -73,9 +143,11 @@ public sealed class AcademicKnowledgeService(
             new Dictionary<string, string> { ["title"] = "Grade Point Average" }),
         new(
             "policy-enrolment",
-            "Enrolment and grading. An enrolment moves through statuses such as Enrolled or In Progress and becomes "
-            + "finalized once it is graded. Only finalized, passed enrolments that carry credit points count towards "
-            + "graduation, WAM and GPA.",
+            "Enrolment and grading. An enrolment is Enrolled before its session starts and In Progress from the "
+            + "session start through its end, even if it already has a grade or is finalized. After the session ends, "
+            + "its status is Passed, Failed or Completed based on its result. Enrolled and In Progress courses are "
+            + "active. Graduation credit counts finalized Passed enrolments with credit points; WAM and GPA use "
+            + "finalized enrolments with a mark and positive credit points, including failed marks.",
             new Dictionary<string, string> { ["title"] = "Enrolment and grading" }),
     ];
 }

@@ -302,6 +302,11 @@ app.MapPost("/api/ai/knowledge", async (KnowledgeQuestionRequest request,
         return Results.BadRequest(new { error = "A question is required." });
     }
 
+    if (request.UserId is <= 0)
+    {
+        return Results.BadRequest(new { error = "User ID must be positive." });
+    }
+
     try
     {
         return Results.Ok(await knowledge.AskAsync(request, cancellationToken));
