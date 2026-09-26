@@ -45,7 +45,7 @@ var tools = new Dictionary<string, McpToolDefinition>(StringComparer.OrdinalIgno
         new Dictionary<string, string> { ["feature"] = "student-1 through student-5" }),
     ["calculate_student_academic_statistics"] = new(
         "calculate_student_academic_statistics",
-        "Calculate a student's weighted average mark (WAM) and grade point average (GPA).",
+        "Return a student's weighted average mark (WAM), grade point average (GPA), and total credit points gained by academic year.",
         new Dictionary<string, string> { ["student_id"] = "Required student identifier, for example STU123" }),
 };
 
@@ -159,32 +159,25 @@ static async Task<McpToolResult> CalculateStudentAcademicStatisticsAsync(
     {
         var client = clients.CreateClient("academicRecords");
         var escapedStudentId = Uri.EscapeDataString(studentId);
-        var wamTask = client.GetAsync($"/api/students/{escapedStudentId}/wam", cancellationToken);
-        var gpaTask = client.GetAsync($"/api/students/{escapedStudentId}/gpa", cancellationToken);
-        await Task.WhenAll(wamTask, gpaTask);
-
-        using var wamResponse = await wamTask;
-        using var gpaResponse = await gpaTask;
-        if (!wamResponse.IsSuccessStatusCode || !gpaResponse.IsSuccessStatusCode)
+        using var response = await client.GetAsync($"/api/students/{escapedStudentId}/statistics", cancellationToken);
+        if (!response.IsSuccessStatusCode)
         {
-            var failedResponse = !wamResponse.IsSuccessStatusCode ? wamResponse : gpaResponse;
             return new McpToolResult(
                 "calculate_student_academic_statistics",
                 true,
                 new
                 {
                     error = "Academic Records could not retrieve statistics for this student.",
-                    statusCode = (int)failedResponse.StatusCode
+                    statusCode = (int)response.StatusCode
                 },
                 DateTimeOffset.UtcNow);
         }
 
-        var wam = await wamResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
-        var gpa = await gpaResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        var statistics = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
         return new McpToolResult(
             "calculate_student_academic_statistics",
             false,
-            new { studentId, wam, gpa },
+            statistics,
             DateTimeOffset.UtcNow);
     }
     catch (HttpRequestException)

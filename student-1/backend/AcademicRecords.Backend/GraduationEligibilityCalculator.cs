@@ -7,9 +7,7 @@ public static class GraduationEligibilityCalculator
     public static GraduationEligibilityResult Calculate(StudentStatisticsProfile profile)
     {
         var enrollments = profile.Enrollments ?? [];
-        var earnedCreditPoints = enrollments
-            .Where(IsCreditEarningEnrollment)
-            .Sum(enrollment => enrollment.Credits ?? 0m);
+        var earnedCreditPoints = CreditPointsCalculator.Calculate(enrollments).TotalCreditPointsGained;
 
         var outstandingRequirements = new List<string>();
         if (earnedCreditPoints < RequiredCreditPoints)
@@ -39,12 +37,6 @@ public static class GraduationEligibilityCalculator
             RequiredCreditPoints,
             outstandingRequirements);
     }
-
-    private static bool IsCreditEarningEnrollment(StudentStatisticsEnrollment enrollment) =>
-        enrollment.IsFinalized &&
-        (string.Equals(enrollment.Status, "Passed", StringComparison.OrdinalIgnoreCase) ||
-         string.Equals(enrollment.Status, "Completed", StringComparison.OrdinalIgnoreCase)) &&
-        enrollment.Credits is > 0;
 
     private static bool IsActiveEnrollment(StudentStatisticsEnrollment enrollment) =>
         string.Equals(enrollment.Status, "Enrolled", StringComparison.OrdinalIgnoreCase) ||
