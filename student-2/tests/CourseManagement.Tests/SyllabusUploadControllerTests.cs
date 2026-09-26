@@ -17,7 +17,7 @@ public sealed class SyllabusUploadControllerTests
     public async Task SuccessfulDatabaseUploadIngestsPdfText()
     {
         var rag = new StubRagServerClient();
-        var controller = CreateController(rag);
+        var controller = CreateController(rag, out _);
 
         var result = await controller.UploadOrReplace(
             7,
@@ -42,7 +42,7 @@ public sealed class SyllabusUploadControllerTests
         {
             IngestException = new HttpRequestException("RAG unavailable.")
         };
-        var controller = CreateController(rag);
+        var controller = CreateController(rag, out _);
 
         var result = await controller.UploadOrReplace(
             7,
@@ -57,12 +57,56 @@ public sealed class SyllabusUploadControllerTests
         });
     }
 
-    static SyllabusUploadController CreateController(StubRagServerClient rag)
+    [Test]
+    public async Task SuccessfulDatabaseDeleteRemovesSyllabusFromRag()
     {
-        var databaseResponse = new HttpResponseMessage(HttpStatusCode.Created)
+        var rag = new StubRagServerClient();
+        var controller = CreateController(
+            rag,
+            out var ragHandler,
+            HttpStatusCode.NoContent,
+            string.Empty);
+
+        var result = await controller.Delete(7, CancellationToken.None);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result, Is.TypeOf<NoContentResult>());
+            Assert.That(ragHandler.Method, Is.EqualTo(HttpMethod.Delete));
+            Assert.That(
+                ragHandler.RequestUri?.AbsolutePath,
+                Is.EqualTo("/api/rag/coursemanagement/documents/course-7-syllabus"));
+        });
+    }
+
+    [Test]
+    public async Task RagDeleteFailureDoesNotChangeSuccessfulDatabaseResponse()
+    {
+        var rag = new StubRagServerClient();
+        var controller = CreateController(
+            rag,
+            out _,
+            HttpStatusCode.NoContent,
+            string.Empty,
+            new HttpRequestException("RAG unavailable."));
+
+        var result = await controller.Delete(7, CancellationToken.None);
+
+        Assert.That(result, Is.TypeOf<NoContentResult>());
+    }
+
+    static SyllabusUploadController CreateController(
+        StubRagServerClient rag,
+        out StubHttpMessageHandler ragHandler,
+        HttpStatusCode statusCode = HttpStatusCode.Created,
+        string responseBody =
+            """{"courseId":7,"fileName":"Course Outline.pdf","contentType":"application/pdf","sizeBytes":100}""",
+        Exception? ragDeleteFailure = null)
+    {
+        var databaseResponse = new HttpResponseMessage(statusCode)
         {
             Content = new StringContent(
-                """{"courseId":7,"fileName":"Course Outline.pdf","contentType":"application/pdf","sizeBytes":100}""",
+                responseBody,
                 Encoding.UTF8,
                 "application/json")
         };
@@ -70,9 +114,22 @@ public sealed class SyllabusUploadControllerTests
         {
             BaseAddress = new Uri("http://course-database.test/")
         };
+        ragHandler = new StubHttpMessageHandler(
+            new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(
+                    """{"collection":"coursemanagement","documentId":"course-7-syllabus","deleted":true}""",
+                    Encoding.UTF8,
+                    "application/json")
+            },
+            ragDeleteFailure);
+        var ragDeleteClient = new HttpClient(ragHandler)
+        {
+            BaseAddress = new Uri("http://rag.test/")
+        };
 
         return new SyllabusUploadController(
-            new StubHttpClientFactory(database),
+            new StubHttpClientFactory(database, ragDeleteClient),
             rag,
             NullLogger<SyllabusUploadController>.Instance)
         {
@@ -102,17 +159,34 @@ public sealed class SyllabusUploadControllerTests
         })).GeneratePdf();
     }
 
-    sealed class StubHttpClientFactory(HttpClient client) : IHttpClientFactory
+    sealed class StubHttpClientFactory(
+        HttpClient database,
+        HttpClient ragDelete) : IHttpClientFactory
     {
-        public HttpClient CreateClient(string name) => client;
+        public HttpClient CreateClient(string name) =>
+            name == SyllabusUploadController.RagClientName
+                ? ragDelete
+                : database;
     }
 
-    sealed class StubHttpMessageHandler(HttpResponseMessage response) : HttpMessageHandler
+    sealed class StubHttpMessageHandler(
+        HttpResponseMessage response,
+        Exception? exception = null) : HttpMessageHandler
     {
+        public HttpMethod? Method { get; private set; }
+        public Uri? RequestUri { get; private set; }
+
         protected override Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request,
-            CancellationToken cancellationToken) =>
-            Task.FromResult(response);
+            CancellationToken cancellationToken)
+        {
+            Method = request.Method;
+            RequestUri = request.RequestUri;
+
+            return exception is null
+                ? Task.FromResult(response)
+                : Task.FromException<HttpResponseMessage>(exception);
+        }
     }
 
     sealed class StubRagServerClient : IRagServerClient

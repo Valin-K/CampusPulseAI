@@ -1,4 +1,4 @@
-namespace CourseManagement.Backend.Services;
+namespace CourseManagement.Backend.Infrastructure;
 
 public sealed class DatabaseApiProxy(IHttpClientFactory clients)
 {

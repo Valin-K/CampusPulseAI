@@ -2,7 +2,7 @@ using System.Net.Http.Headers;
 using System.Text.Json;
 using CampusPulse.Shared.Rag.Client;
 using CampusPulse.Shared.Rag.Contracts;
-using CourseManagement.Backend.Services;
+using CourseManagement.Backend.Infrastructure;
 using Microsoft.AspNetCore.Mvc;
 using UglyToad.PdfPig;
 using UglyToad.PdfPig.Core;
@@ -17,6 +17,8 @@ public sealed class SyllabusUploadController(
     IRagServerClient rag,
     ILogger<SyllabusUploadController> logger) : ControllerBase
 {
+    public const string RagClientName = "courseSyllabusRag";
+
     [HttpPut]
     [Consumes("multipart/form-data")]
     public async Task<IActionResult> UploadOrReplace(
@@ -64,7 +66,6 @@ public sealed class SyllabusUploadController(
 
         using (databaseResponse)
         {
-            var responseBody = await databaseResponse.Content.ReadAsStringAsync(cancellationToken);
             if (databaseResponse.IsSuccessStatusCode && pdfBytes is not null)
             {
                 await TryIngestAsync(
@@ -82,7 +83,53 @@ public sealed class SyllabusUploadController(
             return new ContentResult
             {
                 StatusCode = (int)databaseResponse.StatusCode,
-                Content = responseBody,
+                Content = await databaseResponse.Content.ReadAsStringAsync(cancellationToken),
+                ContentType = databaseResponse.Content.Headers.ContentType?.ToString()
+                    ?? "application/json"
+            };
+        }
+    }
+
+    [HttpDelete]
+    public async Task<IActionResult> Delete(
+        int courseId,
+        CancellationToken cancellationToken)
+    {
+        HttpResponseMessage databaseResponse;
+        try
+        {
+            databaseResponse = await clients
+                .CreateClient(DatabaseApiProxy.ClientName)
+                .DeleteAsync(
+                    $"/api/courses/{courseId}/syllabus",
+                    cancellationToken);
+        }
+        catch (HttpRequestException)
+        {
+            return DatabaseUnavailable();
+        }
+        catch (TaskCanceledException)
+            when (!cancellationToken.IsCancellationRequested)
+        {
+            return DatabaseUnavailable();
+        }
+
+        using (databaseResponse)
+        {
+            if (databaseResponse.IsSuccessStatusCode)
+            {
+                await TryDeleteFromRagAsync(courseId, cancellationToken);
+            }
+
+            if (databaseResponse.StatusCode == System.Net.HttpStatusCode.NoContent)
+            {
+                return NoContent();
+            }
+
+            return new ContentResult
+            {
+                StatusCode = (int)databaseResponse.StatusCode,
+                Content = await databaseResponse.Content.ReadAsStringAsync(cancellationToken),
                 ContentType = databaseResponse.Content.Headers.ContentType?.ToString()
                     ?? "application/json"
             };
@@ -152,6 +199,47 @@ public sealed class SyllabusUploadController(
             logger.LogWarning(
                 exception,
                 "The syllabus for Course {CourseId} was stored but RAG ingestion failed.",
+                courseId);
+        }
+    }
+
+    async Task TryDeleteFromRagAsync(
+        int courseId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var response = await clients
+                .CreateClient(RagClientName)
+                .DeleteAsync(
+                    $"/api/rag/coursemanagement/documents/course-{courseId}-syllabus",
+                    cancellationToken);
+            response.EnsureSuccessStatusCode();
+
+            if (response.Content.Headers.ContentLength == 0)
+            {
+                logger.LogWarning(
+                    "The syllabus for Course {CourseId} was deleted but the RAG server returned an empty deletion response.",
+                    courseId);
+            }
+        }
+        catch (TaskCanceledException exception)
+            when (!cancellationToken.IsCancellationRequested)
+        {
+            logger.LogWarning(
+                exception,
+                "RAG deletion timed out for the syllabus belonging to Course {CourseId}.",
+                courseId);
+        }
+        catch (Exception exception)
+            when (exception is HttpRequestException
+                or InvalidOperationException
+                or JsonException
+                or NotSupportedException)
+        {
+            logger.LogWarning(
+                exception,
+                "The syllabus for Course {CourseId} was deleted but RAG cleanup failed.",
                 courseId);
         }
     }
