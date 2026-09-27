@@ -3,6 +3,7 @@ using System.Text.Json;
 using CampusPulse.Shared.Mcp.Client;
 using CampusPulse.Shared.Mcp.Contracts;
 using CampusPulse.Shared.Rag.Assistant;
+using CampusPulse.Shared.Rag.Contracts;
 using CourseManagement.Backend.Contracts.Ai;
 
 namespace CourseManagement.Backend.Services;
@@ -70,12 +71,14 @@ public sealed class LocalCourseAiOrchestrator(
         var sources = MergeSources(ragAnswer, mcpResults);
         var model = configuration["Gemini:Model"]
             ?? "gemini-3.5-flash-lite";
+        var confidence = ragAnswer?.Confidence ?? (mcpResults.Count > 0 ? 1 : 0);
 
         return new RagAssistantAnswer(
             request.Question.Trim(),
             "answered",
             reply,
-            ragAnswer?.Confidence ?? (mcpResults.Count > 0 ? 1 : 0),
+            confidence,
+            RagConfidenceCategory.From(RagStatus.Answered, confidence),
             sources,
             ragAnswer?.Embedder ?? model);
     }
