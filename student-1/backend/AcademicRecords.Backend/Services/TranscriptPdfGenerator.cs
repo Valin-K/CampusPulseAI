@@ -3,7 +3,7 @@ using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
 using System.Globalization;
 
-namespace AcademicRecords.Backend;
+namespace AcademicRecords.Backend.Services;
 
 public interface ITranscriptPdfGenerator
 {
