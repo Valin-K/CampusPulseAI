@@ -10,7 +10,7 @@ namespace CourseManagement.Backend.Services;
 public sealed class CourseKnowledgeService(
     IHttpClientFactory clients,
     RagKnowledgeService knowledge,
-    ILogger<CourseKnowledgeService> logger) : ICourseKnowledgeService
+    ILogger<CourseKnowledgeService> logger) : ICourseRagService
 {
     public const string CatalogueClientName = "courseCatalogueData";
 
