@@ -1,4 +1,6 @@
 using CourseManagement.Backend.Clients;
+using CourseManagement.Backend.Configuration;
+using CourseManagement.Backend.Infrastructure;
 using CourseManagement.Backend.Services;
 
 var builder = WebApplication.CreateBuilder(args);
