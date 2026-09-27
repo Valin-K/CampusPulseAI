@@ -31,7 +31,8 @@ public sealed class LocalEventAiOrchestratorTests
             Assert.That(rag.CallCount, Is.Zero);
             Assert.That(response.Sources, Has.Count.EqualTo(1));
             Assert.That(response.Sources[0].DocumentId, Is.EqualTo("tool:check_mcp_integration"));
-            Assert.That(response.Channels, Is.EqualTo(new[] { "MCP" }));
+            // No RAG leg → no confidence category (deterministic MCP lookup).
+            Assert.That(response.ConfidenceCategory, Is.Empty);
         });
     }
 
@@ -55,7 +56,8 @@ public sealed class LocalEventAiOrchestratorTests
             Assert.That(database.RequestedPaths, Is.EqualTo(new[] { "/api/rooms" }));
             Assert.That(rag.CallCount, Is.Zero);
             Assert.That(response.Sources[0].DocumentId, Is.EqualTo("tool:list_rooms"));
-            Assert.That(response.Channels, Is.EqualTo(new[] { "DB" }));
+            // No RAG leg → no confidence category (deterministic DB lookup).
+            Assert.That(response.ConfidenceCategory, Is.Empty);
         });
     }
 
@@ -81,7 +83,8 @@ public sealed class LocalEventAiOrchestratorTests
             Assert.That(database.RequestedPaths, Is.EqualTo(new[] { "/api/refequipment" }));
             Assert.That(response.Sources, Has.Count.EqualTo(2));
             Assert.That(response.Confidence, Is.EqualTo(0.8));
-            Assert.That(response.Channels, Is.EqualTo(new[] { "RAG", "DB" }));
+            // RAG leg ran → the RAG retrieval confidence category is surfaced.
+            Assert.That(response.ConfidenceCategory, Is.EqualTo(RagConfidenceCategory.High));
         });
     }
 

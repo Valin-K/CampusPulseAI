@@ -76,46 +76,19 @@ public sealed class LocalEventAiOrchestrator(
 
         var reply = await CreateFinalAnswerAsync(request.Question, route, ragAnswer, toolResults, cancellationToken);
         var sources = MergeSources(ragAnswer, toolResults);
-        var confidence = ragAnswer?.Confidence ?? (toolResults.Count > 0 ? 1 : 0);
         var model = configuration["Gemini:Model"] ?? "gemini-3.5-flash-lite";
 
+        // Confidence is a retrieval score, so it is only meaningful for the RAG leg. Tool-only
+        // answers (DB / MCP) are deterministic lookups and carry no confidence category.
         return new RagAssistantAnswer(
             request.Question.Trim(),
             "answered",
             reply,
-            confidence,
-            RagConfidenceCategory.From("answered", confidence),
+            ragAnswer?.Confidence ?? 0,
+            ragAnswer?.ConfidenceCategory ?? string.Empty,
             sources,
-            ragAnswer?.Embedder ?? model)
-        {
-            Channels = BuildChannels(ragAnswer, toolResults),
-        };
+            ragAnswer?.Embedder ?? model);
     }
-
-    private static IReadOnlyList<string> BuildChannels(
-        RagAssistantAnswer? ragAnswer, IReadOnlyList<ToolResult> toolResults)
-    {
-        var channels = new List<string>();
-        if (ragAnswer is not null)
-        {
-            channels.Add("RAG");
-        }
-
-        if (toolResults.Any(result => !IsMcpTool(result.Tool)))
-        {
-            channels.Add("DB");
-        }
-
-        if (toolResults.Any(result => IsMcpTool(result.Tool)))
-        {
-            channels.Add("MCP");
-        }
-
-        return channels;
-    }
-
-    private static bool IsMcpTool(string tool) =>
-        string.Equals(tool, "check_mcp_integration", StringComparison.OrdinalIgnoreCase);
 
     private async Task<AiExecutionPlan> CreatePlanAsync(string question, CancellationToken cancellationToken)
     {

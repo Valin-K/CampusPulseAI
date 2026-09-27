@@ -11,10 +11,7 @@ public sealed record RagAssistantAnswer(
     double Confidence,
     string ConfidenceCategory,
     IReadOnlyList<RagKnowledgeSource> Sources,
-    string Embedder)
-{
-    public IReadOnlyList<string> Channels { get; init; } = [];
-}
+    string Embedder);
 
 // A coarse, user-facing confidence band derived from the retrieval score. Answers that were not
 // grounded in retrieved context (insufficient / generation unavailable / failed) are always
