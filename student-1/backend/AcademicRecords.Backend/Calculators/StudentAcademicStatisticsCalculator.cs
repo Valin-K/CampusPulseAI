@@ -1,6 +1,6 @@
 using AcademicRecords.Backend.Contracts;
 
-namespace AcademicRecords.Backend;
+namespace AcademicRecords.Backend.Calculators;
 
 public static class StudentAcademicStatisticsCalculator
 {
