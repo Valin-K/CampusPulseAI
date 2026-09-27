@@ -10,22 +10,13 @@ namespace EventScheduling.Backend.Services;
 public sealed class EventKnowledgeService(
     IHttpClientFactory clients,
     RagKnowledgeService knowledge,
-    ILogger<EventKnowledgeService> logger) : IEventKnowledgeService
+    ILogger<EventKnowledgeService> logger) : IEventRagService
 {
     private static readonly RagFeature Feature = RagFeature.EventScheduling;
-    private const string McpFeature = "student-5";
 
     public async Task<RagAssistantAnswer> AskAsync(
         KnowledgeQuestionRequest request, CancellationToken cancellationToken)
     {
-        // Lightweight intent routing: a question about the shared MCP server is answered by calling
-        // the MCP tool directly, so the chat replaces the old "Verify MCP integration" button.
-        // Everything else is answered from the RAG knowledge base.
-        if (IsMcpIntegrationQuestion(request.Question))
-        {
-            return await CheckMcpIntegrationAsync(request.Question, cancellationToken);
-        }
-
         var corpus = await BuildCorpusAsync(cancellationToken);
 
         // AGENT-MIGRATION: handing the corpus to the shared RAG assistant (ask + citation parsing)
@@ -33,42 +24,6 @@ public sealed class EventKnowledgeService(
         // feature owns its data.
         return await knowledge.AskAsync(Feature, request.Question, corpus, cancellationToken);
     }
-
-    private static bool IsMcpIntegrationQuestion(string question) =>
-        question.Contains("mcp", StringComparison.OrdinalIgnoreCase);
-
-    private async Task<RagAssistantAnswer> CheckMcpIntegrationAsync(
-        string question, CancellationToken cancellationToken)
-    {
-        try
-        {
-            using var response = await clients.CreateClient("mcp").PostAsJsonAsync(
-                "/api/mcp/tools/call",
-                new McpToolCallRequest("validate_integration",
-                    new Dictionary<string, object?> { ["feature"] = McpFeature }),
-                cancellationToken);
-            response.EnsureSuccessStatusCode();
-
-            var result = await response.Content.ReadFromJsonAsync<McpIntegrationResponse>(cancellationToken);
-            var reply = result is { IsError: false, Result.Valid: true }
-                ? "Yes - the Event & Facility Scheduling feature is integrated with the shared MCP server. "
-                    + $"Registered checks: {string.Join(", ", result.Result.Checks)}."
-                : "The shared MCP server responded, but this feature is not currently registered.";
-            return McpAnswer(question, reply);
-        }
-        catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException)
-        {
-            logger.LogWarning(exception, "The MCP integration check could not reach the MCP server.");
-            return McpAnswer(question,
-                "I couldn't reach the shared MCP server. Make sure it's running on the host at "
-                + "http://localhost:5268 and try again.");
-        }
-    }
-
-    // MCP answers are not RAG-grounded, so they carry no citations and no confidence badge
-    // (empty ConfidenceCategory).
-    private static RagAssistantAnswer McpAnswer(string question, string reply) =>
-        new(question, RagStatus.Answered, reply, 0, string.Empty, [], "mcp");
 
     private async Task<IReadOnlyList<RagDocument>> BuildCorpusAsync(CancellationToken cancellationToken)
     {
