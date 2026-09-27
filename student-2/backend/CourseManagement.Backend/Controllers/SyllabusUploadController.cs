@@ -1,11 +1,9 @@
 using System.Net.Http.Headers;
-using System.Text.Json;
 using CampusPulse.Shared.Rag.Client;
 using CampusPulse.Shared.Rag.Contracts;
 using CourseManagement.Backend.Infrastructure;
 using Microsoft.AspNetCore.Mvc;
 using UglyToad.PdfPig;
-using UglyToad.PdfPig.Core;
 using UglyToad.PdfPig.DocumentLayoutAnalysis.TextExtractor;
 
 namespace CourseManagement.Backend.Controllers;
@@ -27,6 +25,7 @@ public sealed class SyllabusUploadController(
         CancellationToken cancellationToken)
     {
         byte[]? pdfBytes = null;
+        string? fileName = null;
         using var form = new MultipartFormDataContent();
         if (file is not null)
         {
@@ -34,6 +33,7 @@ public sealed class SyllabusUploadController(
             using var buffer = new MemoryStream();
             await source.CopyToAsync(buffer, cancellationToken);
             pdfBytes = buffer.ToArray();
+            fileName = file.FileName;
 
             var fileContent = new ByteArrayContent(pdfBytes);
             if (MediaTypeHeaderValue.TryParse(file.ContentType, out var contentType))
@@ -44,33 +44,22 @@ public sealed class SyllabusUploadController(
             form.Add(fileContent, "file", file.FileName);
         }
 
-        HttpResponseMessage databaseResponse;
         try
         {
-            databaseResponse = await clients
+            using var databaseResponse = await clients
                 .CreateClient(DatabaseApiProxy.ClientName)
                 .PutAsync(
                     $"/api/courses/{courseId}/syllabus",
                     form,
                     cancellationToken);
-        }
-        catch (HttpRequestException)
-        {
-            return DatabaseUnavailable();
-        }
-        catch (TaskCanceledException)
-            when (!cancellationToken.IsCancellationRequested)
-        {
-            return DatabaseUnavailable();
-        }
 
-        using (databaseResponse)
-        {
-            if (databaseResponse.IsSuccessStatusCode && pdfBytes is not null)
+            if (databaseResponse.IsSuccessStatusCode
+                && pdfBytes is not null
+                && fileName is not null)
             {
                 await TryIngestAsync(
                     courseId,
-                    file!.FileName,
+                    fileName,
                     pdfBytes,
                     cancellationToken);
             }
@@ -88,6 +77,15 @@ public sealed class SyllabusUploadController(
                     ?? "application/json"
             };
         }
+        catch (Exception exception)
+            when (!cancellationToken.IsCancellationRequested)
+        {
+            logger.LogError("{ErrorMessage}", exception.Message);
+            return Problem(
+                statusCode: StatusCodes.Status503ServiceUnavailable,
+                title: "Course Management Database unavailable",
+                detail: "The syllabus could not be stored because the Course database service is unavailable.");
+        }
     }
 
     [HttpDelete]
@@ -95,27 +93,14 @@ public sealed class SyllabusUploadController(
         int courseId,
         CancellationToken cancellationToken)
     {
-        HttpResponseMessage databaseResponse;
         try
         {
-            databaseResponse = await clients
+            using var databaseResponse = await clients
                 .CreateClient(DatabaseApiProxy.ClientName)
                 .DeleteAsync(
                     $"/api/courses/{courseId}/syllabus",
                     cancellationToken);
-        }
-        catch (HttpRequestException)
-        {
-            return DatabaseUnavailable();
-        }
-        catch (TaskCanceledException)
-            when (!cancellationToken.IsCancellationRequested)
-        {
-            return DatabaseUnavailable();
-        }
 
-        using (databaseResponse)
-        {
             if (databaseResponse.IsSuccessStatusCode)
             {
                 await TryDeleteFromRagAsync(courseId, cancellationToken);
@@ -134,6 +119,15 @@ public sealed class SyllabusUploadController(
                     ?? "application/json"
             };
         }
+        catch (Exception exception)
+            when (!cancellationToken.IsCancellationRequested)
+        {
+            logger.LogError("{ErrorMessage}", exception.Message);
+            return Problem(
+                statusCode: StatusCodes.Status503ServiceUnavailable,
+                title: "Course Management Database unavailable",
+                detail: "The syllabus could not be deleted because the Course database service is unavailable.");
+        }
     }
 
     async Task TryIngestAsync(
@@ -151,13 +145,10 @@ public sealed class SyllabusUploadController(
                 pdf.GetPages().Select(page => ContentOrderTextExtractor.GetText(page)));
             if (string.IsNullOrWhiteSpace(text))
             {
-                logger.LogWarning(
-                    "The syllabus for Course {CourseId} was stored but contained no extractable text for RAG ingestion.",
-                    courseId);
                 return;
             }
 
-            var response = await rag.IngestAsync(
+            await rag.IngestAsync(
                 "coursemanagement",
                 new RagIngestRequest(
                 [
@@ -172,34 +163,11 @@ public sealed class SyllabusUploadController(
                         })
                 ]),
                 cancellationToken);
-
-            if (response is null)
-            {
-                logger.LogWarning(
-                    "The syllabus for Course {CourseId} was stored but the RAG server returned an empty ingestion response.",
-                    courseId);
-            }
-        }
-        catch (TaskCanceledException exception)
-            when (!cancellationToken.IsCancellationRequested)
-        {
-            logger.LogWarning(
-                exception,
-                "RAG ingestion timed out for the syllabus belonging to Course {CourseId}.",
-                courseId);
         }
         catch (Exception exception)
-            when (exception is HttpRequestException
-                or IOException
-                or InvalidOperationException
-                or JsonException
-                or NotSupportedException
-                or PdfDocumentFormatException)
+            when (!cancellationToken.IsCancellationRequested)
         {
-            logger.LogWarning(
-                exception,
-                "The syllabus for Course {CourseId} was stored but RAG ingestion failed.",
-                courseId);
+            logger.LogError("{ErrorMessage}", exception.Message);
         }
     }
 
@@ -215,38 +183,11 @@ public sealed class SyllabusUploadController(
                     $"/api/rag/coursemanagement/documents/course-{courseId}-syllabus",
                     cancellationToken);
             response.EnsureSuccessStatusCode();
-
-            if (response.Content.Headers.ContentLength == 0)
-            {
-                logger.LogWarning(
-                    "The syllabus for Course {CourseId} was deleted but the RAG server returned an empty deletion response.",
-                    courseId);
-            }
-        }
-        catch (TaskCanceledException exception)
-            when (!cancellationToken.IsCancellationRequested)
-        {
-            logger.LogWarning(
-                exception,
-                "RAG deletion timed out for the syllabus belonging to Course {CourseId}.",
-                courseId);
         }
         catch (Exception exception)
-            when (exception is HttpRequestException
-                or InvalidOperationException
-                or JsonException
-                or NotSupportedException)
+            when (!cancellationToken.IsCancellationRequested)
         {
-            logger.LogWarning(
-                exception,
-                "The syllabus for Course {CourseId} was deleted but RAG cleanup failed.",
-                courseId);
+            logger.LogError("{ErrorMessage}", exception.Message);
         }
     }
-
-    ObjectResult DatabaseUnavailable() =>
-        Problem(
-            statusCode: StatusCodes.Status503ServiceUnavailable,
-            title: "Course Management Database unavailable",
-            detail: "The syllabus could not be stored because the Course database service is unavailable.");
 }

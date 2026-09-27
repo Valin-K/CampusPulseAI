@@ -95,13 +95,47 @@ public sealed class SyllabusUploadControllerTests
         Assert.That(result, Is.TypeOf<NoContentResult>());
     }
 
+    [Test]
+    public async Task DatabaseUploadFailureReturnsServiceUnavailable()
+    {
+        var controller = CreateController(
+            new StubRagServerClient(),
+            out _,
+            databaseFailure: new HttpRequestException("Database unavailable."));
+
+        var result = await controller.UploadOrReplace(
+            7,
+            CreateUpload(CreatePdf("RAG syllabus data.")),
+            CancellationToken.None);
+
+        Assert.That(
+            ((ObjectResult)result).StatusCode,
+            Is.EqualTo(StatusCodes.Status503ServiceUnavailable));
+    }
+
+    [Test]
+    public async Task DatabaseDeleteFailureReturnsServiceUnavailable()
+    {
+        var controller = CreateController(
+            new StubRagServerClient(),
+            out _,
+            databaseFailure: new HttpRequestException("Database unavailable."));
+
+        var result = await controller.Delete(7, CancellationToken.None);
+
+        Assert.That(
+            ((ObjectResult)result).StatusCode,
+            Is.EqualTo(StatusCodes.Status503ServiceUnavailable));
+    }
+
     static SyllabusUploadController CreateController(
         StubRagServerClient rag,
         out StubHttpMessageHandler ragHandler,
         HttpStatusCode statusCode = HttpStatusCode.Created,
         string responseBody =
             """{"courseId":7,"fileName":"Course Outline.pdf","contentType":"application/pdf","sizeBytes":100}""",
-        Exception? ragDeleteFailure = null)
+        Exception? ragDeleteFailure = null,
+        Exception? databaseFailure = null)
     {
         var databaseResponse = new HttpResponseMessage(statusCode)
         {
@@ -110,7 +144,8 @@ public sealed class SyllabusUploadControllerTests
                 Encoding.UTF8,
                 "application/json")
         };
-        var database = new HttpClient(new StubHttpMessageHandler(databaseResponse))
+        var database = new HttpClient(
+            new StubHttpMessageHandler(databaseResponse, databaseFailure))
         {
             BaseAddress = new Uri("http://course-database.test/")
         };
