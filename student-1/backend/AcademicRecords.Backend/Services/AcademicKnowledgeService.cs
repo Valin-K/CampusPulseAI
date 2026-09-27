@@ -17,19 +17,30 @@ public sealed class AcademicKnowledgeService(
     public async Task<RagAssistantAnswer> AskAsync(
         KnowledgeQuestionRequest request, CancellationToken cancellationToken)
     {
-        if (IsStudentEnrollmentQuestion(request.Question))
-        {
-            return request.UserId is > 0
-                ? await GetStudentEnrollmentsAsync(request, cancellationToken)
-                : MissingStudentContext(request.Question);
-        }
-
+        var mcpContext = await GetStudentMcpContextAsync(request.UserId, cancellationToken);
         var corpus = await BuildCorpusAsync(cancellationToken);
 
         // AGENT-MIGRATION: handing the corpus to the shared RAG assistant (ask + citation parsing)
         // moves into the multi-agent server; building this feature's corpus stays here because this
         // feature owns its data.
-        return await knowledge.AskAsync(Feature, request.Question, corpus, cancellationToken);
+        var answer = await knowledge.AskAsync(
+            Feature, request.Question, corpus, cancellationToken, mcpContext?.Context);
+        if (mcpContext is null)
+        {
+            return answer;
+        }
+
+        var sources = answer.Sources.ToList();
+        foreach (var source in mcpContext.Sources)
+        {
+            sources.Add(new RagKnowledgeSource(
+                sources.Count + 1,
+                source.Name,
+                $"mcp:{source.ToolName}",
+                1));
+        }
+
+        return answer with { Sources = sources };
     }
 
     private async Task<IReadOnlyList<RagDocument>> BuildCorpusAsync(
@@ -55,90 +66,90 @@ public sealed class AcademicKnowledgeService(
         return documents;
     }
 
-    private async Task<RagAssistantAnswer> GetStudentEnrollmentsAsync(
-        KnowledgeQuestionRequest request, CancellationToken cancellationToken)
+    private async Task<StudentMcpContext?> GetStudentMcpContextAsync(
+        int? userId, CancellationToken cancellationToken)
+    {
+        var enrollmentTool = McpTool.GetStudentEnrollments;
+        var statisticsTool = McpTool.CalculateAcademicStatistics;
+        var enrollmentResult = await CallMcpToolAsync(
+            enrollmentTool,
+            new Dictionary<string, object?> { ["user_id"] = userId },
+            cancellationToken);
+        if (enrollmentResult is null)
+        {
+            return null;
+        }
+
+        var profile = enrollmentResult.Value.Deserialize<StudentEnrollmentToolResult>(JsonOptions);
+        if (profile is null)
+        {
+            return null;
+        }
+
+        var context = new Dictionary<string, object?>
+        {
+            ["studentId"] = profile.StudentId,
+            ["enrollments"] = profile.Enrollments
+        };
+        var sources = new List<McpContextSource> { enrollmentTool.Source };
+        var statistics = await CallMcpToolAsync(
+            statisticsTool,
+            new Dictionary<string, object?> { ["student_id"] = profile.StudentId },
+            cancellationToken);
+        if (statistics is not null)
+        {
+            context["academicStatistics"] = statistics.Value;
+            sources.Add(statisticsTool.Source);
+        }
+
+        return new StudentMcpContext(JsonSerializer.Serialize(context, JsonOptions), sources);
+    }
+
+    private async Task<JsonElement?> CallMcpToolAsync(
+        McpTool tool,
+        Dictionary<string, object?> arguments,
+        CancellationToken cancellationToken)
     {
         try
         {
             using var response = await clients.CreateClient("mcp").PostAsJsonAsync(
                 "/api/mcp/tools/call",
-                new McpToolCallRequest(
-                    "get_student_enrollments",
-                    new Dictionary<string, object?> { ["user_id"] = request.UserId }),
+                new McpToolCallRequest(tool.Name, arguments),
                 cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
-                throw new InvalidOperationException(
-                    $"The MCP server returned HTTP {(int)response.StatusCode} while retrieving student enrollments.");
+                logger.LogWarning(
+                    "The MCP server returned HTTP {StatusCode} for {ToolName}; continuing without that MCP context.",
+                    (int)response.StatusCode,
+                    tool.Name);
+                return null;
             }
 
             var toolResponse = await response.Content.ReadFromJsonAsync<McpToolCallResponse>(
                 cancellationToken: cancellationToken);
             if (toolResponse is null || toolResponse.IsError || toolResponse.Result.ValueKind != JsonValueKind.Object)
             {
-                throw new InvalidOperationException("The MCP server could not retrieve student enrollments.");
+                logger.LogWarning("MCP tool {ToolName} returned no data; continuing without that MCP context.", tool.Name);
+                return null;
             }
 
-            var profile = toolResponse.Result.Deserialize<StudentEnrollmentToolResult>(JsonOptions);
-            if (profile is null)
-            {
-                throw new InvalidOperationException("The MCP server returned an invalid enrollment response.");
-            }
-
-            var reply = profile.Enrollments.Count == 0
-                ? $"No enrollment records were found for student {profile.StudentId}."
-                : $"Enrollment records for {profile.StudentId}:\n{string.Join("\n", profile.Enrollments.Select(FormatEnrollment))}";
-
-            return new RagAssistantAnswer(
-                request.Question,
-                "answered",
-                reply,
-                1,
-                [new RagKnowledgeSource(1, "Student enrollment records", "mcp:get_student_enrollments", 1)],
-                "mcp");
+            return toolResponse.Result;
         }
         catch (HttpRequestException exception)
         {
-            logger.LogWarning(exception, "Could not retrieve student enrollments from the MCP server.");
-            throw new InvalidOperationException("The MCP server is unavailable while retrieving student enrollments.", exception);
+            logger.LogWarning(exception, "Could not call MCP tool {ToolName}; continuing without that MCP context.", tool.Name);
+            return null;
         }
         catch (TaskCanceledException exception) when (!cancellationToken.IsCancellationRequested)
         {
-            logger.LogWarning(exception, "Timed out retrieving student enrollments from the MCP server.");
-            throw new InvalidOperationException("The MCP server timed out while retrieving student enrollments.", exception);
+            logger.LogWarning(exception, "MCP tool {ToolName} timed out; continuing without that MCP context.", tool.Name);
+            return null;
         }
-    }
-
-    private static bool IsStudentEnrollmentQuestion(string question)
-    {
-        var normalized = $" {question.Trim().ToLowerInvariant()} ";
-        var isPersonal = new[] { " my ", " i ", " me ", " have i ", " am i ", " did i ", " for me " }
-            .Any(normalized.Contains);
-        var isEnrollmentRelated = new[]
+        catch (JsonException exception)
         {
-            "enroll", "enrol", "course", "class", "subject", "grade", "mark", "passed", "failed", "completed", "term"
-        }.Any(normalized.Contains);
-
-        return isPersonal && isEnrollmentRelated;
-    }
-
-    private static RagAssistantAnswer MissingStudentContext(string question) =>
-        new(
-            question,
-            "insufficient_context",
-            "Open your student profile to ask about your enrollment records.",
-            0,
-            [],
-            "mcp");
-
-    private static string FormatEnrollment(StudentEnrollmentToolRecord enrollment)
-    {
-        var term = enrollment.TermName ?? enrollment.TermCode ?? "Unknown term";
-        var mark = enrollment.GradeValue is decimal grade
-            ? $", mark {grade.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)}"
-            : string.Empty;
-        var finalized = enrollment.IsFinalized ? "finalized" : "not finalized";
-        return $"- {enrollment.CourseCode} — {term} {enrollment.AcademicYear}: {enrollment.Status}{mark}, {finalized}";
+            logger.LogWarning(exception, "MCP tool {ToolName} returned invalid data; continuing without that MCP context.", tool.Name);
+            return null;
+        }
     }
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
@@ -181,6 +192,17 @@ public sealed class AcademicKnowledgeService(
 
     private sealed record McpToolCallRequest(string Tool, Dictionary<string, object?> Arguments);
     private sealed record McpToolCallResponse(bool IsError, JsonElement Result);
+    private sealed record McpContextSource(string ToolName, string Name);
+    private sealed record McpTool(string Name, McpContextSource Source)
+    {
+        public static McpTool GetStudentEnrollments { get; } = new(
+            "get_student_enrollments", new("get_student_enrollments", "Student enrollment MCP"));
+
+        public static McpTool CalculateAcademicStatistics { get; } = new(
+            "calculate_student_academic_statistics", new("calculate_student_academic_statistics", "Academic statistics MCP"));
+    }
+
+    private sealed record StudentMcpContext(string Context, IReadOnlyList<McpContextSource> Sources);
     private sealed record StudentEnrollmentToolResult(string StudentId, List<StudentEnrollmentToolRecord> Enrollments);
     private sealed record StudentEnrollmentToolRecord(
         string CourseCode,

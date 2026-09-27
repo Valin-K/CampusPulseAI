@@ -140,10 +140,15 @@ app.MapPost("/api/rag/{collection}/answer", async (
 
     if (sources.Count == 0 || confidence < threshold)
     {
-        return Results.Ok(Respond(
-            "insufficient_context",
-            "The knowledge base does not contain enough information to answer this question.",
-            sources.Count == 0 ? "No documents matched." : $"Top score {confidence:0.####} is below the threshold {threshold:0.####}."));
+        if (string.IsNullOrWhiteSpace(request.SupplementalContext))
+        {
+            return Results.Ok(Respond(
+                "insufficient_context",
+                "The knowledge base does not contain enough information to answer this question.",
+                sources.Count == 0 ? "No documents matched." : $"Top score {confidence:0.####} is below the threshold {threshold:0.####}."));
+        }
+
+        sources = [];
     }
 
     if (!gemini.HasApiKey)
@@ -162,6 +167,7 @@ app.MapPost("/api/rag/{collection}/answer", async (
             Question = request.Question,
             Sources = promptSources,
             Persona = request.Instructions,
+            SupplementalContext = request.SupplementalContext,
         });
         var answer = await gemini.GenerateAsync(prompt, cancellationToken);
         return Results.Ok(answer is null
