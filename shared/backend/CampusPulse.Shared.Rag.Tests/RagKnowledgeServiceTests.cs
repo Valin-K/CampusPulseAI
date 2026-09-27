@@ -58,6 +58,7 @@ public sealed class RagKnowledgeServiceTests
         {
             Assert.That(result.Status, Is.EqualTo(RagStatus.Answered));
             Assert.That(result.Reply, Is.EqualTo("Hire lasts seven days [1]."));
+            Assert.That(result.ConfidenceCategory, Is.EqualTo(RagConfidenceCategory.High));
             Assert.That(result.Sources, Has.Count.EqualTo(1));
             Assert.That(result.Sources[0].Number, Is.EqualTo(1));
             Assert.That(result.Sources[0].Label, Is.EqualTo("Equipment hire rules"));
@@ -115,7 +116,22 @@ public sealed class RagKnowledgeServiceTests
         Assert.Multiple(() =>
         {
             Assert.That(result.Reply, Is.EqualTo("I do not have enough information in the knowledge base to answer that."));
+            Assert.That(result.ConfidenceCategory, Is.EqualTo(RagConfidenceCategory.Insufficient));
             Assert.That(result.Sources, Has.Count.EqualTo(2));
+        });
+    }
+
+    [Test]
+    public void ConfidenceCategory_MapsScoreBandsAndTreatsNonAnsweredAsInsufficient()
+    {
+        Assert.Multiple(() =>
+        {
+            Assert.That(RagConfidenceCategory.From(RagStatus.Answered, 0.90), Is.EqualTo(RagConfidenceCategory.High));
+            Assert.That(RagConfidenceCategory.From(RagStatus.Answered, 0.70), Is.EqualTo(RagConfidenceCategory.Medium));
+            Assert.That(RagConfidenceCategory.From(RagStatus.Answered, 0.58), Is.EqualTo(RagConfidenceCategory.Low));
+            // A high score with a non-answered status must never present as confident.
+            Assert.That(RagConfidenceCategory.From(RagStatus.InsufficientContext, 0.95), Is.EqualTo(RagConfidenceCategory.Insufficient));
+            Assert.That(RagConfidenceCategory.From(RagStatus.GenerationUnavailable, 0.95), Is.EqualTo(RagConfidenceCategory.Insufficient));
         });
     }
 

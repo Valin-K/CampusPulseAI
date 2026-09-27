@@ -10,7 +10,7 @@ namespace EventScheduling.Backend.Services;
 public sealed class EventKnowledgeService(
     IHttpClientFactory clients,
     RagKnowledgeService knowledge,
-    ILogger<EventKnowledgeService> logger) : IEventKnowledgeService
+    ILogger<EventKnowledgeService> logger) : IEventRagService
 {
     private static readonly RagFeature Feature = RagFeature.EventScheduling;
 
