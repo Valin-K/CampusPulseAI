@@ -18,7 +18,12 @@ public sealed record IngestRequest(List<RagDocument> Documents);
 
 public sealed record IngestResponse(string Collection, int Documents, int Chunks, string Embedder);
 
-public sealed record AnswerRequest(string Question, int? TopK, string? Instructions, double? MinimumConfidence);
+public sealed record AnswerRequest(
+    string Question,
+    int? TopK,
+    string? Instructions,
+    double? MinimumConfidence,
+    string? SupplementalContext = null);
 
 public sealed record RagSource(
     int Rank,

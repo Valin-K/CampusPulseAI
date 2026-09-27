@@ -21,7 +21,8 @@ public sealed record RagAnswerRequest(
     string Question,
     int? TopK = null,
     string? Instructions = null,
-    double? MinimumConfidence = null);
+    double? MinimumConfidence = null,
+    string? SupplementalContext = null);
 
 public static class RagStatus
 {
