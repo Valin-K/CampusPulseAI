@@ -1,14 +1,33 @@
 using AcademicRecords.Backend.Models;
 using AcademicRecords.Backend.Services;
-using CampusPulse.Shared.Rag.Assistant;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AcademicRecords.Backend.Controllers;
 
-[Route("api/ai/knowledge")]
-public sealed class KnowledgeController(IAcademicKnowledgeService knowledge) : ControllerBase
+[Route("api")]
+public sealed class AiController(
+    IHttpClientFactory clients,
+    StudentCourseMetadataService courseMetadata,
+    GeminiAcademicProgressService progressService,
+    IAcademicKnowledgeService knowledge) : AcademicRecordsControllerBase(clients)
 {
-    [HttpPost]
+    [HttpPost("students/{studentId}/ai-analysis")]
+    public async Task<IActionResult> AnalyzeProgress(string studentId, CancellationToken cancellationToken)
+    {
+        var (profile, error) = await this.GetStudentProfileAsync(AcademicRecordsDatabase, studentId, cancellationToken);
+        if (error is not null)
+        {
+            return error;
+        }
+
+        var courses = await courseMetadata.GetCourseMetadataAsync(cancellationToken);
+        var analysis = await progressService.AnalyzeAsync(
+            StudentCourseMetadataService.ApplyCourseMetadata(profile!, courses),
+            cancellationToken);
+        return Ok(analysis);
+    }
+
+    [HttpPost("ai/knowledge")]
     public async Task<IActionResult> Ask(
         [FromBody] KnowledgeQuestionRequest request,
         CancellationToken cancellationToken)
@@ -43,4 +62,5 @@ public sealed class KnowledgeController(IAcademicKnowledgeService knowledge) : C
                 statusCode: StatusCodes.Status504GatewayTimeout);
         }
     }
+
 }

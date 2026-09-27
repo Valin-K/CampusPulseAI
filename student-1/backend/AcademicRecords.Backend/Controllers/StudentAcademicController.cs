@@ -1,4 +1,3 @@
-using System.Net.Http.Json;
 using AcademicRecords.Backend.Calculators;
 using AcademicRecords.Backend.Contracts;
 using AcademicRecords.Backend.Services;
@@ -11,7 +10,6 @@ namespace AcademicRecords.Backend.Controllers;
 public sealed class StudentAcademicController(
     IHttpClientFactory clients,
     StudentCourseMetadataService courseMetadata,
-    GeminiAcademicProgressService progressService,
     ITranscriptPdfGenerator pdfGenerator) : AcademicRecordsControllerBase(clients)
 {
     [HttpGet("{studentId}/wam")]
@@ -25,7 +23,7 @@ public sealed class StudentAcademicController(
     [HttpGet("{studentId}/statistics")]
     public async Task<IActionResult> GetStatistics(string studentId, CancellationToken cancellationToken)
     {
-        var (profile, error) = await GetStudentProfileAsync(studentId, cancellationToken);
+        var (profile, error) = await this.GetStudentProfileAsync(AcademicRecordsDatabase, studentId, cancellationToken);
         if (error is not null)
         {
             return error;
@@ -39,7 +37,7 @@ public sealed class StudentAcademicController(
     [HttpGet("{studentId}/eligibility")]
     public async Task<IActionResult> GetEligibility(string studentId, CancellationToken cancellationToken)
     {
-        var (profile, error) = await GetStudentProfileAsync(studentId, cancellationToken);
+        var (profile, error) = await this.GetStudentProfileAsync(AcademicRecordsDatabase, studentId, cancellationToken);
         if (error is not null)
         {
             return error;
@@ -50,26 +48,10 @@ public sealed class StudentAcademicController(
         return Ok(GraduationEligibilityCalculator.Calculate(profile));
     }
 
-    [HttpPost("{studentId}/ai-analysis")]
-    public async Task<IActionResult> AnalyzeProgress(string studentId, CancellationToken cancellationToken)
-    {
-        var (profile, error) = await GetStudentProfileAsync(studentId, cancellationToken);
-        if (error is not null)
-        {
-            return error;
-        }
-
-        var courses = await courseMetadata.GetCourseMetadataAsync(cancellationToken);
-        var analysis = await progressService.AnalyzeAsync(
-            StudentCourseMetadataService.ApplyCourseMetadata(profile!, courses),
-            cancellationToken);
-        return Ok(analysis);
-    }
-
     [HttpGet("{studentId}/transcript.pdf")]
     public async Task<IActionResult> GetTranscript(string studentId, CancellationToken cancellationToken)
     {
-        var (profile, error) = await GetStudentProfileAsync(studentId, cancellationToken);
+        var (profile, error) = await this.GetStudentProfileAsync(AcademicRecordsDatabase, studentId, cancellationToken);
         if (error is not null)
         {
             return error;
@@ -86,7 +68,7 @@ public sealed class StudentAcademicController(
         bool gpa,
         CancellationToken cancellationToken)
     {
-        var (profile, error) = await GetStudentProfileAsync(studentId, cancellationToken);
+        var (profile, error) = await this.GetStudentProfileAsync(AcademicRecordsDatabase, studentId, cancellationToken);
         if (error is not null)
         {
             return error;
@@ -104,26 +86,4 @@ public sealed class StudentAcademicController(
             statistic.Value, statistic.GradedEnrollmentCount, statistic.TotalCredits));
     }
 
-    private async Task<(StudentStatisticsProfile? Profile, IActionResult? Error)> GetStudentProfileAsync(
-        string studentId,
-        CancellationToken cancellationToken)
-    {
-        using var response = await AcademicRecordsDatabase.GetAsync(
-            $"/api/students/{Uri.EscapeDataString(studentId)}", cancellationToken);
-        if (!response.IsSuccessStatusCode)
-        {
-            var content = await response.Content.ReadAsStringAsync(cancellationToken);
-            return (null, new ContentResult
-            {
-                Content = content,
-                ContentType = response.Content.Headers.ContentType?.MediaType ?? "application/json",
-                StatusCode = (int)response.StatusCode
-            });
-        }
-
-        var profile = await response.Content.ReadFromJsonAsync<StudentStatisticsProfile>(cancellationToken);
-        return profile is null
-            ? (null, Problem("The student profile response was invalid."))
-            : (profile, null);
-    }
 }
