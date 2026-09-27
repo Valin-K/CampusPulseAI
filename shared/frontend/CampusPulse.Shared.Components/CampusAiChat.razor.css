@@ -164,6 +164,17 @@
 .campus-ai-confidence.conf-low { color: #9a3b12; background: #fce0d2; }
 .campus-ai-confidence.conf-insufficient { color: #627d98; background: #e4ebf2; }
 
+.campus-ai-tool {
+    align-self: flex-start;
+    padding: .12rem .5rem;
+    border-radius: 999px;
+    font-size: .68rem;
+    font-weight: 700;
+    letter-spacing: .01em;
+    color: #4b3b8f;
+    background: #e7e3f7;
+}
+
 .campus-ai-sources { color: var(--university-muted, #627d98); font-size: .75rem; }
 .campus-ai-sources summary { cursor: pointer; }
 .campus-ai-sources ul { margin: .2rem 0 0; padding-left: 1.1rem; }

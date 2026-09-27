@@ -25,6 +25,10 @@
                                 Confidence: @message.ConfidenceCategory
                             </span>
                         }
+                        @if (!message.IsUser && message.ViaMcp)
+                        {
+                            <span class="campus-ai-tool">⚙ Answered via MCP server</span>
+                        }
                         @if (!message.IsUser && message.Sources.Count > 0)
                         {
                             <details class="campus-ai-sources">
@@ -121,7 +125,8 @@
                 }
                 else
                 {
-                    messages.Add(new(false, answer.Reply, answer.Sources ?? [], answer.ConfidenceCategory));
+                    messages.Add(new(false, answer.Reply, answer.Sources ?? [], answer.ConfidenceCategory,
+                        string.Equals(answer.Embedder, "mcp", StringComparison.OrdinalIgnoreCase)));
                 }
             }
         }
@@ -135,8 +140,8 @@
         }
     }
 
-    private sealed record ChatMessage(bool IsUser, string Text, IReadOnlyList<KnowledgeSource> Sources, string? ConfidenceCategory = null);
+    private sealed record ChatMessage(bool IsUser, string Text, IReadOnlyList<KnowledgeSource> Sources, string? ConfidenceCategory = null, bool ViaMcp = false);
     private sealed record KnowledgeQuestionRequest(string Question);
-    private sealed record KnowledgeAnswer(string Reply, IReadOnlyList<KnowledgeSource>? Sources, string? ConfidenceCategory);
+    private sealed record KnowledgeAnswer(string Reply, IReadOnlyList<KnowledgeSource>? Sources, string? ConfidenceCategory, string? Embedder);
     private sealed record KnowledgeSource(string Label);
 }
