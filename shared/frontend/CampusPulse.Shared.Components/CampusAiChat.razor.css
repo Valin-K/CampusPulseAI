@@ -150,6 +150,20 @@
 
 .campus-ai-bubble.is-thinking { color: var(--university-muted, #627d98); font-style: italic; }
 
+.campus-ai-confidence {
+    align-self: flex-start;
+    padding: .12rem .5rem;
+    border-radius: 999px;
+    font-size: .68rem;
+    font-weight: 700;
+    letter-spacing: .01em;
+}
+
+.campus-ai-confidence.conf-high { color: #0b6b3a; background: #d6f2e1; }
+.campus-ai-confidence.conf-medium { color: #8a5a00; background: #fdeecb; }
+.campus-ai-confidence.conf-low { color: #9a3b12; background: #fce0d2; }
+.campus-ai-confidence.conf-insufficient { color: #627d98; background: #e4ebf2; }
+
 .campus-ai-sources { color: var(--university-muted, #627d98); font-size: .75rem; }
 .campus-ai-sources summary { cursor: pointer; }
 .campus-ai-sources ul { margin: .2rem 0 0; padding-left: 1.1rem; }

@@ -49,7 +49,13 @@ public sealed class RagKnowledgeService(IRagServerClient rag, RagCitationParser 
                 source.Rank, Label(source), source.DocumentId, source.Score));
 
         return new RagAssistantAnswer(
-            question, response.Status, reply, response.Confidence, sources.ToList(), response.Embedder);
+            question,
+            response.Status,
+            reply,
+            response.Confidence,
+            RagConfidenceCategory.From(response.Status, response.Confidence),
+            sources.ToList(),
+            response.Embedder);
     }
 
     private static string Label(RagSource source)

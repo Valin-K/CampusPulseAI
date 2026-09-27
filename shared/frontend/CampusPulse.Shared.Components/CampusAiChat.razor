@@ -19,6 +19,12 @@
                 {
                     <li class="campus-ai-message @(message.IsUser ? "is-user" : "is-assistant")">
                         <div class="campus-ai-bubble">@message.Text</div>
+                        @if (!message.IsUser && !string.IsNullOrEmpty(message.ConfidenceCategory))
+                        {
+                            <span class="campus-ai-confidence conf-@message.ConfidenceCategory.ToLowerInvariant()">
+                                Confidence: @message.ConfidenceCategory
+                            </span>
+                        }
                         @if (!message.IsUser && message.Sources.Count > 0)
                         {
                             <details class="campus-ai-sources">
@@ -115,7 +121,7 @@
                 }
                 else
                 {
-                    messages.Add(new(false, answer.Reply, answer.Sources ?? []));
+                    messages.Add(new(false, answer.Reply, answer.Sources ?? [], answer.ConfidenceCategory));
                 }
             }
         }
@@ -129,8 +135,8 @@
         }
     }
 
-    private sealed record ChatMessage(bool IsUser, string Text, IReadOnlyList<KnowledgeSource> Sources);
+    private sealed record ChatMessage(bool IsUser, string Text, IReadOnlyList<KnowledgeSource> Sources, string? ConfidenceCategory = null);
     private sealed record KnowledgeQuestionRequest(string Question);
-    private sealed record KnowledgeAnswer(string Reply, IReadOnlyList<KnowledgeSource>? Sources);
+    private sealed record KnowledgeAnswer(string Reply, IReadOnlyList<KnowledgeSource>? Sources, string? ConfidenceCategory);
     private sealed record KnowledgeSource(string Label);
 }
