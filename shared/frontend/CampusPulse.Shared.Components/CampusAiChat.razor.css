@@ -56,9 +56,7 @@
     box-shadow: 0 24px 60px rgba(16, 42, 67, .28);
 }
 
-.campus-ai-panel.is-open,
-.campus-ai-dock:hover .campus-ai-panel,
-.campus-ai-dock:focus-within .campus-ai-panel {
+.campus-ai-panel.is-open {
     display: flex;
 }
 
