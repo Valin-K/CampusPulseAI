@@ -1,3 +1,4 @@
+using CampusPulse.Shared.Mcp.Client;
 using CourseManagement.Backend.Clients;
 using CourseManagement.Backend.Configuration;
 using CourseManagement.Backend.Infrastructure;
@@ -74,6 +75,14 @@ builder.Services.AddHttpClient(CourseKnowledgeService.CatalogueClientName, clien
     client.BaseAddress = new Uri(courseManagementDatabaseAddress, UriKind.Absolute);
     client.Timeout = TimeSpan.FromSeconds(30);
 });
+builder.Services.AddHttpClient<IMcpClient, McpClient>(client =>
+{
+    client.BaseAddress = new Uri(
+        builder.Configuration["Services:McpServer"]
+        ?? "http://localhost:5268",
+        UriKind.Absolute);
+    client.Timeout = TimeSpan.FromSeconds(30);
+});
 builder.Services.AddHttpClient<CampusPulse.Shared.Rag.Client.IRagServerClient, CampusPulse.Shared.Rag.Client.RagServerClient>(client =>
 {
     client.BaseAddress = new Uri(builder.Configuration["Services:RagServer"] ?? "http://localhost:5267");
@@ -81,7 +90,8 @@ builder.Services.AddHttpClient<CampusPulse.Shared.Rag.Client.IRagServerClient, C
 });
 builder.Services.AddSingleton<CampusPulse.Shared.Rag.Generation.RagCitationParser>();
 builder.Services.AddScoped<CampusPulse.Shared.Rag.Assistant.RagKnowledgeService>();
-builder.Services.AddScoped<ICourseKnowledgeService, CourseKnowledgeService>();
+builder.Services.AddScoped<ICourseRagService, CourseKnowledgeService>();
+builder.Services.AddScoped<ICourseKnowledgeService, LocalCourseAiOrchestrator>();
 var geminiApiKey = builder.Configuration["GEMINI_API_KEY"];
 var geminiApiAddress = builder.Configuration["Gemini:BaseUrl"]
     ?? "https://generativelanguage.googleapis.com/";
