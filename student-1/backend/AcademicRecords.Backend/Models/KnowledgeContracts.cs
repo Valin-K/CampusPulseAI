@@ -10,17 +10,3 @@ public sealed class KnowledgeQuestionRequest
 
     public int? UserId { get; set; }
 }
-
-public sealed record StudentEnrollmentProfile(
-    string StudentId,
-    List<StudentEnrollmentResponse>? Enrollments);
-
-public sealed record StudentEnrollmentResponse(
-    int EnrollmentId,
-    string CourseCode,
-    string? TermCode,
-    string? TermName,
-    int AcademicYear,
-    string Status,
-    decimal? GradeValue,
-    bool IsFinalized);

@@ -1,4 +1,5 @@
-using System.Globalization;
+using System.Net.Http.Json;
+using System.Text.Json;
 using AcademicRecords.Backend.Models;
 using CampusPulse.Shared.Rag.Assistant;
 using CampusPulse.Shared.Rag.Contracts;
@@ -16,7 +17,14 @@ public sealed class AcademicKnowledgeService(
     public async Task<RagAssistantAnswer> AskAsync(
         KnowledgeQuestionRequest request, CancellationToken cancellationToken)
     {
-        var corpus = await BuildCorpusAsync(request.UserId, cancellationToken);
+        if (IsStudentEnrollmentQuestion(request.Question))
+        {
+            return request.UserId is > 0
+                ? await GetStudentEnrollmentsAsync(request, cancellationToken)
+                : MissingStudentContext(request.Question);
+        }
+
+        var corpus = await BuildCorpusAsync(cancellationToken);
 
         // AGENT-MIGRATION: handing the corpus to the shared RAG assistant (ask + citation parsing)
         // moves into the multi-agent server; building this feature's corpus stays here because this
@@ -25,17 +33,15 @@ public sealed class AcademicKnowledgeService(
     }
 
     private async Task<IReadOnlyList<RagDocument>> BuildCorpusAsync(
-        int? userId, CancellationToken cancellationToken)
+        CancellationToken cancellationToken)
     {
         var documents = new List<RagDocument>(PolicyDocuments);
-        List<CourseMetadataResponse> courses = [];
 
         try
         {
             var loadedCourses = await clients.CreateClient("courseManagementDatabase")
                 .GetFromJsonAsync<List<CourseMetadataResponse>>("/api/courses", cancellationToken);
-            courses = loadedCourses ?? [];
-            documents.AddRange(courses.Select(CourseDocument));
+            documents.AddRange((loadedCourses ?? []).Select(CourseDocument));
         }
         catch (HttpRequestException exception)
         {
@@ -46,80 +52,102 @@ public sealed class AcademicKnowledgeService(
             logger.LogWarning(exception, "Timed out loading the course catalogue for the knowledge corpus.");
         }
 
-        if (userId is > 0)
-        {
-            await AddEnrollmentDocumentsAsync(userId.Value, courses, documents, cancellationToken);
-        }
-
         return documents;
     }
 
-    private async Task AddEnrollmentDocumentsAsync(
-        int userId,
-        IReadOnlyList<CourseMetadataResponse> courses,
-        List<RagDocument> documents,
-        CancellationToken cancellationToken)
+    private async Task<RagAssistantAnswer> GetStudentEnrollmentsAsync(
+        KnowledgeQuestionRequest request, CancellationToken cancellationToken)
     {
         try
         {
-            var profile = await clients.CreateClient("academicRecordsDatabase")
-                .GetFromJsonAsync<StudentEnrollmentProfile>(
-                    $"/api/students/by-user/{userId}", cancellationToken);
-            if (profile?.Enrollments is null)
+            using var response = await clients.CreateClient("mcp").PostAsJsonAsync(
+                "/api/mcp/tools/call",
+                new McpToolCallRequest(
+                    "get_student_enrollments",
+                    new Dictionary<string, object?> { ["user_id"] = request.UserId }),
+                cancellationToken);
+            if (!response.IsSuccessStatusCode)
             {
-                return;
+                throw new InvalidOperationException(
+                    $"The MCP server returned HTTP {(int)response.StatusCode} while retrieving student enrollments.");
             }
 
-            var coursesByCode = courses.ToDictionary(course => course.Code, StringComparer.OrdinalIgnoreCase);
-            documents.AddRange(profile.Enrollments.Select(enrollment =>
-                EnrollmentDocument(profile.StudentId, enrollment, coursesByCode)));
+            var toolResponse = await response.Content.ReadFromJsonAsync<McpToolCallResponse>(
+                cancellationToken: cancellationToken);
+            if (toolResponse is null || toolResponse.IsError || toolResponse.Result.ValueKind != JsonValueKind.Object)
+            {
+                throw new InvalidOperationException("The MCP server could not retrieve student enrollments.");
+            }
+
+            var profile = toolResponse.Result.Deserialize<StudentEnrollmentToolResult>(JsonOptions);
+            if (profile is null)
+            {
+                throw new InvalidOperationException("The MCP server returned an invalid enrollment response.");
+            }
+
+            var reply = profile.Enrollments.Count == 0
+                ? $"No enrollment records were found for student {profile.StudentId}."
+                : $"Enrollment records for {profile.StudentId}:\n{string.Join("\n", profile.Enrollments.Select(FormatEnrollment))}";
+
+            return new RagAssistantAnswer(
+                request.Question,
+                "answered",
+                reply,
+                1,
+                [new RagKnowledgeSource(1, "Student enrollment records", "mcp:get_student_enrollments", 1)],
+                "mcp");
         }
         catch (HttpRequestException exception)
         {
-            logger.LogWarning(exception, "Could not load student enrollments for the knowledge corpus.");
+            logger.LogWarning(exception, "Could not retrieve student enrollments from the MCP server.");
+            throw new InvalidOperationException("The MCP server is unavailable while retrieving student enrollments.", exception);
         }
         catch (TaskCanceledException exception) when (!cancellationToken.IsCancellationRequested)
         {
-            logger.LogWarning(exception, "Timed out loading student enrollments for the knowledge corpus.");
+            logger.LogWarning(exception, "Timed out retrieving student enrollments from the MCP server.");
+            throw new InvalidOperationException("The MCP server timed out while retrieving student enrollments.", exception);
         }
     }
+
+    private static bool IsStudentEnrollmentQuestion(string question)
+    {
+        var normalized = $" {question.Trim().ToLowerInvariant()} ";
+        var isPersonal = new[] { " my ", " i ", " me ", " have i ", " am i ", " did i ", " for me " }
+            .Any(normalized.Contains);
+        var isEnrollmentRelated = new[]
+        {
+            "enroll", "enrol", "course", "class", "subject", "grade", "mark", "passed", "failed", "completed", "term"
+        }.Any(normalized.Contains);
+
+        return isPersonal && isEnrollmentRelated;
+    }
+
+    private static RagAssistantAnswer MissingStudentContext(string question) =>
+        new(
+            question,
+            "insufficient_context",
+            "Open your student profile to ask about your enrollment records.",
+            0,
+            [],
+            "mcp");
+
+    private static string FormatEnrollment(StudentEnrollmentToolRecord enrollment)
+    {
+        var term = enrollment.TermName ?? enrollment.TermCode ?? "Unknown term";
+        var mark = enrollment.GradeValue is decimal grade
+            ? $", mark {grade.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)}"
+            : string.Empty;
+        var finalized = enrollment.IsFinalized ? "finalized" : "not finalized";
+        return $"- {enrollment.CourseCode} — {term} {enrollment.AcademicYear}: {enrollment.Status}{mark}, {finalized}";
+    }
+
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     private static RagDocument CourseDocument(CourseMetadataResponse course) =>
         new(
             $"course-{course.Code}",
             $"Course {course.Code} — {course.Name}. Worth {course.CreditPoints} credit points, graded as {course.GradeType}.",
             new Dictionary<string, string> { ["code"] = course.Code, ["title"] = course.Name });
-
-    private static RagDocument EnrollmentDocument(
-        string studentId,
-        StudentEnrollmentResponse enrollment,
-        IReadOnlyDictionary<string, CourseMetadataResponse> courses)
-    {
-        courses.TryGetValue(enrollment.CourseCode, out var course);
-        var courseTitle = course?.Name ?? enrollment.CourseCode;
-        var term = enrollment.TermName ?? enrollment.TermCode ?? "Unknown term";
-        var credits = course is null
-            ? string.Empty
-            : $" Worth {course.CreditPoints.ToString(CultureInfo.InvariantCulture)} credit points. ";
-        var mark = enrollment.GradeValue is decimal gradeValue
-            ? $" Recorded mark {gradeValue.ToString(CultureInfo.InvariantCulture)}."
-            : string.Empty;
-        var gradeType = course is null ? string.Empty : $" Graded as {course.GradeType}.";
-
-        return new RagDocument(
-            $"enrollment-{enrollment.EnrollmentId}",
-            $"Student {studentId} is enrolled in {courseTitle} ({enrollment.CourseCode}) for {term} "
-            + $"{enrollment.AcademicYear}. Current status: {enrollment.Status}. "
-            + $"{(enrollment.IsFinalized ? "Finalized." : "Not finalized.")}{credits}{mark}{gradeType}",
-            new Dictionary<string, string>
-            {
-                ["studentId"] = studentId,
-                ["courseCode"] = enrollment.CourseCode,
-                ["title"] = courseTitle,
-                ["term"] = term,
-                ["status"] = enrollment.Status
-            });
-    }
 
     private static readonly IReadOnlyList<RagDocument> PolicyDocuments =
     [
@@ -150,4 +178,16 @@ public sealed class AcademicKnowledgeService(
             + "finalized enrolments with a mark and positive credit points, including failed marks.",
             new Dictionary<string, string> { ["title"] = "Enrolment and grading" }),
     ];
+
+    private sealed record McpToolCallRequest(string Tool, Dictionary<string, object?> Arguments);
+    private sealed record McpToolCallResponse(bool IsError, JsonElement Result);
+    private sealed record StudentEnrollmentToolResult(string StudentId, List<StudentEnrollmentToolRecord> Enrollments);
+    private sealed record StudentEnrollmentToolRecord(
+        string CourseCode,
+        string? TermCode,
+        string? TermName,
+        int AcademicYear,
+        string Status,
+        decimal? GradeValue,
+        bool IsFinalized);
 }
