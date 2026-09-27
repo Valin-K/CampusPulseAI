@@ -32,7 +32,6 @@
     <Project Path="student-1/frontend/AcademicRecords.Frontend/AcademicRecords.Frontend.csproj" Id="7cbc512d-38c0-49d9-8247-aa5504ae1333" />
     <Project Path="student-1/tests/AcademicRecords.Tests/AcademicRecords.Tests.csproj" Id="b9e4fc4e-8977-4783-a5b9-4c8051210c2e" />
   </Folder>
-  <Folder Name="/student-1/database/" />
   <Folder Name="/student-2/">
     <Project Path="student-2/backend/CourseManagement.Backend/CourseManagement.Backend.csproj" Id="b02f1002-9a07-4914-8a47-3bd83fd2aab0" />
     <Project Path="student-2/frontend/CourseManagement.Frontend/CourseManagement.Frontend.csproj" Id="efdddfe6-7ce1-402f-acfe-cabd4add9ca4" />
