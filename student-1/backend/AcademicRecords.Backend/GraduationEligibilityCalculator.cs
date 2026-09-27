@@ -1,3 +1,5 @@
+using AcademicRecords.Backend.Contracts;
+
 namespace AcademicRecords.Backend;
 
 public static class GraduationEligibilityCalculator
