@@ -31,6 +31,11 @@ builder.Services.AddHttpClient<IRagServerClient, RagServerClient>(client =>
     client.Timeout = TimeSpan.FromSeconds(90);
 });
 
+builder.Services.AddHttpClient("mcp", client =>
+{
+    client.BaseAddress = new Uri(builder.Configuration["Services:McpServer"] ?? "http://localhost:5268");
+});
+
 builder.Services.AddScoped<IBookingAssistantService, GeminiBookingAssistantService>();
 builder.Services.AddSingleton<RagCitationParser>();
 builder.Services.AddScoped<RagKnowledgeService>();
