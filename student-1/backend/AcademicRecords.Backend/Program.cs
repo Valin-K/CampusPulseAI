@@ -20,6 +20,11 @@ builder.Services.AddHttpClient("courseManagementDatabase", client =>
 {
     client.BaseAddress = new Uri(builder.Configuration["Services:CourseManagementDatabase"] ?? "http://coursemanagement.database:8080");
 });
+builder.Services.AddHttpClient("mcp", client =>
+{
+    client.BaseAddress = new Uri(builder.Configuration["Services:McpServer"] ?? "http://localhost:5268");
+    client.Timeout = TimeSpan.FromSeconds(30);
+});
 var geminiApiKey = builder.Configuration["GEMINI_API_KEY"] ?? builder.Configuration["Gemini:ApiKey"];
 builder.Services.AddHttpClient("gemini", client =>
 {
@@ -166,6 +171,30 @@ app.MapGet("/api/students/{studentId}/wam", async (string studentId, IHttpClient
 app.MapGet("/api/students/{studentId}/gpa", async (string studentId, IHttpClientFactory clients, CancellationToken cancellationToken) =>
     await GetStudentStatisticAsync(studentId, true, clients, cancellationToken));
 
+app.MapGet("/api/students/{studentId}/statistics", async (
+    string studentId,
+    IHttpClientFactory clients,
+    CancellationToken cancellationToken) =>
+{
+    using var response = await clients.CreateClient("academicRecordsDatabase")
+        .GetAsync($"/api/students/{Uri.EscapeDataString(studentId)}", cancellationToken);
+    if (!response.IsSuccessStatusCode)
+    {
+        var content = await response.Content.ReadAsStringAsync(cancellationToken);
+        return Results.Content(content, response.Content.Headers.ContentType?.MediaType ?? "application/json", statusCode: (int)response.StatusCode);
+    }
+
+    var profile = await response.Content.ReadFromJsonAsync<StudentStatisticsProfile>(cancellationToken);
+    if (profile is null)
+    {
+        return Results.Problem("The student profile response was invalid.");
+    }
+
+    var courses = await GetCourseMetadataAsync(clients, cancellationToken);
+    profile = ApplyCourseMetadata(profile, courses);
+    return Results.Ok(StudentAcademicStatisticsCalculator.Calculate(profile));
+});
+
 app.MapGet("/api/students/{studentId}/eligibility", async (string studentId, IHttpClientFactory clients, CancellationToken cancellationToken) =>
 {
     using var response = await clients.CreateClient("academicRecordsDatabase")
@@ -276,6 +305,11 @@ app.MapPost("/api/ai/knowledge", async (KnowledgeQuestionRequest request,
     if (string.IsNullOrWhiteSpace(request.Question))
     {
         return Results.BadRequest(new { error = "A question is required." });
+    }
+
+    if (request.UserId is <= 0)
+    {
+        return Results.BadRequest(new { error = "User ID must be positive." });
     }
 
     try

@@ -53,7 +53,15 @@ jobs:
             sleep 1
           done
           curl --silent --fail http://localhost:5268/health
-          curl --silent --fail http://localhost:5268/api/mcp/tools
+          tools=$(curl --silent --fail http://localhost:5268/api/mcp/tools)
+          printf '%s' "$tools"
+          printf '%s' "$tools" | grep --quiet 'calculate_student_academic_statistics'
+          invalid_statistics_call=$(curl --silent --fail \
+            -H "Content-Type: application/json" \
+            -d '{"tool":"calculate_student_academic_statistics","arguments":{}}' \
+            http://localhost:5268/api/mcp/tools/call)
+          printf '%s' "$invalid_statistics_call"
+          printf '%s' "$invalid_statistics_call" | grep --quiet '"isError":true'
           curl --silent --fail \
             -H "Content-Type: application/json" \
             -d '{"tool":"project_files","arguments":{"directory_path":"docs"}}' \
