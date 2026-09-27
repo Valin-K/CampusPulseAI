@@ -15,32 +15,21 @@ public sealed class CourseManagementTools(HttpClient courseManagement)
         new(
             "course.get_details",
             "Get one course with its prerequisites, faculty assignments and syllabus metadata.",
-            new Dictionary<string, string>
-            {
-                ["courseId"] = "Required positive course database ID."
-            }),
+            CourseIdentifierSchema()),
         new(
             "course.get_prerequisites",
             "Get the prerequisite requirements for one course.",
-            new Dictionary<string, string>
-            {
-                ["courseId"] = "Required positive course database ID."
-            }),
+            CourseIdentifierSchema()),
         new(
             "course.get_faculty_assignments",
             "Get the faculty members assigned to one course.",
-            new Dictionary<string, string>
-            {
-                ["courseId"] = "Required positive course database ID."
-            }),
+            CourseIdentifierSchema()),
         new(
             "course.check_prerequisite_eligibility",
             "Check whether completed courses and grades satisfy a target course's prerequisite requirements.",
-            new Dictionary<string, string>
-            {
-                ["courseId"] = "Required positive target course database ID.",
-                ["completedCourses"] = "Required array of objects containing courseCode and grade."
-            })
+            CourseIdentifierSchema(
+                ("completedCourses",
+                    "Required array of objects containing courseCode and grade.")))
     ];
 
     private static readonly HashSet<string> ToolNames =
@@ -58,27 +47,129 @@ public sealed class CourseManagementTools(HttpClient courseManagement)
             "course.list_courses" =>
                 await GetAsync("/api/courses", cancellationToken),
             "course.get_details" =>
-                await GetAsync(
-                    $"/api/courses/{RequiredCourseId(request.Arguments)}",
+                await GetCourseDetailsAsync(
+                    request.Arguments,
                     cancellationToken),
             "course.get_prerequisites" =>
                 await GetCoursePropertyAsync(
-                    RequiredCourseId(request.Arguments),
+                    await ResolveCourseIdAsync(
+                        request.Arguments,
+                        cancellationToken),
                     "prerequisites",
                     cancellationToken),
             "course.get_faculty_assignments" =>
-                await GetAsync(
-                    $"/api/faculty-assignments?courseId={RequiredCourseId(request.Arguments)}",
+                await GetFacultyAssignmentsAsync(
+                    request.Arguments,
                     cancellationToken),
             "course.check_prerequisite_eligibility" =>
                 await CheckEligibilityAsync(
-                    RequiredCourseId(request.Arguments),
+                    await ResolveCourseIdAsync(
+                        request.Arguments,
+                        cancellationToken),
                     RequiredCompletedCourses(request.Arguments),
                     cancellationToken),
             _ => new McpToolExecution(
                 true,
                 new { error = $"Course tool '{request.Tool}' is not registered." })
         };
+    }
+
+    private async Task<McpToolExecution> GetCourseDetailsAsync(
+        IReadOnlyDictionary<string, object?> arguments,
+        CancellationToken cancellationToken)
+    {
+        var courseId = await ResolveCourseIdAsync(
+            arguments,
+            cancellationToken);
+        return await GetAsync(
+            $"/api/courses/{courseId}",
+            cancellationToken);
+    }
+
+    private async Task<McpToolExecution> GetFacultyAssignmentsAsync(
+        IReadOnlyDictionary<string, object?> arguments,
+        CancellationToken cancellationToken)
+    {
+        var courseId = await ResolveCourseIdAsync(
+            arguments,
+            cancellationToken);
+        return await GetAsync(
+            $"/api/faculty-assignments?courseId={courseId}",
+            cancellationToken);
+    }
+
+    private async Task<int> ResolveCourseIdAsync(
+        IReadOnlyDictionary<string, object?> arguments,
+        CancellationToken cancellationToken)
+    {
+        var hasCourseId = arguments.ContainsKey("courseId");
+        var courseCode = OptionalString(arguments, "courseCode");
+        var courseName = OptionalString(arguments, "courseName");
+        var identifierCount = (hasCourseId ? 1 : 0)
+            + (courseCode is null ? 0 : 1)
+            + (courseName is null ? 0 : 1);
+
+        if (identifierCount != 1)
+        {
+            throw new McpToolArgumentException(
+                "Provide exactly one of courseId, courseCode, or courseName.");
+        }
+
+        if (hasCourseId)
+        {
+            return RequiredCourseId(arguments);
+        }
+
+        using var response = await courseManagement.GetAsync(
+            "/api/courses",
+            cancellationToken);
+        var payload = await ReadPayloadAsync(response, cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new HttpRequestException(
+                $"The Course API returned HTTP {(int)response.StatusCode} while resolving the Course.");
+        }
+
+        if (payload.ValueKind != JsonValueKind.Array)
+        {
+            throw new HttpRequestException(
+                "The Course API returned an invalid Course catalogue.");
+        }
+
+        var propertyName = courseCode is null ? "name" : "code";
+        var expectedValue = courseCode ?? courseName!;
+        var matches = payload
+            .EnumerateArray()
+            .Where(course =>
+                course.TryGetProperty(propertyName, out var property)
+                && property.ValueKind == JsonValueKind.String
+                && string.Equals(
+                    property.GetString(),
+                    expectedValue,
+                    StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        if (matches.Count == 0)
+        {
+            throw new McpToolArgumentException(
+                $"No Course matched {propertyName} '{expectedValue}'.");
+        }
+
+        if (matches.Count > 1)
+        {
+            throw new McpToolArgumentException(
+                $"More than one Course matched {propertyName} '{expectedValue}'.");
+        }
+
+        if (!matches[0].TryGetProperty("id", out var id)
+            || !id.TryGetInt32(out var courseId)
+            || courseId <= 0)
+        {
+            throw new HttpRequestException(
+                "The matching Course did not contain a valid ID.");
+        }
+
+        return courseId;
     }
 
     private async Task<McpToolExecution> GetCoursePropertyAsync(
@@ -198,6 +289,47 @@ public sealed class CourseManagementTools(HttpClient courseManagement)
             ? courseId
             : throw new McpToolArgumentException(
                 "A positive courseId argument is required.");
+    }
+
+    private static string? OptionalString(
+        IReadOnlyDictionary<string, object?> arguments,
+        string name)
+    {
+        if (!arguments.TryGetValue(name, out var value))
+        {
+            return null;
+        }
+
+        var text = value switch
+        {
+            JsonElement { ValueKind: JsonValueKind.String } element =>
+                element.GetString(),
+            string stringValue => stringValue,
+            _ => null
+        };
+
+        return string.IsNullOrWhiteSpace(text) ? null : text.Trim();
+    }
+
+    private static Dictionary<string, string> CourseIdentifierSchema(
+        params (string Name, string Description)[] additionalArguments)
+    {
+        var schema = new Dictionary<string, string>
+        {
+            ["courseId"] =
+                "Optional positive Course database ID. Provide exactly one Course identifier.",
+            ["courseCode"] =
+                "Optional exact Course code. Provide exactly one Course identifier.",
+            ["courseName"] =
+                "Optional exact Course name. Provide exactly one Course identifier."
+        };
+
+        foreach (var (name, description) in additionalArguments)
+        {
+            schema[name] = description;
+        }
+
+        return schema;
     }
 
     private static JsonElement RequiredCompletedCourses(

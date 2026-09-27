@@ -48,6 +48,52 @@ public sealed class LocalCourseAiOrchestratorTests
     }
 
     [Test]
+    public async Task AskUsesCourseNameToGetFacultyAssignments()
+    {
+        var gemini = new QueuedHttpMessageHandler(
+            GeminiResponse("""
+                {
+                  "route": "mcp",
+                  "ragQuestion": null,
+                  "mcpCalls": [{
+                    "tool": "course.get_faculty_assignments",
+                    "arguments": {
+                      "courseName": "Programming Fundamentals"
+                    }
+                  }]
+                }
+                """),
+            GeminiResponse("Dr Ada Lovelace is assigned to Programming Fundamentals."));
+        var mcp = new StubMcpClient();
+        var service = CreateService(
+            gemini,
+            mcp,
+            new StubCourseRagService());
+
+        var response = await service.AskAsync(
+            Request("What faculty are assigned to Programming Fundamentals?"),
+            CancellationToken.None);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                mcp.CalledTools,
+                Is.EqualTo(new[] { "course.get_faculty_assignments" }));
+            Assert.That(
+                mcp.CalledArguments[0]["courseName"].GetString(),
+                Is.EqualTo("Programming Fundamentals"));
+            Assert.That(
+                response.Reply,
+                Is.EqualTo(
+                    "Dr Ada Lovelace is assigned to Programming Fundamentals."));
+            Assert.That(response.Sources, Has.Count.EqualTo(1));
+            Assert.That(
+                response.Sources[0].DocumentId,
+                Is.EqualTo("mcp:course.get_faculty_assignments"));
+        });
+    }
+
+    [Test]
     public async Task AskCanCombineRagAndMcp()
     {
         var gemini = new QueuedHttpMessageHandler(
@@ -164,6 +210,8 @@ public sealed class LocalCourseAiOrchestratorTests
     sealed class StubMcpClient : IMcpClient
     {
         public List<string> CalledTools { get; } = [];
+        public List<IReadOnlyDictionary<string, JsonElement>>
+            CalledArguments { get; } = [];
 
         public Task<IReadOnlyList<McpToolDefinition>> GetToolsAsync(
             CancellationToken cancellationToken) =>
@@ -179,6 +227,15 @@ public sealed class LocalCourseAiOrchestratorTests
                     new Dictionary<string, string>
                     {
                         ["courseId"] = "Required positive Course ID."
+                    }),
+                new(
+                    "course.get_faculty_assignments",
+                    "Get faculty assignments.",
+                    new Dictionary<string, string>
+                    {
+                        ["courseId"] = "Optional positive Course ID.",
+                        ["courseCode"] = "Optional exact Course code.",
+                        ["courseName"] = "Optional exact Course name."
                     })
             ]);
 
@@ -188,15 +245,32 @@ public sealed class LocalCourseAiOrchestratorTests
             CancellationToken cancellationToken)
         {
             CalledTools.Add(tool);
-            return Task.FromResult(new McpToolCallResponse(
-                tool,
-                IsError: false,
-                JsonSerializer.SerializeToElement(new
+            CalledArguments.Add(arguments);
+            var result = tool.Equals(
+                "course.get_faculty_assignments",
+                StringComparison.OrdinalIgnoreCase)
+                ? JsonSerializer.SerializeToElement(new
+                {
+                    courseId = 1,
+                    facultyAssignments = new[]
+                    {
+                        new
+                        {
+                            staffName = "Dr Ada Lovelace",
+                            role = "Lecturer"
+                        }
+                    }
+                })
+                : JsonSerializer.SerializeToElement(new
                 {
                     id = 1,
                     code = "CPAI1001",
                     name = "Programming Fundamentals"
-                }),
+                });
+            return Task.FromResult(new McpToolCallResponse(
+                tool,
+                IsError: false,
+                result,
                 DateTimeOffset.UtcNow));
         }
     }
