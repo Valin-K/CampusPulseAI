@@ -13,6 +13,7 @@ builder.Services.AddHttpClient<CourseManagementTools>(client =>
         builder.Configuration["Services:CourseManagementBackend"]
         ?? "http://localhost:5118");
     client.Timeout = TimeSpan.FromSeconds(10);
+});
 builder.Services.AddHttpClient("academicRecords", client =>
 {
     client.BaseAddress = new Uri(builder.Configuration["Services:AcademicRecordsBackend"] ?? "http://localhost:5020");
@@ -69,15 +70,6 @@ app.MapGet("/health", () => Results.Ok(new
     toolCount = tools.Count + CourseManagementTools.Definitions.Count
 }));
 app.MapGet("/api/mcp/tools", (IConfiguration configuration) =>
-    tool.Name,
-    tool.Description,
-    InputSchema = tool.InputSchema
-})));
-app.MapPost("/api/mcp/tools/call", async (
-    McpCallRequest request,
-    IConfiguration configuration,
-    IHttpClientFactory clients,
-    CancellationToken cancellationToken) =>
 {
     if (!IsEnabled(configuration["MCP_ENABLED"]))
     {
@@ -98,6 +90,7 @@ app.MapPost("/api/mcp/tools/call", async Task<IResult> (
     McpCallRequest request,
     IConfiguration configuration,
     CourseManagementTools courseTools,
+    IHttpClientFactory clients,
     CancellationToken cancellationToken) =>
 {
     if (!IsEnabled(configuration["MCP_ENABLED"]))
@@ -413,9 +406,6 @@ static Dictionary<string, object?> ReadLatestEvidence()
         };
 }
 
-public sealed record McpCallRequest(string Tool, Dictionary<string, object?> Arguments);
-public sealed record McpToolResult(string Tool, bool IsError, object Result, DateTimeOffset ExecutedAtUtc);
-public sealed record McpToolDefinition(string Name, string Description, Dictionary<string, string> InputSchema);
 public sealed record StudentEnrollmentsToolResult(string StudentId, IReadOnlyList<StudentEnrollmentToolRecord> Enrollments);
 public sealed record StudentEnrollmentToolProfile(string StudentId, List<StudentEnrollmentToolRecord>? Enrollments);
 public sealed record StudentEnrollmentToolRecord(
