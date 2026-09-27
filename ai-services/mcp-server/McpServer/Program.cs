@@ -1,10 +1,19 @@
 using System.Net.Http.Json;
 using System.Text.Json;
+using McpServer.Contracts;
+using McpServer.Tools;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddOpenApi();
 builder.Services.AddCors(options => options.AddDefaultPolicy(policy => policy
     .AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod()));
+builder.Services.AddHttpClient<CourseManagementTools>(client =>
+{
+    client.BaseAddress = new Uri(
+        builder.Configuration["Services:CourseManagementBackend"]
+        ?? "http://localhost:5118");
+    client.Timeout = TimeSpan.FromSeconds(10);
+});
 builder.Services.AddHttpClient("academicRecords", client =>
 {
     client.BaseAddress = new Uri(builder.Configuration["Services:AcademicRecordsBackend"] ?? "http://localhost:5020");
@@ -54,24 +63,72 @@ var tools = new Dictionary<string, McpToolDefinition>(StringComparer.OrdinalIgno
 };
 
 app.UseCors();
-app.MapGet("/health", () => Results.Ok(new { status = "healthy", service = "mcp", toolCount = tools.Count }));
-app.MapGet("/api/mcp/tools", (IConfiguration configuration) => !IsEnabled(configuration["MCP_ENABLED"])
-    ? Results.StatusCode(StatusCodes.Status403Forbidden)
-    : Results.Ok(tools.Values.Select(tool => new
+app.MapGet("/health", () => Results.Ok(new
 {
-    tool.Name,
-    tool.Description,
-    InputSchema = tool.InputSchema
-})));
-app.MapPost("/api/mcp/tools/call", async (
+    status = "healthy",
+    service = "mcp",
+    toolCount = tools.Count + CourseManagementTools.Definitions.Count
+}));
+app.MapGet("/api/mcp/tools", (IConfiguration configuration) =>
+{
+    if (!IsEnabled(configuration["MCP_ENABLED"]))
+    {
+        return Results.StatusCode(StatusCodes.Status403Forbidden);
+    }
+
+    return Results.Ok(
+        tools.Values
+            .Concat(CourseManagementTools.Definitions)
+            .Select(tool => new
+            {
+                tool.Name,
+                tool.Description,
+                InputSchema = tool.InputSchema
+            }));
+});
+app.MapPost("/api/mcp/tools/call", async Task<IResult> (
     McpCallRequest request,
     IConfiguration configuration,
+    CourseManagementTools courseTools,
     IHttpClientFactory clients,
     CancellationToken cancellationToken) =>
 {
     if (!IsEnabled(configuration["MCP_ENABLED"]))
     {
         return Results.StatusCode(StatusCodes.Status403Forbidden);
+    }
+
+    if (CourseManagementTools.CanHandle(request.Tool))
+    {
+        try
+        {
+            var execution = await courseTools.ExecuteAsync(
+                request,
+                cancellationToken);
+            return Results.Ok(
+                new McpToolResult(
+                    request.Tool,
+                    execution.IsError,
+                    execution.Result,
+                    DateTimeOffset.UtcNow));
+        }
+        catch (McpToolArgumentException exception)
+        {
+            return Results.BadRequest(new { error = exception.Message });
+        }
+        catch (HttpRequestException exception)
+        {
+            return Results.Problem(
+                $"The Course Management backend is unavailable: {exception.Message}",
+                statusCode: StatusCodes.Status503ServiceUnavailable);
+        }
+        catch (TaskCanceledException)
+            when (!cancellationToken.IsCancellationRequested)
+        {
+            return Results.Problem(
+                "The Course Management backend did not respond in time.",
+                statusCode: StatusCodes.Status504GatewayTimeout);
+        }
     }
 
     if (!tools.TryGetValue(request.Tool, out var definition))
@@ -349,9 +406,6 @@ static Dictionary<string, object?> ReadLatestEvidence()
         };
 }
 
-public sealed record McpCallRequest(string Tool, Dictionary<string, object?> Arguments);
-public sealed record McpToolResult(string Tool, bool IsError, object Result, DateTimeOffset ExecutedAtUtc);
-public sealed record McpToolDefinition(string Name, string Description, Dictionary<string, string> InputSchema);
 public sealed record StudentEnrollmentsToolResult(string StudentId, IReadOnlyList<StudentEnrollmentToolRecord> Enrollments);
 public sealed record StudentEnrollmentToolProfile(string StudentId, List<StudentEnrollmentToolRecord>? Enrollments);
 public sealed record StudentEnrollmentToolRecord(
