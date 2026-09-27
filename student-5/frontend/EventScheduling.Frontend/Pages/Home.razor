@@ -114,34 +114,6 @@
     }
 </section>
 
-<section class="surface-card" aria-label="Shared AI services" style="margin-top: 1.25rem">
-    <div class="section-heading">
-        <div>
-            <span class="eyebrow">Shared AI services</span>
-            <h2>MCP integration</h2>
-        </div>
-        <button type="button" class="button button-secondary" disabled="@isCheckingMcp" @onclick="VerifyMcpAsync">
-            @(isCheckingMcp ? "Checking…" : "Verify MCP integration")
-        </button>
-    </div>
-    @if (mcpResult is { Success: true, Response: { } mcp })
-    {
-        <div class="notice notice-success" role="status">
-            <strong>MCP connected.</strong>
-            Feature @mcp.Result.Feature.Replace("-", " ") is @(mcp.Result.Valid ? "registered" : "not registered")
-            with the shared MCP server. Checks: @string.Join(", ", mcp.Result.Checks).
-        </div>
-    }
-    else if (mcpResult is { Error: { } mcpError })
-    {
-        <div class="notice notice-error" role="alert">@mcpError</div>
-    }
-    else
-    {
-        <p class="eyebrow">Confirms this feature is registered with the shared MCP server running on localhost.</p>
-    }
-</section>
-
 @code {
     private readonly List<BookingResponse> myBookings = [];
     private readonly DateOnly anchorDate = DateOnly.FromDateTime(DateTime.Today);
@@ -149,8 +121,6 @@
     private string? errorMessage;
     private bool isLoading = true;
     private int? busyBookingId;
-    private bool isCheckingMcp;
-    private McpVerifyResult? mcpResult;
 
     private List<DashboardEntry> DashboardBookings => BuildDashboard();
 
@@ -230,14 +200,6 @@
     }
 
     private void GoToDay(DateOnly date) => Nav.NavigateTo($"/day/{date:yyyy-MM-dd}");
-
-    private async Task VerifyMcpAsync()
-    {
-        isCheckingMcp = true;
-        mcpResult = null;
-        mcpResult = await Api.VerifyMcpIntegrationAsync();
-        isCheckingMcp = false;
-    }
 
     private enum DashboardCategory
     {

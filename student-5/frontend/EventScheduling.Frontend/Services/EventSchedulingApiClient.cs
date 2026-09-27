@@ -190,28 +190,6 @@ public sealed class EventSchedulingApiClient(HttpClient httpClient)
         }
     }
 
-    public async Task<McpVerifyResult> VerifyMcpIntegrationAsync(CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            var response = await httpClient.PostAsync("/api/ai/mcp/integration", content: null, cancellationToken);
-            if (response.IsSuccessStatusCode)
-            {
-                var payload = await response.Content.ReadFromJsonAsync<McpIntegrationResponse>(cancellationToken);
-                return payload is null
-                    ? new McpVerifyResult(false, null, "The MCP server returned an empty response.")
-                    : new McpVerifyResult(true, payload, null);
-            }
-
-            var problem = await response.Content.ReadFromJsonAsync<ProblemResponse>(cancellationToken);
-            return new McpVerifyResult(false, null, FormatError(problem) ?? "The MCP integration check failed.");
-        }
-        catch (HttpRequestException)
-        {
-            return new McpVerifyResult(false, null, "The Event Scheduling service is unavailable.");
-        }
-    }
-
     private async Task<BookingResult> PostBookingActionAsync(string url, CancellationToken cancellationToken)
     {
         try
