@@ -1,9 +1,24 @@
+using System.Net.Http.Json;
 using System.Text.Json;
+using McpServer.Contracts;
+using McpServer.Tools;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddOpenApi();
 builder.Services.AddCors(options => options.AddDefaultPolicy(policy => policy
     .AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod()));
+builder.Services.AddHttpClient<CourseManagementTools>(client =>
+{
+    client.BaseAddress = new Uri(
+        builder.Configuration["Services:CourseManagementBackend"]
+        ?? "http://localhost:5118");
+    client.Timeout = TimeSpan.FromSeconds(10);
+});
+builder.Services.AddHttpClient("academicRecords", client =>
+{
+    client.BaseAddress = new Uri(builder.Configuration["Services:AcademicRecordsBackend"] ?? "http://localhost:5020");
+    client.Timeout = TimeSpan.FromSeconds(30);
+});
 
 var app = builder.Build();
 if (app.Environment.IsDevelopment())
@@ -37,28 +52,98 @@ var tools = new Dictionary<string, McpToolDefinition>(StringComparer.OrdinalIgno
         "validate_integration",
         "Validate that a feature is registered with the shared MCP server.",
         new Dictionary<string, string> { ["feature"] = "student-1 through student-5" }),
+    ["calculate_student_academic_statistics"] = new(
+        "calculate_student_academic_statistics",
+        "Return a student's weighted average mark (WAM), grade point average (GPA), and total credit points gained by academic year.",
+        new Dictionary<string, string> { ["student_id"] = "Required student identifier, for example STU123" }),
+    ["get_student_enrollments"] = new(
+        "get_student_enrollments",
+        "Return the course, term, status, grade, and finalization details for a student.",
+        new Dictionary<string, string> { ["user_id"] = "Required numeric user ID for the student" }),
 };
 
 app.UseCors();
-app.MapGet("/health", () => Results.Ok(new { status = "healthy", service = "mcp", toolCount = tools.Count }));
-app.MapGet("/api/mcp/tools", (IConfiguration configuration) => !IsEnabled(configuration["MCP_ENABLED"])
-    ? Results.StatusCode(StatusCodes.Status403Forbidden)
-    : Results.Ok(tools.Values.Select(tool => new
+app.MapGet("/health", () => Results.Ok(new
 {
-    tool.Name,
-    tool.Description,
-    InputSchema = tool.InputSchema
-})));
-app.MapPost("/api/mcp/tools/call", (McpCallRequest request, IConfiguration configuration) =>
+    status = "healthy",
+    service = "mcp",
+    toolCount = tools.Count + CourseManagementTools.Definitions.Count
+}));
+app.MapGet("/api/mcp/tools", (IConfiguration configuration) =>
 {
     if (!IsEnabled(configuration["MCP_ENABLED"]))
     {
         return Results.StatusCode(StatusCodes.Status403Forbidden);
     }
 
+    return Results.Ok(
+        tools.Values
+            .Concat(CourseManagementTools.Definitions)
+            .Select(tool => new
+            {
+                tool.Name,
+                tool.Description,
+                InputSchema = tool.InputSchema
+            }));
+});
+app.MapPost("/api/mcp/tools/call", async Task<IResult> (
+    McpCallRequest request,
+    IConfiguration configuration,
+    CourseManagementTools courseTools,
+    IHttpClientFactory clients,
+    CancellationToken cancellationToken) =>
+{
+    if (!IsEnabled(configuration["MCP_ENABLED"]))
+    {
+        return Results.StatusCode(StatusCodes.Status403Forbidden);
+    }
+
+    if (CourseManagementTools.CanHandle(request.Tool))
+    {
+        try
+        {
+            var execution = await courseTools.ExecuteAsync(
+                request,
+                cancellationToken);
+            return Results.Ok(
+                new McpToolResult(
+                    request.Tool,
+                    execution.IsError,
+                    execution.Result,
+                    DateTimeOffset.UtcNow));
+        }
+        catch (McpToolArgumentException exception)
+        {
+            return Results.BadRequest(new { error = exception.Message });
+        }
+        catch (HttpRequestException exception)
+        {
+            return Results.Problem(
+                $"The Course Management backend is unavailable: {exception.Message}",
+                statusCode: StatusCodes.Status503ServiceUnavailable);
+        }
+        catch (TaskCanceledException)
+            when (!cancellationToken.IsCancellationRequested)
+        {
+            return Results.Problem(
+                "The Course Management backend did not respond in time.",
+                statusCode: StatusCodes.Status504GatewayTimeout);
+        }
+    }
+
     if (!tools.TryGetValue(request.Tool, out var definition))
     {
         return Results.NotFound(new { error = $"Tool '{request.Tool}' is not registered." });
+    }
+
+    if (definition.Name == "calculate_student_academic_statistics")
+    {
+        return Results.Ok(await CalculateStudentAcademicStatisticsAsync(request.Arguments, clients, cancellationToken));
+    }
+
+    if (definition.Name == "get_student_enrollments")
+    {
+        return Results.Ok(await GetStudentEnrollmentsAsync(request.Arguments, clients, cancellationToken));
     }
 
     var feature = GetString(request.Arguments, "feature");
@@ -108,9 +193,177 @@ static bool IsEnabled(string? value) => string.IsNullOrWhiteSpace(value)
 
 static string? GetString(Dictionary<string, object?> arguments, string name)
 {
-    return arguments.TryGetValue(name, out var value) && value is JsonElement element
-        ? element.GetString()
-        : value?.ToString();
+    if (!arguments.TryGetValue(name, out var value))
+    {
+        return null;
+    }
+
+    return value switch
+    {
+        JsonElement { ValueKind: JsonValueKind.String } element => element.GetString(),
+        string text => text,
+        _ => null
+    };
+}
+
+static int? GetInt32(Dictionary<string, object?> arguments, string name)
+{
+    if (!arguments.TryGetValue(name, out var value))
+    {
+        return null;
+    }
+
+    return value switch
+    {
+        JsonElement { ValueKind: JsonValueKind.Number } element when element.TryGetInt32(out var number) => number,
+        int number => number,
+        _ => null
+    };
+}
+
+static async Task<McpToolResult> CalculateStudentAcademicStatisticsAsync(
+    Dictionary<string, object?> arguments,
+    IHttpClientFactory clients,
+    CancellationToken cancellationToken)
+{
+    var studentId = GetString(arguments, "student_id");
+    if (string.IsNullOrWhiteSpace(studentId))
+    {
+        return new McpToolResult(
+            "calculate_student_academic_statistics",
+            true,
+            new { error = "A non-empty student_id argument is required." },
+            DateTimeOffset.UtcNow);
+    }
+
+    try
+    {
+        var client = clients.CreateClient("academicRecords");
+        var escapedStudentId = Uri.EscapeDataString(studentId);
+        using var response = await client.GetAsync($"/api/students/{escapedStudentId}/statistics", cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            return new McpToolResult(
+                "calculate_student_academic_statistics",
+                true,
+                new
+                {
+                    error = "Academic Records could not retrieve statistics for this student.",
+                    statusCode = (int)response.StatusCode
+                },
+                DateTimeOffset.UtcNow);
+        }
+
+        var statistics = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        return new McpToolResult(
+            "calculate_student_academic_statistics",
+            false,
+            statistics,
+            DateTimeOffset.UtcNow);
+    }
+    catch (HttpRequestException)
+    {
+        return new McpToolResult(
+            "calculate_student_academic_statistics",
+            true,
+            new { error = "The Academic Records backend is unavailable." },
+            DateTimeOffset.UtcNow);
+    }
+    catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
+    {
+        return new McpToolResult(
+            "calculate_student_academic_statistics",
+            true,
+            new { error = "The Academic Records backend did not respond in time." },
+            DateTimeOffset.UtcNow);
+    }
+    catch (JsonException)
+    {
+        return new McpToolResult(
+            "calculate_student_academic_statistics",
+            true,
+            new { error = "The Academic Records backend returned an invalid statistics response." },
+            DateTimeOffset.UtcNow);
+    }
+}
+
+static async Task<McpToolResult> GetStudentEnrollmentsAsync(
+    Dictionary<string, object?> arguments,
+    IHttpClientFactory clients,
+    CancellationToken cancellationToken)
+{
+    var userId = GetInt32(arguments, "user_id");
+    if (userId is not > 0)
+    {
+        return new McpToolResult(
+            "get_student_enrollments",
+            true,
+            new { error = "A positive user_id argument is required." },
+            DateTimeOffset.UtcNow);
+    }
+
+    try
+    {
+        var client = clients.CreateClient("academicRecords");
+        using var response = await client.GetAsync($"/api/students/by-user/{userId}", cancellationToken);
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return new McpToolResult(
+                "get_student_enrollments",
+                true,
+                new { error = "No student profile was found for this user_id." },
+                DateTimeOffset.UtcNow);
+        }
+
+        if (!response.IsSuccessStatusCode)
+        {
+            return new McpToolResult(
+                "get_student_enrollments",
+                true,
+                new { error = "Academic Records could not retrieve enrollments for this student.", statusCode = (int)response.StatusCode },
+                DateTimeOffset.UtcNow);
+        }
+
+        var profile = await response.Content.ReadFromJsonAsync<StudentEnrollmentToolProfile>(cancellationToken);
+        if (profile is null)
+        {
+            return new McpToolResult(
+                "get_student_enrollments",
+                true,
+                new { error = "Academic Records returned an invalid student enrollment response." },
+                DateTimeOffset.UtcNow);
+        }
+
+        return new McpToolResult(
+            "get_student_enrollments",
+            false,
+            new StudentEnrollmentsToolResult(profile.StudentId, profile.Enrollments ?? []),
+            DateTimeOffset.UtcNow);
+    }
+    catch (HttpRequestException)
+    {
+        return new McpToolResult(
+            "get_student_enrollments",
+            true,
+            new { error = "The Academic Records backend is unavailable." },
+            DateTimeOffset.UtcNow);
+    }
+    catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
+    {
+        return new McpToolResult(
+            "get_student_enrollments",
+            true,
+            new { error = "The Academic Records backend did not respond in time." },
+            DateTimeOffset.UtcNow);
+    }
+    catch (JsonException)
+    {
+        return new McpToolResult(
+            "get_student_enrollments",
+            true,
+            new { error = "The Academic Records backend returned an invalid enrollment response." },
+            DateTimeOffset.UtcNow);
+    }
 }
 
 static Dictionary<string, object?> ListProjectFiles(string relativePath)
@@ -153,6 +406,13 @@ static Dictionary<string, object?> ReadLatestEvidence()
         };
 }
 
-public sealed record McpCallRequest(string Tool, Dictionary<string, object?> Arguments);
-public sealed record McpToolResult(string Tool, bool IsError, object Result, DateTimeOffset ExecutedAtUtc);
-public sealed record McpToolDefinition(string Name, string Description, Dictionary<string, string> InputSchema);
+public sealed record StudentEnrollmentsToolResult(string StudentId, IReadOnlyList<StudentEnrollmentToolRecord> Enrollments);
+public sealed record StudentEnrollmentToolProfile(string StudentId, List<StudentEnrollmentToolRecord>? Enrollments);
+public sealed record StudentEnrollmentToolRecord(
+    string CourseCode,
+    string? TermCode,
+    string? TermName,
+    int AcademicYear,
+    string Status,
+    decimal? GradeValue,
+    bool IsFinalized);

@@ -1,6 +1,6 @@
 using CourseManagement.Backend.Clients;
+using CourseManagement.Backend.Configuration;
 using CourseManagement.Backend.Contracts.CourseAccess;
-using CourseManagement.Backend.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 

@@ -1,5 +1,5 @@
 using CourseManagement.Backend.Contracts.Ai;
-using CourseManagement.Backend.Controllers;
+using CourseManagement.Backend.Controllers.AI;
 using CourseManagement.Backend.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;

@@ -41,6 +41,20 @@ public sealed class VectorStore
             .ToList();
     }
 
+    public bool DeleteDocument(string collection, string documentId)
+    {
+        if (!_collections.TryGetValue(collection, out var entries))
+        {
+            return false;
+        }
+
+        lock (entries)
+        {
+            return entries.RemoveAll(entry =>
+                string.Equals(entry.DocumentId, documentId, StringComparison.Ordinal)) > 0;
+        }
+    }
+
     public bool Delete(string collection) => _collections.TryRemove(collection, out _);
 
 	// for diagnostic purposes, return a summary of all collections, including the number of unique documents and total chunks in each collection

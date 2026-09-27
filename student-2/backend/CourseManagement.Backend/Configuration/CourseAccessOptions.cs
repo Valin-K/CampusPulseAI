@@ -1,4 +1,4 @@
-namespace CourseManagement.Backend.Services;
+namespace CourseManagement.Backend.Configuration;
 
 public sealed class CourseAccessOptions
 {

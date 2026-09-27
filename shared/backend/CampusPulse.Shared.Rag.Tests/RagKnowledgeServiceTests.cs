@@ -67,6 +67,22 @@ public sealed class RagKnowledgeServiceTests
     }
 
     [Test]
+    public async Task AskAsync_PassesSupplementalMcpContextToTheServer()
+    {
+        const string supplementalContext = "{\"studentId\":\"STU042\",\"enrollments\":[]}";
+        var client = new FakeRagServerClient
+        {
+            AnswerResult = Response(RagStatus.Answered, "Answer [1].", TwoSources()),
+        };
+        var service = new RagKnowledgeService(client, new RagCitationParser());
+
+        await service.AskAsync(
+            Feature, "How long can I hire equipment for?", Corpus, CancellationToken.None, supplementalContext);
+
+        Assert.That(client.LastAnswer!.SupplementalContext, Is.EqualTo(supplementalContext));
+    }
+
+    [Test]
     public async Task AskAsync_SendsThePersonaAndTopKToTheServer()
     {
         var client = new FakeRagServerClient

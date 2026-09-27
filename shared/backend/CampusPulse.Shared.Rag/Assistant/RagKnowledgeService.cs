@@ -10,7 +10,8 @@ public sealed class RagKnowledgeService(IRagServerClient rag, RagCitationParser 
         RagFeature feature,
         string question,
         IReadOnlyList<RagDocument> corpus,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string? supplementalContext = null)
     {
         var trimmedQuestion = question.Trim();
 
@@ -18,7 +19,11 @@ public sealed class RagKnowledgeService(IRagServerClient rag, RagCitationParser 
 
         var response = await rag.AnswerAsync(
             feature.Collection,
-            new RagAnswerRequest(trimmedQuestion, TopK: 4, Instructions: feature.Persona),
+            new RagAnswerRequest(
+                trimmedQuestion,
+                TopK: 4,
+                Instructions: feature.Persona,
+                SupplementalContext: supplementalContext),
             cancellationToken);
         if (response is null)
         {

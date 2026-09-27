@@ -7,6 +7,7 @@ public sealed record RagPromptRequest
     public required string Question { get; init; }
     public required IReadOnlyList<RagSource> Sources { get; init; }
     public string? Persona { get; init; }
+    public string? SupplementalContext { get; init; }
     public RagOutputFormat Format { get; init; } = RagOutputFormat.Prose;
     public string? JsonSchemaHint { get; init; }
 }

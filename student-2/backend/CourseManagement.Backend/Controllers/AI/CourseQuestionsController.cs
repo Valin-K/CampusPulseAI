@@ -2,7 +2,7 @@ using CourseManagement.Backend.Contracts.Ai;
 using CourseManagement.Backend.Services;
 using Microsoft.AspNetCore.Mvc;
 
-namespace CourseManagement.Backend.Controllers;
+namespace CourseManagement.Backend.Controllers.AI;
 
 [ApiController]
 [Route("api/ai/course-questions")]

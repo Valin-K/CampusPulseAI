@@ -1,9 +1,10 @@
+using CampusPulse.Shared.Mcp.Client;
 using CampusPulse.Shared.Rag.Assistant;
 using CourseManagement.Backend.Contracts.Ai;
 using CourseManagement.Backend.Services;
 using Microsoft.AspNetCore.Mvc;
 
-namespace CourseManagement.Backend.Controllers;
+namespace CourseManagement.Backend.Controllers.AI;
 
 [ApiController]
 [Route("api/ai/knowledge")]
@@ -24,11 +25,32 @@ public sealed class KnowledgeController(
             logger.LogWarning(exception, "The knowledge assistant could not answer.");
             return Problem(exception.Message, statusCode: StatusCodes.Status503ServiceUnavailable);
         }
+        catch (GeminiConfigurationException exception)
+        {
+            logger.LogWarning(exception, "Gemini is not configured for the knowledge assistant.");
+            return Problem(
+                exception.Message,
+                statusCode: StatusCodes.Status503ServiceUnavailable);
+        }
+        catch (GeminiResponseException exception)
+        {
+            logger.LogWarning(exception, "Gemini returned an invalid knowledge-assistant response.");
+            return Problem(
+                "Gemini returned an invalid response.",
+                statusCode: StatusCodes.Status502BadGateway);
+        }
+        catch (McpResponseException exception)
+        {
+            logger.LogWarning(exception, "The knowledge assistant could not use MCP.");
+            return Problem(
+                exception.Message,
+                statusCode: StatusCodes.Status503ServiceUnavailable);
+        }
         catch (HttpRequestException exception)
         {
-            logger.LogWarning(exception, "The knowledge assistant could not reach the RAG server.");
+            logger.LogWarning(exception, "The knowledge assistant could not reach a required AI service.");
             return Problem(
-                "The shared RAG server is unavailable. Start it on the host at http://localhost:5267 before using this feature.",
+                "A required AI service is unavailable.",
                 statusCode: StatusCodes.Status503ServiceUnavailable);
         }
         catch (TaskCanceledException exception) when (!cancellationToken.IsCancellationRequested)
