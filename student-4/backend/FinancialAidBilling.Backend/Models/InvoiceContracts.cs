@@ -85,16 +85,6 @@ public sealed record AcademicStudentProfile(
     DateOnly? EnrollmentDate,
     string? Major);
 
-public sealed record GeminiGenerateRequest(IReadOnlyList<GeminiContent> Contents);
-
-public sealed record GeminiContent(IReadOnlyList<GeminiPart> Parts);
-
-public sealed record GeminiPart(string Text);
-
-public sealed record GeminiGenerateResponse(IReadOnlyList<GeminiCandidate>? Candidates);
-
-public sealed record GeminiCandidate(GeminiContent? Content);
-
 public sealed record ScholarshipRecommendationResponse(int StudentId, int MatchCount, string Recommendation);
 
 public static class HttpResponseMessageExtensions

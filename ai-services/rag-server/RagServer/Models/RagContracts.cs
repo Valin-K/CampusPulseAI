@@ -6,9 +6,6 @@ public sealed class RagOptions
     public int ChunkOverlap { get; set; } = 100;
     public int DefaultTopK { get; set; } = 4;
     public double MinimumConfidence { get; set; } = 0.55;
-    public int EmbeddingDimensions { get; set; } = 768;
-    public string EmbeddingModel { get; set; } = "gemini-embedding-001";
-    public string GenerationModel { get; set; } = "gemini-3.5-flash-lite";
     public string[] AllowedCollections { get; set; } = [];
 }
 

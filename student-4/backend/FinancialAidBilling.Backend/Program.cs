@@ -1,4 +1,5 @@
 using CampusPulse.Shared.Rag.Assistant;
+using CampusPulse.Shared.Ai;
 using CampusPulse.Shared.Rag.Client;
 using CampusPulse.Shared.Rag.Contracts;
 using CampusPulse.Shared.Rag.Generation;
@@ -42,18 +43,7 @@ builder.Services.AddHttpClient<IRagServerClient, RagServerClient>(client =>
 builder.Services.AddSingleton<RagCitationParser>();
 builder.Services.AddScoped<RagKnowledgeService>();
 builder.Services.AddScoped<IFinancialAidKnowledgeService, FinancialAidKnowledgeService>();
-var geminiApiKey = builder.Configuration["GEMINI_API_KEY"];
-
-builder.Services.AddHttpClient("gemini", client =>
-{
-    client.BaseAddress = new Uri("https://generativelanguage.googleapis.com/");
-    client.Timeout = TimeSpan.FromSeconds(90);
-
-    if (!string.IsNullOrWhiteSpace(geminiApiKey))
-    {
-        client.DefaultRequestHeaders.Add("x-goog-api-key", geminiApiKey);
-    }
-});
+builder.Services.AddAiGateway(builder.Configuration);
 
 var app = builder.Build();
 

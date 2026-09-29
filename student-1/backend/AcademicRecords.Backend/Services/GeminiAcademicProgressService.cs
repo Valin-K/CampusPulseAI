@@ -1,5 +1,5 @@
 using System.Globalization;
-using System.Net.Http.Json;
+using CampusPulse.Shared.Ai;
 using System.Text.Json;
 using AcademicRecords.Backend.Calculators;
 using AcademicRecords.Backend.Contracts;
@@ -7,35 +7,17 @@ using AcademicRecords.Backend.Models;
 
 namespace AcademicRecords.Backend.Services;
 
-public sealed class GeminiAcademicProgressService(IHttpClientFactory clients, IConfiguration configuration)
+public sealed class GeminiAcademicProgressService(IAiGatewayClient gateway, ILogger<GeminiAcademicProgressService> logger)
 {
     public async Task<AcademicProgressAnalysisResponse> AnalyzeAsync(
         StudentStatisticsProfile profile,
         CancellationToken cancellationToken)
     {
         var metrics = CalculateMetrics(profile);
-        var apiKey = configuration["GEMINI_API_KEY"] ?? configuration["Gemini:ApiKey"];
-        if (string.IsNullOrWhiteSpace(apiKey))
-        {
-            return Failed(metrics, "GEMINI_API_KEY is not configured.");
-        }
-
-        var prompt = CreatePrompt(profile, metrics);
-        var request = new GeminiGenerateRequest([new GeminiContent([new GeminiPart(prompt)])]);
-        var model = configuration["Gemini:Model"] ?? "gemini-3.5-flash-lite";
-
         try
         {
-            using var response = await clients.CreateClient("gemini")
-                .PostAsJsonAsync($"v1beta/models/{model}:generateContent", request, cancellationToken);
-            response.EnsureSuccessStatusCode();
-
-            var result = await response.Content.ReadFromJsonAsync<GeminiGenerateResponse>(cancellationToken: cancellationToken);
-            var text = result?.Candidates?.FirstOrDefault()?.Content?.Parts?.FirstOrDefault()?.Text;
-            if (string.IsNullOrWhiteSpace(text))
-            {
-                return Failed(metrics, "Gemini returned an empty analysis.");
-            }
+            var result = await gateway.GenerateAsync(CreatePrompt(), CreateContext(profile, metrics), cancellationToken);
+            var text = result.Text;
 
             var analysis = JsonSerializer.Deserialize<GeminiAnalysis>(RemoveMarkdownCodeFence(text),
                 new JsonSerializerOptions(JsonSerializerDefaults.Web)
@@ -44,7 +26,8 @@ public sealed class GeminiAcademicProgressService(IHttpClientFactory clients, IC
                 });
             if (analysis is null || string.IsNullOrWhiteSpace(analysis.ExpectedGraduationTerm))
             {
-                return Failed(metrics, "Gemini returned an invalid analysis.");
+                logger.LogWarning("The AI service returned an invalid academic analysis.");
+                return Failed(metrics, "The AI service returned an invalid analysis.");
             }
 
             return new(
@@ -56,16 +39,19 @@ public sealed class GeminiAcademicProgressService(IHttpClientFactory clients, IC
                     flag.Severity ?? "Info", flag.Category ?? "General", flag.Description ?? "", flag.RecommendedAction ?? "")).ToList() ?? [],
                 metrics);
         }
-        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException exception) when (!cancellationToken.IsCancellationRequested)
         {
+            logger.LogWarning(exception, "The academic analysis request timed out.");
             return Failed(metrics, "The AI request timed out.");
         }
-        catch (HttpRequestException)
+        catch (HttpRequestException exception)
         {
+            logger.LogWarning(exception, "The AI gateway is unavailable for academic analysis.");
             return Failed(metrics, "The AI service is unavailable.");
         }
-        catch (JsonException)
+        catch (JsonException exception)
         {
+            logger.LogWarning(exception, "The AI service returned an unreadable academic analysis.");
             return Failed(metrics, "The AI service returned an unreadable response.");
         }
     }
@@ -95,14 +81,16 @@ public sealed class GeminiAcademicProgressService(IHttpClientFactory clients, IC
             enrollments.Count(enrollment => string.Equals(enrollment.Status, "Failed", StringComparison.OrdinalIgnoreCase)));
     }
 
-    private static string CreatePrompt(StudentStatisticsProfile profile, AcademicProgressMetrics metrics) => $"""
+    private static string CreatePrompt() => """
         You are an academic progress assistant. Analyze only the supplied student record.
-        Predict when the student is likely to complete a {metrics.RequiredCredits:0.##}-credit degree using their observed yearly pace.
+        Predict when the student is likely to complete the required degree credits using their observed yearly pace.
         Flag declining GPA, repeated failures, and insufficient completion pace. Do not invent course requirements.
         Return JSON only with the fields expectedGraduationTerm, expectedGraduationDate, explanation, and riskFlags.
         Each riskFlags item must have severity, category, description, and recommendedAction.
         Use an empty riskFlags array when no risk is supported by the record.
+        """;
 
+    private static string CreateContext(StudentStatisticsProfile profile, AcademicProgressMetrics metrics) => $"""
         Student: {profile.FirstName} {profile.LastName}; degree: {profile.Degree}; major: {profile.Major}
         Earned credits: {metrics.EarnedCredits:0.##}; required credits: {metrics.RequiredCredits:0.##};
         credits remaining: {metrics.CreditsRemaining:0.##}; average credits per academic year: {metrics.AverageCreditsPerYear:0.##};

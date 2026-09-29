@@ -6,7 +6,8 @@ using AcademicRecords.Database.Data;
 using AcademicRecords.Database.Models;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
+using CampusPulse.Shared.Ai;
+using Microsoft.Extensions.Logging.Abstractions;
 using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -56,9 +57,9 @@ namespace AcademicRecords.Tests
         }
 
         [Test]
-        public async Task AcademicProgressAnalysisReportsMissingApiKey()
+        public async Task AcademicProgressAnalysisReportsUnavailableGateway()
         {
-            var service = new GeminiAcademicProgressService(null!, new ConfigurationBuilder().Build());
+            var service = new GeminiAcademicProgressService(new UnavailableGateway(), NullLogger<GeminiAcademicProgressService>.Instance);
             var profile = new StudentStatisticsProfile
             {
                 StudentId = "AI-TEST-1",
@@ -81,9 +82,17 @@ namespace AcademicRecords.Tests
 
             Assert.That(result.Succeeded, Is.False);
             Assert.That(result.Status, Is.EqualTo("Failed"));
-            Assert.That(result.Message, Does.Contain("GEMINI_API_KEY"));
+            Assert.That(result.Message, Does.Contain("unavailable"));
             Assert.That(result.Metrics.EarnedCredits, Is.EqualTo(12));
             Assert.That(result.Metrics.CreditsRemaining, Is.EqualTo(132));
+        }
+
+        private sealed class UnavailableGateway : IAiGatewayClient
+        {
+            public Task<AiEmbeddingResponse> EmbedAsync(IReadOnlyList<string> texts, bool isQuery, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task<AiGatewayStatus> GetStatusAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task<AiGenerationResponse> GenerateAsync(string prompt, string context, CancellationToken cancellationToken = default) =>
+                Task.FromException<AiGenerationResponse>(new HttpRequestException("Gateway unavailable"));
         }
 
         [Test]

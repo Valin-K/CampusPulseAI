@@ -3,6 +3,7 @@
     <Project Path="ai-services/mcp-server/McpServer/McpServer.csproj" Id="4751f458-f0fa-4f3d-8e53-aae8d8fb249d" />
     <Project Path="ai-services/multi-agent-server/MultiAgentServer/MultiAgentServer.csproj" Id="3db1fd65-d870-413c-9343-850bbdbdac96" />
     <Project Path="ai-services/rag-server/RagServer/RagServer.csproj" Id="9255b6b6-ec32-43df-b3be-e16b83c11585" />
+    <Project Path="ai-services/rag-server/RagServer.Tests/RagServer.Tests.csproj" />
   </Folder>
   <Folder Name="/Shared/" />
   <Folder Name="/Shared/configuration/">
@@ -23,6 +24,9 @@
     <File Path="shared/frontend/js/common.js" />
   </Folder>
   <Folder Name="/Shared/backend/">
+    <Project Path="shared/backend/CampusPulse.Shared.Ai/CampusPulse.Shared.Ai.csproj" />
+    <Project Path="shared/backend/CampusPulse.Shared.Ai.Gateway/CampusPulse.Shared.Ai.Gateway.csproj" />
+    <Project Path="shared/backend/CampusPulse.Shared.Ai.Tests/CampusPulse.Shared.Ai.Tests.csproj" />
     <Project Path="shared/backend/CampusPulse.Shared.Mcp/CampusPulse.Shared.Mcp.csproj" />
     <Project Path="shared/backend/CampusPulse.Shared.Rag/CampusPulse.Shared.Rag.csproj" />
     <Project Path="shared/backend/CampusPulse.Shared.Rag.Tests/CampusPulse.Shared.Rag.Tests.csproj" />
