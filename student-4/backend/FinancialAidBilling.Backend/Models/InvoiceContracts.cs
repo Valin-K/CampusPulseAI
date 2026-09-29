@@ -75,7 +75,8 @@ public sealed record StudentProfile(
     int StudentId,
     string Name,
     string Major,
-    int YearLevel);
+    int YearLevel,
+    string AcademicStudentId);
 
 public sealed record AcademicStudentProfile(
     int UserId,
@@ -85,7 +86,11 @@ public sealed record AcademicStudentProfile(
     DateOnly? EnrollmentDate,
     string? Major);
 
-public sealed record ScholarshipRecommendationResponse(int StudentId, int MatchCount, string Recommendation);
+public sealed record ScholarshipRecommendationResponse(
+    int StudentId, int MatchCount, string Recommendation, ScholarshipAcademicContext AcademicContext);
+
+public sealed record ScholarshipAcademicContext(
+    string StudentId, decimal? Gpa, int GpaScale, string GpaEligibility, string Tool, DateTimeOffset ExecutedAtUtc);
 
 public static class HttpResponseMessageExtensions
 {

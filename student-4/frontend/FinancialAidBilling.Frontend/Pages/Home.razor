@@ -90,11 +90,20 @@
 else if (activeTab == "scholarships")
 {
     <section class="ai-card">
-        <div><span class="eyebrow">Gemini-powered guidance</span><h2>Find scholarships for @UserContext.CurrentUser!.FirstName</h2><p>Uses this student's Academic Records profile and only the scholarships stored in this service.</p></div>
+        <div><span class="eyebrow">MCP + Gemini guidance</span><h2>Find scholarships for @UserContext.CurrentUser!.FirstName</h2><p>Calls MCP for your academic statistics and matches open, unexpired scholarships by major and year. GPA eligibility requires aid-office review because the GPA scales differ.</p></div>
         <button class="button button-accent" @onclick="GetRecommendationsAsync" disabled="@isRecommending">@(isRecommending ? "Matching…" : "Find my matches")</button>
         @if (!string.IsNullOrWhiteSpace(aiRecommendation))
         {
-            <div id="ai-recommendation" class="ai-response" tabindex="-1"><strong>@recommendationMatchCount database matches</strong><p>@aiRecommendation</p></div>
+            <div id="ai-recommendation" class="ai-response" tabindex="-1">
+                <strong>@recommendationMatchCount potential database matches</strong>
+                @if (recommendationAcademicContext is not null)
+                {
+                    <p>MCP academic GPA: @(recommendationAcademicContext.Gpa?.ToString("F2") ?? "Unavailable") / @recommendationAcademicContext.GpaScale</p>
+                    <p>@recommendationAcademicContext.GpaEligibility</p>
+                    <small>Tool: @recommendationAcademicContext.Tool · Student: @recommendationAcademicContext.StudentId · @recommendationAcademicContext.ExecutedAtUtc.ToLocalTime().ToString("g")</small>
+                }
+                <p>@aiRecommendation</p>
+            </div>
         }
     </section>
 
@@ -102,7 +111,7 @@ else if (activeTab == "scholarships")
         <div>
             <span class="eyebrow">Shared AI services</span>
             <h2>Scholarship knowledge assistant</h2>
-            <p>Searches this service's scholarship catalogue through the shared RAG server. You can also verify this feature's shared MCP integration.</p>
+            <p>Retrieves scholarship catalogue passages through the shared RAG server and uses them to generate a source-grounded answer. Scholarship matching above uses MCP academic statistics; the registration check below is diagnostic only.</p>
         </div>
         <div class="form-stack">
             <label class="field">
@@ -110,25 +119,25 @@ else if (activeTab == "scholarships")
                 <input @bind="ragQuestion" maxlength="1000" placeholder="Which scholarships are open to computing students?" />
             </label>
             <div class="button-row">
-                <button class="button button-accent" @onclick="AskScholarshipAssistantAsync" disabled="@isAskingRag">@(isAskingRag ? "Searching…" : "Ask the knowledge assistant")</button>
-                <button class="button button-secondary" @onclick="CheckMcpIntegrationAsync" disabled="@isCheckingMcp">@(isCheckingMcp ? "Checking…" : "Verify MCP integration")</button>
+                <button class="button button-accent" @onclick="AskScholarshipAssistantAsync" disabled="@(isAskingRag || string.IsNullOrWhiteSpace(ragQuestion))">@(isAskingRag ? "Searching…" : "Ask the knowledge assistant")</button>
+                <button class="button button-secondary" @onclick="CheckMcpIntegrationAsync" disabled="@isCheckingMcp">@(isCheckingMcp ? "Checking…" : "Check MCP registration")</button>
             </div>
         </div>
-        @if (mcpIntegration is not null)
+        @if (mcpIntegration is { IsError: false, Result.Valid: true })
         {
             <div class="ai-response" role="status"><strong>MCP interaction succeeded</strong><p>Student 4 is registered: @string.Join(", ", mcpIntegration.Result.Checks).</p></div>
         }
         @if (ragAnswer is not null)
         {
             <div class="ai-response" role="status">
-                <strong>RAG interaction succeeded · @ragAnswer.Status</strong>
+                <strong>@RagStatusLabel · @ragAnswer.Status</strong>
                 <p>@(ragAnswer.Answer ?? ragAnswer.Detail ?? "Relevant catalogue passages were retrieved.")</p>
                 @if (ragAnswer.Sources.Count > 0)
                 {
                     <ul class="detail-list">
                         @foreach (var source in ragAnswer.Sources)
                         {
-                            <li>@(source.Metadata?.GetValueOrDefault("scholarshipName") ?? source.DocumentId)</li>
+                            <li><strong>[@source.Rank] @(source.Metadata?.GetValueOrDefault("title") ?? source.Metadata?.GetValueOrDefault("scholarshipName") ?? source.DocumentId)</strong><p>@source.Text</p></li>
                         }
                     </ul>
                 }
@@ -215,6 +224,7 @@ else
     private string? successMessage;
     private string? aiRecommendation;
     private int recommendationMatchCount;
+    private ScholarshipAcademicContext? recommendationAcademicContext;
     private string ragQuestion = string.Empty;
     private McpIntegrationResponse? mcpIntegration;
     private RagAnswerResponse? ragAnswer;
@@ -223,6 +233,15 @@ else
     private bool isRecommending;
     private bool isCheckingMcp;
     private bool isAskingRag;
+
+    private string RagStatusLabel => ragAnswer?.Status switch
+    {
+        "answered" => "Source-grounded RAG answer",
+        "insufficient_context" => "Not enough scholarship evidence",
+        "generation_unavailable" => "Passages retrieved; answer generation unavailable",
+        "generation_failed" => "Passages retrieved; answer generation failed",
+        _ => "Unexpected RAG response"
+    };
 
     private decimal OutstandingBalance => invoices.Where(item => item.StudentId == StudentId && item.Status != InvoiceStatus.Paid).Sum(item => item.Amount);
     private int OutstandingCount => invoices.Count(item => item.StudentId == StudentId && item.Status != InvoiceStatus.Paid);
@@ -294,17 +313,21 @@ else
 
     private async Task GetRecommendationsAsync()
     {
-        isRecommending = true; errorMessage = null;
+        isRecommending = true; errorMessage = null; aiRecommendation = null; recommendationAcademicContext = null;
         try
         {
             using var response = await Http.PostAsync($"/api/scholarships/recommendations/student/{StudentId}", null);
             if (!response.IsSuccessStatusCode) { errorMessage = await response.Content.ReadAsStringAsync(); return; }
             var result = await response.Content.ReadFromJsonAsync<ScholarshipRecommendationResponse>();
-            aiRecommendation = result?.Recommendation;
-            recommendationMatchCount = result?.MatchCount ?? 0;
+            if (result?.AcademicContext is null) { errorMessage = "The recommendation service returned an invalid response."; return; }
+            aiRecommendation = result.Recommendation;
+            recommendationMatchCount = result.MatchCount;
+            recommendationAcademicContext = result.AcademicContext;
             await JS.InvokeVoidAsync("UniversityUI.reveal", "ai-recommendation");
         }
-        catch (HttpRequestException) { errorMessage = "Gemini is currently unavailable."; }
+        catch (HttpRequestException) { errorMessage = "Scholarship recommendations are unavailable. Check MCP, Academic Records, and the AI gateway."; }
+        catch (System.Text.Json.JsonException) { errorMessage = "The recommendation service returned an invalid response."; }
+        catch (TaskCanceledException) { errorMessage = "The scholarship recommendation request timed out."; }
         finally { isRecommending = false; }
     }
 
@@ -336,6 +359,8 @@ else
             if (ragAnswer is null) { errorMessage = "The RAG server returned an invalid response."; }
         }
         catch (HttpRequestException) { errorMessage = "The shared RAG server is currently unavailable."; }
+        catch (System.Text.Json.JsonException) { errorMessage = "The RAG server returned an invalid response."; }
+        catch (TaskCanceledException) { errorMessage = "The scholarship knowledge request timed out."; }
         finally { isAskingRag = false; }
     }
 
