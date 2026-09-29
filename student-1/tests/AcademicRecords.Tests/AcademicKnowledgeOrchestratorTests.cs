@@ -13,36 +13,35 @@ namespace AcademicRecords.Tests;
 public sealed class AcademicKnowledgeOrchestratorTests
 {
     [Test]
-    public async Task AskUsesDirectRouteWithoutCallingRagOrMcpToolsAndUsesGatewayModel()
+    public async Task AskLoadsOwnerScopedToolsAndUsesDynamicAcademicTool()
     {
         var gateway = new RecordingAiGateway(
-            PlanResponse("direct", null, []),
-            new AiGenerationResponse("A general academic explanation.", "shared-model"));
+            PlanResponse("mcp", null, [new { tool = "student_count", arguments = new { } }]),
+            new AiGenerationResponse("There are 12 student profiles.", "shared-model"));
         var mcp = new StubMcpClient();
         var rag = new StubAcademicRagService();
         var service = CreateService(gateway, mcp, rag);
 
         var answer = await service.AskAsync(
-            new KnowledgeQuestionRequest { Question = "What is a GPA?" },
+            new KnowledgeQuestionRequest { Question = "How many students are there?" },
             CancellationToken.None);
 
         Assert.Multiple(() =>
         {
-            Assert.That(answer.Reply, Is.EqualTo("A general academic explanation."));
-            Assert.That(answer.Embedder, Is.EqualTo("shared-model"));
-            Assert.That(rag.LastRequest, Is.Null);
-            Assert.That(mcp.CalledTools, Is.Empty);
-            Assert.That(gateway.Calls, Has.Count.EqualTo(2));
-            Assert.That(gateway.Calls[0].Context, Does.Contain("What is a GPA?"));
-            Assert.That(gateway.Calls[0].Context, Does.Contain("[]"));
+            Assert.That(gateway.Calls[0].Context, Does.Contain("student_count"));
+            Assert.That(gateway.Calls[0].Context, Does.Contain("students_by_subject"));
             Assert.That(gateway.Calls[0].Context, Does.Not.Contain("get_student_enrollments"));
-            Assert.That(gateway.Calls[1].Prompt, Does.Contain("Use only the supplied RAG and MCP results"));
-            Assert.That(gateway.Calls[1].Context, Does.Contain("What is a GPA?"));
+            Assert.That(gateway.Calls[0].Context, Does.Not.Contain("project_files"));
+            Assert.That(gateway.Calls[0].Context, Does.Not.Contain("course.list_courses"));
+            Assert.That(mcp.CalledTools, Is.EqualTo(new[] { "student_count" }));
+            Assert.That(answer.Sources.Select(source => source.DocumentId), Does.Contain("mcp:student_count"));
+            Assert.That(answer.Reply, Is.EqualTo("There are 12 student profiles."));
+            Assert.That(rag.LastRequest, Is.Null);
         });
     }
 
     [Test]
-    public async Task AskCombinesRagAndMcpAndBindsStudentIdsFromTrustedInputs()
+    public async Task AskCombinesRagAndMcpAndBindsIdentityArgumentsFromToolSchemas()
     {
         var gateway = new RecordingAiGateway(
             PlanResponse(
@@ -50,7 +49,8 @@ public sealed class AcademicKnowledgeOrchestratorTests
                 "What does my progression policy say?",
                 [
                     new { tool = "get_student_enrollments", arguments = new { user_id = 999 } },
-                    new { tool = "calculate_student_academic_statistics", arguments = new { student_id = "STU999" } }
+                    new { tool = "calculate_student_academic_statistics", arguments = new { student_id = "STU999" } },
+                    new { tool = "student_count", arguments = new { } }
                 ]),
             new AiGenerationResponse("Your academic statistics are available.", "shared-model"));
         var mcp = new StubMcpClient();
@@ -65,7 +65,7 @@ public sealed class AcademicKnowledgeOrchestratorTests
         {
             Assert.That(mcp.CalledTools, Is.EqualTo(new[]
             {
-                "get_student_enrollments", "calculate_student_academic_statistics"
+                "get_student_enrollments", "calculate_student_academic_statistics", "student_count"
             }));
             Assert.That(mcp.Calls[0].Arguments["user_id"].GetInt32(), Is.EqualTo(42));
             Assert.That(mcp.Calls[1].Arguments["student_id"].GetString(), Is.EqualTo("STU042"));
@@ -73,14 +73,15 @@ public sealed class AcademicKnowledgeOrchestratorTests
             Assert.That(answer.Reply, Is.EqualTo("Your academic statistics are available."));
             Assert.That(answer.Sources.Select(source => source.DocumentId), Does.Contain("mcp:get_student_enrollments"));
             Assert.That(answer.Sources.Select(source => source.DocumentId), Does.Contain("mcp:calculate_student_academic_statistics"));
+            Assert.That(answer.Sources.Select(source => source.DocumentId), Does.Contain("mcp:student_count"));
             Assert.That(answer.Sources.Select(source => source.DocumentId), Does.Contain("policy-graduation"));
             Assert.That(answer.Embedder, Is.EqualTo("test-embedder"));
-            Assert.That(gateway.Calls[1].Context, Does.Contain("get_student_enrollments"));
+            Assert.That(gateway.Calls[1].Context, Does.Contain("calculate_student_academic_statistics"));
         });
     }
 
     [Test]
-    public void AskRejectsToolsOutsideTheAcademicAllowlist()
+    public void AskRejectsToolsOutsideTheFetchedAcademicOwnerCatalogue()
     {
         var gateway = new RecordingAiGateway(
             PlanResponse("mcp", null, [new { tool = "project_files", arguments = new { } }]));
@@ -88,7 +89,7 @@ public sealed class AcademicKnowledgeOrchestratorTests
         var service = CreateService(gateway, mcp, new StubAcademicRagService());
 
         var exception = Assert.ThrowsAsync<HttpRequestException>(() => service.AskAsync(
-            new KnowledgeQuestionRequest { Question = "List repository files.", UserId = 42 },
+            new KnowledgeQuestionRequest { Question = "List repository files." },
             CancellationToken.None));
 
         Assert.Multiple(() =>
@@ -99,7 +100,7 @@ public sealed class AcademicKnowledgeOrchestratorTests
     }
 
     [Test]
-    public void AskRejectsStudentToolsWithoutRequestUserId()
+    public void AskRejectsIdentityToolsWithoutRequestUserId()
     {
         var gateway = new RecordingAiGateway(
             PlanResponse("mcp", null, [new { tool = "get_student_enrollments", arguments = new { } }]));
@@ -108,6 +109,29 @@ public sealed class AcademicKnowledgeOrchestratorTests
 
         var exception = Assert.ThrowsAsync<HttpRequestException>(() => service.AskAsync(
             new KnowledgeQuestionRequest { Question = "What courses am I taking?" },
+            CancellationToken.None));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exception!.StatusCode, Is.EqualTo(HttpStatusCode.BadGateway));
+            Assert.That(mcp.CalledTools, Is.Empty);
+        });
+    }
+
+    [Test]
+    public void AskRequiresAnEarlierIdentityLookupForStudentIdTools()
+    {
+        var gateway = new RecordingAiGateway(
+            PlanResponse("mcp", null,
+            [
+                new { tool = "calculate_student_academic_statistics", arguments = new { student_id = "STU999" } },
+                new { tool = "get_student_enrollments", arguments = new { user_id = 42 } }
+            ]));
+        var mcp = new StubMcpClient();
+        var service = CreateService(gateway, mcp, new StubAcademicRagService());
+
+        var exception = Assert.ThrowsAsync<HttpRequestException>(() => service.AskAsync(
+            new KnowledgeQuestionRequest { Question = "What is my GPA?", UserId = 42 },
             CancellationToken.None));
 
         Assert.Multiple(() =>
@@ -171,9 +195,18 @@ public sealed class AcademicKnowledgeOrchestratorTests
         public Task<IReadOnlyList<McpToolDefinition>> GetToolsAsync(CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<McpToolDefinition>>(
             [
-                new("get_student_enrollments", "Get a student's enrollments.", new Dictionary<string, string>()),
-                new("calculate_student_academic_statistics", "Get WAM and GPA.", new Dictionary<string, string>()),
-                new("project_files", "List repository files.", new Dictionary<string, string>())
+                new("get_student_enrollments", "Return a student's enrollments.",
+                    new Dictionary<string, string> { ["user_id"] = "Required numeric user ID." }, "Academic Records"),
+                new("calculate_student_academic_statistics", "Return WAM and GPA.",
+                    new Dictionary<string, string> { ["student_id"] = "Required student identifier." }, "Academic Records"),
+                new("student_count", "Return the number of student profiles.",
+                    new Dictionary<string, string>(), "Academic Records"),
+                new("students_by_subject", "Return student count for a subject.",
+                    new Dictionary<string, string> { ["subject_code"] = "Required subject code." }, "Academic Records"),
+                new("project_files", "List repository files.",
+                    new Dictionary<string, string>(), "Repository"),
+                new("course.list_courses", "List available courses.",
+                    new Dictionary<string, string>(), "Course Management")
             ]);
 
         public Task<McpToolCallResponse> CallAsync(
@@ -183,9 +216,15 @@ public sealed class AcademicKnowledgeOrchestratorTests
         {
             CalledTools.Add(tool);
             Calls.Add((tool, arguments));
-            var result = tool == "get_student_enrollments"
-                ? JsonSerializer.SerializeToElement(new { studentId = "STU042", enrollments = Array.Empty<object>() })
-                : JsonSerializer.SerializeToElement(new { weightedAverageMark = 82.0, gradePointAverage = 6.0 });
+            var result = tool switch
+            {
+                "get_student_enrollments" => JsonSerializer.SerializeToElement(
+                    new { studentId = "STU042", enrollments = Array.Empty<object>() }),
+                "calculate_student_academic_statistics" => JsonSerializer.SerializeToElement(
+                    new { weightedAverageMark = 82.0, gradePointAverage = 6.0 }),
+                "student_count" => JsonSerializer.SerializeToElement(new { student_count = 12 }),
+                _ => JsonSerializer.SerializeToElement(new { })
+            };
             return Task.FromResult(new McpToolCallResponse(tool, false, result, DateTimeOffset.UtcNow));
         }
     }
