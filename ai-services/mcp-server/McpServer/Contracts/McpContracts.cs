@@ -10,11 +10,6 @@ public sealed record McpToolResult(
     object Result,
     DateTimeOffset ExecutedAtUtc);
 
-public sealed record McpToolDefinition(
-    string Name,
-    string Description,
-    Dictionary<string, string> InputSchema);
-
 public sealed record McpToolExecution(
     bool IsError,
     object Result);

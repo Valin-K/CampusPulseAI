@@ -1,4 +1,6 @@
-namespace AcademicRecords.Backend;
+using AcademicRecords.Backend.Contracts;
+
+namespace AcademicRecords.Backend.Calculators;
 
 public static class CreditPointsCalculator
 {

@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using AcademicRecords.Backend.Contracts;
 using AcademicRecords.Backend.Models;
 using AcademicRecords.Backend.Services;
 using CampusPulse.Shared.Rag.Assistant;

@@ -289,6 +289,7 @@ public sealed class LocalCourseAiOrchestratorTests
                 "answered",
                 "Assignment 1 is due at the end of Week 5 [1].",
                 0.8,
+                RagConfidenceCategory.High,
                 [
                     new RagKnowledgeSource(
                         1,
