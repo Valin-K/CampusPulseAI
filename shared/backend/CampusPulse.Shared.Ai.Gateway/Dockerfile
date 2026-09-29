@@ -1,4 +1,5 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 COPY ["Directory.Packages.props", "."]
 COPY ["shared/backend/CampusPulse.Shared.Ai/CampusPulse.Shared.Ai.csproj", "shared/backend/CampusPulse.Shared.Ai/"]
@@ -6,7 +7,7 @@ COPY ["shared/backend/CampusPulse.Shared.Ai.Gateway/CampusPulse.Shared.Ai.Gatewa
 RUN dotnet restore "shared/backend/CampusPulse.Shared.Ai.Gateway/CampusPulse.Shared.Ai.Gateway.csproj"
 COPY shared/backend/CampusPulse.Shared.Ai shared/backend/CampusPulse.Shared.Ai
 COPY shared/backend/CampusPulse.Shared.Ai.Gateway shared/backend/CampusPulse.Shared.Ai.Gateway
-RUN dotnet publish "shared/backend/CampusPulse.Shared.Ai.Gateway/CampusPulse.Shared.Ai.Gateway.csproj" -c Release --no-restore -o /app/publish /p:UseAppHost=false
+RUN dotnet publish "shared/backend/CampusPulse.Shared.Ai.Gateway/CampusPulse.Shared.Ai.Gateway.csproj" -c $BUILD_CONFIGURATION --no-restore -o /app/publish /p:UseAppHost=false
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 USER $APP_UID
