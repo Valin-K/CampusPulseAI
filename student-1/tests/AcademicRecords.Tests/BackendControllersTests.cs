@@ -5,6 +5,7 @@ using AcademicRecords.Backend.Contracts;
 using AcademicRecords.Backend.Controllers;
 using AcademicRecords.Backend.Models;
 using AcademicRecords.Backend.Services;
+using CampusPulse.Shared.Mcp.Client;
 using CampusPulse.Shared.Rag.Assistant;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -203,6 +204,9 @@ public sealed class BackendControllersTests
     }
 
     [TestCase("invalid-operation", 503)]
+    [TestCase("gemini-configuration", 503)]
+    [TestCase("gemini-response", 502)]
+    [TestCase("mcp", 503)]
     [TestCase("http-request", 503)]
     [TestCase("timeout", 504)]
     public async Task AskMapsKnowledgeServiceFailuresToGatewayResponses(string failure, int expectedStatus)
@@ -211,6 +215,9 @@ public sealed class BackendControllersTests
         var knowledge = new StubAcademicKnowledgeService((_, _) => failure switch
         {
             "invalid-operation" => Task.FromException<RagAssistantAnswer>(new InvalidOperationException("RAG is not configured.")),
+            "gemini-configuration" => Task.FromException<RagAssistantAnswer>(new AcademicGeminiConfigurationException("Gemini is not configured.")),
+            "gemini-response" => Task.FromException<RagAssistantAnswer>(new AcademicGeminiResponseException("Gemini returned an invalid response.")),
+            "mcp" => Task.FromException<RagAssistantAnswer>(new McpResponseException("MCP is unavailable.")),
             "http-request" => Task.FromException<RagAssistantAnswer>(new HttpRequestException("RAG unavailable.")),
             "timeout" => Task.FromException<RagAssistantAnswer>(new TaskCanceledException()),
             _ => throw new ArgumentOutOfRangeException(nameof(failure))

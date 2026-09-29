@@ -1,5 +1,6 @@
 using AcademicRecords.Backend.Models;
 using AcademicRecords.Backend.Services;
+using CampusPulse.Shared.Mcp.Client;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AcademicRecords.Backend.Controllers;
@@ -50,10 +51,22 @@ public sealed class AiController(
         {
             return Problem(exception.Message, statusCode: StatusCodes.Status503ServiceUnavailable);
         }
+        catch (AcademicGeminiConfigurationException exception)
+        {
+            return Problem(exception.Message, statusCode: StatusCodes.Status503ServiceUnavailable);
+        }
+        catch (AcademicGeminiResponseException exception)
+        {
+            return Problem(exception.Message, statusCode: StatusCodes.Status502BadGateway);
+        }
+        catch (McpResponseException exception)
+        {
+            return Problem(exception.Message, statusCode: StatusCodes.Status503ServiceUnavailable);
+        }
         catch (HttpRequestException)
         {
             return Problem(
-                "The shared RAG server is unavailable. Start it on the host at http://localhost:5267 before using this feature.",
+                "A required AI service is unavailable.",
                 statusCode: StatusCodes.Status503ServiceUnavailable);
         }
         catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
