@@ -1,6 +1,8 @@
 using System.Globalization;
 using System.Net.Http.Json;
+using System.Text.Json;
 using CampusHousing.Backend.Models;
+using CampusPulse.Shared.Mcp.Client;
 using CampusPulse.Shared.Rag.Assistant;
 using CampusPulse.Shared.Rag.Contracts;
 using CampusPulse.Shared.Rag.Generation;
@@ -9,6 +11,7 @@ namespace CampusHousing.Backend.Services;
 
 public sealed class HousingKnowledgeService(
     IHttpClientFactory clients,
+    IMcpClient mcp,
     RagKnowledgeService knowledge,
     ILogger<HousingKnowledgeService> logger) : IHousingKnowledgeService
 {
@@ -18,11 +21,38 @@ public sealed class HousingKnowledgeService(
         KnowledgeQuestionRequest request, CancellationToken cancellationToken)
     {
         var corpus = await BuildCorpusAsync(cancellationToken);
+        var mcpContext = await BuildMcpContextAsync(cancellationToken);
 
         // AGENT-MIGRATION: handing the corpus to the shared RAG assistant (ask + citation parsing)
         // moves into the multi-agent server; building this feature's corpus stays here because this
         // feature owns its data.
-        return await knowledge.AskAsync(Feature, request.Question, corpus, cancellationToken);
+        return await knowledge.AskAsync(
+            Feature,
+            request.Question,
+            corpus,
+            cancellationToken,
+            mcpContext);
+    }
+
+    private async Task<string?> BuildMcpContextAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await mcp.CallAsync(
+                "validate_integration",
+                new Dictionary<string, JsonElement>
+                {
+                    ["feature"] = JsonSerializer.SerializeToElement("student-3"),
+                },
+                cancellationToken);
+
+            return $"Shared MCP integration context for Campus Housing: {result.Result}";
+        }
+        catch (McpResponseException exception)
+        {
+            logger.LogWarning(exception, "Could not load shared MCP context for the housing assistant.");
+            return null;
+        }
     }
 
     private async Task<IReadOnlyList<RagDocument>> BuildCorpusAsync(CancellationToken cancellationToken)

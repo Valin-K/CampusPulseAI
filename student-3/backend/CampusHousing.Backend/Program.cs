@@ -1,4 +1,5 @@
 using CampusPulse.Shared.Ai;
+using CampusPulse.Shared.Mcp.Client;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -10,6 +11,11 @@ var academicRecordsUrl = builder.Configuration["Services:AcademicRecordsDatabase
 builder.Services.AddHttpClient("AcademicRecordsDatabase", client => client.BaseAddress = new Uri(academicRecordsUrl.TrimEnd('/') + "/"));
 builder.Services.AddAiGateway(builder.Configuration);
 builder.Services.AddTransient<CampusHousing.Backend.Services.MaintenanceClassifier>();
+builder.Services.AddHttpClient<IMcpClient, McpClient>(client =>
+{
+    client.BaseAddress = new Uri(builder.Configuration["Services:McpServer"] ?? "http://localhost:5268");
+    client.Timeout = TimeSpan.FromSeconds(30);
+});
 builder.Services.AddHttpClient<CampusPulse.Shared.Rag.Client.IRagServerClient, CampusPulse.Shared.Rag.Client.RagServerClient>(client =>
 {
     client.BaseAddress = new Uri(builder.Configuration["Services:RagServer"] ?? "http://localhost:5267");
