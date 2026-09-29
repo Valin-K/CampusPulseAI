@@ -26,15 +26,28 @@ public sealed class HousingKnowledgeService(
         // AGENT-MIGRATION: handing the corpus to the shared RAG assistant (ask + citation parsing)
         // moves into the multi-agent server; building this feature's corpus stays here because this
         // feature owns its data.
-        return await knowledge.AskAsync(
+        var answer = await knowledge.AskAsync(
             Feature,
             request.Question,
             corpus,
             cancellationToken,
-            mcpContext);
+            mcpContext?.Context);
+        if (mcpContext is null)
+        {
+            return answer;
+        }
+
+        var sources = answer.Sources.ToList();
+        sources.Add(new RagKnowledgeSource(
+            sources.Count + 1,
+            mcpContext.SourceLabel,
+            "mcp:validate_integration",
+            1));
+
+        return answer with { Sources = sources };
     }
 
-    private async Task<string?> BuildMcpContextAsync(CancellationToken cancellationToken)
+    private async Task<McpContext?> BuildMcpContextAsync(CancellationToken cancellationToken)
     {
         try
         {
@@ -46,14 +59,23 @@ public sealed class HousingKnowledgeService(
                 },
                 cancellationToken);
 
-            return $"Shared MCP integration context for Campus Housing: {result.Result}";
+            return new McpContext(
+                $"Shared MCP integration context for Campus Housing: {result.Result}",
+                "Shared MCP integration validation");
         }
         catch (McpResponseException exception)
         {
             logger.LogWarning(exception, "Could not load shared MCP context for the housing assistant.");
             return null;
         }
+        catch (TaskCanceledException exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            logger.LogWarning(exception, "Timed out loading shared MCP context for the housing assistant.");
+            return null;
+        }
     }
+
+    private sealed record McpContext(string Context, string SourceLabel);
 
     private async Task<IReadOnlyList<RagDocument>> BuildCorpusAsync(CancellationToken cancellationToken)
     {
