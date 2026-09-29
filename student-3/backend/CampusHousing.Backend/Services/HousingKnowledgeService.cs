@@ -1,5 +1,7 @@
 using System.Globalization;
 using System.Net.Http.Json;
+using System.Text.Json;
+using CampusPulse.Shared.Mcp.Client;
 using CampusHousing.Backend.Models;
 using CampusPulse.Shared.Rag.Assistant;
 using CampusPulse.Shared.Rag.Contracts;
@@ -9,6 +11,7 @@ namespace CampusHousing.Backend.Services;
 
 public sealed class HousingKnowledgeService(
     IHttpClientFactory clients,
+    IMcpClient mcp,
     RagKnowledgeService knowledge,
     ILogger<HousingKnowledgeService> logger) : IHousingKnowledgeService
 {
@@ -17,12 +20,60 @@ public sealed class HousingKnowledgeService(
     public async Task<RagAssistantAnswer> AskAsync(
         KnowledgeQuestionRequest request, CancellationToken cancellationToken)
     {
+        var mcpContext = await GetMcpContextAsync(cancellationToken);
         var corpus = await BuildCorpusAsync(cancellationToken);
 
-        // AGENT-MIGRATION: handing the corpus to the shared RAG assistant (ask + citation parsing)
-        // moves into the multi-agent server; building this feature's corpus stays here because this
-        // feature owns its data.
-        return await knowledge.AskAsync(Feature, request.Question, corpus, cancellationToken);
+        var answer = await knowledge.AskAsync(
+            Feature, request.Question, corpus, cancellationToken, mcpContext?.Context);
+        if (mcpContext is null)
+        {
+            return answer;
+        }
+
+        var sources = answer.Sources.ToList();
+        foreach (var source in mcpContext.Sources)
+        {
+            sources.Add(new RagKnowledgeSource(
+                sources.Count + 1,
+                source.Name,
+                $"mcp:{source.ToolName}",
+                1));
+        }
+
+        return answer with { Sources = sources };
+    }
+
+    private async Task<McpContext?> GetMcpContextAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await mcp.CallAsync(
+                "validate_integration",
+                new Dictionary<string, JsonElement>
+                {
+                    ["feature"] = JsonSerializer.SerializeToElement("student-3")
+                },
+                cancellationToken);
+
+            if (result.IsError || result.Result.ValueKind != JsonValueKind.Object)
+            {
+                return null;
+            }
+
+            return new McpContext(
+                JsonSerializer.Serialize(new { feature = "student-3", capability = result.Result }),
+                [new McpContextSource("validate_integration", "MCP integration validation")]);
+        }
+        catch (McpResponseException exception)
+        {
+            logger.LogWarning(exception, "Could not call the shared MCP server; continuing without MCP context.");
+            return null;
+        }
+        catch (TaskCanceledException exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            logger.LogWarning(exception, "The shared MCP server timed out; continuing without MCP context.");
+            return null;
+        }
     }
 
     private async Task<IReadOnlyList<RagDocument>> BuildCorpusAsync(CancellationToken cancellationToken)
@@ -79,4 +130,7 @@ public sealed class HousingKnowledgeService(
             + "either available for allocation or already fully allocated.",
             new Dictionary<string, string> { ["title"] = "Dorm rooms" }),
     ];
+
+    private sealed record McpContext(string Context, IReadOnlyList<McpContextSource> Sources);
+    private sealed record McpContextSource(string ToolName, string Name);
 }

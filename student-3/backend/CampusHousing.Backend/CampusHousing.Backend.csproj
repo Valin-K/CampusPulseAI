@@ -17,6 +17,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\..\shared\backend\CampusPulse.Shared.Mcp\CampusPulse.Shared.Mcp.csproj" />
     <ProjectReference Include="..\..\..\shared\backend\CampusPulse.Shared.Rag\CampusPulse.Shared.Rag.csproj" />
   </ItemGroup>
 

@@ -1,3 +1,5 @@
+using CampusPulse.Shared.Mcp.Client;
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
@@ -16,6 +18,11 @@ builder.Services.AddHttpClient("gemini", client =>
     {
         client.DefaultRequestHeaders.Add("x-goog-api-key", geminiApiKey);
     }
+});
+builder.Services.AddHttpClient<IMcpClient, McpClient>(client =>
+{
+    client.BaseAddress = new Uri(builder.Configuration["Services:McpServer"] ?? "http://localhost:5268");
+    client.Timeout = TimeSpan.FromSeconds(30);
 });
 builder.Services.AddTransient<CampusHousing.Backend.Services.MaintenanceClassifier>();
 builder.Services.AddHttpClient<CampusPulse.Shared.Rag.Client.IRagServerClient, CampusPulse.Shared.Rag.Client.RagServerClient>(client =>

@@ -62,7 +62,7 @@
     </ChildContent>
 </CampusShell>
 
-<CampusAiChat />
+<CampusAiChat StudentUserId="@(UserContext.CurrentUser?.UserId)" />
 
 @code {
     string? selectionErrorMessage;
