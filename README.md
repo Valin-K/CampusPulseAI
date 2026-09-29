@@ -76,7 +76,7 @@ When the solution is first opened, allow Visual Studio to restore NuGet packages
 5. In the Visual Studio debug target selector, choose **Docker Compose**.
 6. Press **F5** to build the images, start the services, attach the debugger, and launch the configured browser target. Use **Ctrl+F5** to run without the debugger.
 
-The Compose configuration starts the backend APIs, MCP server, multi-agent server, RAG server, and all frontend containers. The frontend URLs are:
+The Compose configuration starts the databases, backend APIs, shared AI gateway, and frontend containers. Visual Studio starts MCP and RAG on the host through `scripts\launch-local-ai-services.ps1`; multi-agent routing is not part of this gateway. The frontend URLs are:
 
 | Application | URL |
 | --- | --- |
@@ -138,6 +138,37 @@ docker compose up
 ```
 
 The Docker build context must be the repository root because the Dockerfiles copy `Directory.Packages.props` and project files from the root-level directory structure.
+
+## Shared Gemini gateway
+
+Set `GEMINI_API_KEY` in the repository-root `.env` (never commit it). Compose injects it
+**only into `ai.gateway`**, not into any student backend or the RAG server.
+
+- `shared\backend\CampusPulse.Shared.Ai` is the reusable client and contracts project.
+- `shared\backend\CampusPulse.Shared.Ai.Gateway` is the separately hosted gateway.
+- All five student backends call `IAiGatewayClient.GenerateAsync(prompt, context, cancellationToken)`.
+  They retain their own prompts, data access, validation, and business logic.
+- RAG uses the same gateway for generation and embeddings. Retrieval and citations remain in RAG.
+- This is a Gemini transport gateway, **not** a multi-agent server, router, or tool executor.
+
+Start the gateway with `docker compose up --build -d ai.gateway`. For terminal-based
+development, also run `.\scripts\launch-local-ai-services.ps1` for MCP and RAG.
+Host services connect to `http://localhost:5269`; Compose backends use `http://ai.gateway:8080`.
+Override `Services__AiGateway` when using another address. Only the gateway configures
+`Gemini__GenerationModel`, `Gemini__EmbeddingModel`, and `Gemini__EmbeddingDimensions`.
+
+The HTTP API is `POST /api/ai/generate` with `{ "prompt": "...", "context": "..." }`,
+returning `{ "text": "...", "model": "..." }`; `POST /api/ai/embeddings` accepts
+`{ "texts": ["..."], "isQuery": false }`. `GET /api/ai/status` reports model
+configuration and availability without exposing the key. Generation/embedding errors
+are explicit; a missing key returns 503. RAG retains local hashed retrieval when the
+gateway explicitly reports no key. Restart RAG and re-ingest after changing embedding
+configuration.
+
+The gateway has no public authentication layer: it is for the trusted Compose network
+and its host port is bound to loopback only. Do not expose it publicly without
+service authentication and rate limiting. The separate Python developer agentic-loop
+tool below is not part of the application gateway migration.
 
 ## Run and test .NET projects locally
 

@@ -1,4 +1,15 @@
 services:
+  ai.gateway:
+    image: ${DOCKER_REGISTRY-}campuspulse-ai-gateway
+    build:
+      context: .
+      dockerfile: shared/backend/CampusPulse.Shared.Ai.Gateway/Dockerfile
+    environment:
+      ASPNETCORE_HTTP_PORTS: 8080
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+    ports:
+      - "127.0.0.1:5269:8080"
+
   academicrecords.database:
     image: ${DOCKER_REGISTRY-}academicrecords.database
     build:
@@ -27,12 +38,13 @@ services:
       Services__CourseManagementDatabase: http://coursemanagement.database:8080
       Services__McpServer: http://host.docker.internal:5268
       Services__RagServer: http://host.docker.internal:5267
-      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      Services__AiGateway: http://ai.gateway:8080
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
       - "5020:8080"
     depends_on:
+      - ai.gateway
       - academicrecords.database
 
   coursemanagement.backend:
@@ -45,10 +57,11 @@ services:
       - Services__CourseManagementDatabase=http://coursemanagement.database:8080
       - Services__McpServer=http://host.docker.internal:5268
       - Services__RagServer=http://host.docker.internal:5267
-      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - Services__AiGateway=http://ai.gateway:8080
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
+      - ai.gateway
       - academicrecords.database
       - coursemanagement.database
 
@@ -77,12 +90,14 @@ services:
       Services__AcademicRecordsDatabase: http://academicrecords.database:8080
       Services__McpServer: http://host.docker.internal:5268
       Services__RagServer: http://host.docker.internal:5267
-      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      Services__AiGateway: http://ai.gateway:8080
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
       - "5083:8080"
     depends_on:
+      ai.gateway:
+        condition: service_started
       campushousing.database:
         condition: service_healthy
       academicrecords.database:
@@ -118,12 +133,14 @@ services:
       Services__AcademicRecordsBackend: http://academicrecords.backend:8080
       Services__McpServer: http://host.docker.internal:5268
       Services__RagServer: http://host.docker.internal:5267
-      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      Services__AiGateway: http://ai.gateway:8080
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
       - "8089:8080"
     depends_on:
+      ai.gateway:
+        condition: service_started
       financialaidbilling.database:
         condition: service_started
       academicrecords.backend:
@@ -150,12 +167,14 @@ services:
       Services__AcademicRecordsDatabase: http://academicrecords.database:8080
       Services__McpServer: http://host.docker.internal:5268
       Services__RagServer: http://host.docker.internal:5267
-      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      Services__AiGateway: http://ai.gateway:8080
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
       - "8090:8080"
     depends_on:
+      ai.gateway:
+        condition: service_started
       eventscheduling.database:
         condition: service_started
       academicrecords.database:

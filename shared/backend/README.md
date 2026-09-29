@@ -1,4 +1,22 @@
-# CampusPulse.Shared.Rag — Shared RAG Classes & Per-Service Knowledge Assistants
+# Shared backend libraries and AI gateway
+
+## Shared Gemini access
+
+`CampusPulse.Shared.Ai` provides `IAiGatewayClient` and `AddAiGateway(configuration)`.
+Its generation method takes separate `prompt` and `context` strings plus a cancellation
+token, returning `Text` and `Model`. It also exposes embeddings and gateway status.
+Consumers need only `Services:AiGateway`, never a Gemini API key.
+
+`CampusPulse.Shared.Ai.Gateway` is a separate web project/container that owns the key,
+model configuration, Gemini HTTP calls, and response validation. All five feature
+backends and the RAG server use it. Compose passes `GEMINI_API_KEY` only to `ai.gateway`.
+This adds no agents, routing, tool execution, or domain logic.
+
+See the root README's **Shared Gemini gateway** section for startup and API details.
+`CampusPulse.Shared.Ai.Tests` covers the shared transport and provider behavior without
+network access or a real key.
+
+## CampusPulse.Shared.Rag — Shared RAG Classes & Per-Service Knowledge Assistants
 
 This folder holds the **shared backend library for Retrieval-Augmented Generation (RAG)**. It is the
 "generation-trust" layer that every feature backend uses to answer knowledge questions with
@@ -16,7 +34,8 @@ This folder holds the **shared backend library for Retrieval-Augmented Generatio
   into** each backend (and into the RAG server) via a `ProjectReference` — there is no "shared classes
   container".
 - **It is the trust layer around the model call**, not the retrieval engine. Embedding, vector search,
-  and generation are done by the **RAG server** (`ai-services/rag-server`), which already existed.
+  orchestration are done by the **RAG server** (`ai-services/rag-server`); Gemini generation
+  and embeddings are requested through the shared AI gateway.
 - **It grounds answers in shareable knowledge only** — policies + non-personal catalogue data. Personal
   records (transcripts, individual invoices, allocations) are **never** put in the shared vector store;
   each feature's existing direct-model path handles personal analysis.
@@ -104,14 +123,15 @@ The RAG (and MCP) servers run **on the host**, not in Compose. Backends reach th
 `http://host.docker.internal:5267`.
 
 ```powershell
-# 1. (optional) real answers need a key:  $env:GEMINI_API_KEY = "your-key"
+# 1. Set GEMINI_API_KEY in the root .env for real answers, then start the gateway:
+docker compose up --build -d ai.gateway
 # 2. start the host AI servers (MCP + RAG) and wait for health:
 pwsh -File scripts/launch-local-ai-services.ps1
 # 3. run a backend (host) or via `docker compose up --build <service>.backend`, then:
 curl.exe -s -X POST http://localhost:<port>/api/ai/knowledge -H "Content-Type: application/json" -d "{\"question\":\"How many credit points do I need to graduate?\"}"
 ```
 
-Without a `GEMINI_API_KEY` the RAG server runs **keyless**: it returns retrieved sources but
+When the gateway reports no `GEMINI_API_KEY`, the RAG server runs **keyless**: it returns retrieved sources but
 `status: generation_unavailable` (no generated answer). The shared library degrades cleanly, and if a
 feature's own database is unreachable the corpus falls back to **policy docs only** instead of failing.
 

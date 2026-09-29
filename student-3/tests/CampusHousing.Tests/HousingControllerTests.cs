@@ -5,7 +5,7 @@ using CampusHousing.Backend.Models;
 using CampusHousing.Backend.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Configuration;
+using CampusPulse.Shared.Ai;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace CampusHousing.Tests;
@@ -316,7 +316,7 @@ public sealed class HousingControllerTests
     {
         var controller = new HousingController(
             new TestHttpClientFactory(client),
-            new MaintenanceClassifier(new EmptyHttpClientFactory(), new ConfigurationBuilder().Build(), NullLogger<MaintenanceClassifier>.Instance));
+            new MaintenanceClassifier(new UnavailableGateway(), NullLogger<MaintenanceClassifier>.Instance));
         var context = new DefaultHttpContext();
         if (administrator) context.Request.Headers["X-Housing-Role"] = "Administrator";
         if (studentId is not null) context.Request.Headers["X-Housing-User"] = studentId;
@@ -329,9 +329,12 @@ public sealed class HousingControllerTests
         public HttpClient CreateClient(string name) => client;
     }
 
-    private sealed class EmptyHttpClientFactory : IHttpClientFactory
+    private sealed class UnavailableGateway : IAiGatewayClient
     {
-        public HttpClient CreateClient(string name) => throw new NotSupportedException();
+        public Task<AiEmbeddingResponse> EmbedAsync(IReadOnlyList<string> texts, bool isQuery, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<AiGatewayStatus> GetStatusAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<AiGenerationResponse> GenerateAsync(string prompt, string context, CancellationToken cancellationToken = default) =>
+            Task.FromException<AiGenerationResponse>(new HttpRequestException("Gateway unavailable"));
     }
 
     private sealed class RecordingHttpClient : HttpClient

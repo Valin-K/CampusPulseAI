@@ -1,4 +1,4 @@
-using CampusPulse.Shared.Mcp.Client;
+using CampusPulse.Shared.Ai;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -8,22 +8,7 @@ var databaseUrl = builder.Configuration["Services:CampusHousingDatabase"] ?? "ht
 builder.Services.AddHttpClient("CampusHousingDatabase", client => client.BaseAddress = new Uri(databaseUrl.TrimEnd('/') + "/"));
 var academicRecordsUrl = builder.Configuration["Services:AcademicRecordsDatabase"] ?? "http://localhost:5021";
 builder.Services.AddHttpClient("AcademicRecordsDatabase", client => client.BaseAddress = new Uri(academicRecordsUrl.TrimEnd('/') + "/"));
-builder.Services.AddHttpClient("gemini", client =>
-{
-    client.BaseAddress = new Uri("https://generativelanguage.googleapis.com/");
-    client.Timeout = TimeSpan.FromSeconds(90);
-
-    var geminiApiKey = builder.Configuration["GEMINI_API_KEY"];
-    if (!string.IsNullOrWhiteSpace(geminiApiKey))
-    {
-        client.DefaultRequestHeaders.Add("x-goog-api-key", geminiApiKey);
-    }
-});
-builder.Services.AddHttpClient<IMcpClient, McpClient>(client =>
-{
-    client.BaseAddress = new Uri(builder.Configuration["Services:McpServer"] ?? "http://localhost:5268");
-    client.Timeout = TimeSpan.FromSeconds(30);
-});
+builder.Services.AddAiGateway(builder.Configuration);
 builder.Services.AddTransient<CampusHousing.Backend.Services.MaintenanceClassifier>();
 builder.Services.AddHttpClient<CampusPulse.Shared.Rag.Client.IRagServerClient, CampusPulse.Shared.Rag.Client.RagServerClient>(client =>
 {
