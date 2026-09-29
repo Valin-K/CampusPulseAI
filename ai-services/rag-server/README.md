@@ -18,13 +18,36 @@ retrieved by questions asked against your collection. Nothing is shared between 
 ## Running it
 
 ```powershell
-# from the repository root, with GEMINI_API_KEY set in your environment or .env
-dotnet run --project ai-services/rag-server/RagServer/RagServer.csproj
+# from the repository root
+dotnet run --project ai-services\rag-server\RagServer\RagServer.csproj
 ```
 
-Start it before `docker compose up`. Without `GEMINI_API_KEY` the server still runs: it
-uses a local keyword-based embedding and returns retrieved context with
-`status: generation_unavailable` instead of a generated answer. That mode is what CI uses.
+Start it before `docker compose up`. RAG uses the shared AI gateway at
+`Services:AiGateway` (environment variable `Services__AiGateway`, default
+`http://localhost:5269`). All provider credentials and model configuration belong
+to the gateway, not this server. Compose starts the gateway; alternatively, run it
+in another terminal before ingesting or asking questions:
+
+```powershell
+dotnet run --project shared\backend\CampusPulse.Shared.Ai.Gateway\CampusPulse.Shared.Ai.Gateway.csproj --no-launch-profile --urls http://localhost:5269
+```
+
+If the gateway explicitly reports generation unavailable, RAG uses local
+keyword-based embeddings and returns retrieved context with
+`status: generation_unavailable` instead of a generated answer. CI uses this
+keyless mode. Gateway connection failures never enable fallback: embedding
+requests return `502`, and generation errors return `generation_failed`.
+
+The first successful gateway status response pins the embedding mode, model and
+dimensions for this RAG process. Failed initialization can be retried. Subsequent
+operations check the configuration again and validate returned embedding models
+and dimensions. Changing gateway configuration requires restarting RAG and
+re-ingesting documents; incompatible vectors are never silently mixed.
+
+`/health` remains available before the gateway starts. Until the first AI
+operation, its embedder is `uninitialized` and `generationAvailable` is `null`.
+After initialization these fields describe the pinned configuration, not gateway
+connectivity.
 
 Data is held in memory and is lost when the process stops. Seed your collection from your
 backend on startup or behind an admin endpoint.
@@ -94,8 +117,8 @@ Response:
 |---|---|---|
 | `answered` | Retrieved context passed the confidence threshold and Gemini produced a response | generated text with `[n]` citations into `sources` |
 | `insufficient_context` | No chunks matched, or the best match scored below `minimumConfidence` | fixed "not enough information" message |
-| `generation_unavailable` | No `GEMINI_API_KEY` on the server | `null`, `sources` still populated |
-| `generation_failed` | Gemini errored or returned nothing | `null`, see `detail` |
+| `generation_unavailable` | Gateway explicitly reports generation unavailable | `null`, `sources` still populated |
+| `generation_failed` | Gateway errored, changed configuration, or returned nothing | `null`, see `detail` |
 
 `confidence` is the cosine similarity of the best-matching chunk. `sources` are always
 returned so your backend can show citations or apply its own policy.

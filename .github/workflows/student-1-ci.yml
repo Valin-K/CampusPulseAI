@@ -37,6 +37,9 @@ jobs:
           filters: |
             student1:
               - 'student-1/**'
+              - 'shared/backend/CampusPulse.Shared.Ai*/**'
+              - 'docker-compose.yml'
+              - '.github/workflows/student-1-ci.yml'
 
       - name: Verify preinstalled .NET SDK
         if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.student1 == 'true'
@@ -98,8 +101,8 @@ jobs:
         shell: bash
         run: |
           docker compose -f docker-compose.yml -p student-1-ci config --quiet
-          docker compose -f docker-compose.yml -p student-1-ci build academicrecords.database academicrecords.backend academicrecords.frontend
-          docker compose -f docker-compose.yml -p student-1-ci up --detach --wait --no-build academicrecords.database academicrecords.backend academicrecords.frontend
+          docker compose -f docker-compose.yml -p student-1-ci build ai.gateway academicrecords.database academicrecords.backend academicrecords.frontend
+          docker compose -f docker-compose.yml -p student-1-ci up --detach --wait --no-build ai.gateway academicrecords.database academicrecords.backend academicrecords.frontend
 
       - name: Smoke test Student 1 endpoints
         if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.student1 == 'true'
@@ -108,6 +111,7 @@ jobs:
           set -euo pipefail
 
           endpoints=(
+            "http://localhost:5269/health"
             "http://localhost:5020/health"
             "http://localhost:5020/api/users"
             "http://localhost:5020/api/students"
@@ -155,7 +159,7 @@ jobs:
         shell: bash
         run: |
           docker compose -f docker-compose.yml -p student-1-ci ps
-          docker compose -f docker-compose.yml -p student-1-ci logs --no-color academicrecords.database academicrecords.backend academicrecords.frontend
+          docker compose -f docker-compose.yml -p student-1-ci logs --no-color ai.gateway academicrecords.database academicrecords.backend academicrecords.frontend
 
       - name: Remove Student 1 containers
         if: always() && (github.event_name == 'workflow_dispatch' || steps.filter.outputs.student1 == 'true')

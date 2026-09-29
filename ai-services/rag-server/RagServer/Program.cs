@@ -1,3 +1,4 @@
+using CampusPulse.Shared.Ai;
 using CampusPulse.Shared.Rag.Generation;
 using Microsoft.Extensions.Options;
 using RagServer.Models;
@@ -10,19 +11,10 @@ builder.Services.AddCors(options => options.AddDefaultPolicy(policy => policy
     .AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod()));
 builder.Services.Configure<RagOptions>(builder.Configuration.GetSection("Rag"));
 
-var geminiApiKey = builder.Configuration["GEMINI_API_KEY"] ?? builder.Configuration["Gemini:ApiKey"];
-builder.Services.AddHttpClient("gemini", client =>
-{
-    client.BaseAddress = new Uri("https://generativelanguage.googleapis.com/");
-    client.Timeout = TimeSpan.FromSeconds(90);
-    if (!string.IsNullOrWhiteSpace(geminiApiKey))
-    {
-        client.DefaultRequestHeaders.Add("x-goog-api-key", geminiApiKey);
-    }
-});
+builder.Services.AddAiGateway(builder.Configuration);
 builder.Services.AddSingleton<VectorStore>();
 builder.Services.AddSingleton<TextChunker>();
-builder.Services.AddSingleton<GeminiClient>();
+builder.Services.AddSingleton<RagAiClient>();
 builder.Services.AddSingleton<RagPromptBuilder>();
 
 var app = builder.Build();
@@ -33,12 +25,12 @@ if (app.Environment.IsDevelopment())
 
 app.UseCors();
 
-app.MapGet("/health", (VectorStore store, GeminiClient gemini, IOptions<RagOptions> options) => Results.Ok(new
+app.MapGet("/health", (VectorStore store, RagAiClient ai, IOptions<RagOptions> options) => Results.Ok(new
 {
     status = "healthy",
     service = "rag",
-    embedder = gemini.EmbedderName,
-    generationAvailable = gemini.HasApiKey,
+    embedder = ai.EmbedderName,
+    generationAvailable = ai.GenerationAvailable,
     collections = store.Summaries().Count,
     allowedCollections = options.Value.AllowedCollections
 }));
@@ -50,7 +42,7 @@ app.MapPost("/api/rag/{collection}/documents", async (
     IngestRequest request,
     VectorStore store,
     TextChunker chunker,
-    GeminiClient gemini,
+    RagAiClient ai,
     IOptions<RagOptions> options,
     CancellationToken cancellationToken) =>
 {
@@ -75,7 +67,7 @@ app.MapPost("/api/rag/{collection}/documents", async (
     List<float[]> vectors;
     try
     {
-        vectors = await gemini.EmbedAsync(pending.Select(item => item.text).ToList(), isQuery: false, cancellationToken);
+        vectors = await ai.EmbedAsync(pending.Select(item => item.text).ToList(), isQuery: false, cancellationToken);
     }
     catch (Exception exception) when (exception is HttpRequestException or InvalidOperationException or TaskCanceledException)
     {
@@ -89,7 +81,7 @@ app.MapPost("/api/rag/{collection}/documents", async (
             new StoredChunk(document.Id, entry.item.index, entry.item.text, document.Metadata, entry.vector)));
     }
 
-    return Results.Ok(new IngestResponse(collection, documents.Count, pending.Count, gemini.EmbedderName));
+    return Results.Ok(new IngestResponse(collection, documents.Count, pending.Count, ai.EmbedderName));
 });
 
 app.MapDelete("/api/rag/{collection}", (string collection, VectorStore store, IOptions<RagOptions> options) =>
@@ -101,7 +93,7 @@ app.MapPost("/api/rag/{collection}/answer", async (
     string collection,
     AnswerRequest request,
     VectorStore store,
-    GeminiClient gemini,
+    RagAiClient ai,
     RagPromptBuilder promptBuilder,
     IOptions<RagOptions> options,
     CancellationToken cancellationToken) =>
@@ -122,7 +114,7 @@ app.MapPost("/api/rag/{collection}/answer", async (
     float[] queryVector;
     try
     {
-        queryVector = (await gemini.EmbedAsync([request.Question], isQuery: true, cancellationToken))[0];
+        queryVector = (await ai.EmbedAsync([request.Question], isQuery: true, cancellationToken))[0];
     }
     catch (Exception exception) when (exception is HttpRequestException or InvalidOperationException or TaskCanceledException)
     {
@@ -136,7 +128,7 @@ app.MapPost("/api/rag/{collection}/answer", async (
     var confidence = sources.Count == 0 ? 0 : sources[0].Score;
 
     AnswerResponse Respond(string status, string? answer, string? detail = null) =>
-        new(collection, request.Question, status, answer, confidence, sources, gemini.EmbedderName, detail, DateTimeOffset.UtcNow);
+        new(collection, request.Question, status, answer, confidence, sources, ai.EmbedderName, detail, DateTimeOffset.UtcNow);
 
     if (sources.Count == 0 || confidence < threshold)
     {
@@ -151,9 +143,9 @@ app.MapPost("/api/rag/{collection}/answer", async (
         sources = [];
     }
 
-    if (!gemini.HasApiKey)
+    if (ai.GenerationAvailable == false)
     {
-        return Results.Ok(Respond("generation_unavailable", null, "GEMINI_API_KEY is not configured; returning retrieved context only."));
+        return Results.Ok(Respond("generation_unavailable", null, "The AI gateway reports generation unavailable; returning retrieved context only."));
     }
 
     try
@@ -162,19 +154,19 @@ app.MapPost("/api/rag/{collection}/answer", async (
             .Select(source => new SharedRagSource(
                 source.Rank, source.DocumentId, source.ChunkIndex, source.Score, source.Text, source.Metadata))
             .ToList();
-        var prompt = promptBuilder.Build(new RagPromptRequest
+        var prompt = promptBuilder.BuildParts(new RagPromptRequest
         {
             Question = request.Question,
             Sources = promptSources,
             Persona = request.Instructions,
             SupplementalContext = request.SupplementalContext,
         });
-        var answer = await gemini.GenerateAsync(prompt, cancellationToken);
+        var answer = await ai.GenerateAsync(prompt.Prompt, prompt.Context, cancellationToken);
         return Results.Ok(answer is null
-            ? Respond("generation_failed", null, "Gemini returned an empty response.")
+            ? Respond("generation_failed", null, "The AI gateway returned an empty response.")
             : Respond("answered", answer));
     }
-    catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException)
+    catch (Exception exception) when (exception is HttpRequestException or InvalidOperationException or TaskCanceledException)
     {
         return Results.Ok(Respond("generation_failed", null, exception.Message));
     }

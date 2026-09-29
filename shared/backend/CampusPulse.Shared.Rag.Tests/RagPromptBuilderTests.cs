@@ -30,6 +30,28 @@ public sealed class RagPromptBuilderTests
         };
 
     [Test]
+    public void BuildParts_SeparatesTrustedInstructionsFromContextAndPreservesCombinedPrompt()
+    {
+        var request = Request(
+            persona: "You are the Event assistant.",
+            supplementalContext: "{\"studentId\":\"STU042\"}");
+        var parts = _builder.BuildParts(request);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(parts.Prompt, Does.Contain(InjectionDefenceMarker));
+            Assert.That(parts.Prompt, Does.Contain("You are the Event assistant."));
+            Assert.That(parts.Prompt, Does.Not.Contain("Hire lasts seven days."));
+            Assert.That(parts.Prompt, Does.Not.Contain("STU042"));
+            Assert.That(parts.Context, Does.Contain("[1]"));
+            Assert.That(parts.Context, Does.Contain("Hire lasts seven days."));
+            Assert.That(parts.Context, Does.Contain("STU042"));
+            Assert.That(parts.Context, Does.Contain(request.Question));
+            Assert.That(parts.Prompt + parts.Context, Is.EqualTo(_builder.Build(request)));
+        });
+    }
+
+    [Test]
     public void Build_AlwaysIncludesTheInjectionDefenceLine()
     {
         Assert.Multiple(() =>

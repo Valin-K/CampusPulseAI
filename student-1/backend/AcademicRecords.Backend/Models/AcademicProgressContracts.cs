@@ -28,13 +28,3 @@ public sealed record AcademicProgressMetrics(
     decimal? RecentGpa,
     int CompletedYears,
     int FailedCourses);
-
-public sealed record GeminiGenerateRequest(IReadOnlyList<GeminiContent> Contents);
-
-public sealed record GeminiContent(IReadOnlyList<GeminiPart> Parts);
-
-public sealed record GeminiPart(string Text);
-
-public sealed record GeminiGenerateResponse(IReadOnlyList<GeminiCandidate>? Candidates);
-
-public sealed record GeminiCandidate(GeminiContent? Content);
