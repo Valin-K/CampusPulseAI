@@ -13,7 +13,9 @@ permissions:
   pull-requests: read
 
 env:
+  AI_MODE_ENABLED: "false"
   MCP_ENABLED: "false"
+  RAG_ENABLED: "false"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
@@ -39,6 +41,8 @@ jobs:
             student3:
               - 'student-3/**'
               - 'shared/backend/CampusPulse.Shared.Ai*/**'
+              - 'shared/backend/CampusPulse.Shared.Mcp/**'
+              - 'shared/backend/CampusPulse.Shared.Rag/**'
               - 'docker-compose.yml'
               - '.github/workflows/student-3.yml'
 
