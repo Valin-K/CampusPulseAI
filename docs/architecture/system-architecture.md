@@ -18,7 +18,7 @@ Every student domain follows the same four-project shape:
 | Layer | Responsibility |
 |---|---|
 | Frontend | Blazor WebAssembly, published to static files and served by nginx on port 80. |
-| Backend | ASP.NET Core minimal APIs. Orchestrates the database service, peer services and Gemini. No direct database access. |
+| Backend | ASP.NET Core APIs. Orchestrates the database service, peer services and shared AI gateway. No direct database access or Gemini key. |
 | Database | ASP.NET Core service owning an EF Core `DbContext` over SQLite. The only writer to its own data. |
 | Tests | NUnit coverage of validation rules and seeded data. |
 
@@ -58,6 +58,8 @@ flowchart TB
         D5["eventscheduling.database"]
     end
 
+    AI["Shared AI gateway<br/>ai.gateway :5269 (loopback)"]
+    RAG["RAG server<br/>host :5267"]
     GEM["Google Gemini API<br/>generativelanguage.googleapis.com"]
 
     SHELL --> F1 & F2 & F3 & F4 & F5
@@ -78,7 +80,10 @@ flowchart TB
     B5 --> D5
     B5 --> D1
 
-    B1 & B2 & B3 & B4 & B5 -.-> GEM
+    B1 & B2 & B3 & B4 & B5 -.-> AI
+    B1 & B2 & B3 & B4 & B5 -.-> RAG
+    RAG --> AI
+    AI --> GEM
 ```
 
 Ports shown are host ports declared in `docker-compose.yml`. Services without a port are
@@ -117,13 +122,18 @@ peers from `Services__*` keys, falling back to a Compose service name.
 | financialaidbilling.backend | **academicrecords.backend** | `Services__AcademicRecordsBackend` |
 | eventscheduling.backend | eventscheduling.database | `Services__EventDatabase` |
 | eventscheduling.backend | academicrecords.database | `Services__AcademicRecordsDatabase` |
+| all feature backends and RAG | ai.gateway | `Services__AiGateway` |
 
 Academic Records is the hub: every other domain reads student identity from it. Financial
 Aid & Billing is the only service that integrates at the **backend** tier rather than the
 database tier, because it consumes the composed student profile rather than raw rows.
 
-`GEMINI_API_KEY` is passed to all five backends as `${GEMINI_API_KEY:-}`, so an unset key
-leaves AI features disabled without breaking startup.
+`GEMINI_API_KEY` is passed only to `ai.gateway` as `${GEMINI_API_KEY:-}`. The shared
+`CampusPulse.Shared.Ai` client sends separate prompt and context strings to this service,
+which owns Gemini generation, embeddings, model configuration, and transport validation.
+An unset key returns explicit 503 responses without breaking startup; RAG retains
+hashed retrieval when gateway status explicitly reports generation unavailable.
+The gateway does not perform multi-agent routing or execute tools.
 
 ## Request flow — AI scholarship recommendation
 
@@ -136,6 +146,7 @@ sequenceDiagram
     participant B as financialaidbilling.backend
     participant AR as academicrecords.backend
     participant DB as financialaidbilling.database
+    participant AI as Shared AI gateway
     participant G as Gemini
 
     U->>F: Find my matches
@@ -146,8 +157,10 @@ sequenceDiagram
     B->>DB: GET /api/scholarships
     DB-->>B: catalogue
     B->>B: filter by active, year level, major (Any / STEM)
-    B->>G: generateContent with matched catalogue
-    G-->>B: recommendation narrative
+    B->>AI: GenerateAsync(prompt, matched catalogue context)
+    AI->>G: generateContent
+    G-->>AI: recommendation narrative
+    AI-->>B: text and model
     B-->>F: narrative + match count
     F-->>U: render matches
 ```

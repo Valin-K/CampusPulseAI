@@ -4,12 +4,16 @@ on:
   push:
     paths:
       - "ai-services/rag-server/**"
+      - "shared/backend/CampusPulse.Shared.Ai*/**"
+      - "shared/backend/CampusPulse.Shared.Rag/**"
       - "CampusPulseAI.slnx"
       - "Directory.Packages.props"
       - ".github/workflows/rag-server-ci.yml"
   pull_request:
     paths:
       - "ai-services/rag-server/**"
+      - "shared/backend/CampusPulse.Shared.Ai*/**"
+      - "shared/backend/CampusPulse.Shared.Rag/**"
       - "CampusPulseAI.slnx"
       - "Directory.Packages.props"
       - ".github/workflows/rag-server-ci.yml"
@@ -38,16 +42,31 @@ jobs:
       - name: Build RAG server
         run: dotnet build ai-services/rag-server/RagServer/RagServer.csproj --configuration Release --no-restore --nologo
 
-      # Runs without GEMINI_API_KEY on purpose: the server falls back to a local hashed
-      # embedding and reports generation_unavailable, so the whole ingest and retrieve
-      # path is exercised without a secret.
+      - name: Test RAG gateway integration
+        run: dotnet test ai-services/rag-server/RagServer.Tests/RagServer.Tests.csproj --configuration Release --nologo
+
+      - name: Build AI gateway
+        run: dotnet build shared/backend/CampusPulse.Shared.Ai.Gateway/CampusPulse.Shared.Ai.Gateway.csproj --configuration Release --nologo
+
+      # The keyless gateway explicitly enables RAG's local hashed embeddings.
       - name: Smoke test RAG endpoints
         shell: bash
         run: |
           set -euo pipefail
-          dotnet run --project ai-services/rag-server/RagServer/RagServer.csproj --configuration Release --no-build --urls http://localhost:5267 > rag-server.log 2>&1 &
+          dotnet run --project shared/backend/CampusPulse.Shared.Ai.Gateway/CampusPulse.Shared.Ai.Gateway.csproj --configuration Release --no-build --no-launch-profile --urls http://localhost:5269 > ai-gateway.log 2>&1 &
+          gateway_pid=$!
+          trap 'kill $gateway_pid ${server_pid:-} 2>/dev/null || true' EXIT
+          for attempt in {1..20}; do
+            if curl --silent --fail http://localhost:5269/health > /dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          curl --silent --fail http://localhost:5269/health | jq --exit-status '.service == "ai-gateway"'
+          curl --silent --fail http://localhost:5269/api/ai/status | jq --exit-status '.generationAvailable == false'
+
+          dotnet run --project ai-services/rag-server/RagServer/RagServer.csproj --configuration Release --no-build --no-launch-profile --urls http://localhost:5267 > rag-server.log 2>&1 &
           server_pid=$!
-          trap 'kill $server_pid' EXIT
 
           for attempt in {1..20}; do
             if curl --silent --fail http://localhost:5267/health > /dev/null; then
@@ -65,6 +84,7 @@ jobs:
             http://localhost:5267/api/rag/coursemanagement/documents)
           echo "$ingest"
           test "$(printf '%s' "$ingest" | jq --raw-output '.chunks')" -ge 1
+          test "$(printf '%s' "$ingest" | jq --raw-output '.embedder')" = "hashed-bag-of-words"
 
           answer=$(curl --silent --fail \
             -H "Content-Type: application/json" \
@@ -85,4 +105,4 @@ jobs:
 
       - name: Show server log on failure
         if: failure()
-        run: cat rag-server.log
+        run: cat ai-gateway.log rag-server.log

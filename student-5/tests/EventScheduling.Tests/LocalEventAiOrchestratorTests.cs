@@ -6,7 +6,7 @@ using CampusPulse.Shared.Mcp.Contracts;
 using CampusPulse.Shared.Rag.Assistant;
 using EventScheduling.Backend.Models;
 using EventScheduling.Backend.Services;
-using Microsoft.Extensions.Configuration;
+using CampusPulse.Shared.Ai;
 
 namespace EventScheduling.Tests;
 
@@ -27,6 +27,13 @@ public sealed class LocalEventAiOrchestratorTests
         Assert.Multiple(() =>
         {
             Assert.That(response.Reply, Is.EqualTo("The Event Scheduling feature is integrated with the MCP server."));
+            Assert.That(response.Embedder, Is.EqualTo("gateway-test"));
+            using var plan = JsonDocument.Parse(gemini.RequestBodies[0]);
+            using var answer = JsonDocument.Parse(gemini.RequestBodies[1]);
+            Assert.That(plan.RootElement.GetProperty("prompt").GetString(), Does.Not.Contain("Is the MCP integrated?"));
+            Assert.That(plan.RootElement.GetProperty("context").GetString(), Does.Contain("Is the MCP integrated?"));
+            Assert.That(answer.RootElement.GetProperty("context").GetString(), Does.Contain("feature-allowlisted"));
+            Assert.That(answer.RootElement.GetProperty("prompt").GetString(), Does.Not.Contain("feature-allowlisted"));
             Assert.That(mcp.CalledTools, Is.EqualTo(new[] { "validate_integration" }));
             Assert.That(rag.CallCount, Is.Zero);
             Assert.That(response.Sources, Has.Count.EqualTo(1));
@@ -105,27 +112,42 @@ public sealed class LocalEventAiOrchestratorTests
         });
     }
 
+    [Test]
+    public void AskPropagatesGatewayFailureWithoutCallingTools()
+    {
+        var mcp = new StubMcpClient();
+        var service = CreateService(new QueuedHttpMessageHandler(new HttpResponseMessage(HttpStatusCode.ServiceUnavailable)),
+            mcp, new StubEventRagService(), database: null);
+
+        Assert.That(async () => await service.AskAsync(Request("Question"), CancellationToken.None),
+            Throws.TypeOf<HttpRequestException>());
+        Assert.That(mcp.CalledTools, Is.Empty);
+    }
+
+    [Test]
+    public void AskPropagatesCallerCancellation()
+    {
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        var service = CreateService(new QueuedHttpMessageHandler(), new StubMcpClient(), new StubEventRagService(), database: null);
+
+        Assert.That(async () => await service.AskAsync(Request("Question"), cancellation.Token),
+            Throws.InstanceOf<OperationCanceledException>());
+    }
+
     private static LocalEventAiOrchestrator CreateService(
         HttpMessageHandler gemini, IMcpClient mcp, IEventRagService rag, HttpMessageHandler? database)
     {
-        var configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["GEMINI_API_KEY"] = "test-key",
-                ["Gemini:Model"] = "gemini-test"
-            })
-            .Build();
-
         var factory = new NamedHttpClientFactory(new Dictionary<string, HttpMessageHandler>
         {
-            ["gemini"] = gemini,
             ["eventDatabase"] = database ?? new RecordingHttpMessageHandler(new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = new StringContent("[]", Encoding.UTF8, "application/json")
             })
         });
 
-        return new LocalEventAiOrchestrator(factory, configuration, mcp, rag);
+        var gateway = new AiGatewayClient(new HttpClient(gemini) { BaseAddress = new Uri("https://gateway.test/") });
+        return new LocalEventAiOrchestrator(factory, gateway, mcp, rag);
     }
 
     private static KnowledgeQuestionRequest Request(string question) => new() { Question = question };
@@ -134,7 +156,7 @@ public sealed class LocalEventAiOrchestratorTests
     {
         var json = JsonSerializer.Serialize(new
         {
-            candidates = new[] { new { content = new { parts = new[] { new { text } } } } }
+            text, model = "gateway-test"
         });
         return new HttpResponseMessage(HttpStatusCode.OK)
         {
@@ -200,9 +222,14 @@ public sealed class LocalEventAiOrchestratorTests
     private sealed class QueuedHttpMessageHandler(params HttpResponseMessage[] responses) : HttpMessageHandler
     {
         private readonly Queue<HttpResponseMessage> responses = new(responses);
+        public List<string> RequestBodies { get; } = [];
 
-        protected override Task<HttpResponseMessage> SendAsync(
-            HttpRequestMessage request, CancellationToken cancellationToken) =>
-            Task.FromResult(responses.Dequeue());
+        protected override async Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            RequestBodies.Add(await request.Content!.ReadAsStringAsync(cancellationToken));
+            return responses.Dequeue();
+        }
     }
 }

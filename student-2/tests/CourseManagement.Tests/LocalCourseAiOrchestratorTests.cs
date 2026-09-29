@@ -6,7 +6,7 @@ using CampusPulse.Shared.Mcp.Contracts;
 using CampusPulse.Shared.Rag.Assistant;
 using CourseManagement.Backend.Contracts.Ai;
 using CourseManagement.Backend.Services;
-using Microsoft.Extensions.Configuration;
+using CampusPulse.Shared.Ai;
 
 namespace CourseManagement.Tests;
 
@@ -38,6 +38,13 @@ public sealed class LocalCourseAiOrchestratorTests
         Assert.Multiple(() =>
         {
             Assert.That(response.Reply, Is.EqualTo("There are ten Courses available."));
+            Assert.That(response.Embedder, Is.EqualTo("gateway-test"));
+            using var plan = JsonDocument.Parse(gemini.RequestBodies[0]);
+            using var answer = JsonDocument.Parse(gemini.RequestBodies[1]);
+            Assert.That(plan.RootElement.GetProperty("prompt").GetString(), Does.Not.Contain("Which Courses are available?"));
+            Assert.That(plan.RootElement.GetProperty("context").GetString(), Does.Contain("Which Courses are available?"));
+            Assert.That(answer.RootElement.GetProperty("context").GetString(), Does.Contain("CPAI1001"));
+            Assert.That(answer.RootElement.GetProperty("prompt").GetString(), Does.Not.Contain("CPAI1001"));
             Assert.That(mcp.CalledTools, Is.EqualTo(new[] { "course.list_courses" }));
             Assert.That(rag.CallCount, Is.Zero);
             Assert.That(response.Sources, Has.Count.EqualTo(1));
@@ -110,26 +117,41 @@ public sealed class LocalCourseAiOrchestratorTests
         });
     }
 
+    [Test]
+    public void AskPropagatesGatewayFailureWithoutCallingTools()
+    {
+        var mcp = new StubMcpClient();
+        var service = CreateService(new QueuedHttpMessageHandler(new HttpResponseMessage(HttpStatusCode.ServiceUnavailable)),
+            mcp, new StubCourseRagService());
+
+        Assert.That(async () => await service.AskAsync(Request("Question"), CancellationToken.None),
+            Throws.TypeOf<HttpRequestException>());
+        Assert.That(mcp.CalledTools, Is.Empty);
+    }
+
+    [Test]
+    public void AskPropagatesCallerCancellation()
+    {
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        var service = CreateService(new QueuedHttpMessageHandler(), new StubMcpClient(), new StubCourseRagService());
+
+        Assert.That(async () => await service.AskAsync(Request("Question"), cancellation.Token),
+            Throws.InstanceOf<OperationCanceledException>());
+    }
+
     static LocalCourseAiOrchestrator CreateService(
         HttpMessageHandler gemini,
         IMcpClient mcp,
         ICourseRagService rag)
     {
-        var configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["GEMINI_API_KEY"] = "test-key",
-                ["Gemini:Model"] = "gemini-test"
-            })
-            .Build();
         var client = new HttpClient(gemini)
         {
-            BaseAddress = new Uri("https://gemini.test/")
+            BaseAddress = new Uri("https://gateway.test/")
         };
 
         return new LocalCourseAiOrchestrator(
-            new StubHttpClientFactory(client),
-            configuration,
+            new AiGatewayClient(client),
             mcp,
             rag);
     }
@@ -141,16 +163,7 @@ public sealed class LocalCourseAiOrchestratorTests
     {
         var json = JsonSerializer.Serialize(new
         {
-            candidates = new[]
-            {
-                new
-                {
-                    content = new
-                    {
-                        parts = new[] { new { text } }
-                    }
-                }
-            }
+            text, model = "gateway-test"
         });
         return new HttpResponseMessage(HttpStatusCode.OK)
         {
@@ -227,19 +240,19 @@ public sealed class LocalCourseAiOrchestratorTests
         }
     }
 
-    sealed class StubHttpClientFactory(HttpClient client) : IHttpClientFactory
-    {
-        public HttpClient CreateClient(string name) => client;
-    }
-
     sealed class QueuedHttpMessageHandler(
         params HttpResponseMessage[] responses) : HttpMessageHandler
     {
         readonly Queue<HttpResponseMessage> responses = new(responses);
+        public List<string> RequestBodies { get; } = [];
 
-        protected override Task<HttpResponseMessage> SendAsync(
+        protected override async Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request,
-            CancellationToken cancellationToken) =>
-            Task.FromResult(responses.Dequeue());
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            RequestBodies.Add(await request.Content!.ReadAsStringAsync(cancellationToken));
+            return responses.Dequeue();
+        }
     }
 }
