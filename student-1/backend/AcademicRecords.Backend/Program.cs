@@ -1,4 +1,5 @@
 using AcademicRecords.Backend;
+using CampusPulse.Shared.Ai;
 using AcademicRecords.Backend.Services;
 using CampusPulse.Shared.Rag.Assistant;
 using CampusPulse.Shared.Rag.Client;
@@ -22,16 +23,7 @@ builder.Services.AddHttpClient("mcp", client =>
     client.BaseAddress = new Uri(builder.Configuration["Services:McpServer"] ?? "http://localhost:5268");
     client.Timeout = TimeSpan.FromSeconds(30);
 });
-var geminiApiKey = builder.Configuration["GEMINI_API_KEY"] ?? builder.Configuration["Gemini:ApiKey"];
-builder.Services.AddHttpClient("gemini", client =>
-{
-    client.BaseAddress = new Uri("https://generativelanguage.googleapis.com/");
-    client.Timeout = TimeSpan.FromSeconds(90);
-    if (!string.IsNullOrWhiteSpace(geminiApiKey))
-    {
-        client.DefaultRequestHeaders.Add("x-goog-api-key", geminiApiKey);
-    }
-});
+builder.Services.AddAiGateway(builder.Configuration);
 builder.Services.AddSingleton<ITranscriptPdfGenerator, TranscriptPdfGenerator>();
 builder.Services.AddScoped<GeminiAcademicProgressService>();
 builder.Services.AddScoped<StudentCourseMetadataService>();

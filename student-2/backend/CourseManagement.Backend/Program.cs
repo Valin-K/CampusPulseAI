@@ -1,4 +1,5 @@
 using CampusPulse.Shared.Mcp.Client;
+using CampusPulse.Shared.Ai;
 using CourseManagement.Backend.Clients;
 using CourseManagement.Backend.Configuration;
 using CourseManagement.Backend.Infrastructure;
@@ -92,23 +93,7 @@ builder.Services.AddSingleton<CampusPulse.Shared.Rag.Generation.RagCitationParse
 builder.Services.AddScoped<CampusPulse.Shared.Rag.Assistant.RagKnowledgeService>();
 builder.Services.AddScoped<ICourseRagService, CourseKnowledgeService>();
 builder.Services.AddScoped<ICourseKnowledgeService, LocalCourseAiOrchestrator>();
-var geminiApiKey = builder.Configuration["GEMINI_API_KEY"];
-var geminiApiAddress = builder.Configuration["Gemini:BaseUrl"]
-    ?? "https://generativelanguage.googleapis.com/";
-builder.Services.AddHttpClient(
-    GeminiCourseQuestionService.ClientName,
-    client =>
-    {
-        client.BaseAddress = new Uri(geminiApiAddress, UriKind.Absolute);
-        client.Timeout = TimeSpan.FromSeconds(90);
-
-        if (!string.IsNullOrWhiteSpace(geminiApiKey))
-        {
-            client.DefaultRequestHeaders.Add(
-                "x-goog-api-key",
-                geminiApiKey);
-        }
-    });
+builder.Services.AddAiGateway(builder.Configuration);
 builder.Services.AddOpenApi();
 
 var app = builder.Build();

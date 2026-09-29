@@ -12,6 +12,7 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 COPY ["Directory.Packages.props", "."]
+COPY ["shared/backend/CampusPulse.Shared.Ai/CampusPulse.Shared.Ai.csproj", "shared/backend/CampusPulse.Shared.Ai/"]
 COPY ["shared/backend/CampusPulse.Shared.Mcp/CampusPulse.Shared.Mcp.csproj", "shared/backend/CampusPulse.Shared.Mcp/"]
 COPY ["shared/backend/CampusPulse.Shared.Rag/CampusPulse.Shared.Rag.csproj", "shared/backend/CampusPulse.Shared.Rag/"]
 COPY ["student-5/backend/EventScheduling.Backend/EventScheduling.Backend.csproj", "student-5/backend/EventScheduling.Backend/"]

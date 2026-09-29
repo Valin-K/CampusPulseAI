@@ -37,6 +37,10 @@ jobs:
           filters: |
             student4:
               - 'student-4/**'
+              - 'shared/backend/CampusPulse.Shared.Ai*/**'
+              - 'docker-compose.yml'
+              - '.github/docker-compose.student-4.ci.yml'
+              - '.github/workflows/student-4-ci.yml'
 
       - name: No Student 4 changes
         if: github.event_name != 'workflow_dispatch' && steps.filter.outputs.student4 != 'true'
@@ -70,14 +74,14 @@ jobs:
         if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.student4 == 'true'
         shell: bash
         run: |
-          docker compose -p student-4-ci -f docker-compose.yml -f .github/docker-compose.student-4.ci.yml build academicrecords.database academicrecords.backend financialaidbilling.database financialaidbilling.backend financialaidbilling.frontend
-          docker compose -p student-4-ci -f docker-compose.yml -f .github/docker-compose.student-4.ci.yml up --detach --no-build academicrecords.database academicrecords.backend financialaidbilling.database financialaidbilling.backend financialaidbilling.frontend
+          docker compose -p student-4-ci -f docker-compose.yml -f .github/docker-compose.student-4.ci.yml build ai.gateway academicrecords.database academicrecords.backend financialaidbilling.database financialaidbilling.backend financialaidbilling.frontend
+          docker compose -p student-4-ci -f docker-compose.yml -f .github/docker-compose.student-4.ci.yml up --detach --no-build ai.gateway academicrecords.database academicrecords.backend financialaidbilling.database financialaidbilling.backend financialaidbilling.frontend
 
       - name: Smoke test Student 4 containers
         if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.student4 == 'true'
         shell: bash
         run: |
-          endpoints=("http://localhost:18080/health" "http://localhost:18080/api/invoices" "http://localhost:18084/")
+          endpoints=("http://localhost:5269/health" "http://localhost:18080/health" "http://localhost:18080/api/invoices" "http://localhost:18084/")
           for endpoint in "${endpoints[@]}"; do
             reachable=false
             for attempt in {1..30}; do
@@ -89,7 +93,7 @@ jobs:
             done
             if [ "$reachable" = false ]; then
               docker compose -p student-4-ci -f docker-compose.yml -f .github/docker-compose.student-4.ci.yml ps
-              docker compose -p student-4-ci -f docker-compose.yml -f .github/docker-compose.student-4.ci.yml logs --no-color financialaidbilling.database financialaidbilling.backend financialaidbilling.frontend
+              docker compose -p student-4-ci -f docker-compose.yml -f .github/docker-compose.student-4.ci.yml logs --no-color ai.gateway financialaidbilling.database financialaidbilling.backend financialaidbilling.frontend
               echo "Container did not respond successfully: $endpoint"
               exit 1
             fi

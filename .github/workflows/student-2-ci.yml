@@ -37,6 +37,10 @@ jobs:
           filters: |
             student2:
               - 'student-2/**'
+              - 'shared/backend/CampusPulse.Shared.Ai*/**'
+              - 'docker-compose.yml'
+              - '.github/docker-compose.student-2.ci.yml'
+              - '.github/workflows/student-2-ci.yml'
 
       - name: No Student 2 changes
         if: github.event_name != 'workflow_dispatch' && steps.filter.outputs.student2 != 'true'
@@ -71,14 +75,15 @@ jobs:
         shell: bash
         run: |
           cp .github/student-2-ci-appsettings.json student-2/frontend/CourseManagement.Frontend/wwwroot/appsettings.json
-          docker compose -p student-2-ci -f docker-compose.yml -f .github/docker-compose.student-2.ci.yml build academicrecords.database coursemanagement.database coursemanagement.backend coursemanagement.frontend
-          docker compose -p student-2-ci -f docker-compose.yml -f .github/docker-compose.student-2.ci.yml up --detach --no-build academicrecords.database coursemanagement.database coursemanagement.backend coursemanagement.frontend
+          docker compose -p student-2-ci -f docker-compose.yml -f .github/docker-compose.student-2.ci.yml build ai.gateway academicrecords.database coursemanagement.database coursemanagement.backend coursemanagement.frontend
+          docker compose -p student-2-ci -f docker-compose.yml -f .github/docker-compose.student-2.ci.yml up --detach --no-build ai.gateway academicrecords.database coursemanagement.database coursemanagement.backend coursemanagement.frontend
 
       - name: Smoke test Student 2 containers
         if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.student2 == 'true'
         shell: bash
         run: |
           endpoints=(
+            "http://localhost:5269/health"
             "http://localhost:15118/health"
             "http://localhost:15118/api/courses"
             "http://localhost:15118/api/course-access/student"
@@ -131,7 +136,7 @@ jobs:
         shell: bash
         run: |
           docker compose -p student-2-ci -f docker-compose.yml -f .github/docker-compose.student-2.ci.yml ps
-          docker compose -p student-2-ci -f docker-compose.yml -f .github/docker-compose.student-2.ci.yml logs --no-color academicrecords.database coursemanagement.database coursemanagement.backend coursemanagement.frontend
+          docker compose -p student-2-ci -f docker-compose.yml -f .github/docker-compose.student-2.ci.yml logs --no-color ai.gateway academicrecords.database coursemanagement.database coursemanagement.backend coursemanagement.frontend
 
       - name: Remove Student 2 containers
         if: always() && (github.event_name == 'workflow_dispatch' || steps.filter.outputs.student2 == 'true')

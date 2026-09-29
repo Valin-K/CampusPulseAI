@@ -38,6 +38,9 @@ jobs:
             student5:
               - 'student-5/**'
               - 'shared/**'
+              - 'docker-compose.yml'
+              - '.github/docker-compose.student-5.ci.yml'
+              - '.github/workflows/student-5-ci.yml'
 
       - name: No Student 5 changes
         if: github.event_name != 'workflow_dispatch' && steps.filter.outputs.student5 != 'true'
@@ -83,14 +86,14 @@ jobs:
         if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.student5 == 'true'
         shell: bash
         run: |
-          docker compose -p student-5-ci -f docker-compose.yml -f .github/docker-compose.student-5.ci.yml build academicrecords.database eventscheduling.database eventscheduling.backend eventscheduling.frontend
-          docker compose -p student-5-ci -f docker-compose.yml -f .github/docker-compose.student-5.ci.yml up --detach --no-build --no-deps academicrecords.database eventscheduling.database eventscheduling.backend eventscheduling.frontend
+          docker compose -p student-5-ci -f docker-compose.yml -f .github/docker-compose.student-5.ci.yml build ai.gateway academicrecords.database eventscheduling.database eventscheduling.backend eventscheduling.frontend
+          docker compose -p student-5-ci -f docker-compose.yml -f .github/docker-compose.student-5.ci.yml up --detach --no-build --no-deps ai.gateway academicrecords.database eventscheduling.database eventscheduling.backend eventscheduling.frontend
 
       - name: Smoke test Student 5 containers
         if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.student5 == 'true'
         shell: bash
         run: |
-          endpoints=("http://localhost:18085/health" "http://localhost:18085/api/rooms" "http://localhost:18085/api/refequipment" "http://localhost:18085/api/equipment" "http://localhost:18085/api/bookings" "http://localhost:18085/api/users" "http://localhost:18085/api/users/4" "http://localhost:18086/")
+          endpoints=("http://localhost:5269/health" "http://localhost:18085/health" "http://localhost:18085/api/rooms" "http://localhost:18085/api/refequipment" "http://localhost:18085/api/equipment" "http://localhost:18085/api/bookings" "http://localhost:18085/api/users" "http://localhost:18085/api/users/4" "http://localhost:18086/")
           for endpoint in "${endpoints[@]}"; do
             reachable=false
             for attempt in {1..30}; do
@@ -102,7 +105,7 @@ jobs:
             done
             if [ "$reachable" = false ]; then
               docker compose -p student-5-ci -f docker-compose.yml -f .github/docker-compose.student-5.ci.yml ps
-              docker compose -p student-5-ci -f docker-compose.yml -f .github/docker-compose.student-5.ci.yml logs --no-color academicrecords.database eventscheduling.database eventscheduling.backend eventscheduling.frontend
+              docker compose -p student-5-ci -f docker-compose.yml -f .github/docker-compose.student-5.ci.yml logs --no-color ai.gateway academicrecords.database eventscheduling.database eventscheduling.backend eventscheduling.frontend
               echo "Container did not respond successfully: $endpoint"
               exit 1
             fi

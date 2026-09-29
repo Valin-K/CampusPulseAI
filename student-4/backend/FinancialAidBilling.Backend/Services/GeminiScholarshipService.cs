@@ -1,19 +1,15 @@
 using System.Globalization;
 using System.Net.Http.Json;
 using System.Text;
+using CampusPulse.Shared.Ai;
 using FinancialAidBilling.Backend.Models;
 
 namespace FinancialAidBilling.Backend.Services;
 
-public sealed class GeminiScholarshipService(IHttpClientFactory clients, IConfiguration configuration)
+public sealed class GeminiScholarshipService(IHttpClientFactory clients, IAiGatewayClient gateway)
 {
     public async Task<ScholarshipRecommendationResponse> RecommendAsync(StudentProfile profile, CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(configuration["GEMINI_API_KEY"]))
-        {
-            throw new InvalidOperationException("GEMINI_API_KEY is not configured.");
-        }
-
         var scholarships = await clients.CreateClient("billingDatabase")
             .GetFromJsonAsync<List<ScholarshipResponse>>("/api/scholarships", cancellationToken) ?? [];
         var matches = scholarships
@@ -29,7 +25,7 @@ public sealed class GeminiScholarshipService(IHttpClientFactory clients, IConfig
             context.AppendLine(CultureInfo.InvariantCulture, $"- {scholarship.Name}: {scholarship.Description} Award ${scholarship.AwardAmount:N2}; minimum GPA {scholarship.MinimumGpa:F2}; eligible major {scholarship.EligibleMajor}; minimum year {scholarship.MinimumYearLevel}; deadline {scholarship.ApplicationDeadline:yyyy-MM-dd}.");
         }
 
-        var prompt = $"""
+        const string prompt = """
             You are a university financial aid assistant. Recommend scholarships only from the supplied database context.
 
             Return plain text, not Markdown or HTML. Do not use asterisks, headings, or a greeting and sign-off. List every supplied match in descending award order using exactly this readable layout, with one blank line between scholarships:
@@ -40,7 +36,9 @@ public sealed class GeminiScholarshipService(IHttpClientFactory clients, IConfig
             Deadline: Month d, yyyy
 
             Preserve each supplied award amount and deadline exactly. Do not invent eligibility rules, demographic attributes, or facts that are not explicitly present in the student profile.
+            """;
 
+        var studentContext = $"""
             Student profile:
             Student ID: {profile.StudentId}
             Name: {profile.Name}
@@ -50,20 +48,8 @@ public sealed class GeminiScholarshipService(IHttpClientFactory clients, IConfig
             Scholarship matches ({matches.Count}):
             {context}
             """;
-        var request = new GeminiGenerateRequest([new GeminiContent([new GeminiPart(prompt)])]);
-        var model = configuration["Gemini:Model"] ?? "gemini-3.5-flash-lite";
-        using var response = await clients.CreateClient("gemini")
-            .PostAsJsonAsync($"v1beta/models/{model}:generateContent", request, cancellationToken);
-        response.EnsureSuccessStatusCode();
-
-        var result = await response.Content.ReadFromJsonAsync<GeminiGenerateResponse>(cancellationToken: cancellationToken);
-        var recommendation = result?.Candidates?.FirstOrDefault()?.Content?.Parts?.FirstOrDefault()?.Text;
-        if (string.IsNullOrWhiteSpace(recommendation))
-        {
-            throw new InvalidOperationException("Gemini returned an empty recommendation.");
-        }
-
-        return new(profile.StudentId, matches.Count, recommendation);
+        var result = await gateway.GenerateAsync(prompt, studentContext, cancellationToken);
+        return new(profile.StudentId, matches.Count, result.Text);
     }
 
     private static bool MajorMatches(string studentMajor, string eligibleMajor) =>
