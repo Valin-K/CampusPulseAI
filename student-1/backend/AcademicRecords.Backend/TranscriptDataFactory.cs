@@ -1,3 +1,7 @@
+using AcademicRecords.Backend.Calculators;
+using AcademicRecords.Backend.Contracts;
+using AcademicRecords.Backend.Services;
+
 namespace AcademicRecords.Backend;
 
 public static class TranscriptDataFactory

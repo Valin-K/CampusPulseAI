@@ -1,0 +1,149 @@
+@using System.Net.Http.Json
+@using System.Text.Json.Serialization
+@inject HttpClient Http
+
+<div class="campus-ai-dock">
+    <section class="campus-ai-panel @(isOpen ? "is-open" : null)" aria-label="CampusPulse AI assistant">
+        <header class="campus-ai-header">
+            <div>
+                <span class="campus-ai-eyebrow">CampusPulse AI</span>
+                <strong>Ask about campus services</strong>
+            </div>
+            <button type="button" class="campus-ai-minimize" @onclick="CloseAsync" aria-label="Minimize CampusPulse AI">
+                <span aria-hidden="true">−</span>
+            </button>
+        </header>
+
+        <div class="campus-ai-body">
+            <ol class="campus-ai-log" aria-live="polite">
+                @foreach (var message in messages)
+                {
+                    <li class="campus-ai-message @(message.IsUser ? "is-user" : "is-assistant")">
+                        <div class="campus-ai-bubble">@message.Text</div>
+                        @if (!message.IsUser && !string.IsNullOrEmpty(message.ConfidenceCategory))
+                        {
+                            <span class="campus-ai-confidence conf-@message.ConfidenceCategory.ToLowerInvariant()">
+                                Confidence: @message.ConfidenceCategory
+                            </span>
+                        }
+                        @if (!message.IsUser && message.Sources.Count > 0)
+                        {
+                            <details class="campus-ai-sources">
+                                <summary>Sources</summary>
+                                <ul>
+                                    @foreach (var source in message.Sources)
+                                    {
+                                        <li>@source.Label</li>
+                                    }
+                                </ul>
+                            </details>
+                        }
+                    </li>
+                }
+                @if (isBusy)
+                {
+                    <li class="campus-ai-message is-assistant">
+                        <div class="campus-ai-bubble is-thinking">Checking the campus knowledge base…</div>
+                    </li>
+                }
+            </ol>
+
+            @if (!string.IsNullOrWhiteSpace(errorMessage))
+            {
+                <p class="campus-ai-error" role="alert">@errorMessage</p>
+            }
+
+            <form class="campus-ai-input-row" @onsubmit="SendAsync" @onsubmit:preventDefault="true">
+                <input class="campus-ai-input" @bind="draft" @bind:event="oninput"
+                       placeholder="Ask a campus question…" maxlength="1000"
+                       disabled="@isBusy" aria-label="Ask CampusPulse AI" />
+                <button type="submit" class="button button-primary" disabled="@(isBusy || string.IsNullOrWhiteSpace(draft))">Send</button>
+            </form>
+            <p class="campus-ai-hint">Answers use the current service’s RAG knowledge and MCP context.</p>
+        </div>
+    </section>
+
+    @if (!isOpen)
+    {
+        <button type="button" class="campus-ai-fab" @onclick="OpenAsync"
+                aria-label="Open CampusPulse AI">
+            <span class="campus-ai-icon" aria-hidden="true">✦</span>
+            <span class="campus-ai-fab-label">Ask AI</span>
+        </button>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public int? StudentUserId { get; set; }
+
+    private readonly List<ChatMessage> messages =
+    [new(false, "Hi! I can help you find answers across this campus service. What would you like to know?", [])];
+    private string draft = string.Empty;
+    private string? errorMessage;
+    private bool isOpen;
+    private bool isBusy;
+
+    private async Task OpenAsync()
+    {
+        isOpen = true;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task CloseAsync()
+    {
+        isOpen = false;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task SendAsync()
+    {
+        var question = draft.Trim();
+        if (question.Length == 0 || isBusy)
+        {
+            return;
+        }
+
+        messages.Add(new(true, question, []));
+        draft = string.Empty;
+        errorMessage = null;
+        isBusy = true;
+
+        try
+        {
+            using var response = await Http.PostAsJsonAsync(
+                "/api/ai/knowledge", new KnowledgeQuestionRequest(question, StudentUserId));
+            if (!response.IsSuccessStatusCode)
+            {
+                errorMessage = "The AI assistant is unavailable right now. Please try again.";
+            }
+            else
+            {
+                var answer = await response.Content.ReadFromJsonAsync<KnowledgeAnswer>();
+                if (answer is null || string.IsNullOrWhiteSpace(answer.Reply))
+                {
+                    errorMessage = "The AI assistant returned an empty answer.";
+                }
+                else
+                {
+                    messages.Add(new(false, answer.Reply, answer.Sources ?? [], answer.ConfidenceCategory));
+                }
+            }
+        }
+        catch (HttpRequestException)
+        {
+            errorMessage = "The AI assistant could not reach the campus service.";
+        }
+        finally
+        {
+            isBusy = false;
+        }
+    }
+
+    private sealed record ChatMessage(bool IsUser, string Text, IReadOnlyList<KnowledgeSource> Sources, string? ConfidenceCategory = null);
+    private sealed record KnowledgeQuestionRequest(
+        string Question,
+        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? UserId);
+    private sealed record KnowledgeAnswer(string Reply, IReadOnlyList<KnowledgeSource>? Sources, string? ConfidenceCategory);
+    private sealed record KnowledgeSource(string Label);
+}

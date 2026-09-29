@@ -1,7 +1,8 @@
-using System.Text;
+using CampusPulse.Shared.Rag.Generation;
 using Microsoft.Extensions.Options;
 using RagServer.Models;
 using RagServer.Services;
+using SharedRagSource = CampusPulse.Shared.Rag.Contracts.RagSource;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddOpenApi();
@@ -22,6 +23,7 @@ builder.Services.AddHttpClient("gemini", client =>
 builder.Services.AddSingleton<VectorStore>();
 builder.Services.AddSingleton<TextChunker>();
 builder.Services.AddSingleton<GeminiClient>();
+builder.Services.AddSingleton<RagPromptBuilder>();
 
 var app = builder.Build();
 if (app.Environment.IsDevelopment())
@@ -100,6 +102,7 @@ app.MapPost("/api/rag/{collection}/answer", async (
     AnswerRequest request,
     VectorStore store,
     GeminiClient gemini,
+    RagPromptBuilder promptBuilder,
     IOptions<RagOptions> options,
     CancellationToken cancellationToken) =>
 {
@@ -137,10 +140,15 @@ app.MapPost("/api/rag/{collection}/answer", async (
 
     if (sources.Count == 0 || confidence < threshold)
     {
-        return Results.Ok(Respond(
-            "insufficient_context",
-            "The knowledge base does not contain enough information to answer this question.",
-            sources.Count == 0 ? "No documents matched." : $"Top score {confidence:0.####} is below the threshold {threshold:0.####}."));
+        if (string.IsNullOrWhiteSpace(request.SupplementalContext))
+        {
+            return Results.Ok(Respond(
+                "insufficient_context",
+                "The knowledge base does not contain enough information to answer this question.",
+                sources.Count == 0 ? "No documents matched." : $"Top score {confidence:0.####} is below the threshold {threshold:0.####}."));
+        }
+
+        sources = [];
     }
 
     if (!gemini.HasApiKey)
@@ -150,7 +158,18 @@ app.MapPost("/api/rag/{collection}/answer", async (
 
     try
     {
-        var answer = await gemini.GenerateAsync(BuildPrompt(request.Question, request.Instructions, sources), cancellationToken);
+        var promptSources = sources
+            .Select(source => new SharedRagSource(
+                source.Rank, source.DocumentId, source.ChunkIndex, source.Score, source.Text, source.Metadata))
+            .ToList();
+        var prompt = promptBuilder.Build(new RagPromptRequest
+        {
+            Question = request.Question,
+            Sources = promptSources,
+            Persona = request.Instructions,
+            SupplementalContext = request.SupplementalContext,
+        });
+        var answer = await gemini.GenerateAsync(prompt, cancellationToken);
         return Results.Ok(answer is null
             ? Respond("generation_failed", null, "Gemini returned an empty response.")
             : Respond("answered", answer));
@@ -172,30 +191,3 @@ static IResult UnknownCollection(string collection, RagOptions options) => Resul
     error = $"Collection '{collection}' is not registered.",
     allowedCollections = options.AllowedCollections
 });
-
-static string BuildPrompt(string question, string? instructions, IReadOnlyList<RagSource> sources)
-{
-    var prompt = new StringBuilder();
-    prompt.AppendLine("You are an assistant for the CampusPulseAI university system.");
-    prompt.AppendLine("Answer the question using only the numbered context passages below.");
-    prompt.AppendLine("If the context does not contain the answer, say that you do not have enough information.");
-    prompt.AppendLine("Cite the passages you used as [1], [2] and so on. Keep the answer concise.");
-    if (!string.IsNullOrWhiteSpace(instructions))
-    {
-        prompt.AppendLine();
-        prompt.AppendLine("Additional instructions from the calling service:");
-        prompt.AppendLine(instructions.Trim());
-    }
-
-    prompt.AppendLine();
-    prompt.AppendLine("Context:");
-    foreach (var source in sources)
-    {
-        prompt.AppendLine($"[{source.Rank}] (document {source.DocumentId}) {source.Text}");
-    }
-
-    prompt.AppendLine();
-    prompt.AppendLine($"Question: {question.Trim()}");
-    prompt.AppendLine("Answer:");
-    return prompt.ToString();
-}

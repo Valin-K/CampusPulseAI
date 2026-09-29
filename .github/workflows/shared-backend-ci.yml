@@ -1,0 +1,55 @@
+name: Shared Backend Library CI
+
+on:
+  push:
+    paths:
+      - "shared/backend/**"
+      - "CampusPulseAI.slnx"
+      - "Directory.Packages.props"
+      - ".github/workflows/shared-backend-ci.yml"
+  pull_request:
+    paths:
+      - "shared/backend/**"
+      - "CampusPulseAI.slnx"
+      - "Directory.Packages.props"
+      - ".github/workflows/shared-backend-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: Shared RAG library validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore shared library tests
+        run: dotnet restore shared/backend/CampusPulse.Shared.Rag.Tests/CampusPulse.Shared.Rag.Tests.csproj
+
+      - name: Build shared library and tests
+        run: dotnet build shared/backend/CampusPulse.Shared.Rag.Tests/CampusPulse.Shared.Rag.Tests.csproj --configuration Release --no-restore --nologo
+
+      - name: Run unit tests
+        run: dotnet test shared/backend/CampusPulse.Shared.Rag.Tests/CampusPulse.Shared.Rag.Tests.csproj --configuration Release --no-build --no-restore --logger "trx;LogFileName=shared-rag-tests.trx" --results-directory TestResults
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: shared-backend-test-results
+          path: TestResults/*.trx
+          if-no-files-found: ignore

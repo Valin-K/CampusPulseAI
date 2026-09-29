@@ -37,6 +37,7 @@ jobs:
           filters: |
             student5:
               - 'student-5/**'
+              - 'shared/**'
 
       - name: No Student 5 changes
         if: github.event_name != 'workflow_dispatch' && steps.filter.outputs.student5 != 'true'

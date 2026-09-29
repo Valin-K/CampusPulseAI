@@ -1,6 +1,8 @@
 using System.Globalization;
 using System.Net.Http.Json;
 using System.Text.Json;
+using AcademicRecords.Backend.Calculators;
+using AcademicRecords.Backend.Contracts;
 using AcademicRecords.Backend.Models;
 
 namespace AcademicRecords.Backend.Services;

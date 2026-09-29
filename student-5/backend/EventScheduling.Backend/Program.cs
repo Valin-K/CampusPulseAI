@@ -1,3 +1,7 @@
+using CampusPulse.Shared.Mcp.Client;
+using CampusPulse.Shared.Rag.Assistant;
+using CampusPulse.Shared.Rag.Client;
+using CampusPulse.Shared.Rag.Generation;
 using EventScheduling.Backend.Clients;
 using EventScheduling.Backend.Services;
 
@@ -22,7 +26,23 @@ builder.Services.AddHttpClient<IAcademicRecordsClient, AcademicRecordsClient>(cl
         ?? "http://academicrecords.database:8080");
 });
 
+builder.Services.AddHttpClient<IRagServerClient, RagServerClient>(client =>
+{
+    client.BaseAddress = new Uri(builder.Configuration["Services:RagServer"] ?? "http://localhost:5267");
+    client.Timeout = TimeSpan.FromSeconds(90);
+});
+
+builder.Services.AddHttpClient<IMcpClient, McpClient>(client =>
+{
+    client.BaseAddress = new Uri(builder.Configuration["Services:McpServer"] ?? "http://localhost:5268");
+    client.Timeout = TimeSpan.FromSeconds(30);
+});
+
 builder.Services.AddScoped<IBookingAssistantService, GeminiBookingAssistantService>();
+builder.Services.AddSingleton<RagCitationParser>();
+builder.Services.AddScoped<RagKnowledgeService>();
+builder.Services.AddScoped<IEventRagService, EventKnowledgeService>();
+builder.Services.AddScoped<IEventKnowledgeService, LocalEventAiOrchestrator>();
 
 var geminiApiKey = builder.Configuration["GEMINI_API_KEY"];
 builder.Services.AddHttpClient("gemini", client =>

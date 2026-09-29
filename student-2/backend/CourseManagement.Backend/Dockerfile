@@ -14,6 +14,8 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 COPY ["Directory.Packages.props", "."]
+COPY ["shared/backend/CampusPulse.Shared.Mcp/CampusPulse.Shared.Mcp.csproj", "shared/backend/CampusPulse.Shared.Mcp/"]
+COPY ["shared/backend/CampusPulse.Shared.Rag/CampusPulse.Shared.Rag.csproj", "shared/backend/CampusPulse.Shared.Rag/"]
 COPY ["student-2/backend/CourseManagement.Backend/CourseManagement.Backend.csproj", "student-2/backend/CourseManagement.Backend/"]
 RUN dotnet restore "./student-2/backend/CourseManagement.Backend/CourseManagement.Backend.csproj"
 COPY . .

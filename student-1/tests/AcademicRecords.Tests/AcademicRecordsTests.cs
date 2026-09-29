@@ -1,4 +1,6 @@
 ﻿using AcademicRecords.Backend;
+using AcademicRecords.Backend.Calculators;
+using AcademicRecords.Backend.Contracts;
 using AcademicRecords.Backend.Services;
 using AcademicRecords.Database.Data;
 using AcademicRecords.Database.Models;
@@ -547,6 +549,90 @@ namespace AcademicRecords.Tests
             Assert.That(StudentStatisticsCalculator.GradePoints(65m), Is.EqualTo(5m));
             Assert.That(StudentStatisticsCalculator.GradePoints(50m), Is.EqualTo(4m));
             Assert.That(StudentStatisticsCalculator.GradePoints(49.99m), Is.EqualTo(0m));
+        }
+
+        [Test]
+        public void CreditPointsAreTotaledAndGroupedByAcademicYearForPassedFinalizedEnrollments()
+        {
+            var enrollments = new[]
+            {
+                new StudentStatisticsEnrollment { AcademicYear = 2024, Status = "Passed", Credits = 6m, IsFinalized = true },
+                new StudentStatisticsEnrollment { AcademicYear = 2024, Status = "Completed", Credits = 3m, IsFinalized = true },
+                new StudentStatisticsEnrollment { AcademicYear = 2025, Status = "Passed", Credits = 12m, IsFinalized = true },
+                new StudentStatisticsEnrollment { AcademicYear = 2025, Status = "Failed", Credits = 6m, IsFinalized = true },
+                new StudentStatisticsEnrollment { AcademicYear = 2025, Status = "In Progress", Credits = 6m, IsFinalized = true },
+                new StudentStatisticsEnrollment { AcademicYear = 2025, Status = "Passed", Credits = 6m, IsFinalized = false },
+                new StudentStatisticsEnrollment { AcademicYear = 2026, Status = "Passed", Credits = null, IsFinalized = true }
+            };
+
+            var result = CreditPointsCalculator.Calculate(enrollments);
+
+            Assert.That(result.TotalCreditPointsGained, Is.EqualTo(21m));
+            Assert.That(result.CreditPointsGainedPerYear, Is.EqualTo(new[]
+            {
+                new AnnualCreditPoints(2024, 9m),
+                new AnnualCreditPoints(2025, 12m)
+            }));
+        }
+
+        [Test]
+        public void StudentAcademicStatisticsCalculatorCombinesAllStatistics()
+        {
+            var profile = new StudentStatisticsProfile
+            {
+                StudentId = "STU-STATISTICS-1",
+                Enrollments =
+                [
+                    new StudentStatisticsEnrollment
+                    {
+                        AcademicYear = 2024,
+                        Status = "Passed",
+                        Credits = 6m,
+                        GradeValue = 80m,
+                        IsFinalized = true
+                    },
+                    new StudentStatisticsEnrollment
+                    {
+                        AcademicYear = 2024,
+                        Status = "Failed",
+                        Credits = 6m,
+                        GradeValue = 40m,
+                        IsFinalized = true
+                    },
+                    new StudentStatisticsEnrollment
+                    {
+                        AcademicYear = 2025,
+                        Status = "Completed",
+                        Credits = 12m,
+                        IsFinalized = true
+                    },
+                    new StudentStatisticsEnrollment
+                    {
+                        AcademicYear = 2025,
+                        Status = "Enrolled",
+                        Credits = 6m,
+                        IsFinalized = false
+                    }
+                ]
+            };
+
+            var result = StudentAcademicStatisticsCalculator.Calculate(profile);
+
+            Assert.That(result.StudentId, Is.EqualTo("STU-STATISTICS-1"));
+            Assert.That(result.Wam.Statistic, Is.EqualTo("WAM"));
+            Assert.That(result.Wam.Value, Is.EqualTo(60m));
+            Assert.That(result.Wam.GradedEnrollmentCount, Is.EqualTo(2));
+            Assert.That(result.Wam.TotalCredits, Is.EqualTo(12m));
+            Assert.That(result.Gpa.Statistic, Is.EqualTo("GPA"));
+            Assert.That(result.Gpa.Value, Is.EqualTo(3m));
+            Assert.That(result.Gpa.GradedEnrollmentCount, Is.EqualTo(2));
+            Assert.That(result.Gpa.TotalCredits, Is.EqualTo(12m));
+            Assert.That(result.TotalCreditPointsGained, Is.EqualTo(18m));
+            Assert.That(result.CreditPointsGainedPerYear, Is.EqualTo(new[]
+            {
+                new AnnualCreditPoints(2024, 6m),
+                new AnnualCreditPoints(2025, 12m)
+            }));
         }
 
         [Test]
