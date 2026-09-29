@@ -20,9 +20,9 @@ public sealed class AssistantControllerTests
     }
 
     [Test]
-    public async Task ChatMapsConfigurationFailureTo503()
+    public async Task ChatMapsInvalidModelOutputTo503()
     {
-        var controller = Controller(_ => throw new InvalidOperationException("GEMINI_API_KEY is not configured."));
+        var controller = Controller(_ => throw new InvalidOperationException("The AI service returned an invalid reply."));
 
         var result = await controller.Chat(new AssistantChatRequest(), CancellationToken.None);
 

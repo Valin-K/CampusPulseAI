@@ -3,7 +3,8 @@ using System.Text;
 using EventScheduling.Backend.Clients;
 using EventScheduling.Backend.Models;
 using EventScheduling.Backend.Services;
-using Microsoft.Extensions.Configuration;
+using CampusPulse.Shared.Ai;
+using System.Text.Json;
 
 namespace EventScheduling.Tests;
 
@@ -21,7 +22,11 @@ public sealed class GeminiBookingAssistantServiceTests
         Assert.Multiple(() =>
         {
             Assert.That(response.Reply, Is.EqualTo("Study Room 101 works for you."));
-            Assert.That(response.Model, Is.EqualTo("gemini-test"));
+            Assert.That(response.Model, Is.EqualTo("gateway-test"));
+            using var body = JsonDocument.Parse(gemini.RequestBody!);
+            Assert.That(body.RootElement.GetProperty("prompt").GetString(), Does.Contain("STRICT SCOPE"));
+            Assert.That(body.RootElement.GetProperty("prompt").GetString(), Does.Not.Contain("Study Room 101"));
+            Assert.That(body.RootElement.GetProperty("context").GetString(), Does.Contain("Study Room 101"));
             Assert.That(response.Proposal, Is.Not.Null);
             Assert.That(response.Proposal!.Kind, Is.EqualTo(AssistantResourceKind.Room));
             Assert.That(response.Proposal.ResourceId, Is.EqualTo(1));
@@ -130,17 +135,16 @@ public sealed class GeminiBookingAssistantServiceTests
     }
 
     [Test]
-    public void ChatThrowsWhenApiKeyIsMissing()
+    public async Task ChatUsesGatewayWithoutProviderConfiguration()
     {
-        var gemini = new RecordingHttpMessageHandler(Ok(GeminiEnvelope("{}")));
-        var service = CreateService(gemini, apiKey: null);
+        var gemini = new RecordingHttpMessageHandler(Ok(GeminiEnvelope("""{"message":"ok","proposal":null}""")));
+        var service = CreateService(gemini);
+        var response = await service.ChatAsync(Request(4, "hi"), CancellationToken.None);
 
         Assert.Multiple(() =>
         {
-            Assert.That(
-                async () => await service.ChatAsync(Request(4, "hi"), CancellationToken.None),
-                Throws.TypeOf<InvalidOperationException>());
-            Assert.That(gemini.CallCount, Is.Zero);
+            Assert.That(response.Reply, Is.EqualTo("ok"));
+            Assert.That(gemini.CallCount, Is.EqualTo(1));
         });
     }
 
@@ -181,6 +185,25 @@ public sealed class GeminiBookingAssistantServiceTests
         });
     }
 
+    [Test]
+    public void ChatPropagatesCallerCancellation()
+    {
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        var service = CreateService(new RecordingHttpMessageHandler(Ok(GeminiEnvelope("{}"))));
+        Assert.That(async () => await service.ChatAsync(Request(4, "hi"), cancellation.Token),
+            Throws.InstanceOf<OperationCanceledException>());
+    }
+
+    [TestCase("""{"text":"","model":"gateway-test"}""")]
+    [TestCase("{not-json")]
+    public void ChatPropagatesInvalidGatewayResponses(string body)
+    {
+        var service = CreateService(new RecordingHttpMessageHandler(Ok(body)));
+        Assert.That(async () => await service.ChatAsync(Request(4, "hi"), CancellationToken.None),
+            Throws.TypeOf<HttpRequestException>());
+    }
+
     private static AssistantChatRequest Request(int userId, string message) => new()
     {
         UserId = userId,
@@ -205,7 +228,8 @@ public sealed class GeminiBookingAssistantServiceTests
     private static string GeminiEnvelope(string modelText) =>
         System.Text.Json.JsonSerializer.Serialize(new
         {
-            candidates = new[] { new { content = new { parts = new[] { new { text = modelText } } } } }
+            text = modelText,
+            model = "gateway-test"
         });
 
     private static HttpResponseMessage Ok(string json) => new(HttpStatusCode.OK)
@@ -214,17 +238,8 @@ public sealed class GeminiBookingAssistantServiceTests
     };
 
     private static GeminiBookingAssistantService CreateService(
-        RecordingHttpMessageHandler geminiHandler,
-        string? apiKey = "test-key")
+        RecordingHttpMessageHandler geminiHandler)
     {
-        var configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["GEMINI_API_KEY"] = apiKey,
-                ["Gemini:Model"] = "gemini-test"
-            })
-            .Build();
-
         var databaseHandler = new RoutingHttpMessageHandler(new Dictionary<string, string>
         {
             ["/api/rooms"] = RoomsJson,
@@ -234,11 +249,11 @@ public sealed class GeminiBookingAssistantServiceTests
 
         var factory = new NamedHttpClientFactory(new Dictionary<string, HttpMessageHandler>
         {
-            ["eventDatabase"] = databaseHandler,
-            ["gemini"] = geminiHandler
+            ["eventDatabase"] = databaseHandler
         });
 
-        return new GeminiBookingAssistantService(factory, configuration, new StubAcademicRecordsClient());
+        var gateway = new AiGatewayClient(new HttpClient(geminiHandler) { BaseAddress = new Uri("https://gateway.test/") });
+        return new GeminiBookingAssistantService(factory, gateway, new StubAcademicRecordsClient());
     }
 
     private sealed class StubAcademicRecordsClient : IAcademicRecordsClient

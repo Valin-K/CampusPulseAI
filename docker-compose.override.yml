@@ -17,8 +17,6 @@ services:
     ports:
       - "5118:8080"
     volumes:
-      - ${APPDATA}/Microsoft/UserSecrets:/home/app/.microsoft/usersecrets:ro
-      - ${APPDATA}/Microsoft/UserSecrets:/root/.microsoft/usersecrets:ro
       - ${APPDATA}/ASP.NET/Https:/home/app/.aspnet/https:ro
       - ${APPDATA}/ASP.NET/Https:/root/.aspnet/https:ro
 
@@ -51,7 +49,6 @@ services:
 
 # MCP runs locally outside Docker Compose.
 x-local-ai-boundary: true
-
 
 
 

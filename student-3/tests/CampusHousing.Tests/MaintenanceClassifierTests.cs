@@ -1,5 +1,6 @@
 ﻿using CampusHousing.Backend.Services;
-using Microsoft.Extensions.Configuration;
+using CampusPulse.Shared.Ai;
+using System.Text.Json;
 using Microsoft.Extensions.Logging.Abstractions;
 using System.Net;
 using System.Net.Http.Json;
@@ -39,7 +40,7 @@ public class MaintenanceClassifierTests
         var responseText = "```json\n{\"severity\":\" emergency \",\"repairQueue\":\" invalid \"}\n```";
         var classifier = CreateClassifier(new StubHandler(HttpStatusCode.OK, new
         {
-            candidates = new[] { new { content = new { parts = new[] { new { text = responseText } } } } }
+            text = responseText, model = "gateway-test"
         }));
 
         var result = await classifier.ClassifyAsync("The issue is described", CancellationToken.None);
@@ -51,7 +52,7 @@ public class MaintenanceClassifierTests
     [TestCase(HttpStatusCode.OK)]
     public async Task ClassifyAsync_InvalidGeminiResponseUsesFallback(HttpStatusCode status)
     {
-        var body = status == HttpStatusCode.OK ? new { candidates = Array.Empty<object>() } : null;
+        var body = status == HttpStatusCode.OK ? new { text = "", model = "gateway-test" } : null;
         var classifier = CreateClassifier(new StubHandler(status, body));
 
         var result = await classifier.ClassifyAsync("A gas leak", CancellationToken.None);
@@ -74,7 +75,7 @@ public class MaintenanceClassifierTests
     {
         var classifier = CreateClassifier(new StubHandler(HttpStatusCode.OK, new
         {
-            candidates = new[] { new { content = new { parts = new[] { new { text = "{\"Severity\":\" Medium \",\"RepairQueue\":\" security \"}" } } } } }
+            text = "{\"Severity\":\" Medium \",\"RepairQueue\":\" security \"}", model = "gateway-test"
         }));
 
         var result = await classifier.ClassifyAsync("A camera issue", CancellationToken.None);
@@ -89,7 +90,7 @@ public class MaintenanceClassifierTests
     {
         var classifier = CreateClassifier(new StubHandler(HttpStatusCode.OK, new
         {
-            candidates = new[] { new { content = new { parts = new[] { new { text } } } } }
+            text, model = "gateway-test"
         }));
 
         var result = await classifier.ClassifyAsync("A broken light", CancellationToken.None);
@@ -109,44 +110,50 @@ public class MaintenanceClassifierTests
     }
 
     [Test]
-    public async Task ClassifyAsync_UsesConfiguredModelInGeminiPath()
+    public async Task ClassifyAsync_SeparatesInstructionsFromMaintenanceContext()
     {
         var handler = new StubHandler(HttpStatusCode.OK, new
         {
-            candidates = new[] { new { content = new { parts = new[] { new { text = "{\"severity\":\"Low\",\"repairQueue\":\"Security\"}" } } } } }
+            text = "{\"severity\":\"Low\",\"repairQueue\":\"Security\"}", model = "gateway-test"
         });
-        var classifier = CreateClassifier(handler, "gemini-custom");
+        var classifier = CreateClassifier(handler);
 
         await classifier.ClassifyAsync("A lock issue", CancellationToken.None);
 
-        Assert.That(handler.LastRequest!.RequestUri!.ToString(), Does.Contain("gemini-custom:generateContent"));
+        using var body = JsonDocument.Parse(handler.RequestBody!);
+        Assert.That(body.RootElement.GetProperty("prompt").GetString(), Does.Contain("Classify"));
+        Assert.That(body.RootElement.GetProperty("prompt").GetString(), Does.Not.Contain("A lock issue"));
+        Assert.That(body.RootElement.GetProperty("context").GetString(), Does.Contain("A lock issue"));
     }
 
-    private static MaintenanceClassifier CreateClassifier(HttpMessageHandler? handler = null, string? model = null)
+    [Test]
+    public void ClassifyAsync_CallerCancellationIsNotSwallowed()
+    {
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        var classifier = CreateClassifier(new ThrowingHandler(typeof(TaskCanceledException)));
+        Assert.That(async () => await classifier.ClassifyAsync("A gas leak", cancellation.Token),
+            Throws.InstanceOf<OperationCanceledException>());
+    }
+
+    private static MaintenanceClassifier CreateClassifier(HttpMessageHandler? handler = null)
     {
         return new MaintenanceClassifier(
-            new TestHttpClientFactory(handler),
-            new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["GEMINI_API_KEY"] = handler is null ? null : "test-key",
-                ["Gemini:Model"] = model
-            }).Build(),
+            new AiGatewayClient(new HttpClient(handler ?? new StubHandler(HttpStatusCode.ServiceUnavailable, null))
+                { BaseAddress = new Uri("https://gateway.test/") }),
             NullLogger<MaintenanceClassifier>.Instance);
-    }
-
-    private sealed class TestHttpClientFactory(HttpMessageHandler? handler) : IHttpClientFactory
-    {
-        public HttpClient CreateClient(string name) => new(handler ?? new StubHandler(HttpStatusCode.OK, null)) { BaseAddress = new Uri("https://gemini.test/") };
     }
 
     private sealed class StubHandler(HttpStatusCode status, object? body) : HttpMessageHandler
     {
         public HttpRequestMessage? LastRequest { get; private set; }
+        public string? RequestBody { get; private set; }
 
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             LastRequest = request;
-            return Task.FromResult(new HttpResponseMessage(status) { Content = JsonContent.Create(body) });
+            RequestBody = await request.Content!.ReadAsStringAsync(cancellationToken);
+            return new HttpResponseMessage(status) { Content = JsonContent.Create(body) };
         }
     }
 

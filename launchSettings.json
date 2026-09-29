@@ -7,6 +7,7 @@
       "composeLaunchAction": "None",
       "composeLaunchUrl": "http://localhost:8081",
       "serviceActions": {
+        "ai.gateway": "StartWithoutDebugging",
         "academicrecords.backend": "StartWithoutDebugging",
         "coursemanagement.database": "StartWithoutDebugging",
         "coursemanagement.backend": "StartWithoutDebugging",

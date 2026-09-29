@@ -2,7 +2,8 @@ using System.Net;
 using System.Text;
 using CourseManagement.Backend.Contracts.Ai;
 using CourseManagement.Backend.Services;
-using Microsoft.Extensions.Configuration;
+using CampusPulse.Shared.Ai;
+using System.Text.Json;
 
 namespace CourseManagement.Tests;
 
@@ -13,11 +14,8 @@ public sealed class GeminiCourseQuestionServiceTests
     {
         const string json = """
             {
-              "candidates": [{
-                "content": {
-                  "parts": [{ "text": "Review the prerequisite Courses first." }]
-                }
-              }]
+              "text": "Review the prerequisite Courses first.",
+              "model": "gateway-test"
             }
             """;
         var handler = new RecordingHttpMessageHandler(
@@ -39,7 +37,10 @@ public sealed class GeminiCourseQuestionServiceTests
             Assert.That(
                 response.Answer,
                 Is.EqualTo("Review the prerequisite Courses first."));
-            Assert.That(response.Model, Is.EqualTo("gemini-test"));
+            Assert.That(response.Model, Is.EqualTo("gateway-test"));
+            using var body = JsonDocument.Parse(handler.RequestBody!);
+            Assert.That(body.RootElement.GetProperty("prompt").GetString(), Does.Not.Contain("CPAI3001"));
+            Assert.That(body.RootElement.GetProperty("context").GetString(), Does.Contain("CPAI3001"));
             Assert.That(response.IsSyllabusGrounded, Is.False);
             Assert.That(handler.RequestBody, Does.Contain("CPAI3001"));
             Assert.That(
@@ -65,11 +66,8 @@ public sealed class GeminiCourseQuestionServiceTests
     {
         const string json = """
             {
-              "candidates": [{
-                "content": {
-                  "parts": [{ "text": "A catalogue-based answer." }]
-                }
-              }]
+              "text": "A catalogue-based answer.",
+              "model": "gateway-test"
             }
             """;
         var handler = new RecordingHttpMessageHandler(
@@ -107,11 +105,8 @@ public sealed class GeminiCourseQuestionServiceTests
     {
         const string json = """
             {
-              "candidates": [{
-                "content": {
-                  "parts": [{ "text": "A legacy Course answer." }]
-                }
-              }]
+              "text": "A legacy Course answer.",
+              "model": "gateway-test"
             }
             """;
         var handler = new RecordingHttpMessageHandler(
@@ -145,11 +140,11 @@ public sealed class GeminiCourseQuestionServiceTests
     }
 
     [Test]
-    public void AskRejectsMissingApiKeyBeforeCallingGemini()
+    public void AskPropagatesGatewayFailures()
     {
         var handler = new RecordingHttpMessageHandler(
-            new HttpResponseMessage(HttpStatusCode.OK));
-        var service = CreateService(handler, apiKey: null);
+            new HttpResponseMessage(HttpStatusCode.ServiceUnavailable));
+        var service = CreateService(handler);
 
         Assert.Multiple(() =>
         {
@@ -157,8 +152,8 @@ public sealed class GeminiCourseQuestionServiceTests
                 async () => await service.AskAsync(
                     Request("What should I learn first?"),
                     CancellationToken.None),
-                Throws.TypeOf<GeminiConfigurationException>());
-            Assert.That(handler.CallCount, Is.Zero);
+                Throws.TypeOf<HttpRequestException>());
+            Assert.That(handler.CallCount, Is.EqualTo(1));
         });
     }
 
@@ -179,7 +174,7 @@ public sealed class GeminiCourseQuestionServiceTests
             async () => await service.AskAsync(
                 Request("What should I learn first?"),
                 CancellationToken.None),
-            Throws.TypeOf<GeminiResponseException>());
+            Throws.TypeOf<HttpRequestException>());
     }
 
     [Test]
@@ -189,7 +184,7 @@ public sealed class GeminiCourseQuestionServiceTests
             new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = new StringContent(
-                    """{"candidates":[]}""",
+                    """{"text":"","model":"gateway-test"}""",
                     Encoding.UTF8,
                     "application/json")
             });
@@ -199,29 +194,28 @@ public sealed class GeminiCourseQuestionServiceTests
             async () => await service.AskAsync(
                 Request("What should I learn first?"),
                 CancellationToken.None),
-            Throws.TypeOf<GeminiResponseException>());
+            Throws.TypeOf<HttpRequestException>());
+    }
+
+    [Test]
+    public void AskPropagatesCallerCancellation()
+    {
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        var service = CreateService(new RecordingHttpMessageHandler(new HttpResponseMessage(HttpStatusCode.OK)));
+        Assert.That(async () => await service.AskAsync(Request("Question"), cancellation.Token),
+            Throws.InstanceOf<OperationCanceledException>());
     }
 
     static GeminiCourseQuestionService CreateService(
-        RecordingHttpMessageHandler handler,
-        string? apiKey = "test-key")
+        RecordingHttpMessageHandler handler)
     {
-        var values = new Dictionary<string, string?>
-        {
-            ["GEMINI_API_KEY"] = apiKey,
-            ["Gemini:Model"] = "gemini-test"
-        };
-        var configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(values)
-            .Build();
         var httpClient = new HttpClient(handler)
         {
-            BaseAddress = new Uri("https://gemini.test/")
+            BaseAddress = new Uri("https://gateway.test/")
         };
 
-        return new GeminiCourseQuestionService(
-            new StubHttpClientFactory(httpClient),
-            configuration);
+        return new GeminiCourseQuestionService(new AiGatewayClient(httpClient));
     }
 
     static CourseQuestionRequest Request(
@@ -243,11 +237,6 @@ public sealed class GeminiCourseQuestionServiceTests
                 }
             ]
         };
-
-    sealed class StubHttpClientFactory(HttpClient client) : IHttpClientFactory
-    {
-        public HttpClient CreateClient(string name) => client;
-    }
 
     sealed class RecordingHttpMessageHandler(HttpResponseMessage response)
         : HttpMessageHandler

@@ -24,7 +24,7 @@ concurrency:
 
 jobs:
   build-and-test:
-    name: Shared RAG library validation
+    name: Shared backend library validation
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -45,6 +45,9 @@ jobs:
 
       - name: Run unit tests
         run: dotnet test shared/backend/CampusPulse.Shared.Rag.Tests/CampusPulse.Shared.Rag.Tests.csproj --configuration Release --no-build --no-restore --logger "trx;LogFileName=shared-rag-tests.trx" --results-directory TestResults
+
+      - name: Test shared AI gateway and client
+        run: dotnet test shared/backend/CampusPulse.Shared.Ai.Tests/CampusPulse.Shared.Ai.Tests.csproj --configuration Release --logger "trx;LogFileName=shared-ai-tests.trx" --results-directory TestResults
 
       - name: Upload test results
         if: always()

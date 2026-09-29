@@ -20,6 +20,12 @@ public sealed class RagPromptBuilder
 
     public string Build(RagPromptRequest request)
     {
+        var parts = BuildParts(request);
+        return parts.Prompt + parts.Context;
+    }
+
+    public RagPromptParts BuildParts(RagPromptRequest request)
+    {
         ArgumentNullException.ThrowIfNull(request);
 
         var prompt = new StringBuilder();
@@ -48,32 +54,35 @@ public sealed class RagPromptBuilder
             prompt.AppendLine(request.Persona.Trim());
         }
 
-        prompt.AppendLine();
-        prompt.AppendLine("Context:");
+        var context = new StringBuilder();
+        context.AppendLine();
+        context.AppendLine("Context:");
         if (request.Sources.Count == 0)
         {
-            prompt.AppendLine("(no passages retrieved)");
+            context.AppendLine("(no passages retrieved)");
         }
         else
         {
             foreach (var source in request.Sources)
             {
-                prompt.AppendLine($"[{source.Rank}] {DescribeSource(source)}{source.Text}");
+                context.AppendLine($"[{source.Rank}] {DescribeSource(source)}{source.Text}");
             }
         }
 
         if (!string.IsNullOrWhiteSpace(request.SupplementalContext))
         {
-            prompt.AppendLine();
-            prompt.AppendLine("Supplemental MCP context (not a RAG document):");
-            prompt.AppendLine(request.SupplementalContext.Trim());
+            context.AppendLine();
+            context.AppendLine("Supplemental MCP context (not a RAG document):");
+            context.AppendLine(request.SupplementalContext.Trim());
         }
 
-        prompt.AppendLine();
-        prompt.AppendLine($"Question: {request.Question.Trim()}");
-        prompt.AppendLine("Answer:");
-        return prompt.ToString();
+        context.AppendLine();
+        context.AppendLine($"Question: {request.Question.Trim()}");
+        context.AppendLine("Answer:");
+        return new RagPromptParts(prompt.ToString(), context.ToString());
     }
+
+    public sealed record RagPromptParts(string Prompt, string Context);
 
     private static string DescribeSource(RagSource source)
     {
