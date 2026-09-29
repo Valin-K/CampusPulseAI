@@ -1,33 +1,26 @@
 using System.Net;
-using System.Text;
 using System.Text.Json;
 using AcademicRecords.Backend.Models;
 using AcademicRecords.Backend.Services;
+using CampusPulse.Shared.Ai;
 using CampusPulse.Shared.Mcp.Client;
 using CampusPulse.Shared.Mcp.Contracts;
 using CampusPulse.Shared.Rag.Assistant;
 using CampusPulse.Shared.Rag.Contracts;
-using Microsoft.Extensions.Configuration;
 
 namespace AcademicRecords.Tests;
 
 public sealed class AcademicKnowledgeOrchestratorTests
 {
     [Test]
-    public async Task AskUsesDirectRouteWithoutCallingRagOrMcpTools()
+    public async Task AskUsesDirectRouteWithoutCallingRagOrMcpToolsAndUsesGatewayModel()
     {
-        var gemini = new QueueHttpMessageHandler(
-            GeminiResponse("""
-                {
-                  "route": "direct",
-                  "ragQuestion": null,
-                  "mcpCalls": []
-                }
-                """),
-            GeminiResponse("A general academic explanation."));
+        var gateway = new RecordingAiGateway(
+            PlanResponse("direct", null, []),
+            new AiGenerationResponse("A general academic explanation.", "shared-model"));
         var mcp = new StubMcpClient();
         var rag = new StubAcademicRagService();
-        var service = CreateService(gemini, mcp, rag);
+        var service = CreateService(gateway, mcp, rag);
 
         var answer = await service.AskAsync(
             new KnowledgeQuestionRequest { Question = "What is a GPA?" },
@@ -36,29 +29,33 @@ public sealed class AcademicKnowledgeOrchestratorTests
         Assert.Multiple(() =>
         {
             Assert.That(answer.Reply, Is.EqualTo("A general academic explanation."));
+            Assert.That(answer.Embedder, Is.EqualTo("shared-model"));
             Assert.That(rag.LastRequest, Is.Null);
             Assert.That(mcp.CalledTools, Is.Empty);
+            Assert.That(gateway.Calls, Has.Count.EqualTo(2));
+            Assert.That(gateway.Calls[0].Context, Does.Contain("What is a GPA?"));
+            Assert.That(gateway.Calls[0].Context, Does.Contain("[]"));
+            Assert.That(gateway.Calls[0].Context, Does.Not.Contain("get_student_enrollments"));
+            Assert.That(gateway.Calls[1].Prompt, Does.Contain("Use only the supplied RAG and MCP results"));
+            Assert.That(gateway.Calls[1].Context, Does.Contain("What is a GPA?"));
         });
     }
 
     [Test]
     public async Task AskCombinesRagAndMcpAndBindsStudentIdsFromTrustedInputs()
     {
-        var gemini = new QueueHttpMessageHandler(
-            GeminiResponse("""
-                {
-                  "route": "rag_and_mcp",
-                  "ragQuestion": "What does my progression policy say?",
-                  "mcpCalls": [
-                    { "tool": "get_student_enrollments", "arguments": { "user_id": 999 } },
-                    { "tool": "calculate_student_academic_statistics", "arguments": { "student_id": "STU999" } }
-                  ]
-                }
-                """),
-            GeminiResponse("Your academic statistics are available."));
+        var gateway = new RecordingAiGateway(
+            PlanResponse(
+                "rag_and_mcp",
+                "What does my progression policy say?",
+                [
+                    new { tool = "get_student_enrollments", arguments = new { user_id = 999 } },
+                    new { tool = "calculate_student_academic_statistics", arguments = new { student_id = "STU999" } }
+                ]),
+            new AiGenerationResponse("Your academic statistics are available.", "shared-model"));
         var mcp = new StubMcpClient();
         var rag = new StubAcademicRagService();
-        var service = CreateService(gemini, mcp, rag);
+        var service = CreateService(gateway, mcp, rag);
 
         var answer = await service.AskAsync(
             new KnowledgeQuestionRequest { Question = "How am I progressing?", UserId = 42 },
@@ -77,29 +74,26 @@ public sealed class AcademicKnowledgeOrchestratorTests
             Assert.That(answer.Sources.Select(source => source.DocumentId), Does.Contain("mcp:get_student_enrollments"));
             Assert.That(answer.Sources.Select(source => source.DocumentId), Does.Contain("mcp:calculate_student_academic_statistics"));
             Assert.That(answer.Sources.Select(source => source.DocumentId), Does.Contain("policy-graduation"));
+            Assert.That(answer.Embedder, Is.EqualTo("test-embedder"));
+            Assert.That(gateway.Calls[1].Context, Does.Contain("get_student_enrollments"));
         });
     }
 
     [Test]
     public void AskRejectsToolsOutsideTheAcademicAllowlist()
     {
-        var gemini = new QueueHttpMessageHandler(GeminiResponse("""
-            {
-              "route": "mcp",
-              "ragQuestion": null,
-              "mcpCalls": [{ "tool": "project_files", "arguments": {} }]
-            }
-            """));
+        var gateway = new RecordingAiGateway(
+            PlanResponse("mcp", null, [new { tool = "project_files", arguments = new { } }]));
         var mcp = new StubMcpClient();
-        var service = CreateService(gemini, mcp, new StubAcademicRagService());
+        var service = CreateService(gateway, mcp, new StubAcademicRagService());
+
+        var exception = Assert.ThrowsAsync<HttpRequestException>(() => service.AskAsync(
+            new KnowledgeQuestionRequest { Question = "List repository files.", UserId = 42 },
+            CancellationToken.None));
 
         Assert.Multiple(() =>
         {
-            Assert.That(
-                async () => await service.AskAsync(
-                    new KnowledgeQuestionRequest { Question = "List repository files.", UserId = 42 },
-                    CancellationToken.None),
-                Throws.TypeOf<AcademicGeminiResponseException>());
+            Assert.That(exception!.StatusCode, Is.EqualTo(HttpStatusCode.BadGateway));
             Assert.That(mcp.CalledTools, Is.Empty);
         });
     }
@@ -107,83 +101,67 @@ public sealed class AcademicKnowledgeOrchestratorTests
     [Test]
     public void AskRejectsStudentToolsWithoutRequestUserId()
     {
-        var gemini = new QueueHttpMessageHandler(GeminiResponse("""
-            {
-              "route": "mcp",
-              "ragQuestion": null,
-              "mcpCalls": [{ "tool": "get_student_enrollments", "arguments": {} }]
-            }
-            """));
+        var gateway = new RecordingAiGateway(
+            PlanResponse("mcp", null, [new { tool = "get_student_enrollments", arguments = new { } }]));
         var mcp = new StubMcpClient();
-        var service = CreateService(gemini, mcp, new StubAcademicRagService());
+        var service = CreateService(gateway, mcp, new StubAcademicRagService());
+
+        var exception = Assert.ThrowsAsync<HttpRequestException>(() => service.AskAsync(
+            new KnowledgeQuestionRequest { Question = "What courses am I taking?" },
+            CancellationToken.None));
 
         Assert.Multiple(() =>
         {
-            Assert.That(
-                async () => await service.AskAsync(
-                    new KnowledgeQuestionRequest { Question = "What courses am I taking?" },
-                    CancellationToken.None),
-                Throws.TypeOf<AcademicGeminiResponseException>());
+            Assert.That(exception!.StatusCode, Is.EqualTo(HttpStatusCode.BadGateway));
             Assert.That(mcp.CalledTools, Is.Empty);
         });
     }
 
     private static AcademicKnowledgeOrchestrator CreateService(
-        HttpMessageHandler gemini,
+        RecordingAiGateway gateway,
         StubMcpClient mcp,
-        StubAcademicRagService rag)
-    {
-        var configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["GEMINI_API_KEY"] = "test-key",
-                ["Gemini:Model"] = "gemini-test"
-            })
-            .Build();
-        return new AcademicKnowledgeOrchestrator(
-            new StubHttpClientFactory(new HttpClient(gemini)
-            {
-                BaseAddress = new Uri("https://gemini.test/")
-            }),
-            configuration,
-            mcp,
-            rag);
-    }
+        StubAcademicRagService rag) =>
+        new(gateway, mcp, rag);
 
-    private static HttpResponseMessage GeminiResponse(string text)
+    private static AiGenerationResponse PlanResponse(
+        string route,
+        string? ragQuestion,
+        object[] calls)
     {
-        var json = JsonSerializer.Serialize(new
+        var text = JsonSerializer.Serialize(new
         {
-            candidates = new[]
-            {
-                new { content = new { parts = new[] { new { text } } } }
-            }
+            route,
+            ragQuestion,
+            mcpCalls = calls
         });
-        return new HttpResponseMessage(HttpStatusCode.OK)
-        {
-            Content = new StringContent(json, Encoding.UTF8, "application/json")
-        };
+        return new AiGenerationResponse(text, "shared-model");
     }
 
-    private sealed class StubHttpClientFactory(HttpClient client) : IHttpClientFactory
+    private sealed class RecordingAiGateway(params AiGenerationResponse[] responses) : IAiGatewayClient
     {
-        public HttpClient CreateClient(string name) => name == "gemini"
-            ? client
-            : throw new ArgumentException($"Unexpected client name: {name}", nameof(name));
-    }
+        private readonly Queue<AiGenerationResponse> queue = new(responses);
+        public List<GatewayCall> Calls { get; } = [];
 
-    private sealed class QueueHttpMessageHandler(params HttpResponseMessage[] responses) : HttpMessageHandler
-    {
-        private readonly Queue<HttpResponseMessage> queue = new(responses);
-
-        protected override Task<HttpResponseMessage> SendAsync(
-            HttpRequestMessage request,
-            CancellationToken cancellationToken)
+        public Task<AiGenerationResponse> GenerateAsync(
+            string prompt,
+            string context,
+            CancellationToken cancellationToken = default)
         {
-            cancellationToken.ThrowIfCancellationRequested();
+            Calls.Add(new GatewayCall(prompt, context, cancellationToken));
             return Task.FromResult(queue.Dequeue());
         }
+
+        public Task<AiEmbeddingResponse> EmbedAsync(
+            IReadOnlyList<string> texts,
+            bool isQuery,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<AiGatewayStatus> GetStatusAsync(CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
     }
+
+    private sealed record GatewayCall(string Prompt, string Context, CancellationToken CancellationToken);
 
     private sealed class StubMcpClient : IMcpClient
     {

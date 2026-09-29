@@ -204,8 +204,9 @@ public sealed class BackendControllersTests
     }
 
     [TestCase("invalid-operation", 503)]
-    [TestCase("gemini-configuration", 503)]
-    [TestCase("gemini-response", 502)]
+    [TestCase("gateway-bad-gateway", 502)]
+    [TestCase("gateway-service-unavailable", 503)]
+    [TestCase("gateway-timeout", 504)]
     [TestCase("mcp", 503)]
     [TestCase("http-request", 503)]
     [TestCase("timeout", 504)]
@@ -215,8 +216,9 @@ public sealed class BackendControllersTests
         var knowledge = new StubAcademicKnowledgeService((_, _) => failure switch
         {
             "invalid-operation" => Task.FromException<RagAssistantAnswer>(new InvalidOperationException("RAG is not configured.")),
-            "gemini-configuration" => Task.FromException<RagAssistantAnswer>(new AcademicGeminiConfigurationException("Gemini is not configured.")),
-            "gemini-response" => Task.FromException<RagAssistantAnswer>(new AcademicGeminiResponseException("Gemini returned an invalid response.")),
+            "gateway-bad-gateway" => Task.FromException<RagAssistantAnswer>(new HttpRequestException("Gateway failed.", null, HttpStatusCode.BadGateway)),
+            "gateway-service-unavailable" => Task.FromException<RagAssistantAnswer>(new HttpRequestException("Gateway unavailable.", null, HttpStatusCode.ServiceUnavailable)),
+            "gateway-timeout" => Task.FromException<RagAssistantAnswer>(new HttpRequestException("Gateway timed out.", null, HttpStatusCode.GatewayTimeout)),
             "mcp" => Task.FromException<RagAssistantAnswer>(new McpResponseException("MCP is unavailable.")),
             "http-request" => Task.FromException<RagAssistantAnswer>(new HttpRequestException("RAG unavailable.")),
             "timeout" => Task.FromException<RagAssistantAnswer>(new TaskCanceledException()),

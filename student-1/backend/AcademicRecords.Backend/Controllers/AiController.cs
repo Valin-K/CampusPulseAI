@@ -1,3 +1,4 @@
+using System.Net;
 using AcademicRecords.Backend.Models;
 using AcademicRecords.Backend.Services;
 using CampusPulse.Shared.Mcp.Client;
@@ -51,23 +52,26 @@ public sealed class AiController(
         {
             return Problem(exception.Message, statusCode: StatusCodes.Status503ServiceUnavailable);
         }
-        catch (AcademicGeminiConfigurationException exception)
-        {
-            return Problem(exception.Message, statusCode: StatusCodes.Status503ServiceUnavailable);
-        }
-        catch (AcademicGeminiResponseException exception)
-        {
-            return Problem(exception.Message, statusCode: StatusCodes.Status502BadGateway);
-        }
         catch (McpResponseException exception)
         {
             return Problem(exception.Message, statusCode: StatusCodes.Status503ServiceUnavailable);
         }
-        catch (HttpRequestException)
+        catch (HttpRequestException exception)
         {
+            var statusCode = exception.StatusCode switch
+            {
+                HttpStatusCode.BadGateway => StatusCodes.Status502BadGateway,
+                HttpStatusCode.GatewayTimeout => StatusCodes.Status504GatewayTimeout,
+                HttpStatusCode.ServiceUnavailable or HttpStatusCode.TooManyRequests =>
+                    StatusCodes.Status503ServiceUnavailable,
+                null => StatusCodes.Status503ServiceUnavailable,
+                _ => StatusCodes.Status502BadGateway
+            };
             return Problem(
-                "A required AI service is unavailable.",
-                statusCode: StatusCodes.Status503ServiceUnavailable);
+                statusCode == StatusCodes.Status502BadGateway
+                    ? "A required AI service returned an invalid response."
+                    : "A required AI service is unavailable.",
+                statusCode: statusCode);
         }
         catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
