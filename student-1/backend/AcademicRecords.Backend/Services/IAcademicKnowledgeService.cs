@@ -7,3 +7,8 @@ public interface IAcademicKnowledgeService
 {
     Task<RagAssistantAnswer> AskAsync(KnowledgeQuestionRequest request, CancellationToken cancellationToken);
 }
+
+public interface IAcademicRagService
+{
+    Task<RagAssistantAnswer> AskAsync(KnowledgeQuestionRequest request, CancellationToken cancellationToken);
+}

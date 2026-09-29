@@ -42,7 +42,8 @@ builder.Services.AddHttpClient<IRagServerClient, RagServerClient>(client =>
 });
 builder.Services.AddSingleton<RagCitationParser>();
 builder.Services.AddScoped<RagKnowledgeService>();
-builder.Services.AddScoped<IAcademicKnowledgeService, AcademicKnowledgeService>();
+builder.Services.AddScoped<IAcademicRagService, AcademicKnowledgeService>();
+builder.Services.AddScoped<IAcademicKnowledgeService, AcademicKnowledgeOrchestrator>();
 builder.Services.AddCors(options => options.AddPolicy("Frontend", policy => policy
     .WithOrigins("http://localhost:5062", "http://localhost:8081")
     .AllowAnyHeader()
