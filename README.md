@@ -89,6 +89,39 @@ The Compose configuration starts the databases, backend APIs, shared AI gateway,
 
 Backend containers expose port `8080` inside the Compose network. Visual Studio may assign host ports dynamically for services that do not have an explicit host-port mapping. Use the **Containers** window to see the actual host ports and service status.
 
+## Student 4: MCP and RAG features
+
+In **Financial Aid and Billing** (`http://localhost:8084`), open **Scholarships**:
+
+- **Find my matches** calls `POST /api/scholarships/recommendations/student/{userId}`.
+  The backend resolves the Academic Records profile, then calls the shared MCP
+  `calculate_student_academic_statistics` tool using the academic student identifier
+  (not the numeric user ID). The returned GPA is supplied to Gemini alongside
+  open, unexpired scholarship matches by major and year. The UI shows the MCP
+  tool, student identifier, execution time, and GPA.
+- Academic Records reports GPA on a **7-point scale**, whereas scholarship
+  requirements use a **4-point scale**. No conversion policy is configured:
+  these are potential matches, and GPA eligibility is explicitly **unverified**
+  pending aid-office review. Missing finalized grades are not treated as zero GPA.
+- **Ask the knowledge assistant** calls `POST /api/assistant/rag/scholarships`.
+  It loads the current scholarship catalogue and policy, ingests them into the
+  `financialaidbilling` RAG collection, and requests a grounded answer.
+  The UI displays retrieved source passages and distinguishes answered,
+  insufficient-evidence, and generation-unavailable/failed responses.
+  `/api/ai/knowledge` uses the same corpus for the shared assistant.
+- **Check MCP registration** remains a diagnostic; it is not the substantive MCP feature.
+
+Run Academic Records, the billing database/backend, the AI gateway, and the host
+MCP/RAG services (`.\scripts\launch-local-ai-services.ps1`). Student 4 uses
+`Services:McpServer` (default `http://localhost:5268`) and `Services:RagServer`
+(default `http://localhost:5267`); Compose supplies `host.docker.internal` URLs.
+MCP must also be able to reach Academic Records. Dependency failures and timeouts
+are surfaced, not replaced with fabricated statistics or an incomplete catalogue.
+
+To demonstrate both features, find matches for the selected student and confirm
+the MCP evidence appears, then ask "Which scholarships are open to computing
+students?" and inspect the RAG answer and its source passages.
+
 ## Use the Visual Studio Containers window
 
 Visual Studio provides a graphical view of the Docker resources used by the solution:

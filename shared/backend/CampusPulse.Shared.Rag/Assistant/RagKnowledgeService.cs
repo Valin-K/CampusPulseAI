@@ -15,7 +15,12 @@ public sealed class RagKnowledgeService(IRagServerClient rag, RagCitationParser 
     {
         var trimmedQuestion = question.Trim();
 
-        await rag.IngestAsync(feature.Collection, new RagIngestRequest(corpus), cancellationToken);
+        var ingest = await rag.IngestAsync(feature.Collection, new RagIngestRequest(corpus), cancellationToken);
+        if (ingest is null || ingest.Collection != feature.Collection
+            || ingest.Documents != corpus.Count || ingest.Chunks < 1)
+        {
+            throw new InvalidOperationException("The RAG server did not confirm ingestion of the knowledge corpus.");
+        }
 
         var response = await rag.AnswerAsync(
             feature.Collection,

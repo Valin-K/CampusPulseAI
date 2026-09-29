@@ -13,6 +13,7 @@ ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 COPY ["Directory.Packages.props", "."]
 COPY ["shared/backend/CampusPulse.Shared.Ai/CampusPulse.Shared.Ai.csproj", "shared/backend/CampusPulse.Shared.Ai/"]
+COPY ["shared/backend/CampusPulse.Shared.Mcp/CampusPulse.Shared.Mcp.csproj", "shared/backend/CampusPulse.Shared.Mcp/"]
 COPY ["shared/backend/CampusPulse.Shared.Rag/CampusPulse.Shared.Rag.csproj", "shared/backend/CampusPulse.Shared.Rag/"]
 COPY ["student-4/backend/FinancialAidBilling.Backend/FinancialAidBilling.Backend.csproj", "student-4/backend/FinancialAidBilling.Backend/"]
 RUN dotnet restore "./student-4/backend/FinancialAidBilling.Backend/FinancialAidBilling.Backend.csproj"
