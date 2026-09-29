@@ -21,17 +21,19 @@ public sealed class GetCourseDetailsTool(CourseManagementApiClient courseManagem
         "course.get_details",
         "Get one course with its prerequisites, faculty assignments and syllabus metadata.",
         "Course Management",
-        new Dictionary<string, string>
-        {
-            ["courseId"] = "Required positive course database ID."
-        })
+        CourseToolSchemas.Identifier())
 {
-    protected override Task<McpToolExecution> ExecuteCoreAsync(
+    protected override async Task<McpToolExecution> ExecuteCoreAsync(
         McpCallRequest request,
-        CancellationToken cancellationToken) =>
-        courseManagement.GetCourseDetailsAsync(
-            courseManagement.RequiredCourseId(request.Arguments),
+        CancellationToken cancellationToken)
+    {
+        var courseId = await courseManagement.ResolveCourseIdAsync(
+            request.Arguments,
             cancellationToken);
+        return await courseManagement.GetCourseDetailsAsync(
+            courseId,
+            cancellationToken);
+    }
 }
 
 public sealed class GetCoursePrerequisitesTool(CourseManagementApiClient courseManagement)
@@ -39,17 +41,19 @@ public sealed class GetCoursePrerequisitesTool(CourseManagementApiClient courseM
         "course.get_prerequisites",
         "Get the prerequisite requirements for one course.",
         "Course Management",
-        new Dictionary<string, string>
-        {
-                ["courseId"] = "Required positive course database ID."
-        })
+        CourseToolSchemas.Identifier())
 {
-    protected override Task<McpToolExecution> ExecuteCoreAsync(
+    protected override async Task<McpToolExecution> ExecuteCoreAsync(
         McpCallRequest request,
-        CancellationToken cancellationToken) =>
-        courseManagement.GetCoursePrerequisitesAsync(
-            courseManagement.RequiredCourseId(request.Arguments),
+        CancellationToken cancellationToken)
+    {
+        var courseId = await courseManagement.ResolveCourseIdAsync(
+            request.Arguments,
             cancellationToken);
+        return await courseManagement.GetCoursePrerequisitesAsync(
+            courseId,
+            cancellationToken);
+    }
 }
 
 public sealed class GetFacultyAssignmentsTool(CourseManagementApiClient courseManagement)
@@ -57,17 +61,19 @@ public sealed class GetFacultyAssignmentsTool(CourseManagementApiClient courseMa
         "course.get_faculty_assignments",
         "Get the faculty members assigned to one course.",
         "Course Management",
-        new Dictionary<string, string>
-        {
-            ["courseId"] = "Required positive course database ID."
-        })  
+        CourseToolSchemas.Identifier())
 {
-    protected override Task<McpToolExecution> ExecuteCoreAsync(
+    protected override async Task<McpToolExecution> ExecuteCoreAsync(
         McpCallRequest request,
-        CancellationToken cancellationToken) =>
-        courseManagement.GetFacultyAssignmentsAsync(
-            courseManagement.RequiredCourseId(request.Arguments),
+        CancellationToken cancellationToken)
+    {
+        var courseId = await courseManagement.ResolveCourseIdAsync(
+            request.Arguments,
             cancellationToken);
+        return await courseManagement.GetFacultyAssignmentsAsync(
+            courseId,
+            cancellationToken);
+    }
 }
 
 public sealed class CheckPrerequisiteEligibilityTool(CourseManagementApiClient courseManagement)
@@ -75,17 +81,44 @@ public sealed class CheckPrerequisiteEligibilityTool(CourseManagementApiClient c
         "course.check_prerequisite_eligibility",
         "Check whether completed courses and grades satisfy a target course's prerequisite requirements.",
         "Course Management",
-        new Dictionary<string, string>
-            {
-                ["courseId"] = "Required positive target course database ID.",
-                ["completedCourses"] = "Required array of objects containing courseCode and grade."
-            })
+        CourseToolSchemas.Identifier(
+            ("completedCourses",
+                "Required array of objects containing courseCode and grade.")))
 {
-    protected override Task<McpToolExecution> ExecuteCoreAsync(
+    protected override async Task<McpToolExecution> ExecuteCoreAsync(
         McpCallRequest request,
-        CancellationToken cancellationToken) =>
-        courseManagement.CheckPrerequisiteEligibilityAsync(
-            courseManagement.RequiredCourseId(request.Arguments),
+        CancellationToken cancellationToken)
+    {
+        var courseId = await courseManagement.ResolveCourseIdAsync(
+            request.Arguments,
+            cancellationToken);
+        return await courseManagement.CheckPrerequisiteEligibilityAsync(
+            courseId,
             courseManagement.RequiredCompletedCourses(request.Arguments),
             cancellationToken);
+    }
+}
+
+internal static class CourseToolSchemas
+{
+    public static Dictionary<string, string> Identifier(
+        params (string Name, string Description)[] additionalArguments)
+    {
+        var schema = new Dictionary<string, string>
+        {
+            ["courseId"] =
+                "Optional positive Course database ID. Provide exactly one Course identifier.",
+            ["courseCode"] =
+                "Optional exact Course code. Provide exactly one Course identifier.",
+            ["courseName"] =
+                "Optional exact Course name. Provide exactly one Course identifier."
+        };
+
+        foreach (var (name, description) in additionalArguments)
+        {
+            schema[name] = description;
+        }
+
+        return schema;
+    }
 }

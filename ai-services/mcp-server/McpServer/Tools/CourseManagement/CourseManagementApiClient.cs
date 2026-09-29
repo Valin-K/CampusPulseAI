@@ -9,6 +9,80 @@ public sealed class CourseManagementApiClient(HttpClient courseManagement) : IDi
 {
     public void Dispose() => courseManagement.Dispose();
 
+    public async Task<int> ResolveCourseIdAsync(
+        IReadOnlyDictionary<string, object?> arguments,
+        CancellationToken cancellationToken)
+    {
+        var hasCourseId = arguments.ContainsKey("courseId");
+        var courseCode = OptionalString(arguments, "courseCode");
+        var courseName = OptionalString(arguments, "courseName");
+        var identifierCount = (hasCourseId ? 1 : 0)
+            + (courseCode is null ? 0 : 1)
+            + (courseName is null ? 0 : 1);
+
+        if (identifierCount != 1)
+        {
+            throw new McpToolArgumentException(
+                "Provide exactly one of courseId, courseCode, or courseName.");
+        }
+
+        if (hasCourseId)
+        {
+            return RequiredCourseId(arguments);
+        }
+
+        using var response = await courseManagement.GetAsync(
+            "/api/courses",
+            cancellationToken);
+        var payload = await ReadPayloadAsync(response, cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new HttpRequestException(
+                $"The Course API returned HTTP {(int)response.StatusCode} while resolving the Course.");
+        }
+
+        if (payload.ValueKind != JsonValueKind.Array)
+        {
+            throw new HttpRequestException(
+                "The Course API returned an invalid Course catalogue.");
+        }
+
+        var propertyName = courseCode is null ? "name" : "code";
+        var expectedValue = courseCode ?? courseName!;
+        var matches = payload
+            .EnumerateArray()
+            .Where(course =>
+                course.TryGetProperty(propertyName, out var property)
+                && property.ValueKind == JsonValueKind.String
+                && string.Equals(
+                    property.GetString(),
+                    expectedValue,
+                    StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        if (matches.Count == 0)
+        {
+            throw new McpToolArgumentException(
+                $"No Course matched {propertyName} '{expectedValue}'.");
+        }
+
+        if (matches.Count > 1)
+        {
+            throw new McpToolArgumentException(
+                $"More than one Course matched {propertyName} '{expectedValue}'.");
+        }
+
+        if (!matches[0].TryGetProperty("id", out var id)
+            || !id.TryGetInt32(out var courseId)
+            || courseId <= 0)
+        {
+            throw new HttpRequestException(
+                "The matching Course did not contain a valid ID.");
+        }
+
+        return courseId;
+    }
+
     public int RequiredCourseId(
         IReadOnlyDictionary<string, object?> arguments)
     {
@@ -155,5 +229,25 @@ public sealed class CourseManagementApiClient(HttpClient courseManagement) : IDi
 
         return await response.Content.ReadFromJsonAsync<JsonElement>(
             cancellationToken);
+    }
+
+    private static string? OptionalString(
+        IReadOnlyDictionary<string, object?> arguments,
+        string name)
+    {
+        if (!arguments.TryGetValue(name, out var value))
+        {
+            return null;
+        }
+
+        var text = value switch
+        {
+            JsonElement { ValueKind: JsonValueKind.String } element =>
+                element.GetString(),
+            string stringValue => stringValue,
+            _ => null
+        };
+
+        return string.IsNullOrWhiteSpace(text) ? null : text.Trim();
     }
 }
