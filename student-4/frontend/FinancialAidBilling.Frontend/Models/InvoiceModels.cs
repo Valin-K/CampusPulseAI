@@ -71,7 +71,11 @@ public sealed record ScholarshipRequest(string Name, string Description, decimal
 
 public sealed record ScholarshipResponse(int Id, string Name, string Description, decimal AwardAmount, decimal MinimumGpa, string EligibleMajor, int MinimumYearLevel, DateOnly ApplicationDeadline, bool IsActive);
 
-public sealed record ScholarshipRecommendationResponse(int StudentId, int MatchCount, string Recommendation);
+public sealed record ScholarshipRecommendationResponse(
+    int StudentId, int MatchCount, string Recommendation, ScholarshipAcademicContext AcademicContext);
+
+public sealed record ScholarshipAcademicContext(
+    string StudentId, decimal? Gpa, int GpaScale, string GpaEligibility, string Tool, DateTimeOffset ExecutedAtUtc);
 
 public sealed record RagQuestionRequest(string Question);
 

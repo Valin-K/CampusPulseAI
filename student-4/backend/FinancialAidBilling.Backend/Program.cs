@@ -1,7 +1,7 @@
 using CampusPulse.Shared.Rag.Assistant;
 using CampusPulse.Shared.Ai;
+using CampusPulse.Shared.Mcp.Client;
 using CampusPulse.Shared.Rag.Client;
-using CampusPulse.Shared.Rag.Contracts;
 using CampusPulse.Shared.Rag.Generation;
 using FinancialAidBilling.Backend.Models;
 using FinancialAidBilling.Backend.Services;
@@ -29,11 +29,12 @@ builder.Services.AddHttpClient("mcp", client =>
 {
     client.BaseAddress = new Uri(builder.Configuration["Services:McpServer"] ?? "http://localhost:5268");
 });
-builder.Services.AddHttpClient("rag", client =>
+builder.Services.AddHttpClient<IMcpClient, McpClient>(client =>
 {
-    client.BaseAddress = new Uri(builder.Configuration["Services:RagServer"] ?? "http://localhost:5267");
-    client.Timeout = TimeSpan.FromSeconds(90);
+    client.BaseAddress = new Uri(builder.Configuration["Services:McpServer"] ?? "http://localhost:5268");
+    client.Timeout = TimeSpan.FromSeconds(30);
 });
+builder.Services.AddScoped<ScholarshipAcademicService>();
 builder.Services.AddScoped<GeminiScholarshipService>();
 builder.Services.AddHttpClient<IRagServerClient, RagServerClient>(client =>
 {
@@ -113,7 +114,8 @@ scholarships.MapPost("/recommendations/student/{userId:int}", async (int userId,
             profile.UserId,
             $"{profile.FirstName} {profile.LastName}",
             string.IsNullOrWhiteSpace(profile.Major) ? "Undeclared" : profile.Major,
-            yearLevel);
+            yearLevel,
+            profile.StudentId);
 
         return Results.Ok(await service.RecommendAsync(student, cancellationToken));
     }
@@ -124,6 +126,21 @@ scholarships.MapPost("/recommendations/student/{userId:int}", async (int userId,
     catch (HttpRequestException)
     {
         return Results.Problem("Student information or the scholarship recommendation service is unavailable.", statusCode: StatusCodes.Status503ServiceUnavailable);
+    }
+    catch (McpResponseException)
+    {
+        return Results.Problem("Academic statistics could not be verified through MCP. Check that MCP and Academic Records are running.",
+            statusCode: StatusCodes.Status503ServiceUnavailable);
+    }
+    catch (System.Text.Json.JsonException)
+    {
+        return Results.Problem("A scholarship dependency returned an invalid response.",
+            statusCode: StatusCodes.Status502BadGateway);
+    }
+    catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
+    {
+        return Results.Problem("The scholarship recommendation service did not respond in time.",
+            statusCode: StatusCodes.Status504GatewayTimeout);
     }
 });
 
@@ -154,7 +171,7 @@ assistant.MapPost("/mcp/integration", async (IHttpClientFactory clients, Cancell
 
 assistant.MapPost("/rag/scholarships", async (
     RagQuestionRequest request,
-    IHttpClientFactory clients,
+    IFinancialAidKnowledgeService knowledge,
     CancellationToken cancellationToken) =>
 {
     if (string.IsNullOrWhiteSpace(request.Question) || request.Question.Length > 1000)
@@ -164,42 +181,21 @@ assistant.MapPost("/rag/scholarships", async (
 
     try
     {
-        using var scholarshipsResponse = await clients.CreateClient("billingDatabase")
-            .GetAsync("/api/scholarships", cancellationToken);
-        if (!scholarshipsResponse.IsSuccessStatusCode)
-        {
-            return await scholarshipsResponse.ToResultAsync(cancellationToken);
-        }
-
-        var scholarships = await scholarshipsResponse.Content.ReadFromJsonAsync<List<ScholarshipResponse>>(cancellationToken)
-            ?? [];
-        var documents = scholarships.Select(scholarship => new RagDocument(
-            $"scholarship-{scholarship.Id}",
-            $"{scholarship.Name}. {scholarship.Description} Award amount: {scholarship.AwardAmount:C0}. "
-                + $"Minimum GPA: {scholarship.MinimumGpa:F2}. Eligible major: {scholarship.EligibleMajor}. "
-                + $"Minimum year level: {scholarship.MinimumYearLevel}. Application deadline: {scholarship.ApplicationDeadline:MMMM d, yyyy}. "
-                + $"Applications are {(scholarship.IsActive ? "open" : "closed")}.",
-            new Dictionary<string, string> { ["scholarshipName"] = scholarship.Name }))
-            .ToList();
-
-        using var ingestResponse = await clients.CreateClient("rag").PostAsJsonAsync(
-            "/api/rag/financialaidbilling/documents",
-            new RagIngestRequest(documents),
-            cancellationToken);
-        if (!ingestResponse.IsSuccessStatusCode)
-        {
-            return await ingestResponse.ToResultAsync(cancellationToken);
-        }
-
-        return await (await clients.CreateClient("rag").PostAsJsonAsync(
-            "/api/rag/financialaidbilling/answer",
-            new RagAnswerRequest(request.Question.Trim(), 4, "You are the Financial Aid & Billing scholarship assistant. Answer only from the scholarship catalogue and cite your sources.", null),
-            cancellationToken)).ToResultAsync(cancellationToken);
+        return Results.Ok(await knowledge.AskScholarshipsAsync(request, cancellationToken));
+    }
+    catch (InvalidOperationException exception)
+    {
+        return Results.Problem(exception.Message, statusCode: StatusCodes.Status503ServiceUnavailable);
+    }
+    catch (System.Text.Json.JsonException)
+    {
+        return Results.Problem("A scholarship knowledge dependency returned an invalid response.",
+            statusCode: StatusCodes.Status502BadGateway);
     }
     catch (HttpRequestException)
     {
         return Results.Problem(
-            "The shared RAG server is unavailable. Start it on the host at http://localhost:5267 before using this feature.",
+            "The scholarship database or shared RAG server is unavailable.",
             statusCode: StatusCodes.Status503ServiceUnavailable);
     }
     catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
@@ -228,10 +224,15 @@ app.MapPost("/api/ai/knowledge", async (
     {
         return Results.Problem(exception.Message, statusCode: StatusCodes.Status503ServiceUnavailable);
     }
+    catch (System.Text.Json.JsonException)
+    {
+        return Results.Problem("A scholarship knowledge dependency returned an invalid response.",
+            statusCode: StatusCodes.Status502BadGateway);
+    }
     catch (HttpRequestException)
     {
         return Results.Problem(
-            "The shared RAG server is unavailable. Start it on the host at http://localhost:5267 before using this feature.",
+            "The scholarship database or shared RAG server is unavailable.",
             statusCode: StatusCodes.Status503ServiceUnavailable);
     }
     catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
