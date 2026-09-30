@@ -131,7 +131,9 @@ else if (activeTab == "scholarships")
         {
             <div class="ai-response" role="status">
                 <strong>@RagStatusLabel · @ragAnswer.Status</strong>
-                <p>@(ragAnswer.Answer ?? ragAnswer.Detail ?? "Relevant catalogue passages were retrieved.")</p>
+                <div class="rag-answer">
+                    <SafeMarkdown Content="@(ragAnswer.Answer ?? ragAnswer.Detail ?? "Relevant catalogue passages were retrieved.")" />
+                </div>
                 @if (ragAnswer.Sources.Count > 0)
                 {
                     <ul class="detail-list">
