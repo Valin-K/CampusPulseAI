@@ -2,21 +2,14 @@ name: Shared MCP Server CI
 
 on:
   push:
-    paths:
-      - "ai-services/mcp-server/**"
-      - "CampusPulseAI.slnx"
-      - "Directory.Packages.props"
-      - ".github/workflows/mcp-server-ci.yml"
+    branches:
+      - main
   pull_request:
-    paths:
-      - "ai-services/mcp-server/**"
-      - "CampusPulseAI.slnx"
-      - "Directory.Packages.props"
-      - ".github/workflows/mcp-server-ci.yml"
   workflow_dispatch:
 
 permissions:
   contents: read
+  pull-requests: read
 
 jobs:
   build-mcp-server:
@@ -28,19 +21,40 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect changed paths
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            mcp:
+              - 'ai-services/mcp-server/**'
+              - 'CampusPulseAI.slnx'
+              - 'Directory.Packages.props'
+              - '.github/workflows/mcp-server-ci.yml'
+
+      - name: No MCP changes
+        if: github.event_name != 'workflow_dispatch' && steps.filter.outputs.mcp != 'true'
+        run: echo "No MCP changes detected."
 
       - name: Set up .NET
+        if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.mcp == 'true'
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
 
       - name: Restore MCP server
+        if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.mcp == 'true'
         run: dotnet restore ai-services/mcp-server/McpServer/McpServer.csproj
 
       - name: Build MCP server
+        if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.mcp == 'true'
         run: dotnet build ai-services/mcp-server/McpServer/McpServer.csproj --configuration Release --no-restore --nologo
 
       - name: Smoke test MCP endpoints
+        if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.mcp == 'true'
         shell: bash
         run: |
           dotnet run --project ai-services/mcp-server/McpServer/McpServer.csproj --configuration Release --no-build --urls http://localhost:5268 > mcp-server.log 2>&1 &
