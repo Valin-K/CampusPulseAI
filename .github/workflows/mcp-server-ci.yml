@@ -70,6 +70,32 @@ jobs:
           tools=$(curl --silent --fail http://localhost:5268/api/mcp/tools)
           printf '%s' "$tools"
           printf '%s' "$tools" | grep --quiet 'calculate_student_academic_statistics'
+          capabilities=$(curl --silent --fail \
+            -H "Content-Type: application/json" \
+            -d '{"tool":"get_feature_capabilities","arguments":{"feature":"student-1"}}' \
+            http://localhost:5268/api/mcp/tools/call)
+          printf '%s' "$capabilities"
+          printf '%s' "$capabilities" | grep --quiet 'get_feature_capabilities'
+          for feature in student-1 student-2 student-3 student-4 student-5; do
+            integration=$(curl --silent --fail \
+              -H "Content-Type: application/json" \
+              -d "{\"tool\":\"validate_integration\",\"arguments\":{\"feature\":\"$feature\"}}" \
+              http://localhost:5268/api/mcp/tools/call)
+            printf '%s' "$integration"
+            printf '%s' "$integration" | jq --exit-status '
+              .result.valid == true
+              and .result.missingTools == []
+              and .result.unexpectedTools == []
+              and .result.missingGlobalFeatureTools == []
+              and all(.result.checks[]; .passed == true)
+            ' > /dev/null
+          done
+          unsafe_path=$(curl --silent --fail \
+            -H "Content-Type: application/json" \
+            -d '{"tool":"project_files","arguments":{"directory_path":".."}}' \
+            http://localhost:5268/api/mcp/tools/call)
+          printf '%s' "$unsafe_path"
+          printf '%s' "$unsafe_path" | grep --quiet '"isError":true'
           invalid_statistics_call=$(curl --silent --fail \
             -H "Content-Type: application/json" \
             -d '{"tool":"calculate_student_academic_statistics","arguments":{}}' \

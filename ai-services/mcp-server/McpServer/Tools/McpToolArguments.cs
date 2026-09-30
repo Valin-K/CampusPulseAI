@@ -1,10 +1,11 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 
 namespace McpServer.Tools;
 
 internal static class McpToolArguments
 {
-    public static bool IsSupportedFeature(string? feature) => feature is not null
+    public static bool IsSupportedFeature([NotNullWhen(true)] string? feature) => feature is not null
         && feature.StartsWith("student-", StringComparison.OrdinalIgnoreCase)
         && int.TryParse(feature[8..], out var number)
         && number is >= 1 and <= 5;

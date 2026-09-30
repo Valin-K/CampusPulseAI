@@ -49,19 +49,63 @@ public sealed class ProjectFilesTool() : McpTool(
         var relativePath = McpToolArguments.GetString(request.Arguments, "directory_path") ?? ".";
         var root = Directory.GetParent(AppContext.BaseDirectory)?.Parent?.Parent?.Parent?.Parent?.Parent?.Parent?.FullName
             ?? Directory.GetCurrentDirectory();
-        var requested = Path.GetFullPath(Path.Combine(root, relativePath));
-        if (!requested.StartsWith(root, StringComparison.OrdinalIgnoreCase) || !Directory.Exists(requested))
+        try
         {
+            var requested = Path.GetFullPath(Path.Combine(root, relativePath));
+            var relativeRequested = Path.GetRelativePath(root, requested);
+            var isOutsideRepository = Path.IsPathRooted(relativeRequested)
+                || relativeRequested == ".."
+                || relativeRequested.StartsWith(
+                    $"..{Path.DirectorySeparatorChar}",
+                    StringComparison.Ordinal);
+            if (isOutsideRepository
+                || !Directory.Exists(requested)
+                || ContainsReparsePoint(root, relativeRequested))
+            {
+                return Task.FromResult(Error(
+                    "Directory is outside the repository or does not exist."));
+            }
+
+            var files = Directory.EnumerateFileSystemEntries(requested)
+                .Select(Path.GetFileName)
+                .Order()
+                .Take(100)
+                .ToArray();
             return Task.FromResult(new McpToolExecution(false, new Dictionary<string, object?>
             {
-                ["error"] = "Directory is outside the repository or does not exist."
+                ["path"] = relativeRequested,
+                ["files"] = files
             }));
         }
-
-        return Task.FromResult(new McpToolExecution(false, new Dictionary<string, object?>
+        catch (Exception exception) when (
+            exception is ArgumentException
+            or IOException
+            or UnauthorizedAccessException
+            or NotSupportedException)
         {
-            ["path"] = Path.GetRelativePath(root, requested),
-            ["files"] = Directory.EnumerateFileSystemEntries(requested).Select(Path.GetFileName).Order().Take(100).ToArray()
-        }));
+            return Task.FromResult(Error(
+                "The requested directory could not be read safely."));
+        }
+    }
+
+    private static McpToolExecution Error(string message) =>
+        new(true, new Dictionary<string, object?> { ["error"] = message });
+
+    private static bool ContainsReparsePoint(string root, string relativePath)
+    {
+        var current = root;
+        foreach (var segment in relativePath.Split(
+                     Path.DirectorySeparatorChar,
+                     Path.AltDirectorySeparatorChar,
+                     StringSplitOptions.RemoveEmptyEntries))
+        {
+            current = Path.Combine(current, segment);
+            if ((File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
