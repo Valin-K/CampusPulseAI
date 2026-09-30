@@ -7,6 +7,7 @@ using CampusPulse.Shared.Mcp.Client;
 using CampusPulse.Shared.Mcp.Contracts;
 using CampusPulse.Shared.Rag.Assistant;
 using CampusPulse.Shared.Rag.Contracts;
+using Microsoft.Extensions.Configuration;
 
 namespace AcademicRecords.Tests;
 
@@ -33,10 +34,40 @@ public sealed class AcademicKnowledgeOrchestratorTests
             Assert.That(gateway.Calls[0].Context, Does.Not.Contain("get_student_enrollments"));
             Assert.That(gateway.Calls[0].Context, Does.Not.Contain("project_files"));
             Assert.That(gateway.Calls[0].Context, Does.Not.Contain("course.list_courses"));
+            Assert.That(mcp.ToolDiscoveryCalls, Is.EqualTo(1));
             Assert.That(mcp.CalledTools, Is.EqualTo(new[] { "student_count" }));
             Assert.That(answer.Sources.Select(source => source.DocumentId), Does.Contain("mcp:student_count"));
             Assert.That(answer.Reply, Is.EqualTo("There are 12 student profiles."));
             Assert.That(rag.LastRequest, Is.Null);
+        });
+    }
+
+    [Test]
+    public void AskRejectsMcpRouteWhenMcpIsDisabled()
+    {
+        var gateway = new RecordingAiGateway(
+            PlanResponse("mcp", null, [new { tool = "student_count", arguments = new { } }]));
+        var mcp = new StubMcpClient();
+        var rag = new StubAcademicRagService();
+        var configuration = new ConfigurationManager
+        {
+            ["Mcp:Enabled"] = "false"
+        };
+        var service = CreateService(gateway, mcp, rag, configuration);
+
+        var exception = Assert.ThrowsAsync<HttpRequestException>(() => service.AskAsync(
+            new KnowledgeQuestionRequest { Question = "How many students are there?" },
+            CancellationToken.None));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exception!.StatusCode, Is.EqualTo(HttpStatusCode.BadGateway));
+            Assert.That(mcp.ToolDiscoveryCalls, Is.Zero);
+            Assert.That(mcp.CalledTools, Is.Empty);
+            Assert.That(rag.LastRequest, Is.Null);
+            Assert.That(gateway.Calls[0].Prompt, Does.Contain("direct|rag"));
+            Assert.That(gateway.Calls[0].Prompt, Does.Not.Contain("- mcp: current structured"));
+            Assert.That(gateway.Calls[0].Context, Does.Contain("MCP tools are disabled."));
         });
     }
 
@@ -77,6 +108,32 @@ public sealed class AcademicKnowledgeOrchestratorTests
             Assert.That(answer.Sources.Select(source => source.DocumentId), Does.Contain("policy-graduation"));
             Assert.That(answer.Embedder, Is.EqualTo("test-embedder"));
             Assert.That(gateway.Calls[1].Context, Does.Contain("calculate_student_academic_statistics"));
+            Assert.That(gateway.Calls[0].Prompt, Does.Contain("direct|rag|mcp|rag_and_mcp"));
+        });
+    }
+
+    [Test]
+    public void AskRejectsRagRouteWhenRagIsDisabled()
+    {
+        var gateway = new RecordingAiGateway(PlanResponse("rag", "What is the policy?", []));
+        var mcp = new StubMcpClient();
+        var rag = new StubAcademicRagService();
+        var configuration = new ConfigurationManager
+        {
+            ["Rag:Enabled"] = "false"
+        };
+        var service = CreateService(gateway, mcp, rag, configuration);
+
+        var exception = Assert.ThrowsAsync<HttpRequestException>(() => service.AskAsync(
+            new KnowledgeQuestionRequest { Question = "What is the policy?" },
+            CancellationToken.None));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exception!.StatusCode, Is.EqualTo(HttpStatusCode.BadGateway));
+            Assert.That(rag.LastRequest, Is.Null);
+            Assert.That(gateway.Calls[0].Prompt, Does.Not.Contain("academic policies"));
+            Assert.That(gateway.Calls[0].Prompt, Does.Contain("direct|mcp"));
         });
     }
 
@@ -144,8 +201,9 @@ public sealed class AcademicKnowledgeOrchestratorTests
     private static AcademicKnowledgeOrchestrator CreateService(
         RecordingAiGateway gateway,
         StubMcpClient mcp,
-        StubAcademicRagService rag) =>
-        new(gateway, mcp, rag);
+        StubAcademicRagService rag,
+        IConfiguration? configuration = null) =>
+        new(gateway, mcp, rag, configuration ?? new ConfigurationManager());
 
     private static AiGenerationResponse PlanResponse(
         string route,
@@ -189,11 +247,14 @@ public sealed class AcademicKnowledgeOrchestratorTests
 
     private sealed class StubMcpClient : IMcpClient
     {
+        public int ToolDiscoveryCalls { get; private set; }
         public List<string> CalledTools { get; } = [];
         public List<(string Tool, IReadOnlyDictionary<string, JsonElement> Arguments)> Calls { get; } = [];
 
-        public Task<IReadOnlyList<McpToolDefinition>> GetToolsAsync(CancellationToken cancellationToken) =>
-            Task.FromResult<IReadOnlyList<McpToolDefinition>>(
+        public Task<IReadOnlyList<McpToolDefinition>> GetToolsAsync(CancellationToken cancellationToken)
+        {
+            ToolDiscoveryCalls++;
+            return Task.FromResult<IReadOnlyList<McpToolDefinition>>(
             [
                 new("get_student_enrollments", "Return a student's enrollments.",
                     new Dictionary<string, string> { ["user_id"] = "Required numeric user ID." }, "Academic Records"),
@@ -208,6 +269,7 @@ public sealed class AcademicKnowledgeOrchestratorTests
                 new("course.list_courses", "List available courses.",
                     new Dictionary<string, string>(), "Course Management")
             ]);
+        }
 
         public Task<McpToolCallResponse> CallAsync(
             string tool,

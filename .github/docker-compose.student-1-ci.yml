@@ -1,0 +1,5 @@
+services:
+  academicrecords.backend:
+    environment:
+      Rag__Enabled: "false"
+      Mcp__Enabled: "false"
