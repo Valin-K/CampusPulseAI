@@ -2,21 +2,14 @@ name: Shared Backend Library CI
 
 on:
   push:
-    paths:
-      - "shared/backend/**"
-      - "CampusPulseAI.slnx"
-      - "Directory.Packages.props"
-      - ".github/workflows/shared-backend-ci.yml"
+    branches:
+      - main
   pull_request:
-    paths:
-      - "shared/backend/**"
-      - "CampusPulseAI.slnx"
-      - "Directory.Packages.props"
-      - ".github/workflows/shared-backend-ci.yml"
   workflow_dispatch:
 
 permissions:
   contents: read
+  pull-requests: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
@@ -31,26 +24,48 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect changed paths
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            shared-backend:
+              - 'shared/backend/**'
+              - 'CampusPulseAI.slnx'
+              - 'Directory.Packages.props'
+              - '.github/workflows/shared-backend-ci.yml'
+
+      - name: No shared backend changes
+        if: github.event_name != 'workflow_dispatch' && steps.filter.outputs.shared-backend != 'true'
+        run: echo "No shared backend changes detected."
 
       - name: Set up .NET
+        if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.shared-backend == 'true'
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
 
       - name: Restore shared library tests
+        if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.shared-backend == 'true'
         run: dotnet restore shared/backend/CampusPulse.Shared.Rag.Tests/CampusPulse.Shared.Rag.Tests.csproj
 
       - name: Build shared library and tests
+        if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.shared-backend == 'true'
         run: dotnet build shared/backend/CampusPulse.Shared.Rag.Tests/CampusPulse.Shared.Rag.Tests.csproj --configuration Release --no-restore --nologo
 
       - name: Run unit tests
+        if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.shared-backend == 'true'
         run: dotnet test shared/backend/CampusPulse.Shared.Rag.Tests/CampusPulse.Shared.Rag.Tests.csproj --configuration Release --no-build --no-restore --logger "trx;LogFileName=shared-rag-tests.trx" --results-directory TestResults
 
       - name: Test shared AI gateway and client
+        if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.shared-backend == 'true'
         run: dotnet test shared/backend/CampusPulse.Shared.Ai.Tests/CampusPulse.Shared.Ai.Tests.csproj --configuration Release --logger "trx;LogFileName=shared-ai-tests.trx" --results-directory TestResults
 
       - name: Upload test results
-        if: always()
+        if: always() && (github.event_name == 'workflow_dispatch' || steps.filter.outputs.shared-backend == 'true')
         uses: actions/upload-artifact@v4
         with:
           name: shared-backend-test-results

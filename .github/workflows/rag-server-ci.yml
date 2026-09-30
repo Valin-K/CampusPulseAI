@@ -2,25 +2,14 @@ name: Shared RAG Server CI
 
 on:
   push:
-    paths:
-      - "ai-services/rag-server/**"
-      - "shared/backend/CampusPulse.Shared.Ai*/**"
-      - "shared/backend/CampusPulse.Shared.Rag/**"
-      - "CampusPulseAI.slnx"
-      - "Directory.Packages.props"
-      - ".github/workflows/rag-server-ci.yml"
+    branches:
+      - main
   pull_request:
-    paths:
-      - "ai-services/rag-server/**"
-      - "shared/backend/CampusPulse.Shared.Ai*/**"
-      - "shared/backend/CampusPulse.Shared.Rag/**"
-      - "CampusPulseAI.slnx"
-      - "Directory.Packages.props"
-      - ".github/workflows/rag-server-ci.yml"
   workflow_dispatch:
 
 permissions:
   contents: read
+  pull-requests: read
 
 jobs:
   build-rag-server:
@@ -30,26 +19,51 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect changed paths
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            rag:
+              - 'ai-services/rag-server/**'
+              - 'shared/backend/CampusPulse.Shared.Ai*/**'
+              - 'shared/backend/CampusPulse.Shared.Rag/**'
+              - 'CampusPulseAI.slnx'
+              - 'Directory.Packages.props'
+              - '.github/workflows/rag-server-ci.yml'
+
+      - name: No RAG changes
+        if: github.event_name != 'workflow_dispatch' && steps.filter.outputs.rag != 'true'
+        run: echo "No RAG changes detected."
 
       - name: Set up .NET
+        if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.rag == 'true'
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
 
       - name: Restore RAG server
+        if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.rag == 'true'
         run: dotnet restore ai-services/rag-server/RagServer/RagServer.csproj
 
       - name: Build RAG server
+        if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.rag == 'true'
         run: dotnet build ai-services/rag-server/RagServer/RagServer.csproj --configuration Release --no-restore --nologo
 
       - name: Test RAG gateway integration
+        if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.rag == 'true'
         run: dotnet test ai-services/rag-server/RagServer.Tests/RagServer.Tests.csproj --configuration Release --nologo
 
       - name: Build AI gateway
+        if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.rag == 'true'
         run: dotnet build shared/backend/CampusPulse.Shared.Ai.Gateway/CampusPulse.Shared.Ai.Gateway.csproj --configuration Release --nologo
 
       # The keyless gateway explicitly enables RAG's local hashed embeddings.
       - name: Smoke test RAG endpoints
+        if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.rag == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -104,5 +118,5 @@ jobs:
           curl --silent --fail -X DELETE http://localhost:5267/api/rag/coursemanagement
 
       - name: Show server log on failure
-        if: failure()
+        if: failure() && (github.event_name == 'workflow_dispatch' || steps.filter.outputs.rag == 'true')
         run: cat ai-gateway.log rag-server.log

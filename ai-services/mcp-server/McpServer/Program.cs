@@ -45,7 +45,8 @@ app.MapGet("/api/mcp/tools", (
     {
         tool.Name,
         tool.Description,
-        tool.InputSchema
+        tool.InputSchema,
+        tool.Owner
     }));
 });
 app.MapPost("/api/mcp/tools/call", async Task<IResult> (

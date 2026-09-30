@@ -5,7 +5,8 @@ namespace CampusPulse.Shared.Mcp.Contracts;
 public sealed record McpToolDefinition(
     string Name,
     string Description,
-    IReadOnlyDictionary<string, string> InputSchema);
+    IReadOnlyDictionary<string, string> InputSchema,
+    string Owner = "");
 
 public sealed record McpToolCallResponse(
     string Tool,
