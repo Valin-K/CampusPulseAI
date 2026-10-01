@@ -32,6 +32,11 @@ public sealed class CampusHousingDatabaseTests
             Assert.That(db.DormRooms.Single(room => room.Id == 1).Building, Is.EqualTo("Maple Hall"));
             Assert.That(db.DormRooms.Single(room => room.Id == 2).IsAvailable, Is.True);
             Assert.That(db.HousingAllocations.Count(allocation => allocation.DormRoomId == 2), Is.EqualTo(1));
+            Assert.That(db.HousingAllocations.Count(allocation => allocation.DormRoomId == 1), Is.EqualTo(2));
+            Assert.That(db.DormRooms
+                .Where(room => room.Id == 1)
+                .Select(room => room.IsAvailable && db.HousingAllocations.Count(allocation => allocation.DormRoomId == room.Id) < room.Capacity)
+                .Single(), Is.False);
             Assert.That(db.MaintenanceTickets.Single(ticket => ticket.Id == 1).RepairQueue, Is.EqualTo("Electrical"));
         });
     }

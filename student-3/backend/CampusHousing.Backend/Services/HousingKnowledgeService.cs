@@ -51,9 +51,13 @@ public sealed class HousingKnowledgeService(
     private static RagDocument RoomDocument(DormRoom room)
     {
         var culture = CultureInfo.InvariantCulture;
+        var availableBeds = Math.Max(0, room.Capacity - room.OccupiedBeds);
+        var isAvailable = room.IsAvailable && availableBeds > 0;
         var text =
             $"Room {room.RoomNumber} in {room.Building} houses up to {room.Capacity.ToString(culture)} residents. "
-            + $"It is currently {(room.IsAvailable ? "available for allocation" : "fully allocated")}.";
+            + $"It currently has {room.OccupiedBeds.ToString(culture)} occupied bed(s) and "
+            + $"{availableBeds.ToString(culture)} open bed(s). "
+            + $"It is currently {(isAvailable ? "available for allocation" : "not available for allocation")}.";
         return new RagDocument(
             $"room-{room.Id.ToString(culture)}",
             text,
