@@ -378,3 +378,7 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# Python env for agaentic loop
+.venv/
+.venv-agentic/

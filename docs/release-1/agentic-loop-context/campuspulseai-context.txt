@@ -1,0 +1,92 @@
+CampusPulseAI approved project context - Release 1
+=================================================
+
+CampusPulseAI is an existing .NET 10 campus-services solution.
+
+Repository structure and shared infrastructure:
+- `CampusPulseAI.slnx` contains the solution projects.
+- `Directory.Packages.props` centrally manages NuGet package versions.
+- `docker-compose.yml` defines backend APIs, databases, frontends, and the shared AI gateway.
+- `shared/frontend` contains shared Blazor components and UI assets.
+- `shared/backend/CampusPulse.Shared.Ai` contains the shared AI gateway client and contracts.
+- `shared/backend/CampusPulse.Shared.Ai.Gateway` is the separately hosted Gemini gateway.
+- `shared/backend/CampusPulse.Shared.Rag` contains reusable RAG clients, prompt/citation logic, and knowledge-service abstractions; it is a library, not a network service.
+- `ai-services/mcp-server` contains the shared MCP HTTP server.
+- `ai-services/rag-server` contains the shared RAG retrieval and vector-store service.
+- `ai-services/multi-agent-server` is separate from the Gemini gateway. Do not describe the gateway as a multi-agent router, MCP tool executor, or orchestration service.
+- `student-1` through `student-5` each contain their service implementation and related projects.
+
+Student services and ownership:
+- student-1 / Academic Records: student records, transcripts, and academic history.
+- student-2 / Course Management: course catalogue, enrolment gates, and syllabus handling.
+- student-3 / Campus Housing: housing placements and maintenance requests.
+- student-4 / Financial Aid and Billing: invoices, payments, and billing integrations.
+- student-5 / Event Scheduling: campus events, scheduling, and room bookings.
+
+Shared MCP server
+-----------------
+The MCP server runs as a host service at `http://localhost:5268` by default. Student backends in Docker Compose reach it through `http://host.docker.internal:5268`. `MCP_ENABLED` controls tool catalogue and call routes; unset or unparsable values leave them enabled, while `false` disables them.
+
+HTTP routes:
+- `GET /health` reports service status and registered tool count.
+- `GET /api/mcp/tools` returns registered tool names, descriptions, input schemas, and owners.
+- `POST /api/mcp/tools/call` invokes a registered tool using `{ "tool": "...", "arguments": { ... } }`.
+
+The current registry defines these 13 tools:
+- Repository: `project_files`, `ci_report`.
+- Features (global tools): `get_feature_capabilities`, `validate_integration`.
+- Academic Records: `student_count`, `students_by_subject`, `calculate_student_academic_statistics`, `get_student_enrollments`.
+- Course Management: `course.list_courses`, `course.get_details`, `course.get_prerequisites`, `course.get_faculty_assignments`, `course.check_prerequisite_eligibility`.
+
+The Academic Records and Course Management MCP clients use `http://localhost:5020` and `http://localhost:5118` by default when running outside Compose; configuration can override these addresses. Repository tools operate on the CampusPulseAI repository. `project_files` accepts the repository root or a safe child directory and rejects paths that escape the repository.
+
+`validate_integration` is a registration/contract check, not an executor for every tool. It compares the live registry to the declared shared tool inventory, including the global `Features` tools, and reports missing/unexpected tools, ownership mismatches, incomplete contracts, and duplicate names. A pass proves registration metadata only; it does not prove backend availability or that every tool's implementation works. The `feature` argument identifies the requesting student context; do not infer that every student owns a domain-specific MCP tool.
+
+Shared RAG service
+------------------
+The RAG server runs on the host at `http://localhost:5267` by default. Backends in Docker Compose reach it through `http://host.docker.internal:5267`. Its vector store is in memory and is cleared when the process stops. Each feature has an isolated collection:
+- student-1: `academicrecords`
+- student-2: `coursemanagement`
+- student-3: `campushousing`
+- student-4: `financialaidbilling`
+- student-5: `eventscheduling`
+
+HTTP routes:
+- `GET /health` reports service status, embedder, generation availability, and collections.
+- `GET /api/rag/collections` lists collection document and chunk counts.
+- `POST /api/rag/{collection}/documents` ingests documents; reusing an ID replaces that document.
+- `POST /api/rag/{collection}/answer` retrieves context and returns an answer status, confidence, and sources.
+- `DELETE /api/rag/{collection}` deletes a collection.
+
+Unknown collection names are rejected. Answers can report `answered`, `insufficient_context`, `generation_unavailable`, or `generation_failed`; preserve these distinctions when interpreting results. Confidence is the top retrieved chunk's cosine similarity, and sources are returned for citation or policy handling. The RAG server performs embedding and retrieval; feature backends use the shared RAG library to build feature-owned corpora, request answers, parse citations, and shape responses. The feature backends expose `POST /api/ai/knowledge` for their knowledge assistants.
+
+Only shareable policy and catalogue knowledge belongs in the shared vector store. Do not put personal records such as transcripts, individual invoices, or allocations in it. Do not invent a feature's corpus content or business rules. Ingest occurs for each knowledge request because the vector store is in memory; collections must be repopulated after a server restart.
+
+Shared Gemini AI gateway
+------------------------
+The gateway is `shared/backend/CampusPulse.Shared.Ai.Gateway`, hosted separately from student backends. The host port is `5269`; Compose maps it to container port `8080` and provides the internal address `http://ai.gateway:8080`. Host-side consumers default to `http://localhost:5269`, configurable with `Services:AiGateway` / `Services__AiGateway`.
+
+HTTP routes:
+- `GET /health` reports gateway health.
+- `GET /api/ai/status` reports model configuration and availability without returning the API key.
+- `POST /api/ai/generate` accepts `prompt` and `context`, and returns generated `text` and `model`.
+- `POST /api/ai/embeddings` accepts a list of texts and an `isQuery` flag and returns embeddings.
+
+`CampusPulse.Shared.Ai` supplies `IAiGatewayClient` and shared contracts. All five feature backends and the RAG server use the gateway for Gemini generation and/or embeddings. The gateway owns provider calls, model configuration, key handling, and provider-response validation. `GEMINI_API_KEY` is supplied only to the gateway; never require or expose it in student backends, the RAG server, logs, or evidence. The default generation model is `gemini-3.5-flash-lite`; the default embedding model is `gemini-embedding-001` with 768 dimensions. Model names and embedding dimensions are configurable on the gateway.
+
+The RAG server can use local keyword-based embeddings and return `generation_unavailable` when the gateway explicitly reports generation unavailable. A gateway connection failure is not equivalent to that state; embedding or generation failures must be reported rather than silently treated as successful provider-backed operation. The first successful gateway status response pins the embedding configuration for a RAG process; restart RAG and re-ingest after changing embedding configuration.
+
+Local development and validation:
+- `scripts/launch-local-ai-services.ps1` starts or reuses the host MCP server on port 5268 and RAG server on port 5267, then waits for health checks. The shared AI gateway is normally started by Docker Compose; the RAG README also documents running it locally on port 5269.
+- The agentic-loop's `--mode mcp` and `--mode rag` validate those services without AI-provider calls. The full mode performs deterministic solution checks, starts local MCP/RAG services for their integration checks, runs backend HTTP smoke checks, and invokes its configured AI planning/review stages.
+- Run builds, tests, Compose validation, and HTTP checks to establish their current results. Do not claim they pass based only on this context. Record skipped/unavailable services distinctly from passing checks.
+- Agentic-loop evidence is written under `docs/release-1/agentic-loop-evidence/` by default. Do not record API keys in evidence.
+
+Agentic-loop rules:
+- Use only this context and repository evidence. If a fact is not present, inspect the repository or state that it is unknown.
+- Do not invent business rules, endpoints, dependencies, services, tool behavior, or test outcomes.
+- Do not propose replacing existing files such as `docker-compose.yml` or `Directory.Packages.props` with invented content.
+- Keep the gateway, MCP server, RAG server, shared libraries, and multi-agent server roles distinct.
+- Do not claim MCP registration validates tool execution, or that a RAG health check proves grounded-answer behavior.
+- Do not suggest external service meshes, API gateways, or service-discovery tools not already in the repository.
+- If the existing implementation already satisfies the goal, state that no code adaptation is needed.

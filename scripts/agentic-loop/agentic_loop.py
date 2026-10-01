@@ -56,7 +56,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 ENV_PATH = REPO_ROOT / ".env"
 load_dotenv(dotenv_path=ENV_PATH, override=True)
 
-EVIDENCE_DIR = REPO_ROOT / "docs" / "release-0" / "agentic-loop-evidence"
+EVIDENCE_DIR = REPO_ROOT / "docs" / "release-1" / "agentic-loop-evidence"
 MCP_SERVER_URL = os.getenv("MCP_SERVER_URL", "http://localhost:5268").rstrip("/")
 RAG_SERVER_URL = os.getenv("RAG_SERVER_URL", "http://localhost:5267").rstrip("/")
 AI_GATEWAY_URL = os.getenv("AI_GATEWAY_URL", "http://localhost:5269").rstrip("/")
