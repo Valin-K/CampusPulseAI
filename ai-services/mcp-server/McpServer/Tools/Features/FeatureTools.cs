@@ -65,7 +65,9 @@ public sealed class ValidateIntegrationTool() : McpTool(
             ["course.get_details"] = "Course Management",
             ["course.get_prerequisites"] = "Course Management",
             ["course.get_faculty_assignments"] = "Course Management",
-            ["course.check_prerequisite_eligibility"] = "Course Management"
+            ["course.check_prerequisite_eligibility"] = "Course Management",
+            ["room_status"] = "Campus Housing",
+            ["housing.search_related_tickets"] = "Campus Housing"
         };
 
     protected override Task<McpToolExecution> ExecuteCoreAsync(
