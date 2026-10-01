@@ -70,7 +70,17 @@ app.MapPost("/api/mcp/tools/call", async Task<IResult> (
         return Results.NotFound(new { error = $"Tool '{request.Tool}' is not registered." });
     }
 
-    return await tool.ExecuteAsync(request, cancellationToken);
+    var executionRequest = request with
+    {
+        RegisteredTools = tools
+            .Select(candidate => new McpToolDescriptor(
+                candidate.Name,
+                candidate.Owner,
+                candidate.Description,
+                candidate.InputSchema))
+            .ToArray()
+    };
+    return await tool.ExecuteAsync(executionRequest, cancellationToken);
 });
 
 app.Run();

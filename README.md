@@ -282,7 +282,7 @@ python scripts\agentic-loop\agentic_loop.py `
     --context docs\release-0\agentic-loop-context\campuspulseai-context.txt
 ```
 
-This runs the deterministic checks, calls the AI planning/implementation/review agents, and writes a timestamped evidence file to `docs\release-0\agentic-loop-evidence\`. It does not modify source code.
+This runs the deterministic checks, calls the AI planning/implementation/review agents, and writes a timestamped evidence file to `docs\release-1\agentic-loop-evidence\`. It does not modify source code.
 
 ### Run with a specific focus
 
@@ -310,7 +310,7 @@ The script validates that the patch only targets files inside the repository, ap
 
 ### Evidence
 
-Each run writes one JSON file under `docs\release-0\agentic-loop-evidence\`. The file records:
+Each run writes one JSON file under `docs\release-1\agentic-loop-evidence\`. The file records:
 
 - the exact model identifiers used;
 - every prompt sent to the AI agents;

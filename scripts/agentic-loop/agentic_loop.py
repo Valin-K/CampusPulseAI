@@ -18,6 +18,10 @@ Usage:
     # Review-only run
     python scripts/agentic-loop/agentic_loop.py
 
+    # Auto-start local services and validate without Docker or AI-provider calls
+    python scripts/agentic-loop/agentic_loop.py --mode mcp
+    python scripts/agentic-loop/agentic_loop.py --mode rag
+
     # Run with a specific focus
     python scripts/agentic-loop/agentic_loop.py --focus architecture
 
@@ -39,7 +43,8 @@ import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
+from urllib.parse import urlsplit
 
 import requests
 from dotenv import load_dotenv
@@ -51,7 +56,11 @@ REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 ENV_PATH = REPO_ROOT / ".env"
 load_dotenv(dotenv_path=ENV_PATH, override=True)
 
-EVIDENCE_DIR = REPO_ROOT / "docs" / "release-0" / "agentic-loop-evidence"
+EVIDENCE_DIR = REPO_ROOT / "docs" / "release-1" / "agentic-loop-evidence"
+MCP_SERVER_URL = os.getenv("MCP_SERVER_URL", "http://localhost:5268").rstrip("/")
+RAG_SERVER_URL = os.getenv("RAG_SERVER_URL", "http://localhost:5267").rstrip("/")
+AI_GATEWAY_URL = os.getenv("AI_GATEWAY_URL", "http://localhost:5269").rstrip("/")
+LOCAL_SERVICE_PROCESSES: list[subprocess.Popen[Any]] = []
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -231,6 +240,273 @@ def run_http_check(name: str, url: str, timeout: int = 5) -> dict[str, Any]:
         }
 
 
+def run_json_api_check(
+    name: str,
+    method: str,
+    url: str,
+    expected_status: int = 200,
+    payload: dict[str, Any] | None = None,
+    validate: Callable[[Any], str | None] | None = None,
+    summarize: Callable[[Any], str] | None = None,
+    timeout: int = 10,
+) -> tuple[dict[str, Any], Any | None]:
+    """Call a JSON API and validate its status and response contract."""
+    print(f"  {name} ({url})")
+    started = time.perf_counter()
+    try:
+        response = requests.request(method, url, json=payload, timeout=timeout)
+        duration = round(time.perf_counter() - started, 2)
+        if response.status_code != expected_status:
+            return ({
+                "name": name,
+                "passed": False,
+                "skipped": False,
+                "exitCode": 1,
+                "durationSeconds": duration,
+                "output": f"Expected HTTP {expected_status}, received HTTP {response.status_code}: {response.text[:500]}",
+            }, None)
+
+        try:
+            data = response.json()
+        except ValueError:
+            return ({
+                "name": name,
+                "passed": False,
+                "skipped": False,
+                "exitCode": 1,
+                "durationSeconds": duration,
+                "output": "Expected a JSON response.",
+            }, None)
+
+        validation_error = validate(data) if validate else None
+        passed = validation_error is None
+        return ({
+            "name": name,
+            "passed": passed,
+            "skipped": False,
+            "exitCode": 0 if passed else 1,
+            "durationSeconds": duration,
+            "output": validation_error or (
+                summarize(data) if summarize else "Response contract validated."
+            ),
+        }, data)
+    except requests.exceptions.ConnectionError as exc:
+        duration = round(time.perf_counter() - started, 2)
+        return ({
+            "name": name,
+            "passed": False,
+            "skipped": True,
+            "exitCode": 0,
+            "durationSeconds": duration,
+            "output": f"Service not reachable: {exc}",
+        }, None)
+    except Exception as exc:
+        duration = round(time.perf_counter() - started, 2)
+        return ({
+            "name": name,
+            "passed": False,
+            "skipped": False,
+            "exitCode": 1,
+            "durationSeconds": duration,
+            "output": f"API check error: {exc}",
+        }, None)
+
+
+def skipped_check(name: str, reason: str) -> dict[str, Any]:
+    return {
+        "name": name,
+        "passed": False,
+        "skipped": True,
+        "exitCode": 0,
+        "durationSeconds": 0,
+        "output": reason,
+    }
+
+
+def run_mcp_checks() -> list[dict[str, Any]]:
+    """Validate MCP health, the required tool contracts, and a safe tool call."""
+    checks: list[dict[str, Any]] = []
+    health_check, _ = run_json_api_check(
+        "MCP health",
+        "GET",
+        f"{MCP_SERVER_URL}/health",
+        validate=lambda data: None
+        if isinstance(data, dict)
+        and data.get("status") == "healthy"
+        and data.get("service") == "mcp"
+        and isinstance(data.get("toolCount"), int)
+        and data["toolCount"] >= 4
+        else "MCP health response must report healthy status and at least four tools.",
+    )
+    checks.append(health_check)
+
+    required_tools = {"student_count", "students_by_subject", "project_files", "ci_report"}
+    tools_check, tools = run_json_api_check(
+        "MCP tool registry",
+        "GET",
+        f"{MCP_SERVER_URL}/api/mcp/tools",
+        validate=lambda data: None
+        if isinstance(data, list)
+        and required_tools.issubset({
+            tool.get("name") for tool in data if isinstance(tool, dict)
+        })
+        else f"MCP tool registry is missing required tools: {', '.join(sorted(required_tools - ({tool.get('name') for tool in data if isinstance(tool, dict)} if isinstance(data, list) else set())))}.",
+    )
+    checks.append(tools_check)
+
+    if tools_check["passed"]:
+        call_check, _ = run_json_api_check(
+            "MCP project_files tool execution",
+            "POST",
+            f"{MCP_SERVER_URL}/api/mcp/tools/call",
+            payload={"tool": "project_files", "arguments": {"directory_path": "."}},
+            validate=lambda data: None
+            if isinstance(data, dict)
+            and data.get("tool") == "project_files"
+            and data.get("isError") is False
+            and isinstance(data.get("result"), dict)
+            and isinstance(data["result"].get("files"), list)
+            else "project_files did not return a successful file-list result.",
+        )
+        checks.append(call_check)
+    else:
+        checks.append(skipped_check(
+            "MCP project_files tool execution",
+            "Skipped because the MCP tool registry did not validate.",
+        ))
+
+    return checks
+
+
+def run_rag_checks() -> list[dict[str, Any]]:
+    """Validate RAG health, collections, and grounded-answer response metadata."""
+    checks: list[dict[str, Any]] = []
+    health_check, _ = run_json_api_check(
+        "RAG health",
+        "GET",
+        f"{RAG_SERVER_URL}/health",
+        validate=lambda data: None
+        if isinstance(data, dict)
+        and data.get("status") == "healthy"
+        and data.get("service") == "rag"
+        and isinstance(data.get("collections"), int)
+        else "RAG health response is missing healthy service status or collection count.",
+    )
+    checks.append(health_check)
+
+    collections_check, collections = run_json_api_check(
+        "RAG collections",
+        "GET",
+        f"{RAG_SERVER_URL}/api/rag/collections",
+        validate=lambda data: None
+        if isinstance(data, list)
+        and all(
+            isinstance(collection, dict)
+            and isinstance(collection.get("name"), str)
+            and isinstance(collection.get("documents"), int)
+            and isinstance(collection.get("chunks"), int)
+            for collection in data
+        )
+        else "RAG collections response must contain collection names and document/chunk counts.",
+    )
+    checks.append(collections_check)
+
+    populated = next((
+        collection for collection in (collections or [])
+        if isinstance(collection, dict)
+        and collection.get("documents", 0) > 0
+    ), None) if collections_check["passed"] else None
+    seeded_validation_corpus = False
+    if collections_check["passed"] and not populated:
+        seed_check, _ = run_json_api_check(
+            "RAG validation corpus seed",
+            "POST",
+            f"{RAG_SERVER_URL}/api/rag/coursemanagement/documents",
+            payload={"documents": [{
+                "id": "agentic-loop-validation",
+                "text": "CampusPulseAI local RAG validation fixture. COMP1001 is an introductory course used to verify retrieval and source citations.",
+                "metadata": {"source": "agentic-loop-validation"},
+            }]},
+            validate=lambda data: None
+            if isinstance(data, dict)
+            and data.get("collection") == "coursemanagement"
+            and data.get("documents") == 1
+            and isinstance(data.get("chunks"), int)
+            and data["chunks"] > 0
+            else "RAG did not ingest the local validation fixture.",
+        )
+        checks.append(seed_check)
+        if seed_check["passed"]:
+            populated = {"name": "coursemanagement", "documents": 1}
+            seeded_validation_corpus = True
+
+    if populated:
+        def validate_answer(data: Any) -> str | None:
+            if not isinstance(data, dict):
+                return "RAG answer response must be a JSON object."
+            if data.get("status") not in {"answered", "insufficient_context", "generation_unavailable"}:
+                return f"RAG answer returned unexpected status: {data.get('status')}."
+            confidence = data.get("confidence")
+            if not isinstance(confidence, (int, float)) or not -1 <= confidence <= 1:
+                return "RAG answer confidence must be a cosine similarity between -1 and 1."
+            sources = data.get("sources")
+            if not isinstance(sources, list) or not all(
+                isinstance(source, dict)
+                and isinstance(source.get("documentId"), str)
+                and isinstance(source.get("chunkIndex"), int)
+                and isinstance(source.get("score"), (int, float))
+                and isinstance(source.get("text"), str)
+                for source in sources
+            ):
+                return "RAG sources must contain document citations, chunk indexes, scores, and text."
+            if data["status"] == "answered" and not sources:
+                return "RAG returned an answer without source citations."
+            return None
+
+        question = (
+            "What does the local RAG validation fixture say about COMP1001?"
+            if seeded_validation_corpus
+            else "Summarize the available information in this collection."
+        )
+        answer_check, _ = run_json_api_check(
+            "RAG retrieval and grounded answer",
+            "POST",
+            f"{RAG_SERVER_URL}/api/rag/{populated['name']}/answer",
+            payload={"question": question, "topK": 5},
+            validate=validate_answer,
+            summarize=lambda data: (
+                f"RAG status={data['status']}; confidence={data['confidence']}; "
+                f"citations={len(data['sources'])}."
+            ),
+            timeout=30,
+        )
+        checks.append(answer_check)
+        if seeded_validation_corpus:
+            cleanup_check, _ = run_json_api_check(
+                "RAG validation corpus cleanup",
+                "DELETE",
+                f"{RAG_SERVER_URL}/api/rag/coursemanagement",
+                validate=lambda data: None
+                if isinstance(data, dict)
+                and data.get("collection") == "coursemanagement"
+                and data.get("deleted") is True
+                else "RAG did not remove its temporary validation collection.",
+            )
+            checks.append(cleanup_check)
+    elif collections_check["passed"]:
+        checks.append(skipped_check(
+            "RAG retrieval and grounded answer",
+            "Skipped because no RAG collection currently contains documents.",
+        ))
+    else:
+        checks.append(skipped_check(
+            "RAG retrieval and grounded answer",
+            "Skipped because the RAG collection list did not validate.",
+        ))
+
+    return checks
+
+
 def run_all_deterministic_checks() -> list[dict[str, Any]]:
     """Run the full shared validation suite."""
     checks: list[dict[str, Any]] = []
@@ -260,6 +536,28 @@ def run_all_deterministic_checks() -> list[dict[str, Any]]:
         "Docker Compose config validation",
         ["docker", "compose", "config", "--quiet"],
     ))
+
+    # MCP and RAG run as local host services rather than Compose containers.
+    for mode, validate in (("mcp", run_mcp_checks), ("rag", run_rag_checks)):
+        startup_checks = start_validation_services(mode)
+        checks.extend(startup_checks)
+        if all(check["passed"] for check in startup_checks):
+            mode_checks = validate()
+            checks.extend(mode_checks)
+            if any(check["skipped"] for check in mode_checks):
+                checks.append({
+                    "name": f"{mode.upper()} integration validation required",
+                    "passed": False,
+                    "skipped": False,
+                    "exitCode": 1,
+                    "durationSeconds": 0,
+                    "output": "A required local AI service check was skipped after startup.",
+                })
+        else:
+            checks.append(skipped_check(
+                f"{mode.upper()} integration validation",
+                "Skipped because one or more required local AI services failed to start.",
+            ))
 
     # Per-student live HTTP smoke tests (best effort; services may not be running)
     for student in STUDENTS:
@@ -300,6 +598,167 @@ def check_summary(checks: list[dict[str, Any]]) -> str:
 
 def failed_checks(checks: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return [c for c in checks if not c["passed"] and not c["skipped"]]
+
+
+def ensure_local_service(
+    name: str,
+    project: Path,
+    base_url: str,
+    health_path: str,
+    service_name: str,
+    environment: dict[str, str] | None = None,
+    startup_timeout: int = 90,
+) -> dict[str, Any]:
+    """Reuse a healthy local service or launch its .NET project and wait for health."""
+    health_url = f"{base_url}{health_path}"
+    started = time.perf_counter()
+
+    def healthy() -> bool:
+        try:
+            response = requests.get(health_url, timeout=2)
+            data = response.json()
+            return response.status_code == 200 and data.get("service") == service_name
+        except Exception:
+            return False
+
+    def result(passed: bool, output: str) -> dict[str, Any]:
+        return {
+            "name": f"Start {name}",
+            "passed": passed,
+            "skipped": False,
+            "exitCode": 0 if passed else 1,
+            "durationSeconds": round(time.perf_counter() - started, 2),
+            "output": output,
+        }
+
+    if healthy():
+        return result(True, f"Already healthy at {health_url}.")
+
+    parsed_url = urlsplit(base_url)
+    if parsed_url.scheme != "http" or parsed_url.hostname not in {
+        "localhost", "127.0.0.1", "::1"
+    }:
+        return result(False, f"Cannot auto-start a non-local service URL: {base_url}")
+    if not project.is_file():
+        return result(False, f"Service project was not found: {project}")
+
+    application_url = f"http://localhost:{parsed_url.port or 80}"
+    command = [
+        "dotnet", "run", "--configuration", "Release", "--no-launch-profile",
+        "--project", str(project),
+        "--", "--urls", application_url,
+    ]
+    try:
+        process = subprocess.Popen(
+            command,
+            cwd=REPO_ROOT,
+            env={**os.environ, **(environment or {})},
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    except FileNotFoundError as exc:
+        return result(False, f"Could not start {name}; ensure the .NET 10 SDK is installed: {exc}")
+    except Exception as exc:
+        return result(False, f"Could not start {name}: {exc}")
+
+    LOCAL_SERVICE_PROCESSES.append(process)
+    deadline = time.monotonic() + startup_timeout
+    while time.monotonic() < deadline:
+        if healthy():
+            return result(True, f"Started and healthy at {health_url}.")
+        if process.poll() is not None:
+            return result(False, f"{name} exited during startup with code {process.returncode}.")
+        time.sleep(0.5)
+
+    return result(False, f"{name} did not become healthy within {startup_timeout} seconds.")
+
+
+def start_validation_services(mode: str) -> list[dict[str, Any]]:
+    services = []
+    if mode == "mcp":
+        services.append((
+            "MCP server",
+            REPO_ROOT / "ai-services" / "mcp-server" / "McpServer" / "McpServer.csproj",
+            MCP_SERVER_URL,
+            "/health",
+            "mcp",
+            None,
+        ))
+    else:
+        services.extend([
+            (
+                "AI Gateway",
+                REPO_ROOT / "shared" / "backend" / "CampusPulse.Shared.Ai.Gateway"
+                / "CampusPulse.Shared.Ai.Gateway.csproj",
+                AI_GATEWAY_URL,
+                "/health",
+                "ai-gateway",
+                None,
+            ),
+            (
+                "RAG server",
+                REPO_ROOT / "ai-services" / "rag-server" / "RagServer" / "RagServer.csproj",
+                RAG_SERVER_URL,
+                "/health",
+                "rag",
+                {"Services__AiGateway": AI_GATEWAY_URL},
+            ),
+        ])
+
+    checks = []
+    for service in services:
+        check = ensure_local_service(*service)
+        checks.append(check)
+        if not check["passed"]:
+            break
+    return checks
+
+
+def run_validation_mode(args: argparse.Namespace) -> int:
+    """Run one local AI-service validation mode and write its JSON evidence."""
+    run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    evidence_path = args.evidence_dir / f"campuspulseai-{args.mode}-{run_id}.json"
+    args.evidence_dir.mkdir(parents=True, exist_ok=True)
+
+    print(f"{args.mode.upper()} VALIDATION - starting local services")
+    checks = start_validation_services(args.mode)
+    if checks and all(check["passed"] for check in checks):
+        print(f"{args.mode.upper()} VALIDATION - service checks")
+        checks.extend(run_mcp_checks() if args.mode == "mcp" else run_rag_checks())
+    for check in checks:
+        status = (
+            "SKIP" if check["skipped"]
+            else "PASS" if check["passed"]
+            else "FAIL"
+        )
+        print(f"    [{status}] {check['name']} ({check['durationSeconds']}s)")
+
+    passed = bool(checks) and all(check["passed"] and not check["skipped"] for check in checks)
+    evidence = {
+        "schemaVersion": 4,
+        "assessmentEvidence": True,
+        "workflow": f"{args.mode.upper()} validation",
+        "validationMode": args.mode,
+        "runId": run_id,
+        "recordedAtUtc": now_iso(),
+        "goal": args.goal,
+        "focus": args.focus,
+        "checks": checks,
+        "passed": passed,
+        "summary": check_summary(checks),
+        "privacy": {
+            "sourceCodeSentToAi": False,
+            "projectContextSentToAi": False,
+            "apiKeysRecorded": False,
+        },
+    }
+    evidence_path.write_text(
+        json.dumps(evidence, indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    print(f"\nEvidence written to: {evidence_path}")
+    return 0 if passed else 1
 
 
 # ---------------------------------------------------------------------------
@@ -630,6 +1089,12 @@ def parse_args() -> argparse.Namespace:
         description="CampusPulseAI shared agentic loop",
     )
     parser.add_argument(
+        "--mode",
+        choices=["full", "mcp", "rag"],
+        default="full",
+        help="Run the full suite, or auto-start services for local MCP/RAG validation.",
+    )
+    parser.add_argument(
         "--focus",
         choices=["implementation", "database", "architecture", "devops"],
         default="implementation",
@@ -674,6 +1139,12 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
+
+    if args.mode in {"mcp", "rag"}:
+        if args.apply:
+            print("ERROR: --apply is only supported in full mode.", file=sys.stderr)
+            return 1
+        return run_validation_mode(args)
 
     if not OPENROUTER_API_KEY:
         print(
@@ -862,6 +1333,7 @@ def main() -> int:
         "schemaVersion": 4,
         "assessmentEvidence": True,
         "workflow": "Plan -> Act -> Observe -> Adapt -> Verify",
+        "validationMode": args.mode,
         "runId": run_id,
         "recordedAtUtc": now_iso(),
         "goal": args.goal,

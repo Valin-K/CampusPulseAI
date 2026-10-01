@@ -123,3 +123,20 @@ followed. Every run leaves a JSON audit trail in
 `docs/release-0/agentic-loop-evidence/`.
 
 **Cost:** no unattended remediation — a human is in the loop for every change.
+
+---
+
+## ADR-008 — Shared AI service as the LLM gateway
+
+**Status:** Accepted · **Context:** Release 1
+
+The shared AI service (`CampusPulse.Shared.Ai.Gateway`) is the common gateway for
+microservices that need LLM generation or embeddings. Any microservice can access it
+through the shared AI client and the `Services:AiGateway` endpoint configuration. The
+gateway owns provider credentials, model configuration, and provider HTTP calls.
+
+**Why:** a single integration boundary makes AI access available across domains while
+centralizing provider configuration, credentials, and transport behavior.
+
+**Cost:** the gateway becomes a shared runtime dependency; callers need to handle its
+availability and configure its endpoint.
