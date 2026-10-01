@@ -1,5 +1,6 @@
 @inherits LayoutComponentBase
 @inject CurrentUser CurrentUser
+@inject CampusAccountService Account
 
 <CampusShell PageName="Event &amp; Facility Scheduling"
              SectionLabel="Campus scheduling"
@@ -56,7 +57,9 @@
 
     protected override async Task OnInitializedAsync()
     {
+        var accountInitialization = Account.InitializeAsync();
         var profile = await CurrentUser.LoadAsync();
+        await accountInitialization;
 
         if (profile is not null)
         {

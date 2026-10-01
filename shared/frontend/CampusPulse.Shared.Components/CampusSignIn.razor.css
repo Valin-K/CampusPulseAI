@@ -1,0 +1,94 @@
+.campus-account-sign-in {
+    display: grid;
+    gap: 1rem;
+    width: 100%;
+}
+
+.campus-account-sign-in .account-sign-in-hero {
+    min-height: 14rem;
+}
+
+.campus-account-sign-in .account-registration-panel,
+.campus-account-sign-in .account-directory-panel {
+    width: 100%;
+    min-width: 0;
+    margin: 0;
+    overflow: hidden;
+}
+
+.campus-account-sign-in .section-heading {
+    align-items: flex-start;
+    flex-wrap: wrap;
+}
+
+.campus-account-sign-in .section-heading > div {
+    min-width: 12rem;
+}
+
+.campus-account-sign-in .account-directory-panel .form-stack {
+    width: min(100%, 24rem);
+}
+
+.campus-account-sign-in .responsive-table {
+    width: 100%;
+    min-width: 0;
+    overflow-x: auto;
+}
+
+.campus-account-sign-in .account-directory-table {
+    width: 100%;
+    min-width: 40rem;
+    table-layout: fixed;
+}
+
+.campus-account-sign-in .account-directory-table th,
+.campus-account-sign-in .account-directory-table td {
+    overflow-wrap: anywhere;
+}
+
+.campus-account-sign-in .account-directory-table th:last-child,
+.campus-account-sign-in .account-directory-table td:last-child {
+    text-align: right;
+}
+
+.campus-account-sign-in .account-directory-table td:nth-child(2) {
+    white-space: nowrap;
+}
+
+.campus-account-sign-in .account-sort-button {
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: .3rem;
+    border: 0;
+    color: inherit;
+    background: transparent;
+    font: inherit;
+    letter-spacing: inherit;
+    text-transform: inherit;
+    cursor: pointer;
+}
+
+.campus-account-sign-in .account-sort-button:hover {
+    color: var(--university-blue);
+}
+
+.campus-account-sign-in .account-sort-button:focus-visible {
+    outline: 2px solid var(--university-blue);
+    outline-offset: 3px;
+}
+
+@media (max-width: 620px) {
+    .campus-account-sign-in .account-sign-in-hero {
+        gap: 1rem;
+    }
+
+    .campus-account-sign-in .section-heading {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .campus-account-sign-in .section-heading > div {
+        min-width: 0;
+    }
+}

@@ -1,5 +1,6 @@
 ﻿@inherits LayoutComponentBase
 @inject HousingUserContext UserContext
+@inject CampusAccountService Account
 @using Microsoft.JSInterop
 
 <CampusShell PageName="Campus Housing"
@@ -73,7 +74,7 @@
 
     protected override async Task OnInitializedAsync()
     {
-        await UserContext.InitializeAsync();
+        await Task.WhenAll(Account.InitializeAsync(), UserContext.InitializeAsync());
     }
 
     async Task ChangeUserAsync(ChangeEventArgs args)

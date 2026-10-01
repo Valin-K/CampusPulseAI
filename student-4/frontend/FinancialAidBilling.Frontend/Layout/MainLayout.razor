@@ -1,5 +1,6 @@
 ﻿@inherits LayoutComponentBase
 @inject FinancialAidUserContext UserContext
+@inject CampusAccountService Account
 
 <CampusShell PageName="Financial Aid &amp; Billing"
              SectionLabel="Student finance"
@@ -56,7 +57,7 @@
 @code {
     protected override async Task OnInitializedAsync()
     {
-        await UserContext.InitializeAsync();
+        await Task.WhenAll(Account.InitializeAsync(), UserContext.InitializeAsync());
     }
 
     private async Task ChangeUserAsync(ChangeEventArgs args)

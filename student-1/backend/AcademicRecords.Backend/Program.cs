@@ -38,7 +38,18 @@ builder.Services.AddScoped<RagKnowledgeService>();
 builder.Services.AddScoped<IAcademicRagService, AcademicKnowledgeService>();
 builder.Services.AddScoped<IAcademicKnowledgeService, AcademicKnowledgeOrchestrator>();
 builder.Services.AddCors(options => options.AddPolicy("Frontend", policy => policy
-    .WithOrigins("http://localhost:5062", "http://localhost:8081")
+    .WithOrigins(
+        "http://localhost:5062",
+        "http://localhost:5186",
+        "http://localhost:5254",
+        "http://localhost:5128",
+        "http://localhost:5236",
+        "http://localhost:8080",
+        "http://localhost:8081",
+        "http://localhost:8082",
+        "http://localhost:8083",
+        "http://localhost:8084",
+        "http://localhost:8085")
     .AllowAnyHeader()
     .AllowAnyMethod()));
 

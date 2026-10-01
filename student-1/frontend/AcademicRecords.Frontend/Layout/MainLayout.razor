@@ -1,15 +1,16 @@
 ﻿@inherits LayoutComponentBase
 @implements IDisposable
 @inject NavigationManager Navigation
+@inject CampusAccountService Account
 
 <CampusShell PageName="Academic Records"
              SectionLabel="Registrar services"
-             UserName="Academic Records"
-             UserDetails="Enrollment and graduation workspace"
-             UserInitials="AR"
+             UserName="@(Account.CurrentUser?.FullName ?? "Academic Records")"
+             UserDetails="@(Account.CurrentUser is null ? "Enrollment and graduation workspace" : $"{Account.CurrentUser.Role} · {Account.CurrentUser.ExternalId}")"
+             UserInitials="@(Account.CurrentUser?.Initials ?? "AR")"
              HomeHref="http://localhost:8080"
              PortalHref="http://localhost:8080"
-             ContextLabel="Academic records workspace">
+             ContextLabel="@(Account.CurrentUser is null ? "Academic records workspace" : $"{Account.CurrentUser.Role} account")">
     <ChildContent>
         @Body
     </ChildContent>
@@ -34,10 +35,22 @@
         }
     }
 
-    protected override void OnInitialized() => Navigation.LocationChanged += OnLocationChanged;
+    protected override void OnInitialized()
+    {
+        Navigation.LocationChanged += OnLocationChanged;
+        Account.Changed += OnAccountChanged;
+    }
+
+    protected override async Task OnInitializedAsync() => await Account.InitializeAsync();
 
     private void OnLocationChanged(object? sender, LocationChangedEventArgs args) =>
         _ = InvokeAsync(StateHasChanged);
 
-    public void Dispose() => Navigation.LocationChanged -= OnLocationChanged;
+    private void OnAccountChanged() => _ = InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+    {
+        Navigation.LocationChanged -= OnLocationChanged;
+        Account.Changed -= OnAccountChanged;
+    }
 }

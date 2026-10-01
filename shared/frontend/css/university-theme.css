@@ -67,6 +67,14 @@ h3 { color: var(--university-navy); font-size: 1.08rem; }
 .button-small { min-height: 2rem; padding: .38rem .65rem; font-size: .78rem; }
 .button-row { justify-content: flex-start; flex-wrap: wrap; }
 
+.nav-account-slot { min-width: 0; display: flex; align-items: center; }
+.nav-user-slot { width: auto; max-width: 100%; min-width: 0; display: flex; align-items: center; justify-content: flex-end; gap: .75rem; }
+.campus-account-menu { min-width: 0; display: flex; align-items: center; justify-content: flex-end; gap: .4rem; color: white; }
+.campus-account-identity { min-width: 0; max-width: 12rem; display: grid; gap: .1rem; line-height: 1.15; }
+.campus-account-identity strong { overflow: hidden; color: white; font-size: .76rem; text-overflow: ellipsis; white-space: nowrap; }
+.campus-account-identity small { overflow: hidden; color: #b9d1e2; font-size: .68rem; text-overflow: ellipsis; white-space: nowrap; }
+.campus-account-menu .button { flex: 0 0 auto; white-space: nowrap; }
+
 .form-stack { display: grid; gap: .9rem; }
 .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; }
 .field { display: grid; gap: .4rem; color: var(--university-ink); font-size: .84rem; font-weight: 700; }
@@ -113,7 +121,6 @@ td small { display: block; margin-top: .15rem; color: var(--university-muted); }
 .empty-state h1 { margin: .6rem 0 1rem; font-size: clamp(1.8rem, 4vw, 2.8rem); }
 .empty-state p { margin-bottom: 1.5rem; color: var(--university-muted); }
 
-@keyframes modal-in
 @keyframes toast-in { from { opacity: 0; transform: translateY(10px); } }
 @keyframes reveal-pulse { 50% { box-shadow: 0 0 0 5px rgba(244, 185, 66, .25); } }
 @keyframes shimmer { to { background-position: -200% 0; } }
@@ -129,5 +136,9 @@ td small { display: block; margin-top: .15rem; color: var(--university-muted); }
     .tab-list { width: 100%; overflow-x: auto; }
     .tab-button { flex: 1; white-space: nowrap; }
     .ai-card { grid-template-columns: 1fr; }
+}
+@media (max-width: 760px) {
+    .nav-user-slot { align-items: flex-start; flex-wrap: wrap; gap: .6rem; }
+    .campus-account-menu { width: auto; justify-content: flex-start; flex-wrap: wrap; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; } }

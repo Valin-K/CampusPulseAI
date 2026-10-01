@@ -1,3 +1,18 @@
+window.campusPulseAccountSession = {
+    key: 'campuspulse.account.user-id',
+    getUserId() {
+        return sessionStorage.getItem(this.key);
+    },
+    setUserId(userId) {
+        sessionStorage.setItem(this.key, userId);
+        window.dispatchEvent(new Event('campuspulse-account-changed'));
+    },
+    removeUserId() {
+        sessionStorage.removeItem(this.key);
+        window.dispatchEvent(new Event('campuspulse-account-changed'));
+    }
+};
+
 class CampusNavBar extends HTMLElement {
     static observedAttributes = [
         'page-name',
@@ -8,7 +23,8 @@ class CampusNavBar extends HTMLElement {
         'user-details',
         'user-initials',
         'service-count',
-        'context-label'
+        'context-label',
+        'account-session'
     ];
 
     constructor() {
@@ -18,10 +34,43 @@ class CampusNavBar extends HTMLElement {
 
     connectedCallback() {
         this.render();
+        window.addEventListener('campuspulse-account-changed', this.accountChanged);
+        this.refreshAccount();
     }
 
+    disconnectedCallback() {
+        window.removeEventListener('campuspulse-account-changed', this.accountChanged);
+    }
+
+    accountChanged = () => this.refreshAccount();
+
     attributeChangedCallback() {
-        if (this.isConnected) this.render();
+        if (this.isConnected) {
+            this.render();
+            this.refreshAccount();
+        }
+    }
+
+    async refreshAccount() {
+        if (!this.hasAttribute('account-session')) return;
+
+        const userId = window.campusPulseAccountSession.getUserId();
+        if (!userId) {
+            this.accountUser = null;
+            this.render();
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/users', { cache: 'no-store' });
+            if (!response.ok) throw new Error('Unable to load account directory.');
+            const users = await response.json();
+            this.accountUser = users.find(user => String(user.userId) === userId) ?? null;
+        } catch {
+            this.accountUser = null;
+        }
+
+        this.render();
     }
 
     render() {
@@ -50,6 +99,13 @@ class CampusNavBar extends HTMLElement {
         const fallbackUser = userName
             ? `<div class="user" aria-label="Current student"><span class="avatar" aria-hidden="true">${userInitials}</span><span><strong>${escape(userName)}</strong><small>${userDetails}</small></span></div>`
             : '';
+        const accountActions = '<slot name="account-actions"></slot>';
+        const accountUser = this.accountUser;
+        const sessionActions = this.hasAttribute('account-session')
+            ? accountUser
+                ? `<div class="session-actions"><span class="session-identity"><strong>${escape(`${accountUser.firstName ?? ''} ${accountUser.lastName ?? ''}`.trim())}</strong><small>${escape(accountUser.role ?? '')}</small></span><a class="account-button" href="/profile">Profile</a><button class="account-button sign-out" type="button">Sign out</button></div>`
+                : '<div class="session-actions"><a class="account-button sign-in" href="/login">Sign in</a></div>'
+            : '';
         const user = `<slot name="user-selector">${fallbackUser}</slot>`;
         const count = serviceCount
             ? `<span class="service-count">${escape(serviceCount)}</span>`
@@ -66,7 +122,7 @@ class CampusNavBar extends HTMLElement {
                 .brand-copy strong { font-size: 1.05rem; letter-spacing: -.02em; }
                 .brand-copy small, .user small { color: #b9d1e2; font-size: .7rem; }
                 .divider { width: 1px; height: 2.5rem; background: rgba(255, 255, 255, .2); }
-                .page-name { margin-right: auto; }
+                .page-name { flex: 1; min-width: 0; }
                 .page-name span { color: #8fc4e2; font-size: .67rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
                 .page-name strong { font-size: 1rem; }
                 .global-nav { display: flex; align-items: center; }
@@ -76,7 +132,16 @@ class CampusNavBar extends HTMLElement {
                 .user { display: flex; align-items: center; gap: .65rem; padding-left: .9rem; border-left: 1px solid rgba(255, 255, 255, .18); }
                 .user strong { font-size: .8rem; }
                 .avatar { width: 2.35rem; height: 2.35rem; display: grid; place-items: center; border: 1px solid rgba(255, 255, 255, .22); border-radius: 50%; color: #fff; background: #1769aa; font-size: .72rem; font-weight: 850; }
-                ::slotted([slot="user-selector"]) { display: block; min-width: min(19rem, 32vw); padding-left: .9rem; border-left: 1px solid rgba(255, 255, 255, .18); }
+                .session-actions { margin-left: auto; display: flex; align-items: center; gap: .5rem; }
+                .session-identity { min-width: 0; max-width: 12rem; display: grid; gap: .1rem; padding-left: .8rem; border-left: 1px solid rgba(255, 255, 255, .18); }
+                .session-identity strong, .session-identity small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+                .session-identity strong { font-size: .8rem; }
+                .session-identity small { color: #b9d1e2; font-size: .7rem; }
+                .account-button { min-height: 2rem; padding: .45rem .7rem; display: inline-flex; align-items: center; border: 0; border-radius: .5rem; color: #102a43; background: #f4b942; font: inherit; font-size: .75rem; font-weight: 750; text-decoration: none; white-space: nowrap; cursor: pointer; }
+                .account-button:hover { background: #ffcf62; }
+                .account-button.sign-out { color: #fff; background: #b42318; }
+                ::slotted([slot="account-actions"]) { display: flex; flex: 0 0 auto; align-items: center; margin-left: auto; }
+                ::slotted([slot="user-selector"]) { display: block; width: auto; max-width: min(18rem, 24vw); min-width: 0; padding-left: .75rem; border-left: 1px solid rgba(255, 255, 255, .18); }
                 .context-bar { padding: .65rem clamp(1rem, 4vw, 4rem); color: #243b53; background: rgba(255, 255, 255, .72); border-bottom: 1px solid #d9e2ec; font-size: .72rem; font-weight: 700; }
                 .context-bar span { display: flex; align-items: center; gap: .45rem; }
                 .context-bar i { width: .48rem; height: .48rem; border-radius: 50%; background: #20a47a; box-shadow: 0 0 0 4px rgba(32, 164, 122, .12); }
@@ -85,9 +150,10 @@ class CampusNavBar extends HTMLElement {
                     .divider { display: none; }
                     .page-name { order: 3; flex-basis: 100%; padding-top: .65rem; border-top: 1px solid rgba(255, 255, 255, .15); }
                     .global-nav { margin-left: auto; }
+                    ::slotted([slot="account-actions"]) { padding-left: .25rem; }
                     .user > span:last-child { display: none; }
                     .user { padding-left: 0; border-left: 0; }
-                    ::slotted([slot="user-selector"]) { width: 100%; min-width: 0; padding: .65rem 0 0; border-top: 1px solid rgba(255, 255, 255, .15); border-left: 0; }
+                    ::slotted([slot="user-selector"]) { width: auto; max-width: 100%; min-width: 0; padding: .65rem 0 0; border-top: 1px solid rgba(255, 255, 255, .15); border-left: 0; }
                 }
                 @media (max-width: 480px) {
                     .brand-copy { display: none; }
@@ -109,9 +175,15 @@ class CampusNavBar extends HTMLElement {
                 <div class="page-name"><span>${sectionLabel}</span><strong>${pageName}</strong></div>
                 ${count}
                 ${globalLink}
+                ${sessionActions}
+                ${accountActions}
                 ${user}
             </header>
             <div class="context-bar"><span><i aria-hidden="true"></i>${contextLabel}</span></div>`;
+
+        this.shadowRoot.querySelector('.sign-out')?.addEventListener('click', () => {
+            window.campusPulseAccountSession.removeUserId();
+        });
     }
 }
 

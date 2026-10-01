@@ -7,6 +7,7 @@
                   HomeHref="@HomeHref"
                   PortalHref="@PortalHref"
                   ContextLabel="@ContextLabel"
+                  ShowAccountActions="@ShowAccountActions"
                   UserSelector="@UserSelector" />
 
     <main class="campus-workspace">
@@ -28,6 +29,7 @@
     [Parameter] public string HomeHref { get; set; } = "/";
     [Parameter] public string PortalHref { get; set; } = "http://localhost:8080";
     [Parameter] public string ContextLabel { get; set; } = "Student portal";
+    [Parameter] public bool ShowAccountActions { get; set; } = true;
     [Parameter] public RenderFragment? UserSelector { get; set; }
     [Parameter, EditorRequired] public RenderFragment? ChildContent { get; set; }
 }

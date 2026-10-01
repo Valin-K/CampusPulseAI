@@ -1,0 +1,42 @@
+@implements IDisposable
+@inject CampusAccountService Account
+@inject NavigationManager Navigation
+
+<div class="campus-account-menu" aria-label="Account">
+    @if (Account.CurrentUser is { } user)
+    {
+        <span class="campus-account-identity">
+            <strong>@user.FullName</strong>
+            <small>@user.Role · @user.ExternalId</small>
+        </span>
+        <a class="button button-small button-secondary" href="/profile">Profile</a>
+        <button type="button" class="button button-small button-danger" @onclick="SignOutAsync">Sign out</button>
+    }
+    else
+    {
+        <a class="button button-small button-accent" href="/login">Sign in</a>
+    }
+</div>
+
+@code {
+    protected override void OnInitialized()
+    {
+        Account.Changed += AccountChanged;
+    }
+
+    private void AccountChanged() => _ = InvokeAsync(StateHasChanged);
+
+    private async Task SignOutAsync()
+    {
+        try
+        {
+            await Account.SignOutAsync();
+            Navigation.NavigateTo("/login");
+        }
+        catch (JSException)
+        {
+        }
+    }
+
+    public void Dispose() => Account.Changed -= AccountChanged;
+}

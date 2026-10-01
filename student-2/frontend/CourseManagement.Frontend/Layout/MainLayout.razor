@@ -1,5 +1,6 @@
 ﻿@inherits LayoutComponentBase
 @inject CourseUserContext UserContext
+@inject CampusAccountService Account
 
 <CampusShell PageName="Course Management"
              SectionLabel="Course services"
@@ -72,7 +73,7 @@
 
     protected override async Task OnInitializedAsync()
     {
-        await UserContext.InitializeAsync();
+        await Task.WhenAll(Account.InitializeAsync(), UserContext.InitializeAsync());
     }
 
     async Task ChangeUserAsync(ChangeEventArgs args)
