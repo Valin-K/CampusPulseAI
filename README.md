@@ -275,6 +275,16 @@ From the repository root:
 pip install -r scripts\agentic-loop\requirements.txt
 ```
 
+### Run the MCP agentic workflow
+
+`--mode mcp` runs the Lab 07 integration-validation loop. It starts the `academicrecords.backend` Compose target (which starts its declared database and gateway dependencies), waits for the Academic Records database and API health endpoints, then starts or reuses the host MCP server. It collects live registry and execution evidence for all four required tools, sends that evidence to an implementation-assessment model, then sends the same evidence and assessment to an independent review model. It does not answer operational user questions or select a single tool for a user request. Docker Compose and an AI provider configured in the repository `.env` file are required.
+
+```powershell
+python scripts\agentic-loop\agentic_loop.py --mode mcp
+```
+
+Each run writes `evidence.json`, `run-report.md`, `boundary-analysis.md`, `integration-report.md`, and `tool-review.md` under `docs\release-1\agentic-loop-evidence\mcp\<run-id>`. The collector uses fixed, documented validation arguments and records each request and result; source code and API keys are not sent to the models. Record an explicit human decision with `--mcp-human-decision accepted` or `rejected`, together with `--mcp-human-notes` explaining the evidence-based rationale.
+
 ### Run a review-only loop
 
 ```powershell

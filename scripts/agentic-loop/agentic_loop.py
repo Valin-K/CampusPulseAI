@@ -18,9 +18,11 @@ Usage:
     # Review-only run
     python scripts/agentic-loop/agentic_loop.py
 
-    # Auto-start local services and validate without Docker or AI-provider calls
-    python scripts/agentic-loop/agentic_loop.py --mode mcp
+    # RAG validation without Docker or AI-provider calls
     python scripts/agentic-loop/agentic_loop.py --mode rag
+
+    # Run the Lab 07 MCP integration assessment (requires a configured AI provider)
+    python scripts/agentic-loop/agentic_loop.py --mode mcp
 
     # Run with a specific focus
     python scripts/agentic-loop/agentic_loop.py --focus architecture
@@ -48,6 +50,9 @@ from urllib.parse import urlsplit
 
 import requests
 from dotenv import load_dotenv
+
+from mcp_workflow import run_mcp_workflow
+from mcp_workflow.collector import McpCollector
 
 # ---------------------------------------------------------------------------
 # Paths and environment
@@ -324,58 +329,8 @@ def skipped_check(name: str, reason: str) -> dict[str, Any]:
 
 
 def run_mcp_checks() -> list[dict[str, Any]]:
-    """Validate MCP health, the required tool contracts, and a safe tool call."""
-    checks: list[dict[str, Any]] = []
-    health_check, _ = run_json_api_check(
-        "MCP health",
-        "GET",
-        f"{MCP_SERVER_URL}/health",
-        validate=lambda data: None
-        if isinstance(data, dict)
-        and data.get("status") == "healthy"
-        and data.get("service") == "mcp"
-        and isinstance(data.get("toolCount"), int)
-        and data["toolCount"] >= 4
-        else "MCP health response must report healthy status and at least four tools.",
-    )
-    checks.append(health_check)
-
-    required_tools = {"student_count", "students_by_subject", "project_files", "ci_report"}
-    tools_check, tools = run_json_api_check(
-        "MCP tool registry",
-        "GET",
-        f"{MCP_SERVER_URL}/api/mcp/tools",
-        validate=lambda data: None
-        if isinstance(data, list)
-        and required_tools.issubset({
-            tool.get("name") for tool in data if isinstance(tool, dict)
-        })
-        else f"MCP tool registry is missing required tools: {', '.join(sorted(required_tools - ({tool.get('name') for tool in data if isinstance(tool, dict)} if isinstance(data, list) else set())))}.",
-    )
-    checks.append(tools_check)
-
-    if tools_check["passed"]:
-        call_check, _ = run_json_api_check(
-            "MCP project_files tool execution",
-            "POST",
-            f"{MCP_SERVER_URL}/api/mcp/tools/call",
-            payload={"tool": "project_files", "arguments": {"directory_path": "."}},
-            validate=lambda data: None
-            if isinstance(data, dict)
-            and data.get("tool") == "project_files"
-            and data.get("isError") is False
-            and isinstance(data.get("result"), dict)
-            and isinstance(data["result"].get("files"), list)
-            else "project_files did not return a successful file-list result.",
-        )
-        checks.append(call_check)
-    else:
-        checks.append(skipped_check(
-            "MCP project_files tool execution",
-            "Skipped because the MCP tool registry did not validate.",
-        ))
-
-    return checks
+    """Reuse the modular collector for full-suite deterministic MCP checks."""
+    return McpCollector(MCP_SERVER_URL).run_smoke_checks()
 
 
 def run_rag_checks() -> list[dict[str, Any]]:
@@ -674,19 +629,106 @@ def ensure_local_service(
     return result(False, f"{name} did not become healthy within {startup_timeout} seconds.")
 
 
+def wait_for_http_service(
+    name: str,
+    url: str,
+    expected_json_status: str | None = None,
+    startup_timeout: int = 120,
+) -> dict[str, Any]:
+    """Wait for a Compose-hosted HTTP service to become ready."""
+    started = time.perf_counter()
+    deadline = time.monotonic() + startup_timeout
+    last_error = "No successful health response received."
+
+    while time.monotonic() < deadline:
+        try:
+            response = requests.get(url, timeout=3)
+            if response.status_code == 200:
+                if expected_json_status is None:
+                    return {
+                        "name": name,
+                        "passed": True,
+                        "skipped": False,
+                        "exitCode": 0,
+                        "durationSeconds": round(time.perf_counter() - started, 2),
+                        "output": f"HTTP 200 at {url}.",
+                    }
+                body = response.json()
+                if isinstance(body, dict) and body.get("status") == expected_json_status:
+                    return {
+                        "name": name,
+                        "passed": True,
+                        "skipped": False,
+                        "exitCode": 0,
+                        "durationSeconds": round(time.perf_counter() - started, 2),
+                        "output": f"HTTP 200; status={expected_json_status} at {url}.",
+                    }
+                last_error = f"Unexpected health response: {response.text[:300]}"
+            else:
+                last_error = f"HTTP {response.status_code}: {response.text[:300]}"
+        except Exception as exc:
+            last_error = f"{type(exc).__name__}: {exc}"
+        time.sleep(1)
+
+    return {
+        "name": name,
+        "passed": False,
+        "skipped": False,
+        "exitCode": 1,
+        "durationSeconds": round(time.perf_counter() - started, 2),
+        "output": f"Did not become ready within {startup_timeout}s: {last_error}",
+    }
+
+
+def start_mcp_compose_dependencies() -> list[dict[str, Any]]:
+    """Start Academic Records and its Compose dependencies for the data tools."""
+    compose_check = run_command(
+        "Start Academic Records Compose dependencies",
+        [
+            "docker", "compose", "up", "--detach", "--build",
+            "academicrecords.backend",
+        ],
+    )
+    checks = [compose_check]
+    if not compose_check["passed"]:
+        return checks
+
+    readiness_checks = [
+        (
+            "Academic Records database readiness",
+            "http://localhost:5021/health",
+            None,
+        ),
+        (
+            "Academic Records backend readiness",
+            "http://localhost:5020/health",
+            "healthy",
+        ),
+    ]
+    for service_check in readiness_checks:
+        check = wait_for_http_service(*service_check)
+        checks.append(check)
+        if not check["passed"]:
+            break
+    return checks
+
+
 def start_validation_services(mode: str) -> list[dict[str, Any]]:
-    services = []
+    checks = []
     if mode == "mcp":
-        services.append((
+        checks.extend(start_mcp_compose_dependencies())
+        if any(not check["passed"] for check in checks):
+            return checks
+        services = [(
             "MCP server",
             REPO_ROOT / "ai-services" / "mcp-server" / "McpServer" / "McpServer.csproj",
             MCP_SERVER_URL,
             "/health",
             "mcp",
             None,
-        ))
+        )]
     else:
-        services.extend([
+        services = [
             (
                 "AI Gateway",
                 REPO_ROOT / "shared" / "backend" / "CampusPulse.Shared.Ai.Gateway"
@@ -704,9 +746,8 @@ def start_validation_services(mode: str) -> list[dict[str, Any]]:
                 "rag",
                 {"Services__AiGateway": AI_GATEWAY_URL},
             ),
-        ])
+        ]
 
-    checks = []
     for service in services:
         check = ensure_local_service(*service)
         checks.append(check)
@@ -716,7 +757,7 @@ def start_validation_services(mode: str) -> list[dict[str, Any]]:
 
 
 def run_validation_mode(args: argparse.Namespace) -> int:
-    """Run one local AI-service validation mode and write its JSON evidence."""
+    """Run RAG service validation and write its JSON evidence."""
     run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     evidence_path = args.evidence_dir / f"campuspulseai-{args.mode}-{run_id}.json"
     args.evidence_dir.mkdir(parents=True, exist_ok=True)
@@ -725,7 +766,7 @@ def run_validation_mode(args: argparse.Namespace) -> int:
     checks = start_validation_services(args.mode)
     if checks and all(check["passed"] for check in checks):
         print(f"{args.mode.upper()} VALIDATION - service checks")
-        checks.extend(run_mcp_checks() if args.mode == "mcp" else run_rag_checks())
+        checks.extend(run_rag_checks())
     for check in checks:
         status = (
             "SKIP" if check["skipped"]
@@ -1092,7 +1133,7 @@ def parse_args() -> argparse.Namespace:
         "--mode",
         choices=["full", "mcp", "rag"],
         default="full",
-        help="Run the full suite, or auto-start services for local MCP/RAG validation.",
+        help="Run the full suite, the Lab 07 MCP agentic workflow, or RAG validation.",
     )
     parser.add_argument(
         "--focus",
@@ -1134,13 +1175,50 @@ def parse_args() -> argparse.Namespace:
         default=EVIDENCE_DIR,
         help="Directory where evidence JSON files are written.",
     )
+    parser.add_argument(
+        "--mcp-human-decision",
+        choices=["pending", "accepted", "rejected"],
+        default="pending",
+        help="Human decision to record in the MCP integration report.",
+    )
+    parser.add_argument(
+        "--mcp-human-notes",
+        default="",
+        help="Evidence-based justification for the recorded MCP human decision.",
+    )
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
 
-    if args.mode in {"mcp", "rag"}:
+    if args.mode == "mcp":
+        if args.mcp_human_decision != "pending" and not args.mcp_human_notes.strip():
+            print(
+                "ERROR: --mcp-human-notes is required for an accepted or rejected decision.",
+                file=sys.stderr,
+            )
+            return 1
+        if args.apply:
+            print("ERROR: --apply is only supported in full mode.", file=sys.stderr)
+            return 1
+        return run_mcp_workflow(
+            server_url=MCP_SERVER_URL,
+            evidence_dir=args.evidence_dir,
+            start_services=lambda: start_validation_services("mcp"),
+            ai_call=call_ai,
+            provider=AGENTIC_PROVIDER,
+            plan_model=PLAN_MODEL,
+            act_model=ACT_MODEL,
+            review_model=REVIEW_MODEL,
+            user_request=args.mcp_request,
+            tool_arguments_json=args.mcp_arguments,
+            goal=args.goal,
+            human_review_decision=args.mcp_human_decision,
+            human_review_notes=args.mcp_human_notes,
+        )
+
+    if args.mode == "rag":
         if args.apply:
             print("ERROR: --apply is only supported in full mode.", file=sys.stderr)
             return 1
