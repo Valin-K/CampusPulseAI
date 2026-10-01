@@ -23,7 +23,8 @@ builder.Services.AddHttpClient<CampusPulse.Shared.Rag.Client.IRagServerClient, C
 });
 builder.Services.AddSingleton<CampusPulse.Shared.Rag.Generation.RagCitationParser>();
 builder.Services.AddScoped<CampusPulse.Shared.Rag.Assistant.RagKnowledgeService>();
-builder.Services.AddScoped<CampusHousing.Backend.Services.IHousingKnowledgeService, CampusHousing.Backend.Services.HousingKnowledgeService>();
+builder.Services.AddScoped<CampusHousing.Backend.Services.IHousingRagService, CampusHousing.Backend.Services.HousingKnowledgeService>();
+builder.Services.AddScoped<CampusHousing.Backend.Services.IHousingKnowledgeService, CampusHousing.Backend.Services.HousingKnowledgeOrchestrator>();
 builder.Services.AddCors(options => options.AddDefaultPolicy(policy => policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod()));
 
 var app = builder.Build();
