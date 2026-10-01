@@ -18,17 +18,6 @@ Content-Type: application/json
 {
   "documents": [
     {
-# Retrieve: return ranked context and cosine similarity without generating an answer.
-POST {{RagServer_HostAddress}}/api/rag/{{Collection}}/retrieve
-Content-Type: application/json
-
-{
-  "question": "What do I need before I can enrol in Data Structures and Algorithms?",
-  "topK": 5
-}
-
-###
-
       "id": "COMP1001",
       "text": "COMP1001 Introduction to Programming is a first-year core course worth 6 credit points. It has no prerequisites. Assessment is two assignments worth 30 percent each and a final exam worth 40 percent. The course is offered in Autumn and Spring sessions.",
       "metadata": { "courseCode": "COMP1001", "source": "course-catalogue" }
@@ -39,6 +28,17 @@ Content-Type: application/json
       "metadata": { "courseCode": "COMP2002", "source": "course-catalogue" }
     }
   ]
+}
+
+###
+
+# Retrieve: return ranked context and cosine similarity without generating an answer.
+POST {{RagServer_HostAddress}}/api/rag/{{Collection}}/retrieve
+Content-Type: application/json
+
+{
+  "question": "What do I need before I can enrol in Data Structures and Algorithms?",
+  "topK": 5
 }
 
 ###
