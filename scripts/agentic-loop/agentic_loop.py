@@ -18,7 +18,7 @@ Usage:
     # Review-only run
     python scripts/agentic-loop/agentic_loop.py
 
-    # RAG validation without Docker or AI-provider calls
+    # Run the Lab 08 RAG agentic workflow (requires a configured AI provider)
     python scripts/agentic-loop/agentic_loop.py --mode rag
 
     # Run the Lab 07 MCP integration assessment (requires a configured AI provider)
@@ -53,6 +53,8 @@ from dotenv import load_dotenv
 
 from mcp_workflow import run_mcp_workflow
 from mcp_workflow.collector import McpCollector
+from rag_workflow import run_rag_workflow
+from rag_workflow.collector import RagCollector
 
 # ---------------------------------------------------------------------------
 # Paths and environment
@@ -334,132 +336,8 @@ def run_mcp_checks() -> list[dict[str, Any]]:
 
 
 def run_rag_checks() -> list[dict[str, Any]]:
-    """Validate RAG health, collections, and grounded-answer response metadata."""
-    checks: list[dict[str, Any]] = []
-    health_check, _ = run_json_api_check(
-        "RAG health",
-        "GET",
-        f"{RAG_SERVER_URL}/health",
-        validate=lambda data: None
-        if isinstance(data, dict)
-        and data.get("status") == "healthy"
-        and data.get("service") == "rag"
-        and isinstance(data.get("collections"), int)
-        else "RAG health response is missing healthy service status or collection count.",
-    )
-    checks.append(health_check)
-
-    collections_check, collections = run_json_api_check(
-        "RAG collections",
-        "GET",
-        f"{RAG_SERVER_URL}/api/rag/collections",
-        validate=lambda data: None
-        if isinstance(data, list)
-        and all(
-            isinstance(collection, dict)
-            and isinstance(collection.get("name"), str)
-            and isinstance(collection.get("documents"), int)
-            and isinstance(collection.get("chunks"), int)
-            for collection in data
-        )
-        else "RAG collections response must contain collection names and document/chunk counts.",
-    )
-    checks.append(collections_check)
-
-    populated = next((
-        collection for collection in (collections or [])
-        if isinstance(collection, dict)
-        and collection.get("documents", 0) > 0
-    ), None) if collections_check["passed"] else None
-    seeded_validation_corpus = False
-    if collections_check["passed"] and not populated:
-        seed_check, _ = run_json_api_check(
-            "RAG validation corpus seed",
-            "POST",
-            f"{RAG_SERVER_URL}/api/rag/coursemanagement/documents",
-            payload={"documents": [{
-                "id": "agentic-loop-validation",
-                "text": "CampusPulseAI local RAG validation fixture. COMP1001 is an introductory course used to verify retrieval and source citations.",
-                "metadata": {"source": "agentic-loop-validation"},
-            }]},
-            validate=lambda data: None
-            if isinstance(data, dict)
-            and data.get("collection") == "coursemanagement"
-            and data.get("documents") == 1
-            and isinstance(data.get("chunks"), int)
-            and data["chunks"] > 0
-            else "RAG did not ingest the local validation fixture.",
-        )
-        checks.append(seed_check)
-        if seed_check["passed"]:
-            populated = {"name": "coursemanagement", "documents": 1}
-            seeded_validation_corpus = True
-
-    if populated:
-        def validate_answer(data: Any) -> str | None:
-            if not isinstance(data, dict):
-                return "RAG answer response must be a JSON object."
-            if data.get("status") not in {"answered", "insufficient_context", "generation_unavailable"}:
-                return f"RAG answer returned unexpected status: {data.get('status')}."
-            confidence = data.get("confidence")
-            if not isinstance(confidence, (int, float)) or not -1 <= confidence <= 1:
-                return "RAG answer confidence must be a cosine similarity between -1 and 1."
-            sources = data.get("sources")
-            if not isinstance(sources, list) or not all(
-                isinstance(source, dict)
-                and isinstance(source.get("documentId"), str)
-                and isinstance(source.get("chunkIndex"), int)
-                and isinstance(source.get("score"), (int, float))
-                and isinstance(source.get("text"), str)
-                for source in sources
-            ):
-                return "RAG sources must contain document citations, chunk indexes, scores, and text."
-            if data["status"] == "answered" and not sources:
-                return "RAG returned an answer without source citations."
-            return None
-
-        question = (
-            "What does the local RAG validation fixture say about COMP1001?"
-            if seeded_validation_corpus
-            else "Summarize the available information in this collection."
-        )
-        answer_check, _ = run_json_api_check(
-            "RAG retrieval and grounded answer",
-            "POST",
-            f"{RAG_SERVER_URL}/api/rag/{populated['name']}/answer",
-            payload={"question": question, "topK": 5},
-            validate=validate_answer,
-            summarize=lambda data: (
-                f"RAG status={data['status']}; confidence={data['confidence']}; "
-                f"citations={len(data['sources'])}."
-            ),
-            timeout=30,
-        )
-        checks.append(answer_check)
-        if seeded_validation_corpus:
-            cleanup_check, _ = run_json_api_check(
-                "RAG validation corpus cleanup",
-                "DELETE",
-                f"{RAG_SERVER_URL}/api/rag/coursemanagement",
-                validate=lambda data: None
-                if isinstance(data, dict)
-                and data.get("collection") == "coursemanagement"
-                and data.get("deleted") is True
-                else "RAG did not remove its temporary validation collection.",
-            )
-            checks.append(cleanup_check)
-    elif collections_check["passed"]:
-        checks.append(skipped_check(
-            "RAG retrieval and grounded answer",
-            "Skipped because no RAG collection currently contains documents.",
-        ))
-    else:
-        checks.append(skipped_check(
-            "RAG retrieval and grounded answer",
-            "Skipped because the RAG collection list did not validate.",
-        ))
-
-    return checks
+    """Run deterministic RAG checks without invoking the assessment models."""
+    return RagCollector(RAG_SERVER_URL).collect_all()["checks"]
 
 
 def run_all_deterministic_checks() -> list[dict[str, Any]]:
@@ -784,49 +662,17 @@ def start_validation_services(mode: str) -> list[dict[str, Any]]:
 
 
 def run_validation_mode(args: argparse.Namespace) -> int:
-    """Run RAG service validation and write its JSON evidence."""
-    run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    evidence_path = args.evidence_dir / f"campuspulseai-{args.mode}-{run_id}.json"
-    args.evidence_dir.mkdir(parents=True, exist_ok=True)
-
-    print(f"{args.mode.upper()} VALIDATION - starting local services")
-    checks = start_validation_services(args.mode)
-    if checks and all(check["passed"] for check in checks):
-        print(f"{args.mode.upper()} VALIDATION - service checks")
-        checks.extend(run_rag_checks())
-    for check in checks:
-        status = (
-            "SKIP" if check["skipped"]
-            else "PASS" if check["passed"]
-            else "FAIL"
-        )
-        print(f"    [{status}] {check['name']} ({check['durationSeconds']}s)")
-
-    passed = bool(checks) and all(check["passed"] and not check["skipped"] for check in checks)
-    evidence = {
-        "schemaVersion": 4,
-        "assessmentEvidence": True,
-        "workflow": f"{args.mode.upper()} validation",
-        "validationMode": args.mode,
-        "runId": run_id,
-        "recordedAtUtc": now_iso(),
-        "goal": args.goal,
-        "focus": args.focus,
-        "checks": checks,
-        "passed": passed,
-        "summary": check_summary(checks),
-        "privacy": {
-            "sourceCodeSentToAi": False,
-            "projectContextSentToAi": False,
-            "apiKeysRecorded": False,
-        },
-    }
-    evidence_path.write_text(
-        json.dumps(evidence, indent=2, ensure_ascii=False),
-        encoding="utf-8",
+    """Run the Lab 08 RAG evidence and dual-review workflow."""
+    return run_rag_workflow(
+        server_url=RAG_SERVER_URL,
+        evidence_dir=args.evidence_dir,
+        start_services=lambda: start_validation_services("rag"),
+        ai_call=call_ai,
+        provider=AGENTIC_PROVIDER,
+        implementation_model=ACT_MODEL,
+        review_model=REVIEW_MODEL,
+        goal=args.goal,
     )
-    print(f"\nEvidence written to: {evidence_path}")
-    return 0 if passed else 1
 
 
 # ---------------------------------------------------------------------------
@@ -1173,7 +1019,7 @@ def parse_args() -> argparse.Namespace:
         "--mode",
         choices=["full", "mcp", "rag"],
         default="full",
-        help="Run the full suite, the Lab 07 MCP agentic workflow, or RAG validation.",
+        help="Run the full suite, the Lab 07 MCP workflow, or the Lab 08 RAG workflow.",
     )
     parser.add_argument(
         "--focus",
