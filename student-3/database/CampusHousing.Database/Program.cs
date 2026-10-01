@@ -32,7 +32,8 @@ app.MapGet("/api/rooms", async (CampusHousingDbContext db) => Results.Ok(await d
     {
         room.Id, room.Building, room.RoomNumber, room.Capacity,
         OccupiedBeds = db.HousingAllocations.Count(allocation => allocation.DormRoomId == room.Id),
-        room.IsAvailable
+        IsAvailable = room.IsAvailable
+            && db.HousingAllocations.Count(allocation => allocation.DormRoomId == room.Id) < room.Capacity
     }).ToListAsync()));
 app.MapGet("/api/rooms/{id:int}", async (int id, CampusHousingDbContext db) =>
     await db.DormRooms.FindAsync(id) is { } room ? Results.Ok(room) : Results.NotFound());
