@@ -17,6 +17,11 @@ builder.Services.AddHttpClient("academicRecords", client =>
     client.BaseAddress = new Uri(builder.Configuration["Services:AcademicRecordsBackend"] ?? "http://localhost:5020");
     client.Timeout = TimeSpan.FromSeconds(30);
 });
+builder.Services.AddHttpClient("campusHousing", client =>
+{
+    client.BaseAddress = new Uri(builder.Configuration["Services:CampusHousingDatabase"] ?? "http://localhost:5093");
+    client.Timeout = TimeSpan.FromSeconds(10);
+});
 builder.Services.AddMcpTools();
 
 var app = builder.Build();
