@@ -2,8 +2,10 @@ Review RAG output quality using only the supplied evidence.
 
 Check:
 - retrieval quality
+- P@5 and R@5 interpretation
 - citation quality
-- confidence justification
+- negative-query abstention
+- cosine-similarity calibration claims
 - unsupported claims
 
 Return exactly:

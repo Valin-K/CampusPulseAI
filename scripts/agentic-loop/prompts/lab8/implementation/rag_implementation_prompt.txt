@@ -1,5 +1,5 @@
 Assess the CampusPulseAI RAG implementation using the supplied execution evidence.
 
-Map the lab's refresh, retrieve, and answer concepts to this repository's .NET HTTP service. Check document indexing, grounded-answer status, source citations, confidence, and isolated fixture cleanup.
+Map the lab's refresh, retrieve, and answer concepts to this repository's .NET HTTP service. Check isolated corpus refresh, separate top-5 retrieval, P@5/R@5, grounded answer citations, negative-query abstention, and fixture cleanup.
 
-Do not assume Python files or MCP tool names are required. Do not claim behavior that the evidence does not show.
+Treat cosine similarity as a retrieval score, not calibrated confidence. Do not assume Python files or MCP tool names are required. Do not claim behavior that the evidence does not show.

@@ -5,6 +5,7 @@ Check:
 - chunking
 - embedding strategy
 - vector store usage
+- benchmark coverage and relevance labels
 - governance risks
 
 Return exactly:

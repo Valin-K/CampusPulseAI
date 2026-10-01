@@ -32,9 +32,15 @@ def _assessment_evidence(evidence: dict[str, Any]) -> dict[str, Any]:
             for key in (
                 "collection",
                 "documentId",
+                "documentIds",
+                "expectedRelevantChunks",
                 "question",
+                "negativeQuestion",
                 "ingestion",
+                "retrieval",
+                "retrievalMetrics",
                 "answer",
+                "negativeAnswer",
                 "cleanup",
             )
             if key in validation

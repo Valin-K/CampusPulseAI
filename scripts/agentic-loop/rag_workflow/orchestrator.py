@@ -29,14 +29,25 @@ def _observation_summary(evidence: dict[str, Any]) -> str:
     checks = evidence.get("checks", [])
     passed_count = sum(1 for check in checks if check.get("passed"))
     validation = evidence.get("validationEvidence", {})
+    retrieval = validation.get("retrieval")
+    retrieval_metrics = validation.get("retrievalMetrics", {})
     answer = validation.get("answer")
-    status = answer.get("status", "not captured") if isinstance(answer, dict) else "not captured"
-    sources = answer.get("sources", []) if isinstance(answer, dict) else []
-    citation_count = len(sources) if isinstance(sources, list) else 0
-    confidence = answer.get("confidence") if isinstance(answer, dict) else None
+    negative_answer = validation.get("negativeAnswer")
+    answer_status = answer.get("status", "not captured") if isinstance(answer, dict) else "not captured"
+    negative_status = (
+        negative_answer.get("status", "not captured")
+        if isinstance(negative_answer, dict)
+        else "not captured"
+    )
+    cosine_similarity = (
+        retrieval.get("cosineSimilarity") if isinstance(retrieval, dict) else None
+    )
     return (
         f"{passed_count} of {len(checks)} evidence checks passed; "
-        f"answer status={status}; citations={citation_count}; confidence={confidence}."
+        f"cosine similarity={cosine_similarity}; "
+        f"P@5={retrieval_metrics.get('pAt5')}; "
+        f"R@5={retrieval_metrics.get('rAt5')}; "
+        f"answer status={answer_status}; negative-query status={negative_status}."
     )
 
 
@@ -55,6 +66,7 @@ def _render_report(evidence: dict[str, Any]) -> str:
     rag_evidence = evidence.get("ragEvidence", {})
     assessment = evidence.get("implementationAssessment", {}).get("output") or "Not generated."
     review = evidence.get("independentReview", {}).get("output") or "Not generated."
+    improvement = evidence.get("improvement", {})
     return f"""# RAG Validation Report
 
 - Run ID: `{evidence['runId']}`
@@ -85,6 +97,14 @@ def _render_report(evidence: dict[str, Any]) -> str:
 ## REVIEW: Independent Review
 
 {review}
+
+## IMPROVE: Recorded Follow-Up
+
+{improvement.get('recommendations', 'No recommendations recorded.')}
+
+- Status: {improvement.get('status', 'Not reached.')}
+- Source changes applied automatically: **{'yes' if improvement.get('sourceChangesApplied') else 'no'}**
+- Next step: Apply an accepted correction and rerun validation.
 
 ## Human Review
 
@@ -170,7 +190,7 @@ def run_rag_workflow(
                 model,
                 system_prompt,
                 user_prompt,
-                max_tokens=300,
+                max_tokens=1200,
                 temperature=0.1,
             )
         except Exception as exc:
@@ -331,6 +351,12 @@ def run_rag_workflow(
             review_error or "The independent review was empty.",
         )
         return finish("RAG independent review failed.")
+    evidence["improvement"] = {
+        "status": "recommendations_recorded",
+        "recommendations": review_output,
+        "sourceChangesApplied": False,
+    }
+    persist()
     record_stage(
         "REVIEW",
         "passed",

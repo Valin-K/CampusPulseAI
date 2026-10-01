@@ -36,6 +36,7 @@ class RagCollectorTests(unittest.TestCase):
     def run_collector(
         self,
         answer_status: str = "answered",
+        negative_answer_status: str = "insufficient_context",
         wrong_citation: bool = False,
         existing_collections: list[dict] | None = None,
         post_ingest_collections: list[dict] | None = None,
@@ -44,9 +45,11 @@ class RagCollectorTests(unittest.TestCase):
         fixture_id: str | None = None
         marker: str | None = None
         collection_reads = 0
+        answer_calls = 0
+        fixture_documents: list[dict] = []
 
         def request_func(method: str, url: str, **kwargs: object) -> FakeResponse:
-            nonlocal collection_reads, fixture_id, marker
+            nonlocal answer_calls, collection_reads, fixture_documents, fixture_id, marker
             requests_seen.append({"method": method, "url": url, **kwargs})
 
             if method == "GET" and url.endswith("/health"):
@@ -61,29 +64,51 @@ class RagCollectorTests(unittest.TestCase):
                     return FakeResponse(200, existing_collections or [])
                 return FakeResponse(200, post_ingest_collections or [{
                     "name": "coursemanagement",
-                    "documents": 1,
-                    "chunks": 1,
+                    "documents": len(fixture_documents),
+                    "chunks": len(fixture_documents),
                 }])
             if method == "POST" and url.endswith("/documents"):
-                document = kwargs["json"]["documents"][0]
+                fixture_documents = kwargs["json"]["documents"]
+                document = fixture_documents[0]
                 fixture_id = document["id"]
                 marker = document["text"].split("marker ", 1)[1].split(".", 1)[0]
                 return FakeResponse(200, {
                     "collection": "coursemanagement",
-                    "documents": 1,
-                    "chunks": 1,
+                    "documents": len(fixture_documents),
+                    "chunks": len(fixture_documents),
+                })
+            if method == "POST" and url.endswith("/retrieve"):
+                payload = kwargs["json"]
+                sources = [{
+                    "rank": index + 1,
+                    "documentId": document["id"],
+                    "chunkIndex": 0,
+                    "score": 0.86 if index == 0 else 0.1,
+                    "text": document["text"],
+                } for index, document in enumerate(fixture_documents[:5])]
+                return FakeResponse(200, {
+                    "collection": "coursemanagement",
+                    "question": payload["question"],
+                    "topK": payload["topK"],
+                    "cosineSimilarity": 0.86,
+                    "sources": sources,
                 })
             if method == "POST" and url.endswith("/answer"):
+                answer_calls += 1
+                is_positive = answer_calls == 1
+                status = answer_status if is_positive else negative_answer_status
                 return FakeResponse(200, {
-                    "status": answer_status,
-                    "answer": "The marker confirms grounded citation retrieval.",
-                    "confidence": 0.86,
+                    "status": status,
+                    "answer": "The marker identifies a blue lantern."
+                    if is_positive else "The knowledge base does not contain enough information.",
+                    "confidence": 0.86 if is_positive else 0.12,
                     "sources": [{
-                        "documentId": "another-document" if wrong_citation else fixture_id,
+                        "documentId": "another-document"
+                        if wrong_citation and is_positive else fixture_id,
                         "rank": 1,
                         "chunkIndex": 0,
-                        "score": 0.86,
-                        "text": f"Fixture marker {marker} confirms grounded citation retrieval.",
+                        "score": 0.86 if is_positive else 0.12,
+                        "text": fixture_documents[0]["text"],
                     }],
                 })
             if method == "DELETE" and url.endswith("/api/rag/coursemanagement"):
@@ -103,6 +128,22 @@ class RagCollectorTests(unittest.TestCase):
 
         self.assertTrue(evidence["passed"])
         self.assertEqual(evidence["validationEvidence"]["answer"]["status"], "answered")
+        self.assertEqual(
+            evidence["validationEvidence"]["retrievalMetrics"]["pAt5"],
+            0.2,
+        )
+        self.assertEqual(
+            evidence["validationEvidence"]["retrievalMetrics"]["rAt5"],
+            1.0,
+        )
+        self.assertEqual(
+            evidence["validationEvidence"]["negativeAnswer"]["status"],
+            "insufficient_context",
+        )
+        self.assertIn(
+            "municipal bylaw",
+            evidence["validationEvidence"]["negativeQuestion"],
+        )
         self.assertTrue(evidence["checks"][-1]["passed"])
         cleanup = requests_seen[-1]
         self.assertEqual(cleanup["method"], "DELETE")
@@ -127,8 +168,8 @@ class RagCollectorTests(unittest.TestCase):
         evidence, requests_seen = self.run_collector(
             post_ingest_collections=[{
                 "name": "coursemanagement",
-                "documents": 2,
-                "chunks": 2,
+                "documents": 7,
+                "chunks": 7,
             }],
         )
 
@@ -137,6 +178,16 @@ class RagCollectorTests(unittest.TestCase):
         cleanup_check = evidence["checks"][-1]
         self.assertEqual(cleanup_check["name"], "RAG validation corpus cleanup")
         self.assertIn("left it untouched", cleanup_check["output"])
+
+    def test_negative_query_must_be_abstained(self) -> None:
+        evidence, _ = self.run_collector(negative_answer_status="answered")
+
+        self.assertFalse(evidence["passed"])
+        negative_check = next(
+            check for check in evidence["checks"]
+            if check["name"] == "RAG negative-query abstention"
+        )
+        self.assertFalse(negative_check["passed"])
 
     def test_answer_with_citation_to_another_document_fails(self) -> None:
         evidence, _ = self.run_collector(wrong_citation=True)
@@ -179,8 +230,22 @@ def passed_rag_evidence() -> dict:
         "validationEvidence": {
             "collection": "coursemanagement",
             "documentId": "agentic-loop-validation-sample",
+            "documentIds": ["agentic-loop-validation-sample"],
+            "expectedRelevantChunks": 1,
             "question": "What does the fixture confirm?",
+            "negativeQuestion": "What does the unrelated query ask?",
             "ingestion": {"documents": 1, "chunks": 1},
+            "retrieval": {
+                "cosineSimilarity": 0.86,
+                "sources": [{
+                    "documentId": "agentic-loop-validation-sample",
+                    "rank": 1,
+                    "chunkIndex": 0,
+                    "score": 0.86,
+                    "text": "The fixture confirms grounded citation retrieval.",
+                }],
+            },
+            "retrievalMetrics": {"pAt5": 0.2, "rAt5": 1.0},
             "answer": {
                 "status": "answered",
                 "answer": "It confirms grounded citation retrieval.",
@@ -192,6 +257,10 @@ def passed_rag_evidence() -> dict:
                     "score": 0.86,
                     "text": "The fixture confirms grounded citation retrieval.",
                 }],
+            },
+            "negativeAnswer": {
+                "status": "insufficient_context",
+                "confidence": 0.12,
             },
             "cleanup": {"deleted": True},
         },
@@ -213,8 +282,12 @@ class RagPipelineTests(unittest.TestCase):
 
         self.assertIn(".NET HTTP service", implementation)
         self.assertIn("agentic-loop-validation-sample", implementation)
+        self.assertIn("retrievalMetrics", implementation)
+        self.assertIn("negativeAnswer", implementation)
+        self.assertIn("not calibrated", implementation)
         self.assertIn("Risk:", review_system)
         self.assertIn("Strengths:", review_system)
+        self.assertIn("P@5 and R@5", review_system)
         self.assertIn("Implementation assessment.", review)
         self.assertIn("grounded citation retrieval", review)
 
@@ -287,6 +360,8 @@ class RagWorkflowTests(unittest.TestCase):
             [stage["name"] for stage in evidence["stages"]],
             ["OBSERVE", "IMPLEMENTATION", "REVIEW"],
         )
+        self.assertIn("P@5=0.2", evidence["stages"][0]["details"])
+        self.assertIn("R@5=1.0", evidence["stages"][0]["details"])
         self.assertTrue(evidence["passed"])
         self.assertEqual([model["stage"] for model in evidence["models"]], [
             "IMPLEMENTATION", "REVIEW",
@@ -294,11 +369,17 @@ class RagWorkflowTests(unittest.TestCase):
         self.assertEqual(len(model_calls), 2)
         self.assertEqual(
             [call[1]["max_tokens"] for call in model_calls],
-            [300, 300],
+            [1200, 1200],
         )
         self.assertIn("grounded citation retrieval", report)
         self.assertIn("Independent Review", report)
+        self.assertIn("IMPROVE: Recorded Follow-Up", report)
+        self.assertIn("Source changes applied automatically: **no**", report)
         self.assertFalse(evidence["privacy"]["sourceCodeSentToAi"])
+        self.assertEqual(
+            evidence["improvement"]["status"],
+            "recommendations_recorded",
+        )
 
     def test_startup_failure_is_recorded_and_skips_models(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:

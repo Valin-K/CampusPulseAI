@@ -22,6 +22,17 @@ public sealed record AnswerRequest(
     double? MinimumConfidence,
     string? SupplementalContext = null);
 
+public sealed record RetrievalRequest(string Question, int? TopK);
+
+public sealed record RetrievalResponse(
+    string Collection,
+    string Question,
+    int TopK,
+    double CosineSimilarity,
+    IReadOnlyList<RagSource> Sources,
+    string Embedder,
+    DateTimeOffset RetrievedAtUtc);
+
 public sealed record RagSource(
     int Rank,
     string DocumentId,

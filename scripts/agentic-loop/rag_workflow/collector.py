@@ -184,16 +184,59 @@ class RagCollector:
         fixture_id = f"agentic-loop-validation-{uuid.uuid4().hex}"
         marker = f"CAMPUSPULSEVALIDATION{uuid.uuid4().hex[:12]}"
         fixture_text = (
-            f"CampusPulseAI RAG validation fixture marker {marker}. "
-            "The marker confirms grounded citation retrieval."
+            f"Validation marker {marker}: the north arch has a blue lantern."
         )
-        question = f"What does marker {marker} confirm?"
+        question = f"What does marker {marker} identify?"
+        negative_question = (
+            "Which municipal bylaw governs the "
+            f"{uuid.uuid4().hex[:12]} festival in Novanthera?"
+        )
+        distractor_texts = [
+            "Marine layers form when cool ocean air meets warmer sea water.",
+            "Kepler cycles describe repeated paths of distant planets.",
+            "Archival ink remains legible when stored away from sunlight.",
+            "Root systems draw water from layers of surrounding soil.",
+            "Musical intervals compare frequencies of paired notes.",
+        ]
+        fixture_documents = [{
+            "id": fixture_id,
+            "text": fixture_text,
+            "metadata": {"source": "agentic-loop-validation", "relevance": "relevant"},
+        }]
+        fixture_documents.extend({
+            "id": f"agentic-loop-validation-decoy-{uuid.uuid4().hex}",
+            "text": text,
+            "metadata": {"source": "agentic-loop-validation", "relevance": "decoy"},
+        } for text in distractor_texts)
+        expected_relevant_chunks = 1
+        fixture_document_count = len(fixture_documents)
+
+        def source_has_contract(source: Any) -> bool:
+            return (
+                isinstance(source, dict)
+                and isinstance(source.get("documentId"), str)
+                and isinstance(source.get("rank"), int)
+                and not isinstance(source.get("rank"), bool)
+                and source["rank"] > 0
+                and isinstance(source.get("chunkIndex"), int)
+                and not isinstance(source.get("chunkIndex"), bool)
+                and source["chunkIndex"] >= 0
+                and isinstance(source.get("score"), (int, float))
+                and not isinstance(source.get("score"), bool)
+                and math.isfinite(source["score"])
+                and -1 <= source["score"] <= 1
+                and isinstance(source.get("text"), str)
+            )
+
         self.validation_evidence = {
             "collection": collection,
             "documentId": fixture_id,
+            "documentIds": [document["id"] for document in fixture_documents],
+            "expectedRelevantChunks": expected_relevant_chunks,
             "marker": marker,
             "fixtureText": fixture_text,
             "question": question,
+            "negativeQuestion": negative_question,
         }
 
         fixture_attempted = True
@@ -203,13 +246,7 @@ class RagCollector:
             ingestion = self._request(
                 "POST",
                 f"/api/rag/{quote(collection, safe='')}/documents",
-                {
-                    "documents": [{
-                        "id": fixture_id,
-                        "text": fixture_text,
-                        "metadata": {"source": "agentic-loop-validation"},
-                    }]
-                },
+                {"documents": fixture_documents},
             )
             ingest_succeeded = True
             self.validation_evidence["ingestion"] = ingestion
@@ -217,24 +254,88 @@ class RagCollector:
                 isinstance(ingestion, dict)
                 and isinstance(ingestion.get("collection"), str)
                 and ingestion["collection"].casefold() == collection.casefold()
-                and ingestion.get("documents") == 1
+                and ingestion.get("documents") == fixture_document_count
                 and isinstance(ingestion.get("chunks"), int)
-                and ingestion["chunks"] > 0
+                and ingestion["chunks"] == fixture_document_count
             )
             self._record_check(
-                "RAG validation corpus seed",
+                "RAG validation corpus refresh",
                 ingestion_valid,
-                "Unique validation fixture indexed."
+                f"Isolated corpus refreshed with {fixture_document_count} one-chunk documents."
                 if ingestion_valid
-                else "RAG did not confirm indexing the unique validation fixture.",
+                else "RAG did not confirm indexing the expected fixture and distractor documents.",
                 started,
             )
         except Exception as exc:
             ingestion_valid = False
-            self._record_check("RAG validation corpus seed", False, str(exc), started)
+            self._record_check("RAG validation corpus refresh", False, str(exc), started)
 
         started = time.perf_counter()
         if ingestion_valid:
+            try:
+                retrieval = self._request(
+                    "POST",
+                    f"/api/rag/{quote(collection, safe='')}/retrieve",
+                    {"question": question, "topK": 5},
+                )
+                self.validation_evidence["retrieval"] = retrieval
+                retrieved_sources = (
+                    retrieval.get("sources") if isinstance(retrieval, dict) else None
+                )
+                similarity = (
+                    retrieval.get("cosineSimilarity")
+                    if isinstance(retrieval, dict)
+                    else None
+                )
+                retrieval_contract_valid = (
+                    isinstance(retrieval, dict)
+                    and isinstance(retrieval.get("collection"), str)
+                    and retrieval["collection"].casefold() == collection.casefold()
+                    and retrieval.get("question") == question
+                    and retrieval.get("topK") == 5
+                    and isinstance(similarity, (int, float))
+                    and not isinstance(similarity, bool)
+                    and math.isfinite(similarity)
+                    and -1 <= similarity <= 1
+                    and isinstance(retrieved_sources, list)
+                    and len(retrieved_sources) <= 5
+                    and all(source_has_contract(source) for source in retrieved_sources)
+                )
+                relevant_sources = [
+                    source for source in (retrieved_sources or [])
+                    if source.get("documentId") == fixture_id
+                ]
+                precision_at_5 = len(relevant_sources) / 5
+                recall_at_5 = min(
+                    1.0,
+                    len(relevant_sources) / expected_relevant_chunks,
+                )
+                metrics = {
+                    "k": 5,
+                    "retrievedCount": len(retrieved_sources)
+                    if isinstance(retrieved_sources, list) else 0,
+                    "relevantRetrieved": len(relevant_sources),
+                    "relevantTotal": expected_relevant_chunks,
+                    "pAt5": precision_at_5,
+                    "rAt5": recall_at_5,
+                    "cosineSimilarity": similarity,
+                }
+                self.validation_evidence["retrievalMetrics"] = metrics
+                retrieval_valid = retrieval_contract_valid and bool(relevant_sources)
+                self._record_check(
+                    "RAG retrieval metrics",
+                    retrieval_valid,
+                    f"P@5={precision_at_5:.3f}; R@5={recall_at_5:.3f}; "
+                    f"relevant chunks={len(relevant_sources)}/{expected_relevant_chunks}; "
+                    f"cosine similarity={similarity}.",
+                    started,
+                )
+            except Exception as exc:
+                retrieval_valid = False
+                self.validation_evidence["retrievalError"] = str(exc)
+                self._record_check("RAG retrieval metrics", False, str(exc), started)
+
+            started = time.perf_counter()
             try:
                 answer = self._request(
                     "POST",
@@ -244,19 +345,8 @@ class RagCollector:
                 self.validation_evidence["answer"] = answer
                 sources = answer.get("sources") if isinstance(answer, dict) else None
                 citations_valid = isinstance(sources, list) and any(
-                    isinstance(source, dict)
+                    source_has_contract(source)
                     and source.get("documentId") == fixture_id
-                    and isinstance(source.get("rank"), int)
-                    and not isinstance(source.get("rank"), bool)
-                    and source["rank"] > 0
-                    and isinstance(source.get("chunkIndex"), int)
-                    and not isinstance(source.get("chunkIndex"), bool)
-                    and source["chunkIndex"] >= 0
-                    and isinstance(source.get("score"), (int, float))
-                    and not isinstance(source.get("score"), bool)
-                    and math.isfinite(source["score"])
-                    and -1 <= source["score"] <= 1
-                    and isinstance(source.get("text"), str)
                     and marker in source["text"]
                     for source in sources
                 )
@@ -274,7 +364,7 @@ class RagCollector:
                 )
                 if answer_valid:
                     output = (
-                        f"Answered with confidence {confidence}; "
+                        f"Answered with cosine similarity {confidence}; "
                         f"fixture citation {fixture_id} was present."
                     )
                 elif isinstance(answer, dict):
@@ -296,11 +386,57 @@ class RagCollector:
                 self._record_check(
                     "RAG retrieval and grounded answer", False, str(exc), started
                 )
+
+            started = time.perf_counter()
+            try:
+                negative_answer = self._request(
+                    "POST",
+                    f"/api/rag/{quote(collection, safe='')}/answer",
+                    {"question": negative_question, "topK": 5},
+                )
+                self.validation_evidence["negativeAnswer"] = negative_answer
+                negative_similarity = (
+                    negative_answer.get("confidence")
+                    if isinstance(negative_answer, dict)
+                    else None
+                )
+                negative_valid = (
+                    isinstance(negative_answer, dict)
+                    and negative_answer.get("status") == "insufficient_context"
+                    and isinstance(negative_similarity, (int, float))
+                    and not isinstance(negative_similarity, bool)
+                    and math.isfinite(negative_similarity)
+                    and -1 <= negative_similarity <= 1
+                )
+                self._record_check(
+                    "RAG negative-query abstention",
+                    negative_valid,
+                    f"Unanswerable query status={negative_answer.get('status')!r}; "
+                    f"cosine similarity={negative_similarity}; "
+                    "expected insufficient_context.",
+                    started,
+                )
+            except Exception as exc:
+                self._record_check(
+                    "RAG negative-query abstention", False, str(exc), started
+                )
         else:
+            self._record_check(
+                "RAG retrieval metrics",
+                False,
+                "Skipped because the validation corpus was not refreshed.",
+                started,
+            )
             self._record_check(
                 "RAG retrieval and grounded answer",
                 False,
                 "Skipped because the validation fixture was not indexed.",
+                started,
+            )
+            self._record_check(
+                "RAG negative-query abstention",
+                False,
+                "Skipped because the validation corpus was not refreshed.",
                 started,
             )
 
@@ -344,7 +480,7 @@ class RagCollector:
                     )
                 elif (
                     current_collection is not None
-                    and current_collection["documents"] == 1
+                    and current_collection["documents"] == fixture_document_count
                     and current_collection["chunks"] == expected_chunks
                 ):
                     cleanup = self._request(
