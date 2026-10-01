@@ -361,6 +361,10 @@ class McpWorkflowTests(unittest.TestCase):
             )
             self.assertEqual(len(model_calls), 2)
             self.assertEqual(
+                [call[-1]["max_tokens"] for call in model_calls],
+                [1200, 1200],
+            )
+            self.assertEqual(
                 [model["stage"] for model in evidence["models"]],
                 ["IMPLEMENTATION", "REVIEW"],
             )
@@ -386,6 +390,7 @@ class McpServiceStartupTests(unittest.TestCase):
         passed_check = {"name": "check", "passed": True, "skipped": False}
         with (
             patch("agentic_loop.run_command", return_value=passed_check) as run_command,
+            patch("agentic_loop.is_http_service_ready", side_effect=[False, False]),
             patch("agentic_loop.wait_for_http_service", return_value=passed_check) as wait_for,
             patch("agentic_loop.ensure_local_service", return_value=passed_check) as ensure_local,
         ):
@@ -394,13 +399,34 @@ class McpServiceStartupTests(unittest.TestCase):
         self.assertTrue(all(check["passed"] for check in checks))
         self.assertEqual(
             run_command.call_args.args[1],
-            ["docker", "compose", "up", "--detach", "--build", "academicrecords.backend"],
+            [
+                "docker", "compose", "up", "--detach", "--build", "--no-deps",
+                "academicrecords.database", "academicrecords.backend",
+            ],
         )
         self.assertEqual(
             [call.args[1] for call in wait_for.call_args_list],
             ["http://localhost:5021/health", "http://localhost:5020/health"],
         )
         self.assertEqual(ensure_local.call_args.args[0], "MCP server")
+
+    def test_mcp_startup_reuses_healthy_services(self) -> None:
+        passed_check = {"name": "check", "passed": True, "skipped": False}
+        with (
+            patch("agentic_loop.run_command") as run_command,
+            patch("agentic_loop.is_http_service_ready", return_value=True) as is_ready,
+            patch("agentic_loop.wait_for_http_service", return_value=passed_check) as wait_for,
+            patch("agentic_loop.ensure_local_service", return_value=passed_check),
+        ):
+            checks = agentic_loop.start_validation_services("mcp")
+
+        self.assertTrue(all(check["passed"] for check in checks))
+        run_command.assert_not_called()
+        self.assertEqual(is_ready.call_count, 2)
+        self.assertEqual(
+            [call.args[1] for call in wait_for.call_args_list],
+            ["http://localhost:5021/health", "http://localhost:5020/health"],
+        )
 
     def test_mcp_startup_does_not_start_mcp_until_compose_succeeds(self) -> None:
         compose_failure = {
@@ -411,6 +437,7 @@ class McpServiceStartupTests(unittest.TestCase):
         }
         with (
             patch("agentic_loop.run_command", return_value=compose_failure),
+            patch("agentic_loop.is_http_service_ready", side_effect=[False, False]),
             patch("agentic_loop.wait_for_http_service") as wait_for,
             patch("agentic_loop.ensure_local_service") as ensure_local,
         ):
@@ -419,6 +446,44 @@ class McpServiceStartupTests(unittest.TestCase):
         self.assertEqual(checks, [compose_failure])
         wait_for.assert_not_called()
         ensure_local.assert_not_called()
+
+
+class OpenRouterResponseTests(unittest.TestCase):
+    def test_empty_content_reports_finish_reason_and_completion_tokens(self) -> None:
+        class EmptyResponse:
+            def raise_for_status(self) -> None:
+                return None
+
+            def json(self) -> dict[str, object]:
+                return {
+                    "choices": [{
+                        "message": {"content": None},
+                        "finish_reason": "length",
+                    }],
+                    "usage": {"completion_tokens": 300},
+                }
+
+        with (
+            patch("agentic_loop.OPENROUTER_API_KEY", "test-key"),
+            patch("agentic_loop.requests.post", return_value=EmptyResponse()) as post,
+        ):
+            output, error = agentic_loop.call_openrouter(
+                "qwen/qwen3.8-27b",
+                "system",
+                "user",
+                max_tokens=300,
+            )
+
+        self.assertIsNone(output)
+        self.assertEqual(
+            post.call_args.kwargs["json"]["reasoning"],
+            {"effort": "low"},
+        )
+        self.assertEqual(
+            error,
+            "qwen/qwen3.8-27b returned an empty response "
+            "(finish_reason=length, completion_tokens=300).",
+        )
 
 
 if __name__ == "__main__":

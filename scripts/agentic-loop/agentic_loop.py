@@ -680,19 +680,25 @@ def wait_for_http_service(
     }
 
 
+def is_http_service_ready(
+    url: str,
+    expected_json_status: str | None = None,
+    timeout: int = 2,
+) -> bool:
+    try:
+        response = requests.get(url, timeout=timeout)
+        if response.status_code != 200:
+            return False
+        if expected_json_status is None:
+            return True
+        body = response.json()
+        return isinstance(body, dict) and body.get("status") == expected_json_status
+    except Exception:
+        return False
+
+
 def start_mcp_compose_dependencies() -> list[dict[str, Any]]:
     """Start Academic Records and its Compose dependencies for the data tools."""
-    compose_check = run_command(
-        "Start Academic Records Compose dependencies",
-        [
-            "docker", "compose", "up", "--detach", "--build",
-            "academicrecords.backend",
-        ],
-    )
-    checks = [compose_check]
-    if not compose_check["passed"]:
-        return checks
-
     readiness_checks = [
         (
             "Academic Records database readiness",
@@ -705,6 +711,27 @@ def start_mcp_compose_dependencies() -> list[dict[str, Any]]:
             "healthy",
         ),
     ]
+    compose_services = [
+        service_name
+        for service_name, (_, url, expected_status) in zip(
+            ("academicrecords.database", "academicrecords.backend"),
+            readiness_checks,
+        )
+        if not is_http_service_ready(url, expected_status)
+    ]
+    checks = []
+    if compose_services:
+        compose_check = run_command(
+            "Start Academic Records Compose dependencies",
+            [
+                "docker", "compose", "up", "--detach", "--build", "--no-deps",
+                *compose_services,
+            ],
+        )
+        checks.append(compose_check)
+        if not compose_check["passed"]:
+            return checks
+
     for service_check in readiness_checks:
         check = wait_for_http_service(*service_check)
         checks.append(check)
@@ -829,6 +856,8 @@ def call_openrouter(
         "max_tokens": max_tokens,
         "temperature": temperature,
     }
+    if model.casefold() == "qwen/qwen3.8-27b":
+        payload["reasoning"] = {"effort": "low"}
 
     try:
         response = requests.post(
@@ -839,10 +868,21 @@ def call_openrouter(
         )
         response.raise_for_status()
         data = response.json()
-        content = data["choices"][0]["message"]["content"]
+        choices = data.get("choices") if isinstance(data, dict) else None
+        if not isinstance(choices, list) or not choices or not isinstance(choices[0], dict):
+            return None, f"{model} returned an empty response (no choices)."
+
+        choice = choices[0]
+        message = choice.get("message")
+        content = message.get("content") if isinstance(message, dict) else None
         if content and content.strip():
             return content.strip(), None
-        return None, f"{model} returned an empty response."
+
+        details = [f"finish_reason={choice.get('finish_reason') or 'unknown'}"]
+        usage = data.get("usage")
+        if isinstance(usage, dict) and usage.get("completion_tokens") is not None:
+            details.append(f"completion_tokens={usage['completion_tokens']}")
+        return None, f"{model} returned an empty response ({', '.join(details)})."
     except requests.exceptions.HTTPError as exc:
         return None, f"{model} HTTP error: {exc.response.status_code} - {exc.response.text}"
     except Exception as exc:
@@ -1208,11 +1248,8 @@ def main() -> int:
             start_services=lambda: start_validation_services("mcp"),
             ai_call=call_ai,
             provider=AGENTIC_PROVIDER,
-            plan_model=PLAN_MODEL,
-            act_model=ACT_MODEL,
+            implementation_model=ACT_MODEL,
             review_model=REVIEW_MODEL,
-            user_request=args.mcp_request,
-            tool_arguments_json=args.mcp_arguments,
             goal=args.goal,
             human_review_decision=args.mcp_human_decision,
             human_review_notes=args.mcp_human_notes,

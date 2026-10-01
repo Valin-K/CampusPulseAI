@@ -353,7 +353,7 @@ def run_mcp_workflow(
         implementation_model,
         "You are a precise MCP integration validator. Use only the supplied execution evidence.",
         implementation_prompt,
-        max_tokens=300,
+        max_tokens=1200,
     )
     evidence["implementationAssessment"] = {
         "prompt": implementation_prompt,
@@ -385,7 +385,7 @@ def run_mcp_workflow(
         review_model,
         "You are an independent reviewer. Validate the implementation assessment against the captured MCP evidence only.",
         review_prompt,
-        max_tokens=300,
+        max_tokens=1200,
     )
     evidence["independentReview"] = {
         "prompt": review_prompt,
