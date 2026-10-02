@@ -72,16 +72,20 @@ def _observation_summary(evidence: dict[str, Any]) -> str:
     )
 
 
+def _escape_markdown_table_cell(value: str) -> str:
+    return value.replace("|", "\\|").replace("\n", " ")
+
+
 def _render_report(evidence: dict[str, Any]) -> str:
     stages = "\n".join(
         f"| {stage['name']} | {stage['status'].upper()} | "
-        f"{stage['details'].replace('|', '\\|').replace(chr(10), ' ')} |"
+        f"{_escape_markdown_table_cell(stage['details'])} |"
         for stage in evidence["stages"]
     )
     checks = "\n".join(
-        f"| {check['name'].replace('|', '\\|')} | "
+        f"| {_escape_markdown_table_cell(check['name'])} | "
         f"{'PASS' if check.get('passed') else 'FAIL / NOT RUN'} | "
-        f"{check.get('output', '').replace('|', '\\|').replace(chr(10), ' ')} |"
+        f"{_escape_markdown_table_cell(check.get('output', ''))} |"
         for check in evidence.get("checks", [])
     ) or "| None | NOT RUN | No RAG evidence was collected. |"
     rag_evidence = evidence.get("ragEvidence", {})

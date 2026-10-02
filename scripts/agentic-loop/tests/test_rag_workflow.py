@@ -14,6 +14,7 @@ sys.path.insert(0, str(SCRIPT_DIRECTORY))
 
 from rag_workflow.collector import RagCollector
 from rag_workflow.orchestrator import (
+    _render_report,
     _replace_evidence_file,
     run_rag_workflow,
 )
@@ -399,6 +400,31 @@ class RagPipelineTests(unittest.TestCase):
 
 
 class RagWorkflowTests(unittest.TestCase):
+    def test_report_escapes_markdown_table_cells(self) -> None:
+        report = _render_report({
+            "stages": [{
+                "name": "OBSERVE",
+                "status": "completed",
+                "details": "first | second\nthird",
+            }],
+            "checks": [{
+                "name": "check | name",
+                "passed": True,
+                "output": "result | detail\ncontinued",
+            }],
+            "runId": "run",
+            "recordedAtUtc": "timestamp",
+            "passed": True,
+            "goal": "goal",
+            "humanReview": {
+                "decision": "pending",
+                "notes": "",
+            },
+        })
+
+        self.assertIn("| OBSERVE | COMPLETED | first \\| second third |", report)
+        self.assertIn("| check \\| name | PASS | result \\| detail continued |", report)
+
     def test_cli_validation_wrapper_uses_rag_workflow(self) -> None:
         args = SimpleNamespace(
             evidence_dir=Path("evidence"),
