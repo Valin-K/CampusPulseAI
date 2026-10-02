@@ -183,10 +183,26 @@ class RagCollector:
 
         fixture_id = f"agentic-loop-validation-{uuid.uuid4().hex}"
         marker = f"CAMPUSPULSEVALIDATION{uuid.uuid4().hex[:12]}"
-        fixture_text = (
-            f"Validation marker {marker}: the north arch has a blue lantern."
-        )
-        question = f"What does marker {marker} identify?"
+        relevant_facts = [
+            "the north arch has a blue lantern",
+            "the north arch is beside the eastern fountain",
+            "the north arch marks the start of the spring orientation route",
+        ]
+        relevant_documents = [
+            {
+                "id": fixture_id
+                if index == 0
+                else f"agentic-loop-validation-{uuid.uuid4().hex}",
+                "text": f"Validation marker {marker}: {fact}.",
+                "metadata": {
+                    "source": "agentic-loop-validation",
+                    "relevance": "relevant",
+                },
+            }
+            for index, fact in enumerate(relevant_facts)
+        ]
+        fixture_text = relevant_documents[0]["text"]
+        question = f"What facts are recorded for marker {marker}?"
         negative_question = (
             "Which municipal bylaw governs the "
             f"{uuid.uuid4().hex[:12]} festival in Novanthera?"
@@ -198,17 +214,16 @@ class RagCollector:
             "Root systems draw water from layers of surrounding soil.",
             "Musical intervals compare frequencies of paired notes.",
         ]
-        fixture_documents = [{
-            "id": fixture_id,
-            "text": fixture_text,
-            "metadata": {"source": "agentic-loop-validation", "relevance": "relevant"},
-        }]
+        fixture_documents = list(relevant_documents)
         fixture_documents.extend({
             "id": f"agentic-loop-validation-decoy-{uuid.uuid4().hex}",
             "text": text,
             "metadata": {"source": "agentic-loop-validation", "relevance": "decoy"},
         } for text in distractor_texts)
-        expected_relevant_chunks = 1
+        relevant_document_ids = {
+            document["id"] for document in relevant_documents
+        }
+        expected_relevant_chunks = len(relevant_documents)
         fixture_document_count = len(fixture_documents)
 
         def source_has_contract(source: Any) -> bool:
@@ -232,6 +247,13 @@ class RagCollector:
             "collection": collection,
             "documentId": fixture_id,
             "documentIds": [document["id"] for document in fixture_documents],
+            "relevantDocumentIds": [
+                document["id"] for document in relevant_documents
+            ],
+            "relevantFixtures": [
+                {"documentId": document["id"], "text": document["text"]}
+                for document in relevant_documents
+            ],
             "expectedRelevantChunks": expected_relevant_chunks,
             "marker": marker,
             "fixtureText": fixture_text,
@@ -303,7 +325,7 @@ class RagCollector:
                 )
                 relevant_sources = [
                     source for source in (retrieved_sources or [])
-                    if source.get("documentId") == fixture_id
+                    if source.get("documentId") in relevant_document_ids
                 ]
                 precision_at_5 = len(relevant_sources) / 5
                 recall_at_5 = min(
@@ -321,7 +343,10 @@ class RagCollector:
                     "cosineSimilarity": similarity,
                 }
                 self.validation_evidence["retrievalMetrics"] = metrics
-                retrieval_valid = retrieval_contract_valid and bool(relevant_sources)
+                retrieval_valid = (
+                    retrieval_contract_valid
+                    and len(relevant_sources) == expected_relevant_chunks
+                )
                 self._record_check(
                     "RAG retrieval metrics",
                     retrieval_valid,

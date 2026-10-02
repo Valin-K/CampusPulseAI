@@ -5,7 +5,7 @@ public sealed class RagOptions
     public int ChunkSize { get; set; } = 800;
     public int ChunkOverlap { get; set; } = 100;
     public int DefaultTopK { get; set; } = 4;
-    public double MinimumConfidence { get; set; } = 0.55;
+    public double MinimumConfidence { get; set; } = 0.70;
     public string[] AllowedCollections { get; set; } = [];
 }
 

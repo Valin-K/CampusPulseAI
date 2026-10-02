@@ -40,6 +40,7 @@ class RagCollectorTests(unittest.TestCase):
         wrong_citation: bool = False,
         existing_collections: list[dict] | None = None,
         post_ingest_collections: list[dict] | None = None,
+        retrieval_document_indexes: list[int] | None = None,
     ) -> tuple[dict, list[dict]]:
         requests_seen: list[dict] = []
         fixture_id: str | None = None
@@ -79,13 +80,21 @@ class RagCollectorTests(unittest.TestCase):
                 })
             if method == "POST" and url.endswith("/retrieve"):
                 payload = kwargs["json"]
+                retrieved_documents = (
+                    [
+                        fixture_documents[index]
+                        for index in retrieval_document_indexes
+                    ]
+                    if retrieval_document_indexes is not None
+                    else fixture_documents[:5]
+                )
                 sources = [{
                     "rank": index + 1,
                     "documentId": document["id"],
                     "chunkIndex": 0,
                     "score": 0.86 if index == 0 else 0.1,
                     "text": document["text"],
-                } for index, document in enumerate(fixture_documents[:5])]
+                } for index, document in enumerate(retrieved_documents)]
                 return FakeResponse(200, {
                     "collection": "coursemanagement",
                     "question": payload["question"],
@@ -129,12 +138,24 @@ class RagCollectorTests(unittest.TestCase):
         self.assertTrue(evidence["passed"])
         self.assertEqual(evidence["validationEvidence"]["answer"]["status"], "answered")
         self.assertEqual(
+            evidence["validationEvidence"]["expectedRelevantChunks"],
+            3,
+        )
+        self.assertEqual(
+            len(evidence["validationEvidence"]["relevantDocumentIds"]),
+            3,
+        )
+        self.assertEqual(
             evidence["validationEvidence"]["retrievalMetrics"]["pAt5"],
-            0.2,
+            0.6,
         )
         self.assertEqual(
             evidence["validationEvidence"]["retrievalMetrics"]["rAt5"],
             1.0,
+        )
+        self.assertEqual(
+            evidence["validationEvidence"]["retrievalMetrics"]["relevantRetrieved"],
+            3,
         )
         self.assertEqual(
             evidence["validationEvidence"]["negativeAnswer"]["status"],
@@ -152,6 +173,22 @@ class RagCollectorTests(unittest.TestCase):
             "http://localhost:5267/api/rag/coursemanagement",
         )
 
+    def test_retrieval_requires_all_known_relevant_chunks(self) -> None:
+        evidence, _ = self.run_collector(
+            retrieval_document_indexes=[0, 3, 4, 5, 6],
+        )
+
+        self.assertFalse(evidence["passed"])
+        retrieval_check = next(
+            check for check in evidence["checks"]
+            if check["name"] == "RAG retrieval metrics"
+        )
+        self.assertFalse(retrieval_check["passed"])
+        metrics = evidence["validationEvidence"]["retrievalMetrics"]
+        self.assertEqual(metrics["relevantRetrieved"], 1)
+        self.assertEqual(metrics["relevantTotal"], 3)
+        self.assertAlmostEqual(metrics["rAt5"], 1 / 3)
+
     def test_non_answered_status_fails_and_still_cleans_collection(self) -> None:
         evidence, requests_seen = self.run_collector("generation_unavailable")
 
@@ -168,8 +205,8 @@ class RagCollectorTests(unittest.TestCase):
         evidence, requests_seen = self.run_collector(
             post_ingest_collections=[{
                 "name": "coursemanagement",
-                "documents": 7,
-                "chunks": 7,
+                "documents": 9,
+                "chunks": 9,
             }],
         )
 
@@ -229,29 +266,95 @@ def passed_rag_evidence() -> dict:
         "collectionEvidence": [],
         "validationEvidence": {
             "collection": "coursemanagement",
-            "documentId": "agentic-loop-validation-sample",
-            "documentIds": ["agentic-loop-validation-sample"],
-            "expectedRelevantChunks": 1,
+            "documentId": "agentic-loop-validation-sample-1",
+            "documentIds": [
+                "agentic-loop-validation-sample-1",
+                "agentic-loop-validation-sample-2",
+                "agentic-loop-validation-sample-3",
+                "agentic-loop-validation-decoy-1",
+                "agentic-loop-validation-decoy-2",
+                "agentic-loop-validation-decoy-3",
+                "agentic-loop-validation-decoy-4",
+                "agentic-loop-validation-decoy-5",
+            ],
+            "relevantDocumentIds": [
+                "agentic-loop-validation-sample-1",
+                "agentic-loop-validation-sample-2",
+                "agentic-loop-validation-sample-3",
+            ],
+            "relevantFixtures": [
+                {
+                    "documentId": "agentic-loop-validation-sample-1",
+                    "text": "The fixture confirms grounded citation retrieval.",
+                },
+                {
+                    "documentId": "agentic-loop-validation-sample-2",
+                    "text": "The fixture confirms complete recall.",
+                },
+                {
+                    "documentId": "agentic-loop-validation-sample-3",
+                    "text": "The fixture confirms grounded abstention behavior.",
+                },
+            ],
+            "expectedRelevantChunks": 3,
             "question": "What does the fixture confirm?",
             "negativeQuestion": "What does the unrelated query ask?",
-            "ingestion": {"documents": 1, "chunks": 1},
+            "ingestion": {"documents": 8, "chunks": 8},
             "retrieval": {
                 "cosineSimilarity": 0.86,
-                "sources": [{
-                    "documentId": "agentic-loop-validation-sample",
-                    "rank": 1,
-                    "chunkIndex": 0,
-                    "score": 0.86,
-                    "text": "The fixture confirms grounded citation retrieval.",
-                }],
+                "sources": [
+                    {
+                        "documentId": "agentic-loop-validation-sample-1",
+                        "rank": 1,
+                        "chunkIndex": 0,
+                        "score": 0.86,
+                        "text": "The fixture confirms grounded citation retrieval.",
+                    },
+                    {
+                        "documentId": "agentic-loop-validation-sample-2",
+                        "rank": 2,
+                        "chunkIndex": 0,
+                        "score": 0.82,
+                        "text": "The fixture confirms complete recall.",
+                    },
+                    {
+                        "documentId": "agentic-loop-validation-sample-3",
+                        "rank": 3,
+                        "chunkIndex": 0,
+                        "score": 0.78,
+                        "text": "The fixture confirms grounded abstention behavior.",
+                    },
+                    {
+                        "documentId": "agentic-loop-validation-decoy-1",
+                        "rank": 4,
+                        "chunkIndex": 0,
+                        "score": 0.3,
+                        "text": "An unrelated fixture passage.",
+                    },
+                    {
+                        "documentId": "agentic-loop-validation-decoy-2",
+                        "rank": 5,
+                        "chunkIndex": 0,
+                        "score": 0.2,
+                        "text": "Another unrelated fixture passage.",
+                    },
+                ],
             },
-            "retrievalMetrics": {"pAt5": 0.2, "rAt5": 1.0},
+            "retrievalMetrics": {
+                "k": 5,
+                "retrievedCount": 5,
+                "relevantRetrieved": 3,
+                "relevantTotal": 3,
+                "pAt5": 0.6,
+                "rAt5": 1.0,
+                "cosineSimilarity": 0.86,
+            },
             "answer": {
                 "status": "answered",
                 "answer": "It confirms grounded citation retrieval.",
                 "confidence": 0.86,
                 "sources": [{
-                    "documentId": "agentic-loop-validation-sample",
+                    "documentId": "agentic-loop-validation-sample-1",
                     "rank": 1,
                     "chunkIndex": 0,
                     "score": 0.86,
@@ -360,7 +463,7 @@ class RagWorkflowTests(unittest.TestCase):
             [stage["name"] for stage in evidence["stages"]],
             ["OBSERVE", "IMPLEMENTATION", "REVIEW"],
         )
-        self.assertIn("P@5=0.2", evidence["stages"][0]["details"])
+        self.assertIn("P@5=0.6", evidence["stages"][0]["details"])
         self.assertIn("R@5=1.0", evidence["stages"][0]["details"])
         self.assertTrue(evidence["passed"])
         self.assertEqual([model["stage"] for model in evidence["models"]], [
