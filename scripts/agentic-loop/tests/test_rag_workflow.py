@@ -13,7 +13,10 @@ SCRIPT_DIRECTORY = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(SCRIPT_DIRECTORY))
 
 from rag_workflow.collector import RagCollector
-from rag_workflow.orchestrator import run_rag_workflow
+from rag_workflow.orchestrator import (
+    _replace_evidence_file,
+    run_rag_workflow,
+)
 from rag_workflow.pipeline import (
     build_implementation_prompt,
     build_review_prompt,
@@ -472,7 +475,11 @@ class RagWorkflowTests(unittest.TestCase):
         self.assertEqual(len(model_calls), 2)
         self.assertEqual(
             [call[1]["max_tokens"] for call in model_calls],
-            [1200, 1200],
+            [1200, 2400],
+        )
+        self.assertEqual(
+            [model["maxTokens"] for model in evidence["models"]],
+            [1200, 2400],
         )
         self.assertIn("grounded citation retrieval", report)
         self.assertIn("Independent Review", report)
@@ -483,6 +490,60 @@ class RagWorkflowTests(unittest.TestCase):
             evidence["improvement"]["status"],
             "recommendations_recorded",
         )
+
+    def test_evidence_replace_retries_transient_permission_error(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            directory = Path(temporary_directory)
+            temporary_path = directory / "evidence.tmp"
+            evidence_path = directory / "evidence.json"
+            temporary_path.write_text("new evidence", encoding="utf-8")
+            evidence_path.write_text("old evidence", encoding="utf-8")
+            original_replace = Path.replace
+            attempts = 0
+
+            def fail_once(source: Path, target: Path) -> Path:
+                nonlocal attempts
+                attempts += 1
+                if attempts == 1:
+                    raise PermissionError(5, "Access is denied", str(target))
+                return original_replace(source, target)
+
+            with (
+                patch.object(Path, "replace", new=fail_once),
+                patch("rag_workflow.orchestrator.time.sleep") as sleep,
+            ):
+                _replace_evidence_file(temporary_path, evidence_path)
+
+            self.assertEqual(attempts, 2)
+            self.assertEqual(evidence_path.read_text(encoding="utf-8"), "new evidence")
+            self.assertFalse(temporary_path.exists())
+            sleep.assert_called_once_with(0.1)
+
+    def test_evidence_replace_reports_persistent_permission_error(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            directory = Path(temporary_directory)
+            temporary_path = directory / "evidence.tmp"
+            evidence_path = directory / "evidence.json"
+            temporary_path.write_text("latest evidence", encoding="utf-8")
+            evidence_path.write_text("previous evidence", encoding="utf-8")
+
+            with (
+                patch.object(
+                    Path,
+                    "replace",
+                    side_effect=PermissionError(5, "Access is denied"),
+                ) as replace,
+                patch("rag_workflow.orchestrator.time.sleep"),
+            ):
+                with self.assertRaisesRegex(PermissionError, "latest snapshot remains"):
+                    _replace_evidence_file(temporary_path, evidence_path)
+
+            self.assertEqual(replace.call_count, 5)
+            self.assertTrue(temporary_path.exists())
+            self.assertEqual(
+                evidence_path.read_text(encoding="utf-8"),
+                "previous evidence",
+            )
 
     def test_startup_failure_is_recorded_and_skips_models(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
@@ -14,7 +15,27 @@ from .pipeline import (
 
 
 RAG_STAGES = ("OBSERVE", "IMPLEMENTATION", "REVIEW")
+RAG_IMPLEMENTATION_MAX_TOKENS = 1200
+RAG_REVIEW_MAX_TOKENS = 2400
+_EVIDENCE_REPLACE_ATTEMPTS = 5
+_EVIDENCE_REPLACE_INITIAL_DELAY_SECONDS = 0.1
 AiCall = Callable[..., tuple[str | None, str | None, dict[str, Any]]]
+
+
+def _replace_evidence_file(temporary_path: Path, evidence_path: Path) -> None:
+    for attempt in range(_EVIDENCE_REPLACE_ATTEMPTS):
+        try:
+            temporary_path.replace(evidence_path)
+            return
+        except PermissionError as exc:
+            if attempt == _EVIDENCE_REPLACE_ATTEMPTS - 1:
+                raise PermissionError(
+                    f"Could not replace RAG evidence file '{evidence_path}' after "
+                    f"{_EVIDENCE_REPLACE_ATTEMPTS} attempts. Close the destination "
+                    f"if it is open and check its permissions; the latest snapshot "
+                    f"remains at '{temporary_path}'."
+                ) from exc
+            time.sleep(_EVIDENCE_REPLACE_INITIAL_DELAY_SECONDS * (2 ** attempt))
 
 
 def _now_iso() -> str:
@@ -166,7 +187,7 @@ def run_rag_workflow(
     def persist() -> None:
         temporary_path = evidence_path.with_suffix(".tmp")
         temporary_path.write_text(_json_text(evidence), encoding="utf-8")
-        temporary_path.replace(evidence_path)
+        _replace_evidence_file(temporary_path, evidence_path)
 
     def record_stage(name: str, status: str, details: str) -> None:
         evidence["stages"].append({
@@ -183,6 +204,8 @@ def run_rag_workflow(
         model: str,
         system_prompt: str,
         user_prompt: str,
+        *,
+        max_tokens: int,
     ) -> tuple[str | None, str | None]:
         try:
             output, error, metadata = ai_call(
@@ -190,7 +213,7 @@ def run_rag_workflow(
                 model,
                 system_prompt,
                 user_prompt,
-                max_tokens=1200,
+                max_tokens=max_tokens,
                 temperature=0.1,
             )
         except Exception as exc:
@@ -201,6 +224,7 @@ def run_rag_workflow(
             "requestedModel": model,
             "usedProvider": metadata.get("usedProvider"),
             "usedModel": metadata.get("usedModel"),
+            "maxTokens": max_tokens,
             "systemPrompt": system_prompt,
             "userPrompt": user_prompt,
             "rawOutput": output,
@@ -305,6 +329,7 @@ def run_rag_workflow(
             implementation_model,
             implementation_system_prompt,
             implementation_prompt,
+            max_tokens=RAG_IMPLEMENTATION_MAX_TOKENS,
         )
     except Exception as exc:
         implementation_output = None
@@ -336,6 +361,7 @@ def run_rag_workflow(
             review_model,
             review_system_prompt,
             review_prompt,
+            max_tokens=RAG_REVIEW_MAX_TOKENS,
         )
     except Exception as exc:
         review_output = None
