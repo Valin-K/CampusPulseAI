@@ -32,6 +32,17 @@ Content-Type: application/json
 
 ###
 
+# Retrieve: return ranked context and cosine similarity without generating an answer.
+POST {{RagServer_HostAddress}}/api/rag/{{Collection}}/retrieve
+Content-Type: application/json
+
+{
+  "question": "What do I need before I can enrol in Data Structures and Algorithms?",
+  "topK": 5
+}
+
+###
+
 # Answer: retrieve the closest chunks, build a grounded prompt and generate a response.
 POST {{RagServer_HostAddress}}/api/rag/{{Collection}}/answer
 Content-Type: application/json

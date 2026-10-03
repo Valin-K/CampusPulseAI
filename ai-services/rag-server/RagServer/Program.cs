@@ -15,6 +15,7 @@ builder.Services.AddAiGateway(builder.Configuration);
 builder.Services.AddSingleton<VectorStore>();
 builder.Services.AddSingleton<TextChunker>();
 builder.Services.AddSingleton<RagAiClient>();
+builder.Services.AddSingleton<RagRetrievalService>();
 builder.Services.AddSingleton<RagPromptBuilder>();
 
 var app = builder.Build();
@@ -36,6 +37,38 @@ app.MapGet("/health", (VectorStore store, RagAiClient ai, IOptions<RagOptions> o
 }));
 
 app.MapGet("/api/rag/collections", (VectorStore store) => Results.Ok(store.Summaries()));
+
+app.MapPost("/api/rag/{collection}/retrieve", async (
+    string collection,
+    RetrievalRequest request,
+    RagRetrievalService retrievalService,
+    IOptions<RagOptions> options,
+    CancellationToken cancellationToken) =>
+{
+    if (!IsAllowedCollection(collection, options.Value))
+    {
+        return UnknownCollection(collection, options.Value);
+    }
+
+    if (string.IsNullOrWhiteSpace(request.Question))
+    {
+        return Results.BadRequest(new { error = "A question is required." });
+    }
+
+    var topK = Math.Clamp(request.TopK ?? options.Value.DefaultTopK, 1, 20);
+    try
+    {
+        var retrieval = await retrievalService.RetrieveAsync(
+            collection, request.Question, topK, cancellationToken);
+        return Results.Ok(retrieval);
+    }
+    catch (Exception exception) when (exception is HttpRequestException or InvalidOperationException or TaskCanceledException)
+    {
+        return Results.Json(
+            new { error = "Retrieval failed.", detail = exception.Message },
+            statusCode: StatusCodes.Status502BadGateway);
+    }
+});
 
 app.MapPost("/api/rag/{collection}/documents", async (
     string collection,
@@ -92,8 +125,8 @@ app.MapDelete("/api/rag/{collection}", (string collection, VectorStore store, IO
 app.MapPost("/api/rag/{collection}/answer", async (
     string collection,
     AnswerRequest request,
-    VectorStore store,
     RagAiClient ai,
+    RagRetrievalService retrievalService,
     RagPromptBuilder promptBuilder,
     IOptions<RagOptions> options,
     CancellationToken cancellationToken) =>
@@ -111,21 +144,19 @@ app.MapPost("/api/rag/{collection}/answer", async (
     var topK = Math.Clamp(request.TopK ?? options.Value.DefaultTopK, 1, 20);
     var threshold = request.MinimumConfidence ?? options.Value.MinimumConfidence;
 
-    float[] queryVector;
+    RetrievalResponse retrieval;
     try
     {
-        queryVector = (await ai.EmbedAsync([request.Question], isQuery: true, cancellationToken))[0];
+        retrieval = await retrievalService.RetrieveAsync(
+            collection, request.Question, topK, cancellationToken);
     }
     catch (Exception exception) when (exception is HttpRequestException or InvalidOperationException or TaskCanceledException)
     {
         return Results.Json(new { error = "Embedding failed.", detail = exception.Message }, statusCode: StatusCodes.Status502BadGateway);
     }
 
-    var sources = store.Search(collection, queryVector, topK)
-        .Select((hit, index) => new RagSource(
-            index + 1, hit.Chunk.DocumentId, hit.Chunk.ChunkIndex, Math.Round(hit.Score, 4), hit.Chunk.Text, hit.Chunk.Metadata))
-        .ToList();
-    var confidence = sources.Count == 0 ? 0 : sources[0].Score;
+    var sources = retrieval.Sources.ToList();
+    var confidence = retrieval.CosineSimilarity;
 
     AnswerResponse Respond(string status, string? answer, string? detail = null) =>
         new(collection, request.Question, status, answer, confidence, sources, ai.EmbedderName, detail, DateTimeOffset.UtcNow);

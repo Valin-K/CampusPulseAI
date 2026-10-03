@@ -1,0 +1,502 @@
+{
+  "schemaVersion": 1,
+  "assessmentEvidence": true,
+  "workflow": "RAG evidence collection -> implementation assessment -> independent review",
+  "validationMode": "rag",
+  "runId": "20261001T235114370863Z",
+  "recordedAtUtc": "2026-10-01T23:51:14.371326+00:00",
+  "goal": "Validate and improve the shared CampusPulseAI campus services solution.",
+  "serverUrl": "http://localhost:5267",
+  "stages": [
+    {
+      "name": "OBSERVE",
+      "status": "failed",
+      "recordedAtUtc": "2026-10-01T23:51:40.834437+00:00",
+      "details": "7 of 8 evidence checks passed; cosine similarity=0.8333; P@5=0.2; R@5=1.0; answer status=answered; negative-query status=answered."
+    },
+    {
+      "name": "IMPLEMENTATION",
+      "status": "passed",
+      "recordedAtUtc": "2026-10-01T23:51:44.028307+00:00",
+      "details": "Implementation model assessed the collected RAG execution evidence."
+    },
+    {
+      "name": "REVIEW",
+      "status": "passed",
+      "recordedAtUtc": "2026-10-01T23:51:55.067956+00:00",
+      "details": "Independent review completed against the same collected evidence."
+    }
+  ],
+  "models": [
+    {
+      "stage": "IMPLEMENTATION",
+      "requestedProvider": "openrouter",
+      "requestedModel": "qwen/qwen3.8-27b",
+      "usedProvider": "openrouter",
+      "usedModel": "qwen/qwen3.8-27b",
+      "systemPrompt": "You are a precise RAG implementation assessment agent. Use only the supplied execution evidence. Assess; do not write code.",
+      "userPrompt": "Assess the CampusPulseAI RAG implementation using the supplied execution evidence.\n\nMap the lab's refresh, retrieve, and answer concepts to this repository's .NET HTTP service. Check isolated corpus refresh, separate top-5 retrieval, P@5/R@5, grounded answer citations, negative-query abstention, and fixture cleanup.\n\nTreat cosine similarity as a retrieval score, not calibrated confidence. Do not assume Python files or MCP tool names are required. Do not claim behavior that the evidence does not show.\n\nValidation goal:\nValidate and improve the shared CampusPulseAI campus services solution.\n\nObserved RAG execution evidence (JSON):\n{\n  \"passed\": false,\n  \"error\": null,\n  \"checks\": [\n    {\n      \"name\": \"RAG health\",\n      \"passed\": true,\n      \"output\": \"Health contract validated.\"\n    },\n    {\n      \"name\": \"RAG collections\",\n      \"passed\": true,\n      \"output\": \"Collection names and document/chunk counts validated.\"\n    },\n    {\n      \"name\": \"RAG validation workspace\",\n      \"passed\": true,\n      \"output\": \"Selected unused collection coursemanagement for an isolated fixture.\"\n    },\n    {\n      \"name\": \"RAG validation corpus refresh\",\n      \"passed\": true,\n      \"output\": \"Isolated corpus refreshed with 6 one-chunk documents.\"\n    },\n    {\n      \"name\": \"RAG retrieval metrics\",\n      \"passed\": true,\n      \"output\": \"P@5=0.200; R@5=1.000; relevant chunks=1/1; cosine similarity=0.8333.\"\n    },\n    {\n      \"name\": \"RAG retrieval and grounded answer\",\n      \"passed\": true,\n      \"output\": \"Answered with cosine similarity 0.8333; fixture citation agentic-loop-validation-ea66ee2bc7a448e485084934c468171c was present.\"\n    },\n    {\n      \"name\": \"RAG negative-query abstention\",\n      \"passed\": false,\n      \"output\": \"Unanswerable query status='answered'; cosine similarity=0.5642; expected insufficient_context.\"\n    },\n    {\n      \"name\": \"RAG validation corpus cleanup\",\n      \"passed\": true,\n      \"output\": \"Removed the isolated collection after confirming it contained only the fixture.\"\n    }\n  ],\n  \"healthEvidence\": {\n    \"status\": \"healthy\",\n    \"service\": \"rag\",\n    \"embedder\": \"uninitialized\",\n    \"generationAvailable\": null,\n    \"collections\": 0,\n    \"allowedCollections\": [\n      \"academicrecords\",\n      \"coursemanagement\",\n      \"campushousing\",\n      \"financialaidbilling\",\n      \"eventscheduling\"\n    ]\n  },\n  \"collectionEvidence\": [],\n  \"validationEvidence\": {\n    \"collection\": \"coursemanagement\",\n    \"documentId\": \"agentic-loop-validation-ea66ee2bc7a448e485084934c468171c\",\n    \"documentIds\": [\n      \"agentic-loop-validation-ea66ee2bc7a448e485084934c468171c\",\n      \"agentic-loop-validation-decoy-75a0a5b599c74a638b6817ccb1658123\",\n      \"agentic-loop-validation-decoy-40d4873e8ee2468da905ab6b0e1b5a0d\",\n      \"agentic-loop-validation-decoy-a1601a5ba9f94bc58f5f7c22a1250b49\",\n      \"agentic-loop-validation-decoy-1b439741a0fa4b6f964c165cbf511867\",\n      \"agentic-loop-validation-decoy-415f1f8cafb34364a8e9bb18bdde2854\"\n    ],\n    \"expectedRelevantChunks\": 1,\n    \"question\": \"What does marker CAMPUSPULSEVALIDATION2a6ad2692f5c identify?\",\n    \"negativeQuestion\": \"Which municipal bylaw governs the 61b299c871f1 festival in Novanthera?\",\n    \"ingestion\": {\n      \"collection\": \"coursemanagement\",\n      \"documents\": 6,\n      \"chunks\": 6,\n      \"embedder\": \"gemini-embedding-001\"\n    },\n    \"retrieval\": {\n      \"collection\": \"coursemanagement\",\n      \"question\": \"What does marker CAMPUSPULSEVALIDATION2a6ad2692f5c identify?\",\n      \"topK\": 5,\n      \"cosineSimilarity\": 0.8333,\n      \"sources\": [\n        {\n          \"rank\": 1,\n          \"documentId\": \"agentic-loop-validation-ea66ee2bc7a448e485084934c468171c\",\n          \"chunkIndex\": 0,\n          \"score\": 0.8333,\n          \"text\": \"Validation marker CAMPUSPULSEVALIDATION2a6ad2692f5c: the north arch has a blue lantern.\",\n          \"metadata\": {\n            \"source\": \"agentic-loop-validation\",\n            \"relevance\": \"relevant\"\n          }\n        },\n        {\n          \"rank\": 2,\n          \"documentId\": \"agentic-loop-validation-decoy-40d4873e8ee2468da905ab6b0e1b5a0d\",\n          \"chunkIndex\": 0,\n          \"score\": 0.5818,\n          \"text\": \"Kepler cycles describe repeated paths of distant planets.\",\n          \"metadata\": {\n            \"source\": \"agentic-loop-validation\",\n            \"relevance\": \"decoy\"\n          }\n        },\n        {\n          \"rank\": 3,\n          \"documentId\": \"agentic-loop-validation-decoy-a1601a5ba9f94bc58f5f7c22a1250b49\",\n          \"chunkIndex\": 0,\n          \"score\": 0.573,\n          \"text\": \"Archival ink remains legible when stored away from sunlight.\",\n          \"metadata\": {\n            \"source\": \"agentic-loop-validation\",\n            \"relevance\": \"decoy\"\n          }\n        },\n        {\n          \"rank\": 4,\n          \"documentId\": \"agentic-loop-validation-decoy-415f1f8cafb34364a8e9bb18bdde2854\",\n          \"chunkIndex\": 0,\n          \"score\": 0.5707,\n          \"text\": \"Musical intervals compare frequencies of paired notes.\",\n          \"metadata\": {\n            \"source\": \"agentic-loop-validation\",\n            \"relevance\": \"decoy\"\n          }\n        },\n        {\n          \"rank\": 5,\n          \"documentId\": \"agentic-loop-validation-decoy-1b439741a0fa4b6f964c165cbf511867\",\n          \"chunkIndex\": 0,\n          \"score\": 0.5533,\n          \"text\": \"Root systems draw water from layers of surrounding soil.\",\n          \"metadata\": {\n            \"source\": \"agentic-loop-validation\",\n            \"relevance\": \"decoy\"\n          }\n        }\n      ],\n      \"embedder\": \"gemini-embedding-001\",\n      \"retrievedAtUtc\": \"2026-10-01T23:51:37.7335127+00:00\"\n    },\n    \"retrievalMetrics\": {\n      \"k\": 5,\n      \"retrievedCount\": 5,\n      \"relevantRetrieved\": 1,\n      \"relevantTotal\": 1,\n      \"pAt5\": 0.2,\n      \"rAt5\": 1.0,\n      \"cosineSimilarity\": 0.8333\n    },\n    \"answer\": {\n      \"collection\": \"coursemanagement\",\n      \"question\": \"What does marker CAMPUSPULSEVALIDATION2a6ad2692f5c identify?\",\n      \"status\": \"answered\",\n      \"answer\": \"Based on the provided context, the validation marker CAMPUSPULSEVALIDATION2a6ad2692f5c identifies that the north arch has a blue lantern [1].\",\n      \"confidence\": 0.8333,\n      \"sources\": [\n        {\n          \"rank\": 1,\n          \"documentId\": \"agentic-loop-validation-ea66ee2bc7a448e485084934c468171c\",\n          \"chunkIndex\": 0,\n          \"score\": 0.8333,\n          \"text\": \"Validation marker CAMPUSPULSEVALIDATION2a6ad2692f5c: the north arch has a blue lantern.\",\n          \"metadata\": {\n            \"source\": \"agentic-loop-validation\",\n            \"relevance\": \"relevant\"\n          }\n        },\n        {\n          \"rank\": 2,\n          \"documentId\": \"agentic-loop-validation-decoy-40d4873e8ee2468da905ab6b0e1b5a0d\",\n          \"chunkIndex\": 0,\n          \"score\": 0.5818,\n          \"text\": \"Kepler cycles describe repeated paths of distant planets.\",\n          \"metadata\": {\n            \"source\": \"agentic-loop-validation\",\n            \"relevance\": \"decoy\"\n          }\n        },\n        {\n          \"rank\": 3,\n          \"documentId\": \"agentic-loop-validation-decoy-a1601a5ba9f94bc58f5f7c22a1250b49\",\n          \"chunkIndex\": 0,\n          \"score\": 0.573,\n          \"text\": \"Archival ink remains legible when stored away from sunlight.\",\n          \"metadata\": {\n            \"source\": \"agentic-loop-validation\",\n            \"relevance\": \"decoy\"\n          }\n        },\n        {\n          \"rank\": 4,\n          \"documentId\": \"agentic-loop-validation-decoy-415f1f8cafb34364a8e9bb18bdde2854\",\n          \"chunkIndex\": 0,\n          \"score\": 0.5707,\n          \"text\": \"Musical intervals compare frequencies of paired notes.\",\n          \"metadata\": {\n            \"source\": \"agentic-loop-validation\",\n            \"relevance\": \"decoy\"\n          }\n        },\n        {\n          \"rank\": 5,\n          \"documentId\": \"agentic-loop-validation-decoy-1b439741a0fa4b6f964c165cbf511867\",\n          \"chunkIndex\": 0,\n          \"score\": 0.5533,\n          \"text\": \"Root systems draw water from layers of surrounding soil.\",\n          \"metadata\": {\n            \"source\": \"agentic-loop-validation\",\n            \"relevance\": \"decoy\"\n          }\n        }\n      ],\n      \"embedder\": \"gemini-embedding-001\",\n      \"detail\": null,\n      \"executedAtUtc\": \"2026-10-01T23:51:39.389046+00:00\"\n    },\n    \"negativeAnswer\": {\n      \"collection\": \"coursemanagement\",\n      \"question\": \"Which municipal bylaw governs the 61b299c871f1 festival in Novanthera?\",\n      \"status\": \"answered\",\n      \"answer\": \"I do not have enough information to answer this question.\",\n      \"confidence\": 0.5642,\n      \"sources\": [\n        {\n          \"rank\": 1,\n          \"documentId\": \"agentic-loop-validation-ea66ee2bc7a448e485084934c468171c\",\n          \"chunkIndex\": 0,\n          \"score\": 0.5642,\n          \"text\": \"Validation marker CAMPUSPULSEVALIDATION2a6ad2692f5c: the north arch has a blue lantern.\",\n          \"metadata\": {\n            \"source\": \"agentic-loop-validation\",\n            \"relevance\": \"relevant\"\n          }\n        },\n        {\n          \"rank\": 2,\n          \"documentId\": \"agentic-loop-validation-decoy-40d4873e8ee2468da905ab6b0e1b5a0d\",\n          \"chunkIndex\": 0,\n          \"score\": 0.5398,\n          \"text\": \"Kepler cycles describe repeated paths of distant planets.\",\n          \"metadata\": {\n            \"source\": \"agentic-loop-validation\",\n            \"relevance\": \"decoy\"\n          }\n        },\n        {\n          \"rank\": 3,\n          \"documentId\": \"agentic-loop-validation-decoy-a1601a5ba9f94bc58f5f7c22a1250b49\",\n          \"chunkIndex\": 0,\n          \"score\": 0.5256,\n          \"text\": \"Archival ink remains legible when stored away from sunlight.\",\n          \"metadata\": {\n            \"source\": \"agentic-loop-validation\",\n            \"relevance\": \"decoy\"\n          }\n        },\n        {\n          \"rank\": 4,\n          \"documentId\": \"agentic-loop-validation-decoy-415f1f8cafb34364a8e9bb18bdde2854\",\n          \"chunkIndex\": 0,\n          \"score\": 0.5182,\n          \"text\": \"Musical intervals compare frequencies of paired notes.\",\n          \"metadata\": {\n            \"source\": \"agentic-loop-validation\",\n            \"relevance\": \"decoy\"\n          }\n        },\n        {\n          \"rank\": 5,\n          \"documentId\": \"agentic-loop-validation-decoy-1b439741a0fa4b6f964c165cbf511867\",\n          \"chunkIndex\": 0,\n          \"score\": 0.5124,\n          \"text\": \"Root systems draw water from layers of surrounding soil.\",\n          \"metadata\": {\n            \"source\": \"agentic-loop-validation\",\n            \"relevance\": \"decoy\"\n          }\n        }\n      ],\n      \"embedder\": \"gemini-embedding-001\",\n      \"detail\": null,\n      \"executedAtUtc\": \"2026-10-01T23:51:40.7934124+00:00\"\n    },\n    \"cleanup\": {\n      \"collection\": \"coursemanagement\",\n      \"deleted\": true\n    }\n  }\n}\n\nAssess only what this evidence supports. Do not treat the Lab's Python files or MCP tool names as requirements for this .NET HTTP service. Reply in at most 40 words.",
+      "rawOutput": "Isolated refresh, top-5 retrieval (P@5=0.2, R@5=1.0), grounded citation, and cleanup all passed. Negative-query abstention failed: status returned \"answered\" instead of \"insufficient_context\" despite low cosine similarity (0.5642).",
+      "error": null
+    },
+    {
+      "stage": "REVIEW",
+      "requestedProvider": "openrouter",
+      "requestedModel": "qwen/qwen3.8-27b",
+      "usedProvider": "openrouter",
+      "usedModel": "qwen/qwen3.8-27b",
+      "systemPrompt": "Review RAG output quality using only the supplied evidence.\n\nCheck:\n- retrieval quality\n- P@5 and R@5 interpretation\n- citation quality\n- negative-query abstention\n- cosine-similarity calibration claims\n- unsupported claims\n\nReturn exactly:\nRisk:\nCorrection:\nRetest:\n\nMaximum 35 words.\n\nEvaluate RAG architecture using only the supplied evidence.\n\nCheck:\n- corpus design\n- chunking\n- embedding strategy\n- vector store usage\n- benchmark coverage and relevance labels\n- governance risks\n\nReturn exactly:\nStrengths:\nRisks:\nRecommendations:\n\nMaximum 45 words.\n\nTreat these as two review sections and return both formats in order: Risk/Correction/Retest, then Strengths/Risks/Recommendations. Use at most 80 words total.",
+      "userPrompt": "Implementation assessment:\nIsolated refresh, top-5 retrieval (P@5=0.2, R@5=1.0), grounded citation, and cleanup all passed. Negative-query abstention failed: status returned \"answered\" instead of \"insufficient_context\" despite low cosine similarity (0.5642).\n\nObserved RAG execution evidence (JSON):\n{\n  \"passed\": false,\n  \"error\": null,\n  \"checks\": [\n    {\n      \"name\": \"RAG health\",\n      \"passed\": true,\n      \"output\": \"Health contract validated.\"\n    },\n    {\n      \"name\": \"RAG collections\",\n      \"passed\": true,\n      \"output\": \"Collection names and document/chunk counts validated.\"\n    },\n    {\n      \"name\": \"RAG validation workspace\",\n      \"passed\": true,\n      \"output\": \"Selected unused collection coursemanagement for an isolated fixture.\"\n    },\n    {\n      \"name\": \"RAG validation corpus refresh\",\n      \"passed\": true,\n      \"output\": \"Isolated corpus refreshed with 6 one-chunk documents.\"\n    },\n    {\n      \"name\": \"RAG retrieval metrics\",\n      \"passed\": true,\n      \"output\": \"P@5=0.200; R@5=1.000; relevant chunks=1/1; cosine similarity=0.8333.\"\n    },\n    {\n      \"name\": \"RAG retrieval and grounded answer\",\n      \"passed\": true,\n      \"output\": \"Answered with cosine similarity 0.8333; fixture citation agentic-loop-validation-ea66ee2bc7a448e485084934c468171c was present.\"\n    },\n    {\n      \"name\": \"RAG negative-query abstention\",\n      \"passed\": false,\n      \"output\": \"Unanswerable query status='answered'; cosine similarity=0.5642; expected insufficient_context.\"\n    },\n    {\n      \"name\": \"RAG validation corpus cleanup\",\n      \"passed\": true,\n      \"output\": \"Removed the isolated collection after confirming it contained only the fixture.\"\n    }\n  ],\n  \"healthEvidence\": {\n    \"status\": \"healthy\",\n    \"service\": \"rag\",\n    \"embedder\": \"uninitialized\",\n    \"generationAvailable\": null,\n    \"collections\": 0,\n    \"allowedCollections\": [\n      \"academicrecords\",\n      \"coursemanagement\",\n      \"campushousing\",\n      \"financialaidbilling\",\n      \"eventscheduling\"\n    ]\n  },\n  \"collectionEvidence\": [],\n  \"validationEvidence\": {\n    \"collection\": \"coursemanagement\",\n    \"documentId\": \"agentic-loop-validation-ea66ee2bc7a448e485084934c468171c\",\n    \"documentIds\": [\n      \"agentic-loop-validation-ea66ee2bc7a448e485084934c468171c\",\n      \"agentic-loop-validation-decoy-75a0a5b599c74a638b6817ccb1658123\",\n      \"agentic-loop-validation-decoy-40d4873e8ee2468da905ab6b0e1b5a0d\",\n      \"agentic-loop-validation-decoy-a1601a5ba9f94bc58f5f7c22a1250b49\",\n      \"agentic-loop-validation-decoy-1b439741a0fa4b6f964c165cbf511867\",\n      \"agentic-loop-validation-decoy-415f1f8cafb34364a8e9bb18bdde2854\"\n    ],\n    \"expectedRelevantChunks\": 1,\n    \"question\": \"What does marker CAMPUSPULSEVALIDATION2a6ad2692f5c identify?\",\n    \"negativeQuestion\": \"Which municipal bylaw governs the 61b299c871f1 festival in Novanthera?\",\n    \"ingestion\": {\n      \"collection\": \"coursemanagement\",\n      \"documents\": 6,\n      \"chunks\": 6,\n      \"embedder\": \"gemini-embedding-001\"\n    },\n    \"retrieval\": {\n      \"collection\": \"coursemanagement\",\n      \"question\": \"What does marker CAMPUSPULSEVALIDATION2a6ad2692f5c identify?\",\n      \"topK\": 5,\n      \"cosineSimilarity\": 0.8333,\n      \"sources\": [\n        {\n          \"rank\": 1,\n          \"documentId\": \"agentic-loop-validation-ea66ee2bc7a448e485084934c468171c\",\n          \"chunkIndex\": 0,\n          \"score\": 0.8333,\n          \"text\": \"Validation marker CAMPUSPULSEVALIDATION2a6ad2692f5c: the north arch has a blue lantern.\",\n          \"metadata\": {\n            \"source\": \"agentic-loop-validation\",\n            \"relevance\": \"relevant\"\n          }\n        },\n        {\n          \"rank\": 2,\n          \"documentId\": \"agentic-loop-validation-decoy-40d4873e8ee2468da905ab6b0e1b5a0d\",\n          \"chunkIndex\": 0,\n          \"score\": 0.5818,\n          \"text\": \"Kepler cycles describe repeated paths of distant planets.\",\n          \"metadata\": {\n            \"source\": \"agentic-loop-validation\",\n            \"relevance\": \"decoy\"\n          }\n        },\n        {\n          \"rank\": 3,\n          \"documentId\": \"agentic-loop-validation-decoy-a1601a5ba9f94bc58f5f7c22a1250b49\",\n          \"chunkIndex\": 0,\n          \"score\": 0.573,\n          \"text\": \"Archival ink remains legible when stored away from sunlight.\",\n          \"metadata\": {\n            \"source\": \"agentic-loop-validation\",\n            \"relevance\": \"decoy\"\n          }\n        },\n        {\n          \"rank\": 4,\n          \"documentId\": \"agentic-loop-validation-decoy-415f1f8cafb34364a8e9bb18bdde2854\",\n          \"chunkIndex\": 0,\n          \"score\": 0.5707,\n          \"text\": \"Musical intervals compare frequencies of paired notes.\",\n          \"metadata\": {\n            \"source\": \"agentic-loop-validation\",\n            \"relevance\": \"decoy\"\n          }\n        },\n        {\n          \"rank\": 5,\n          \"documentId\": \"agentic-loop-validation-decoy-1b439741a0fa4b6f964c165cbf511867\",\n          \"chunkIndex\": 0,\n          \"score\": 0.5533,\n          \"text\": \"Root systems draw water from layers of surrounding soil.\",\n          \"metadata\": {\n            \"source\": \"agentic-loop-validation\",\n            \"relevance\": \"decoy\"\n          }\n        }\n      ],\n      \"embedder\": \"gemini-embedding-001\",\n      \"retrievedAtUtc\": \"2026-10-01T23:51:37.7335127+00:00\"\n    },\n    \"retrievalMetrics\": {\n      \"k\": 5,\n      \"retrievedCount\": 5,\n      \"relevantRetrieved\": 1,\n      \"relevantTotal\": 1,\n      \"pAt5\": 0.2,\n      \"rAt5\": 1.0,\n      \"cosineSimilarity\": 0.8333\n    },\n    \"answer\": {\n      \"collection\": \"coursemanagement\",\n      \"question\": \"What does marker CAMPUSPULSEVALIDATION2a6ad2692f5c identify?\",\n      \"status\": \"answered\",\n      \"answer\": \"Based on the provided context, the validation marker CAMPUSPULSEVALIDATION2a6ad2692f5c identifies that the north arch has a blue lantern [1].\",\n      \"confidence\": 0.8333,\n      \"sources\": [\n        {\n          \"rank\": 1,\n          \"documentId\": \"agentic-loop-validation-ea66ee2bc7a448e485084934c468171c\",\n          \"chunkIndex\": 0,\n          \"score\": 0.8333,\n          \"text\": \"Validation marker CAMPUSPULSEVALIDATION2a6ad2692f5c: the north arch has a blue lantern.\",\n          \"metadata\": {\n            \"source\": \"agentic-loop-validation\",\n            \"relevance\": \"relevant\"\n          }\n        },\n        {\n          \"rank\": 2,\n          \"documentId\": \"agentic-loop-validation-decoy-40d4873e8ee2468da905ab6b0e1b5a0d\",\n          \"chunkIndex\": 0,\n          \"score\": 0.5818,\n          \"text\": \"Kepler cycles describe repeated paths of distant planets.\",\n          \"metadata\": {\n            \"source\": \"agentic-loop-validation\",\n            \"relevance\": \"decoy\"\n          }\n        },\n        {\n          \"rank\": 3,\n          \"documentId\": \"agentic-loop-validation-decoy-a1601a5ba9f94bc58f5f7c22a1250b49\",\n          \"chunkIndex\": 0,\n          \"score\": 0.573,\n          \"text\": \"Archival ink remains legible when stored away from sunlight.\",\n          \"metadata\": {\n            \"source\": \"agentic-loop-validation\",\n            \"relevance\": \"decoy\"\n          }\n        },\n        {\n          \"rank\": 4,\n          \"documentId\": \"agentic-loop-validation-decoy-415f1f8cafb34364a8e9bb18bdde2854\",\n          \"chunkIndex\": 0,\n          \"score\": 0.5707,\n          \"text\": \"Musical intervals compare frequencies of paired notes.\",\n          \"metadata\": {\n            \"source\": \"agentic-loop-validation\",\n            \"relevance\": \"decoy\"\n          }\n        },\n        {\n          \"rank\": 5,\n          \"documentId\": \"agentic-loop-validation-decoy-1b439741a0fa4b6f964c165cbf511867\",\n          \"chunkIndex\": 0,\n          \"score\": 0.5533,\n          \"text\": \"Root systems draw water from layers of surrounding soil.\",\n          \"metadata\": {\n            \"source\": \"agentic-loop-validation\",\n            \"relevance\": \"decoy\"\n          }\n        }\n      ],\n      \"embedder\": \"gemini-embedding-001\",\n      \"detail\": null,\n      \"executedAtUtc\": \"2026-10-01T23:51:39.389046+00:00\"\n    },\n    \"negativeAnswer\": {\n      \"collection\": \"coursemanagement\",\n      \"question\": \"Which municipal bylaw governs the 61b299c871f1 festival in Novanthera?\",\n      \"status\": \"answered\",\n      \"answer\": \"I do not have enough information to answer this question.\",\n      \"confidence\": 0.5642,\n      \"sources\": [\n        {\n          \"rank\": 1,\n          \"documentId\": \"agentic-loop-validation-ea66ee2bc7a448e485084934c468171c\",\n          \"chunkIndex\": 0,\n          \"score\": 0.5642,\n          \"text\": \"Validation marker CAMPUSPULSEVALIDATION2a6ad2692f5c: the north arch has a blue lantern.\",\n          \"metadata\": {\n            \"source\": \"agentic-loop-validation\",\n            \"relevance\": \"relevant\"\n          }\n        },\n        {\n          \"rank\": 2,\n          \"documentId\": \"agentic-loop-validation-decoy-40d4873e8ee2468da905ab6b0e1b5a0d\",\n          \"chunkIndex\": 0,\n          \"score\": 0.5398,\n          \"text\": \"Kepler cycles describe repeated paths of distant planets.\",\n          \"metadata\": {\n            \"source\": \"agentic-loop-validation\",\n            \"relevance\": \"decoy\"\n          }\n        },\n        {\n          \"rank\": 3,\n          \"documentId\": \"agentic-loop-validation-decoy-a1601a5ba9f94bc58f5f7c22a1250b49\",\n          \"chunkIndex\": 0,\n          \"score\": 0.5256,\n          \"text\": \"Archival ink remains legible when stored away from sunlight.\",\n          \"metadata\": {\n            \"source\": \"agentic-loop-validation\",\n            \"relevance\": \"decoy\"\n          }\n        },\n        {\n          \"rank\": 4,\n          \"documentId\": \"agentic-loop-validation-decoy-415f1f8cafb34364a8e9bb18bdde2854\",\n          \"chunkIndex\": 0,\n          \"score\": 0.5182,\n          \"text\": \"Musical intervals compare frequencies of paired notes.\",\n          \"metadata\": {\n            \"source\": \"agentic-loop-validation\",\n            \"relevance\": \"decoy\"\n          }\n        },\n        {\n          \"rank\": 5,\n          \"documentId\": \"agentic-loop-validation-decoy-1b439741a0fa4b6f964c165cbf511867\",\n          \"chunkIndex\": 0,\n          \"score\": 0.5124,\n          \"text\": \"Root systems draw water from layers of surrounding soil.\",\n          \"metadata\": {\n            \"source\": \"agentic-loop-validation\",\n            \"relevance\": \"decoy\"\n          }\n        }\n      ],\n      \"embedder\": \"gemini-embedding-001\",\n      \"detail\": null,\n      \"executedAtUtc\": \"2026-10-01T23:51:40.7934124+00:00\"\n    },\n    \"cleanup\": {\n      \"collection\": \"coursemanagement\",\n      \"deleted\": true\n    }\n  }\n}\n\nReview the assessment against the evidence only. Flag unsupported claims and missing validation.",
+      "rawOutput": "Risk: Negative-query abstention failed—status \"answered\" instead of \"insufficient_context\" at cosine 0.5642; threshold miscalibrated.\nCorrection: Set abstention threshold between 0.5642 and 0.8333 (e.g., 0.70).\nRetest: Re-run negative query; expect status \"insufficient_context.\"\n\nStrengths: Isolated corpus, cleanup, grounded citation, correct P@5/R@5.\nRisks: Single relevant chunk limits benchmark; threshold gap unaddressed.\nRecommendations: Add multi-relevance fixtures; tune abstention threshold.",
+      "error": null
+    }
+  ],
+  "serviceStartupChecks": [
+    {
+      "name": "Start AI Gateway",
+      "passed": true,
+      "skipped": false,
+      "exitCode": 0,
+      "durationSeconds": 10.25,
+      "output": "Started and healthy at http://localhost:5269/health."
+    },
+    {
+      "name": "Start RAG server",
+      "passed": true,
+      "skipped": false,
+      "exitCode": 0,
+      "durationSeconds": 10.77,
+      "output": "Started and healthy at http://localhost:5267/health."
+    }
+  ],
+  "ragEvidence": {
+    "passed": false,
+    "healthEvidence": {
+      "status": "healthy",
+      "service": "rag",
+      "embedder": "uninitialized",
+      "generationAvailable": null,
+      "collections": 0,
+      "allowedCollections": [
+        "academicrecords",
+        "coursemanagement",
+        "campushousing",
+        "financialaidbilling",
+        "eventscheduling"
+      ]
+    },
+    "collectionEvidence": [],
+    "validationEvidence": {
+      "collection": "coursemanagement",
+      "documentId": "agentic-loop-validation-ea66ee2bc7a448e485084934c468171c",
+      "documentIds": [
+        "agentic-loop-validation-ea66ee2bc7a448e485084934c468171c",
+        "agentic-loop-validation-decoy-75a0a5b599c74a638b6817ccb1658123",
+        "agentic-loop-validation-decoy-40d4873e8ee2468da905ab6b0e1b5a0d",
+        "agentic-loop-validation-decoy-a1601a5ba9f94bc58f5f7c22a1250b49",
+        "agentic-loop-validation-decoy-1b439741a0fa4b6f964c165cbf511867",
+        "agentic-loop-validation-decoy-415f1f8cafb34364a8e9bb18bdde2854"
+      ],
+      "expectedRelevantChunks": 1,
+      "marker": "CAMPUSPULSEVALIDATION2a6ad2692f5c",
+      "fixtureText": "Validation marker CAMPUSPULSEVALIDATION2a6ad2692f5c: the north arch has a blue lantern.",
+      "question": "What does marker CAMPUSPULSEVALIDATION2a6ad2692f5c identify?",
+      "negativeQuestion": "Which municipal bylaw governs the 61b299c871f1 festival in Novanthera?",
+      "ingestion": {
+        "collection": "coursemanagement",
+        "documents": 6,
+        "chunks": 6,
+        "embedder": "gemini-embedding-001"
+      },
+      "retrieval": {
+        "collection": "coursemanagement",
+        "question": "What does marker CAMPUSPULSEVALIDATION2a6ad2692f5c identify?",
+        "topK": 5,
+        "cosineSimilarity": 0.8333,
+        "sources": [
+          {
+            "rank": 1,
+            "documentId": "agentic-loop-validation-ea66ee2bc7a448e485084934c468171c",
+            "chunkIndex": 0,
+            "score": 0.8333,
+            "text": "Validation marker CAMPUSPULSEVALIDATION2a6ad2692f5c: the north arch has a blue lantern.",
+            "metadata": {
+              "source": "agentic-loop-validation",
+              "relevance": "relevant"
+            }
+          },
+          {
+            "rank": 2,
+            "documentId": "agentic-loop-validation-decoy-40d4873e8ee2468da905ab6b0e1b5a0d",
+            "chunkIndex": 0,
+            "score": 0.5818,
+            "text": "Kepler cycles describe repeated paths of distant planets.",
+            "metadata": {
+              "source": "agentic-loop-validation",
+              "relevance": "decoy"
+            }
+          },
+          {
+            "rank": 3,
+            "documentId": "agentic-loop-validation-decoy-a1601a5ba9f94bc58f5f7c22a1250b49",
+            "chunkIndex": 0,
+            "score": 0.573,
+            "text": "Archival ink remains legible when stored away from sunlight.",
+            "metadata": {
+              "source": "agentic-loop-validation",
+              "relevance": "decoy"
+            }
+          },
+          {
+            "rank": 4,
+            "documentId": "agentic-loop-validation-decoy-415f1f8cafb34364a8e9bb18bdde2854",
+            "chunkIndex": 0,
+            "score": 0.5707,
+            "text": "Musical intervals compare frequencies of paired notes.",
+            "metadata": {
+              "source": "agentic-loop-validation",
+              "relevance": "decoy"
+            }
+          },
+          {
+            "rank": 5,
+            "documentId": "agentic-loop-validation-decoy-1b439741a0fa4b6f964c165cbf511867",
+            "chunkIndex": 0,
+            "score": 0.5533,
+            "text": "Root systems draw water from layers of surrounding soil.",
+            "metadata": {
+              "source": "agentic-loop-validation",
+              "relevance": "decoy"
+            }
+          }
+        ],
+        "embedder": "gemini-embedding-001",
+        "retrievedAtUtc": "2026-10-01T23:51:37.7335127+00:00"
+      },
+      "retrievalMetrics": {
+        "k": 5,
+        "retrievedCount": 5,
+        "relevantRetrieved": 1,
+        "relevantTotal": 1,
+        "pAt5": 0.2,
+        "rAt5": 1.0,
+        "cosineSimilarity": 0.8333
+      },
+      "answer": {
+        "collection": "coursemanagement",
+        "question": "What does marker CAMPUSPULSEVALIDATION2a6ad2692f5c identify?",
+        "status": "answered",
+        "answer": "Based on the provided context, the validation marker CAMPUSPULSEVALIDATION2a6ad2692f5c identifies that the north arch has a blue lantern [1].",
+        "confidence": 0.8333,
+        "sources": [
+          {
+            "rank": 1,
+            "documentId": "agentic-loop-validation-ea66ee2bc7a448e485084934c468171c",
+            "chunkIndex": 0,
+            "score": 0.8333,
+            "text": "Validation marker CAMPUSPULSEVALIDATION2a6ad2692f5c: the north arch has a blue lantern.",
+            "metadata": {
+              "source": "agentic-loop-validation",
+              "relevance": "relevant"
+            }
+          },
+          {
+            "rank": 2,
+            "documentId": "agentic-loop-validation-decoy-40d4873e8ee2468da905ab6b0e1b5a0d",
+            "chunkIndex": 0,
+            "score": 0.5818,
+            "text": "Kepler cycles describe repeated paths of distant planets.",
+            "metadata": {
+              "source": "agentic-loop-validation",
+              "relevance": "decoy"
+            }
+          },
+          {
+            "rank": 3,
+            "documentId": "agentic-loop-validation-decoy-a1601a5ba9f94bc58f5f7c22a1250b49",
+            "chunkIndex": 0,
+            "score": 0.573,
+            "text": "Archival ink remains legible when stored away from sunlight.",
+            "metadata": {
+              "source": "agentic-loop-validation",
+              "relevance": "decoy"
+            }
+          },
+          {
+            "rank": 4,
+            "documentId": "agentic-loop-validation-decoy-415f1f8cafb34364a8e9bb18bdde2854",
+            "chunkIndex": 0,
+            "score": 0.5707,
+            "text": "Musical intervals compare frequencies of paired notes.",
+            "metadata": {
+              "source": "agentic-loop-validation",
+              "relevance": "decoy"
+            }
+          },
+          {
+            "rank": 5,
+            "documentId": "agentic-loop-validation-decoy-1b439741a0fa4b6f964c165cbf511867",
+            "chunkIndex": 0,
+            "score": 0.5533,
+            "text": "Root systems draw water from layers of surrounding soil.",
+            "metadata": {
+              "source": "agentic-loop-validation",
+              "relevance": "decoy"
+            }
+          }
+        ],
+        "embedder": "gemini-embedding-001",
+        "detail": null,
+        "executedAtUtc": "2026-10-01T23:51:39.389046+00:00"
+      },
+      "negativeAnswer": {
+        "collection": "coursemanagement",
+        "question": "Which municipal bylaw governs the 61b299c871f1 festival in Novanthera?",
+        "status": "answered",
+        "answer": "I do not have enough information to answer this question.",
+        "confidence": 0.5642,
+        "sources": [
+          {
+            "rank": 1,
+            "documentId": "agentic-loop-validation-ea66ee2bc7a448e485084934c468171c",
+            "chunkIndex": 0,
+            "score": 0.5642,
+            "text": "Validation marker CAMPUSPULSEVALIDATION2a6ad2692f5c: the north arch has a blue lantern.",
+            "metadata": {
+              "source": "agentic-loop-validation",
+              "relevance": "relevant"
+            }
+          },
+          {
+            "rank": 2,
+            "documentId": "agentic-loop-validation-decoy-40d4873e8ee2468da905ab6b0e1b5a0d",
+            "chunkIndex": 0,
+            "score": 0.5398,
+            "text": "Kepler cycles describe repeated paths of distant planets.",
+            "metadata": {
+              "source": "agentic-loop-validation",
+              "relevance": "decoy"
+            }
+          },
+          {
+            "rank": 3,
+            "documentId": "agentic-loop-validation-decoy-a1601a5ba9f94bc58f5f7c22a1250b49",
+            "chunkIndex": 0,
+            "score": 0.5256,
+            "text": "Archival ink remains legible when stored away from sunlight.",
+            "metadata": {
+              "source": "agentic-loop-validation",
+              "relevance": "decoy"
+            }
+          },
+          {
+            "rank": 4,
+            "documentId": "agentic-loop-validation-decoy-415f1f8cafb34364a8e9bb18bdde2854",
+            "chunkIndex": 0,
+            "score": 0.5182,
+            "text": "Musical intervals compare frequencies of paired notes.",
+            "metadata": {
+              "source": "agentic-loop-validation",
+              "relevance": "decoy"
+            }
+          },
+          {
+            "rank": 5,
+            "documentId": "agentic-loop-validation-decoy-1b439741a0fa4b6f964c165cbf511867",
+            "chunkIndex": 0,
+            "score": 0.5124,
+            "text": "Root systems draw water from layers of surrounding soil.",
+            "metadata": {
+              "source": "agentic-loop-validation",
+              "relevance": "decoy"
+            }
+          }
+        ],
+        "embedder": "gemini-embedding-001",
+        "detail": null,
+        "executedAtUtc": "2026-10-01T23:51:40.7934124+00:00"
+      },
+      "cleanup": {
+        "collection": "coursemanagement",
+        "deleted": true
+      }
+    },
+    "checks": [
+      {
+        "name": "RAG health",
+        "passed": true,
+        "skipped": false,
+        "exitCode": 0,
+        "durationSeconds": 0.01,
+        "output": "Health contract validated."
+      },
+      {
+        "name": "RAG collections",
+        "passed": true,
+        "skipped": false,
+        "exitCode": 0,
+        "durationSeconds": 0.02,
+        "output": "Collection names and document/chunk counts validated."
+      },
+      {
+        "name": "RAG validation workspace",
+        "passed": true,
+        "skipped": false,
+        "exitCode": 0,
+        "durationSeconds": 0.0,
+        "output": "Selected unused collection coursemanagement for an isolated fixture."
+      },
+      {
+        "name": "RAG validation corpus refresh",
+        "passed": true,
+        "skipped": false,
+        "exitCode": 0,
+        "durationSeconds": 1.76,
+        "output": "Isolated corpus refreshed with 6 one-chunk documents."
+      },
+      {
+        "name": "RAG retrieval metrics",
+        "passed": true,
+        "skipped": false,
+        "exitCode": 0,
+        "durationSeconds": 0.56,
+        "output": "P@5=0.200; R@5=1.000; relevant chunks=1/1; cosine similarity=0.8333."
+      },
+      {
+        "name": "RAG retrieval and grounded answer",
+        "passed": true,
+        "skipped": false,
+        "exitCode": 0,
+        "durationSeconds": 1.65,
+        "output": "Answered with cosine similarity 0.8333; fixture citation agentic-loop-validation-ea66ee2bc7a448e485084934c468171c was present."
+      },
+      {
+        "name": "RAG negative-query abstention",
+        "passed": false,
+        "skipped": false,
+        "exitCode": 1,
+        "durationSeconds": 1.4,
+        "output": "Unanswerable query status='answered'; cosine similarity=0.5642; expected insufficient_context."
+      },
+      {
+        "name": "RAG validation corpus cleanup",
+        "passed": true,
+        "skipped": false,
+        "exitCode": 0,
+        "durationSeconds": 0.04,
+        "output": "Removed the isolated collection after confirming it contained only the fixture."
+      }
+    ]
+  },
+  "checks": [
+    {
+      "name": "Start AI Gateway",
+      "passed": true,
+      "skipped": false,
+      "exitCode": 0,
+      "durationSeconds": 10.25,
+      "output": "Started and healthy at http://localhost:5269/health."
+    },
+    {
+      "name": "Start RAG server",
+      "passed": true,
+      "skipped": false,
+      "exitCode": 0,
+      "durationSeconds": 10.77,
+      "output": "Started and healthy at http://localhost:5267/health."
+    },
+    {
+      "name": "RAG health",
+      "passed": true,
+      "skipped": false,
+      "exitCode": 0,
+      "durationSeconds": 0.01,
+      "output": "Health contract validated."
+    },
+    {
+      "name": "RAG collections",
+      "passed": true,
+      "skipped": false,
+      "exitCode": 0,
+      "durationSeconds": 0.02,
+      "output": "Collection names and document/chunk counts validated."
+    },
+    {
+      "name": "RAG validation workspace",
+      "passed": true,
+      "skipped": false,
+      "exitCode": 0,
+      "durationSeconds": 0.0,
+      "output": "Selected unused collection coursemanagement for an isolated fixture."
+    },
+    {
+      "name": "RAG validation corpus refresh",
+      "passed": true,
+      "skipped": false,
+      "exitCode": 0,
+      "durationSeconds": 1.76,
+      "output": "Isolated corpus refreshed with 6 one-chunk documents."
+    },
+    {
+      "name": "RAG retrieval metrics",
+      "passed": true,
+      "skipped": false,
+      "exitCode": 0,
+      "durationSeconds": 0.56,
+      "output": "P@5=0.200; R@5=1.000; relevant chunks=1/1; cosine similarity=0.8333."
+    },
+    {
+      "name": "RAG retrieval and grounded answer",
+      "passed": true,
+      "skipped": false,
+      "exitCode": 0,
+      "durationSeconds": 1.65,
+      "output": "Answered with cosine similarity 0.8333; fixture citation agentic-loop-validation-ea66ee2bc7a448e485084934c468171c was present."
+    },
+    {
+      "name": "RAG negative-query abstention",
+      "passed": false,
+      "skipped": false,
+      "exitCode": 1,
+      "durationSeconds": 1.4,
+      "output": "Unanswerable query status='answered'; cosine similarity=0.5642; expected insufficient_context."
+    },
+    {
+      "name": "RAG validation corpus cleanup",
+      "passed": true,
+      "skipped": false,
+      "exitCode": 0,
+      "durationSeconds": 0.04,
+      "output": "Removed the isolated collection after confirming it contained only the fixture."
+    }
+  ],
+  "implementationAssessment": {
+    "output": "Isolated refresh, top-5 retrieval (P@5=0.2, R@5=1.0), grounded citation, and cleanup all passed. Negative-query abstention failed: status returned \"answered\" instead of \"insufficient_context\" despite low cosine similarity (0.5642).",
+    "error": null
+  },
+  "independentReview": {
+    "output": "Risk: Negative-query abstention failed—status \"answered\" instead of \"insufficient_context\" at cosine 0.5642; threshold miscalibrated.\nCorrection: Set abstention threshold between 0.5642 and 0.8333 (e.g., 0.70).\nRetest: Re-run negative query; expect status \"insufficient_context.\"\n\nStrengths: Isolated corpus, cleanup, grounded citation, correct P@5/R@5.\nRisks: Single relevant chunk limits benchmark; threshold gap unaddressed.\nRecommendations: Add multi-relevance fixtures; tune abstention threshold.",
+    "error": null
+  },
+  "humanReview": {
+    "decision": "pending",
+    "notes": ""
+  },
+  "reportFiles": {
+    "evidence": "rag/20261001T235114370863Z/evidence.json",
+    "validationReport": "rag/20261001T235114370863Z/rag-validation-report.md"
+  },
+  "privacy": {
+    "sourceCodeSentToAi": false,
+    "ragExecutionEvidenceSentToAi": true,
+    "apiKeysRecorded": false
+  },
+  "improvement": {
+    "status": "recommendations_recorded",
+    "recommendations": "Risk: Negative-query abstention failed—status \"answered\" instead of \"insufficient_context\" at cosine 0.5642; threshold miscalibrated.\nCorrection: Set abstention threshold between 0.5642 and 0.8333 (e.g., 0.70).\nRetest: Re-run negative query; expect status \"insufficient_context.\"\n\nStrengths: Isolated corpus, cleanup, grounded citation, correct P@5/R@5.\nRisks: Single relevant chunk limits benchmark; threshold gap unaddressed.\nRecommendations: Add multi-relevance fixtures; tune abstention threshold.",
+    "sourceChangesApplied": false
+  },
+  "error": "One or more RAG evidence checks failed.",
+  "passed": false,
+  "summary": "OBSERVE: FAILED\nIMPLEMENTATION: PASSED\nREVIEW: PASSED"
+}

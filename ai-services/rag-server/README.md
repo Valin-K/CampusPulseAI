@@ -87,7 +87,7 @@ POST /api/rag/coursemanagement/answer
   "question": "What are the prerequisites for COMP2002?",
   "topK": 4,
   "instructions": "You are the Course Management assistant. Refer to courses by code.",
-  "minimumConfidence": 0.55
+  "minimumConfidence": 0.70
 }
 ```
 
