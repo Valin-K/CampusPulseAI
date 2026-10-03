@@ -70,7 +70,6 @@ builder.Services.AddHttpClient<ICourseCatalogueClient, CourseCatalogueClient>(
         client.Timeout = TimeSpan.FromSeconds(5);
     });
 builder.Services.AddScoped<DatabaseApiProxy>();
-builder.Services.AddScoped<ICourseQuestionService, GeminiCourseQuestionService>();
 builder.Services.AddHttpClient(CourseKnowledgeService.CatalogueClientName, client =>
 {
     client.BaseAddress = new Uri(courseManagementDatabaseAddress, UriKind.Absolute);

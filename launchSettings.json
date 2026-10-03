@@ -14,7 +14,6 @@
         "campushousing.backend": "StartWithoutDebugging",
         "financialaidbilling.backend": "StartWithoutDebugging",
         "eventscheduling.backend": "StartWithoutDebugging",
-        "multiagentserver": "StartWithoutDebugging",
         "academicrecords.frontend": "StartWithoutDebugging",
         "coursemanagement.frontend": "StartWithoutDebugging",
         "campushousing.frontend": "StartWithoutDebugging",

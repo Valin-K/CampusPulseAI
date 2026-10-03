@@ -103,7 +103,7 @@ else
                 <span class="eyebrow">Course assistant</span>
                 <h2 id="course-ai-heading">Ask Course AI</h2>
                 <p>
-                    Get help comparing catalogue Courses or understanding Course details.
+                    Ask about current Course data or information from indexed Course documents.
                 </p>
             </div>
             @if (SelectedCourses.Count > 0)
@@ -148,7 +148,7 @@ else
                 }
 
                 <small class="ai-limit">
-                    AI answers use catalogue details. Verify important Course decisions.
+                    Answers can use RAG documents and current Course data through MCP. Verify important Course decisions.
                 </small>
 
                 <label class="form-label mt-2" for="course-ai-question">
@@ -167,7 +167,7 @@ else
                             class="button button-accent"
                             disabled="@(isAskingAi || string.IsNullOrWhiteSpace(aiQuestion))"
                             @onclick="AskCourseQuestionAsync">
-                        @(isAskingAi ? "Asking Gemini..." : "Ask AI")
+                        @(isAskingAi ? "Checking Course knowledge..." : "Ask AI")
                     </button>
 
                     @if (aiResponse is not null || aiErrorMessage is not null)
@@ -193,7 +193,7 @@ else
 
                 @if (isAskingAi)
                 {
-                    <LoadingIndicator Message="Gemini is answering your Course question..." />
+                    <LoadingIndicator Message="Course AI is checking RAG and MCP sources..." />
                 }
                 else if (aiErrorMessage is not null)
                 {
@@ -211,7 +211,35 @@ else
                 {
                     <div class="ai-answer" aria-live="polite">
                         <strong>Course AI response</strong>
-                        <p>@aiResponse.Answer</p>
+                        <div class="d-flex flex-wrap gap-2 mt-2">
+                            @if (aiResponse.Sources?.Any(source =>
+                                !source.DocumentId.StartsWith("mcp:", StringComparison.OrdinalIgnoreCase)) == true)
+                            {
+                                <span class="status-badge paid">RAG</span>
+                            }
+                            @if (aiResponse.Sources?.Any(source =>
+                                source.DocumentId.StartsWith("mcp:", StringComparison.OrdinalIgnoreCase)) == true)
+                            {
+                                <span class="status-badge paid">MCP</span>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(aiResponse.ConfidenceCategory))
+                            {
+                                <span class="status-badge">@aiResponse.ConfidenceCategory confidence</span>
+                            }
+                        </div>
+                        <p>@aiResponse.Reply</p>
+                        @if (aiResponse.Sources?.Count > 0)
+                        {
+                            <details class="mt-2">
+                                <summary>Sources</summary>
+                                <ul>
+                                    @foreach (var source in aiResponse.Sources)
+                                    {
+                                        <li>@source.Label</li>
+                                    }
+                                </ul>
+                            </details>
+                        }
                     </div>
                 }
             </div>
@@ -405,7 +433,7 @@ else
     private bool isLoading = true;
     private bool isAskingAi;
     private bool isAiExpanded;
-    private CourseQuestionResponse? aiResponse;
+    private KnowledgeAnswer? aiResponse;
     private StudentCourseSummary? studentSummary;
 
     string DashboardReturnUrl => UserContext.IsCourseAdministrator
@@ -662,9 +690,16 @@ else
         }
 
         var selectedCourses = SelectedCourses;
-        var contextCourses = selectedCourses.Count > 0
-            ? selectedCourses
-            : AiCatalogueCourses;
+        var scopedQuestion = selectedCourses.Count == 0
+            ? question
+            : $"For {string.Join(", ", selectedCourses.Select(course => $"{course.Code} {course.Name}"))}: {question}";
+        if (scopedQuestion.Length > 1000)
+        {
+            aiErrorMessage =
+                "The question and selected Course names must total no more than 1,000 characters.";
+            aiResponse = null;
+            return;
+        }
 
         isAskingAi = true;
         aiErrorMessage = null;
@@ -672,18 +707,8 @@ else
 
         try
         {
-            aiResponse = await CourseApi.AskCourseQuestionAsync(
-                new CourseQuestionRequest(
-                    question,
-                    contextCourses
-                        .Select(course => new CourseQuestionContext(
-                            course.Code,
-                            course.Name,
-                            course.Description,
-                            course.Level,
-                            course.CreditPoints))
-                        .ToList(),
-                    CoursesExplicitlySelected: selectedCourses.Count > 0));
+            aiResponse = await CourseApi.AskKnowledgeQuestionAsync(
+                new KnowledgeQuestionRequest(scopedQuestion));
         }
         catch (CourseApiException exception)
         {
