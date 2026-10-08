@@ -18,6 +18,12 @@ Usage:
     # Review-only run
     python scripts/agentic-loop/agentic_loop.py
 
+    # Run the Lab 08 RAG agentic workflow (requires a configured AI provider)
+    python scripts/agentic-loop/agentic_loop.py --mode rag
+
+    # Run the Lab 07 MCP integration assessment (requires a configured AI provider)
+    python scripts/agentic-loop/agentic_loop.py --mode mcp
+
     # Run with a specific focus
     python scripts/agentic-loop/agentic_loop.py --focus architecture
 
@@ -39,10 +45,16 @@ import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
+from urllib.parse import urlsplit
 
 import requests
 from dotenv import load_dotenv
+
+from mcp_workflow import run_mcp_workflow
+from mcp_workflow.collector import McpCollector
+from rag_workflow import run_rag_workflow
+from rag_workflow.collector import RagCollector
 
 # ---------------------------------------------------------------------------
 # Paths and environment
@@ -51,7 +63,11 @@ REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 ENV_PATH = REPO_ROOT / ".env"
 load_dotenv(dotenv_path=ENV_PATH, override=True)
 
-EVIDENCE_DIR = REPO_ROOT / "docs" / "release-0" / "agentic-loop-evidence"
+EVIDENCE_DIR = REPO_ROOT / "docs" / "release-1" / "agentic-loop-evidence"
+MCP_SERVER_URL = os.getenv("MCP_SERVER_URL", "http://localhost:5268").rstrip("/")
+RAG_SERVER_URL = os.getenv("RAG_SERVER_URL", "http://localhost:5267").rstrip("/")
+AI_GATEWAY_URL = os.getenv("AI_GATEWAY_URL", "http://localhost:5269").rstrip("/")
+LOCAL_SERVICE_PROCESSES: list[subprocess.Popen[Any]] = []
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -231,6 +247,99 @@ def run_http_check(name: str, url: str, timeout: int = 5) -> dict[str, Any]:
         }
 
 
+def run_json_api_check(
+    name: str,
+    method: str,
+    url: str,
+    expected_status: int = 200,
+    payload: dict[str, Any] | None = None,
+    validate: Callable[[Any], str | None] | None = None,
+    summarize: Callable[[Any], str] | None = None,
+    timeout: int = 10,
+) -> tuple[dict[str, Any], Any | None]:
+    """Call a JSON API and validate its status and response contract."""
+    print(f"  {name} ({url})")
+    started = time.perf_counter()
+    try:
+        response = requests.request(method, url, json=payload, timeout=timeout)
+        duration = round(time.perf_counter() - started, 2)
+        if response.status_code != expected_status:
+            return ({
+                "name": name,
+                "passed": False,
+                "skipped": False,
+                "exitCode": 1,
+                "durationSeconds": duration,
+                "output": f"Expected HTTP {expected_status}, received HTTP {response.status_code}: {response.text[:500]}",
+            }, None)
+
+        try:
+            data = response.json()
+        except ValueError:
+            return ({
+                "name": name,
+                "passed": False,
+                "skipped": False,
+                "exitCode": 1,
+                "durationSeconds": duration,
+                "output": "Expected a JSON response.",
+            }, None)
+
+        validation_error = validate(data) if validate else None
+        passed = validation_error is None
+        return ({
+            "name": name,
+            "passed": passed,
+            "skipped": False,
+            "exitCode": 0 if passed else 1,
+            "durationSeconds": duration,
+            "output": validation_error or (
+                summarize(data) if summarize else "Response contract validated."
+            ),
+        }, data)
+    except requests.exceptions.ConnectionError as exc:
+        duration = round(time.perf_counter() - started, 2)
+        return ({
+            "name": name,
+            "passed": False,
+            "skipped": True,
+            "exitCode": 0,
+            "durationSeconds": duration,
+            "output": f"Service not reachable: {exc}",
+        }, None)
+    except Exception as exc:
+        duration = round(time.perf_counter() - started, 2)
+        return ({
+            "name": name,
+            "passed": False,
+            "skipped": False,
+            "exitCode": 1,
+            "durationSeconds": duration,
+            "output": f"API check error: {exc}",
+        }, None)
+
+
+def skipped_check(name: str, reason: str) -> dict[str, Any]:
+    return {
+        "name": name,
+        "passed": False,
+        "skipped": True,
+        "exitCode": 0,
+        "durationSeconds": 0,
+        "output": reason,
+    }
+
+
+def run_mcp_checks() -> list[dict[str, Any]]:
+    """Reuse the modular collector for full-suite deterministic MCP checks."""
+    return McpCollector(MCP_SERVER_URL).run_smoke_checks()
+
+
+def run_rag_checks() -> list[dict[str, Any]]:
+    """Run deterministic RAG checks without invoking the assessment models."""
+    return RagCollector(RAG_SERVER_URL).collect_all()["checks"]
+
+
 def run_all_deterministic_checks() -> list[dict[str, Any]]:
     """Run the full shared validation suite."""
     checks: list[dict[str, Any]] = []
@@ -260,6 +369,28 @@ def run_all_deterministic_checks() -> list[dict[str, Any]]:
         "Docker Compose config validation",
         ["docker", "compose", "config", "--quiet"],
     ))
+
+    # MCP and RAG run as local host services rather than Compose containers.
+    for mode, validate in (("mcp", run_mcp_checks), ("rag", run_rag_checks)):
+        startup_checks = start_validation_services(mode)
+        checks.extend(startup_checks)
+        if all(check["passed"] for check in startup_checks):
+            mode_checks = validate()
+            checks.extend(mode_checks)
+            if any(check["skipped"] for check in mode_checks):
+                checks.append({
+                    "name": f"{mode.upper()} integration validation required",
+                    "passed": False,
+                    "skipped": False,
+                    "exitCode": 1,
+                    "durationSeconds": 0,
+                    "output": "A required local AI service check was skipped after startup.",
+                })
+        else:
+            checks.append(skipped_check(
+                f"{mode.upper()} integration validation",
+                "Skipped because one or more required local AI services failed to start.",
+            ))
 
     # Per-student live HTTP smoke tests (best effort; services may not be running)
     for student in STUDENTS:
@@ -302,6 +433,248 @@ def failed_checks(checks: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return [c for c in checks if not c["passed"] and not c["skipped"]]
 
 
+def ensure_local_service(
+    name: str,
+    project: Path,
+    base_url: str,
+    health_path: str,
+    service_name: str,
+    environment: dict[str, str] | None = None,
+    startup_timeout: int = 90,
+) -> dict[str, Any]:
+    """Reuse a healthy local service or launch its .NET project and wait for health."""
+    health_url = f"{base_url}{health_path}"
+    started = time.perf_counter()
+
+    def healthy() -> bool:
+        try:
+            response = requests.get(health_url, timeout=2)
+            data = response.json()
+            return response.status_code == 200 and data.get("service") == service_name
+        except Exception:
+            return False
+
+    def result(passed: bool, output: str) -> dict[str, Any]:
+        return {
+            "name": f"Start {name}",
+            "passed": passed,
+            "skipped": False,
+            "exitCode": 0 if passed else 1,
+            "durationSeconds": round(time.perf_counter() - started, 2),
+            "output": output,
+        }
+
+    if healthy():
+        return result(True, f"Already healthy at {health_url}.")
+
+    parsed_url = urlsplit(base_url)
+    if parsed_url.scheme != "http" or parsed_url.hostname not in {
+        "localhost", "127.0.0.1", "::1"
+    }:
+        return result(False, f"Cannot auto-start a non-local service URL: {base_url}")
+    if not project.is_file():
+        return result(False, f"Service project was not found: {project}")
+
+    application_url = f"http://localhost:{parsed_url.port or 80}"
+    command = [
+        "dotnet", "run", "--configuration", "Release", "--no-launch-profile",
+        "--project", str(project),
+        "--", "--urls", application_url,
+    ]
+    try:
+        process = subprocess.Popen(
+            command,
+            cwd=REPO_ROOT,
+            env={**os.environ, **(environment or {})},
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    except FileNotFoundError as exc:
+        return result(False, f"Could not start {name}; ensure the .NET 10 SDK is installed: {exc}")
+    except Exception as exc:
+        return result(False, f"Could not start {name}: {exc}")
+
+    LOCAL_SERVICE_PROCESSES.append(process)
+    deadline = time.monotonic() + startup_timeout
+    while time.monotonic() < deadline:
+        if healthy():
+            return result(True, f"Started and healthy at {health_url}.")
+        if process.poll() is not None:
+            return result(False, f"{name} exited during startup with code {process.returncode}.")
+        time.sleep(0.5)
+
+    return result(False, f"{name} did not become healthy within {startup_timeout} seconds.")
+
+
+def wait_for_http_service(
+    name: str,
+    url: str,
+    expected_json_status: str | None = None,
+    startup_timeout: int = 120,
+) -> dict[str, Any]:
+    """Wait for a Compose-hosted HTTP service to become ready."""
+    started = time.perf_counter()
+    deadline = time.monotonic() + startup_timeout
+    last_error = "No successful health response received."
+
+    while time.monotonic() < deadline:
+        try:
+            response = requests.get(url, timeout=3)
+            if response.status_code == 200:
+                if expected_json_status is None:
+                    return {
+                        "name": name,
+                        "passed": True,
+                        "skipped": False,
+                        "exitCode": 0,
+                        "durationSeconds": round(time.perf_counter() - started, 2),
+                        "output": f"HTTP 200 at {url}.",
+                    }
+                body = response.json()
+                if isinstance(body, dict) and body.get("status") == expected_json_status:
+                    return {
+                        "name": name,
+                        "passed": True,
+                        "skipped": False,
+                        "exitCode": 0,
+                        "durationSeconds": round(time.perf_counter() - started, 2),
+                        "output": f"HTTP 200; status={expected_json_status} at {url}.",
+                    }
+                last_error = f"Unexpected health response: {response.text[:300]}"
+            else:
+                last_error = f"HTTP {response.status_code}: {response.text[:300]}"
+        except Exception as exc:
+            last_error = f"{type(exc).__name__}: {exc}"
+        time.sleep(1)
+
+    return {
+        "name": name,
+        "passed": False,
+        "skipped": False,
+        "exitCode": 1,
+        "durationSeconds": round(time.perf_counter() - started, 2),
+        "output": f"Did not become ready within {startup_timeout}s: {last_error}",
+    }
+
+
+def is_http_service_ready(
+    url: str,
+    expected_json_status: str | None = None,
+    timeout: int = 2,
+) -> bool:
+    try:
+        response = requests.get(url, timeout=timeout)
+        if response.status_code != 200:
+            return False
+        if expected_json_status is None:
+            return True
+        body = response.json()
+        return isinstance(body, dict) and body.get("status") == expected_json_status
+    except Exception:
+        return False
+
+
+def start_mcp_compose_dependencies() -> list[dict[str, Any]]:
+    """Start Academic Records and its Compose dependencies for the data tools."""
+    readiness_checks = [
+        (
+            "Academic Records database readiness",
+            "http://localhost:5021/health",
+            None,
+        ),
+        (
+            "Academic Records backend readiness",
+            "http://localhost:5020/health",
+            "healthy",
+        ),
+    ]
+    compose_services = [
+        service_name
+        for service_name, (_, url, expected_status) in zip(
+            ("academicrecords.database", "academicrecords.backend"),
+            readiness_checks,
+        )
+        if not is_http_service_ready(url, expected_status)
+    ]
+    checks = []
+    if compose_services:
+        compose_check = run_command(
+            "Start Academic Records Compose dependencies",
+            [
+                "docker", "compose", "up", "--detach", "--build", "--no-deps",
+                *compose_services,
+            ],
+        )
+        checks.append(compose_check)
+        if not compose_check["passed"]:
+            return checks
+
+    for service_check in readiness_checks:
+        check = wait_for_http_service(*service_check)
+        checks.append(check)
+        if not check["passed"]:
+            break
+    return checks
+
+
+def start_validation_services(mode: str) -> list[dict[str, Any]]:
+    checks = []
+    if mode == "mcp":
+        checks.extend(start_mcp_compose_dependencies())
+        if any(not check["passed"] for check in checks):
+            return checks
+        services = [(
+            "MCP server",
+            REPO_ROOT / "ai-services" / "mcp-server" / "McpServer" / "McpServer.csproj",
+            MCP_SERVER_URL,
+            "/health",
+            "mcp",
+            None,
+        )]
+    else:
+        services = [
+            (
+                "AI Gateway",
+                REPO_ROOT / "shared" / "backend" / "CampusPulse.Shared.Ai.Gateway"
+                / "CampusPulse.Shared.Ai.Gateway.csproj",
+                AI_GATEWAY_URL,
+                "/health",
+                "ai-gateway",
+                None,
+            ),
+            (
+                "RAG server",
+                REPO_ROOT / "ai-services" / "rag-server" / "RagServer" / "RagServer.csproj",
+                RAG_SERVER_URL,
+                "/health",
+                "rag",
+                {"Services__AiGateway": AI_GATEWAY_URL},
+            ),
+        ]
+
+    for service in services:
+        check = ensure_local_service(*service)
+        checks.append(check)
+        if not check["passed"]:
+            break
+    return checks
+
+
+def run_validation_mode(args: argparse.Namespace) -> int:
+    """Run the Lab 08 RAG evidence and dual-review workflow."""
+    return run_rag_workflow(
+        server_url=RAG_SERVER_URL,
+        evidence_dir=args.evidence_dir,
+        start_services=lambda: start_validation_services("rag"),
+        ai_call=call_ai,
+        provider=AGENTIC_PROVIDER,
+        implementation_model=ACT_MODEL,
+        review_model=REVIEW_MODEL,
+        goal=args.goal,
+    )
+
+
 # ---------------------------------------------------------------------------
 # OpenRouter / OpenAI-compatible client
 # ---------------------------------------------------------------------------
@@ -329,6 +702,8 @@ def call_openrouter(
         "max_tokens": max_tokens,
         "temperature": temperature,
     }
+    if model.casefold() == "qwen/qwen3.8-27b":
+        payload["reasoning"] = {"effort": "low"}
 
     try:
         response = requests.post(
@@ -339,10 +714,21 @@ def call_openrouter(
         )
         response.raise_for_status()
         data = response.json()
-        content = data["choices"][0]["message"]["content"]
+        choices = data.get("choices") if isinstance(data, dict) else None
+        if not isinstance(choices, list) or not choices or not isinstance(choices[0], dict):
+            return None, f"{model} returned an empty response (no choices)."
+
+        choice = choices[0]
+        message = choice.get("message")
+        content = message.get("content") if isinstance(message, dict) else None
         if content and content.strip():
             return content.strip(), None
-        return None, f"{model} returned an empty response."
+
+        details = [f"finish_reason={choice.get('finish_reason') or 'unknown'}"]
+        usage = data.get("usage")
+        if isinstance(usage, dict) and usage.get("completion_tokens") is not None:
+            details.append(f"completion_tokens={usage['completion_tokens']}")
+        return None, f"{model} returned an empty response ({', '.join(details)})."
     except requests.exceptions.HTTPError as exc:
         return None, f"{model} HTTP error: {exc.response.status_code} - {exc.response.text}"
     except Exception as exc:
@@ -630,6 +1016,12 @@ def parse_args() -> argparse.Namespace:
         description="CampusPulseAI shared agentic loop",
     )
     parser.add_argument(
+        "--mode",
+        choices=["full", "mcp", "rag"],
+        default="full",
+        help="Run the full suite, the Lab 07 MCP workflow, or the Lab 08 RAG workflow.",
+    )
+    parser.add_argument(
         "--focus",
         choices=["implementation", "database", "architecture", "devops"],
         default="implementation",
@@ -669,11 +1061,51 @@ def parse_args() -> argparse.Namespace:
         default=EVIDENCE_DIR,
         help="Directory where evidence JSON files are written.",
     )
+    parser.add_argument(
+        "--mcp-human-decision",
+        choices=["pending", "accepted", "rejected"],
+        default="pending",
+        help="Human decision to record in the MCP integration report.",
+    )
+    parser.add_argument(
+        "--mcp-human-notes",
+        default="",
+        help="Evidence-based justification for the recorded MCP human decision.",
+    )
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
+
+    if args.mode == "mcp":
+        if args.mcp_human_decision != "pending" and not args.mcp_human_notes.strip():
+            print(
+                "ERROR: --mcp-human-notes is required for an accepted or rejected decision.",
+                file=sys.stderr,
+            )
+            return 1
+        if args.apply:
+            print("ERROR: --apply is only supported in full mode.", file=sys.stderr)
+            return 1
+        return run_mcp_workflow(
+            server_url=MCP_SERVER_URL,
+            evidence_dir=args.evidence_dir,
+            start_services=lambda: start_validation_services("mcp"),
+            ai_call=call_ai,
+            provider=AGENTIC_PROVIDER,
+            implementation_model=ACT_MODEL,
+            review_model=REVIEW_MODEL,
+            goal=args.goal,
+            human_review_decision=args.mcp_human_decision,
+            human_review_notes=args.mcp_human_notes,
+        )
+
+    if args.mode == "rag":
+        if args.apply:
+            print("ERROR: --apply is only supported in full mode.", file=sys.stderr)
+            return 1
+        return run_validation_mode(args)
 
     if not OPENROUTER_API_KEY:
         print(
@@ -862,6 +1294,7 @@ def main() -> int:
         "schemaVersion": 4,
         "assessmentEvidence": True,
         "workflow": "Plan -> Act -> Observe -> Adapt -> Verify",
+        "validationMode": args.mode,
         "runId": run_id,
         "recordedAtUtc": now_iso(),
         "goal": args.goal,

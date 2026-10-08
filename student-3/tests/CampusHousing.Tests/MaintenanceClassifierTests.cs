@@ -4,6 +4,10 @@ using System.Text.Json;
 using Microsoft.Extensions.Logging.Abstractions;
 using System.Net;
 using System.Net.Http.Json;
+using CampusPulse.Shared.Mcp.Client;
+using CampusPulse.Shared.Mcp.Contracts;
+using CampusPulse.Shared.Rag.Client;
+using CampusPulse.Shared.Rag.Contracts;
 
 namespace CampusHousing.Tests;
 
@@ -127,6 +131,95 @@ public class MaintenanceClassifierTests
     }
 
     [Test]
+    public async Task ClassifyAsync_IncludesSimilarHistoricalIncidentWithoutStudentIdentity()
+    {
+        var handler = new StubHandler(HttpStatusCode.OK, new
+        {
+            text = "{\"severity\":\"High\",\"repairQueue\":\"Plumbing\"}", model = "gateway-test"
+        });
+        var historyHandler = new StubHandler(HttpStatusCode.OK, new object[]
+        {
+            new
+            {
+                id = 12,
+                studentId = "STU-PRIVATE",
+                dormRoomId = 4,
+                description = "Water is leaking beneath the bathroom sink",
+                severity = "High",
+                repairQueue = "Plumbing",
+                status = "Resolved",
+                createdAt = DateTime.UtcNow,
+                resolvedAt = DateTime.UtcNow
+            },
+            new
+            {
+                id = 13,
+                studentId = "STU-OTHER",
+                dormRoomId = 2,
+                description = "The hallway light is broken",
+                severity = "Low",
+                repairQueue = "Electrical",
+                status = "Open",
+                createdAt = DateTime.UtcNow.AddDays(-1),
+                resolvedAt = (DateTime?)null
+            }
+        });
+        var classifier = CreateClassifier(handler, historyHandler);
+
+        await classifier.ClassifyAsync("There is water leaking under the sink", CancellationToken.None);
+
+        using var body = JsonDocument.Parse(handler.RequestBody!);
+        var context = body.RootElement.GetProperty("context").GetString()!;
+        Assert.Multiple(() =>
+        {
+            Assert.That(context, Does.Contain("Water is leaking beneath the bathroom sink"));
+            Assert.That(context, Does.Contain("Severity=High"));
+            Assert.That(context, Does.Not.Contain("STU-PRIVATE"));
+            Assert.That(context, Does.Not.Contain("STU-OTHER"));
+        });
+    }
+
+    [Test]
+    public async Task ClassifyAsync_UsesRagAndMcpEvidence()
+    {
+        var handler = new StubHandler(HttpStatusCode.OK, new
+        {
+            text = "{\"severity\":\"High\",\"repairQueue\":\"Plumbing\"}", model = "gateway-test"
+        });
+        var historyHandler = new StubHandler(HttpStatusCode.OK, new[]
+        {
+            new
+            {
+                id = 12,
+                studentId = "STU-PRIVATE",
+                dormRoomId = 4,
+                description = "The sink is leaking",
+                severity = "High",
+                repairQueue = "Plumbing",
+                status = "Resolved",
+                createdAt = DateTime.UtcNow,
+                resolvedAt = DateTime.UtcNow
+            }
+        });
+        var classifier = CreateClassifier(
+            handler,
+            historyHandler,
+            new StubRagServerClient(),
+            new StubMcpClient());
+
+        await classifier.ClassifyAsync("Water is leaking under the sink", CancellationToken.None);
+
+        using var body = JsonDocument.Parse(handler.RequestBody!);
+        var context = body.RootElement.GetProperty("context").GetString()!;
+        Assert.Multiple(() =>
+        {
+            Assert.That(context, Does.Contain("RAG precedent: sink leak"));
+            Assert.That(context, Does.Contain("Live MCP housing context"));
+            Assert.That(context, Does.Contain("open ticket"));
+        });
+    }
+
+    [Test]
     public void ClassifyAsync_CallerCancellationIsNotSwallowed()
     {
         using var cancellation = new CancellationTokenSource();
@@ -136,12 +229,70 @@ public class MaintenanceClassifierTests
             Throws.InstanceOf<OperationCanceledException>());
     }
 
-    private static MaintenanceClassifier CreateClassifier(HttpMessageHandler? handler = null)
+    private static MaintenanceClassifier CreateClassifier(
+        HttpMessageHandler? handler = null,
+        HttpMessageHandler? historyHandler = null,
+        IRagServerClient? rag = null,
+        IMcpClient? mcp = null)
     {
         return new MaintenanceClassifier(
             new AiGatewayClient(new HttpClient(handler ?? new StubHandler(HttpStatusCode.ServiceUnavailable, null))
                 { BaseAddress = new Uri("https://gateway.test/") }),
-            NullLogger<MaintenanceClassifier>.Instance);
+            new StubHttpClientFactory(new HttpClient(historyHandler ?? new StubHandler(HttpStatusCode.ServiceUnavailable, null))
+                { BaseAddress = new Uri("https://housing-database.test/") }),
+            NullLogger<MaintenanceClassifier>.Instance,
+            rag,
+            mcp);
+    }
+
+    private sealed class StubRagServerClient : IRagServerClient
+    {
+        public Task<RagIngestResponse?> IngestAsync(string collection, RagIngestRequest request, CancellationToken cancellationToken) =>
+            Task.FromResult<RagIngestResponse?>(new(collection, request.Documents.Count, request.Documents.Count, "test-embedder"));
+
+        public Task<RagAnswerResponse?> AnswerAsync(string collection, RagAnswerRequest request, CancellationToken cancellationToken) =>
+            Task.FromResult<RagAnswerResponse?>(new(
+                collection,
+                request.Question,
+                RagStatus.Answered,
+                null,
+                0.9,
+                [new RagSource(
+                    1,
+                    "maintenance-ticket-12",
+                    0,
+                    0.9,
+                    "RAG precedent: sink leak",
+                    new Dictionary<string, string>
+                    {
+                        ["severity"] = "High",
+                        ["repairQueue"] = "Plumbing",
+                        ["status"] = "Resolved"
+                    })],
+                "test-embedder",
+                null,
+                DateTimeOffset.UtcNow));
+    }
+
+    private sealed class StubMcpClient : IMcpClient
+    {
+        public Task<IReadOnlyList<McpToolDefinition>> GetToolsAsync(CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<McpToolDefinition>>([]);
+
+        public Task<McpToolCallResponse> CallAsync(
+            string tool,
+            IReadOnlyDictionary<string, JsonElement> arguments,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(new McpToolCallResponse(
+                tool,
+                false,
+                JsonSerializer.SerializeToElement(new { relatedOpenTickets = new[] { "open ticket" } }),
+                DateTimeOffset.UtcNow));
+    }
+
+    private sealed class StubHttpClientFactory(HttpClient client) : IHttpClientFactory
+    {
+        public HttpClient CreateClient(string name) => client;
     }
 
     private sealed class StubHandler(HttpStatusCode status, object? body) : HttpMessageHandler
@@ -152,7 +303,9 @@ public class MaintenanceClassifierTests
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             LastRequest = request;
-            RequestBody = await request.Content!.ReadAsStringAsync(cancellationToken);
+            RequestBody = request.Content is null
+                ? null
+                : await request.Content.ReadAsStringAsync(cancellationToken);
             return new HttpResponseMessage(status) { Content = JsonContent.Create(body) };
         }
     }

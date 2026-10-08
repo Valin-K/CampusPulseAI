@@ -7,3 +7,8 @@ public interface IHousingKnowledgeService
 {
     Task<RagAssistantAnswer> AskAsync(KnowledgeQuestionRequest request, CancellationToken cancellationToken);
 }
+
+public interface IHousingRagService
+{
+    Task<RagAssistantAnswer> AskAsync(KnowledgeQuestionRequest request, CancellationToken cancellationToken);
+}

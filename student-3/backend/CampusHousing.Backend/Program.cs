@@ -7,6 +7,7 @@ builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 var databaseUrl = builder.Configuration["Services:CampusHousingDatabase"] ?? "http://localhost:5093";
 builder.Services.AddHttpClient("CampusHousingDatabase", client => client.BaseAddress = new Uri(databaseUrl.TrimEnd('/') + "/"));
+builder.Services.AddHttpClient("CampusHousingDatabaseHistory", client => client.BaseAddress = new Uri(databaseUrl.TrimEnd('/') + "/"));
 var academicRecordsUrl = builder.Configuration["Services:AcademicRecordsDatabase"] ?? "http://localhost:5021";
 builder.Services.AddHttpClient("AcademicRecordsDatabase", client => client.BaseAddress = new Uri(academicRecordsUrl.TrimEnd('/') + "/"));
 builder.Services.AddAiGateway(builder.Configuration);
@@ -23,7 +24,8 @@ builder.Services.AddHttpClient<CampusPulse.Shared.Rag.Client.IRagServerClient, C
 });
 builder.Services.AddSingleton<CampusPulse.Shared.Rag.Generation.RagCitationParser>();
 builder.Services.AddScoped<CampusPulse.Shared.Rag.Assistant.RagKnowledgeService>();
-builder.Services.AddScoped<CampusHousing.Backend.Services.IHousingKnowledgeService, CampusHousing.Backend.Services.HousingKnowledgeService>();
+builder.Services.AddScoped<CampusHousing.Backend.Services.IHousingRagService, CampusHousing.Backend.Services.HousingKnowledgeService>();
+builder.Services.AddScoped<CampusHousing.Backend.Services.IHousingKnowledgeService, CampusHousing.Backend.Services.HousingKnowledgeOrchestrator>();
 builder.Services.AddCors(options => options.AddDefaultPolicy(policy => policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod()));
 
 var app = builder.Build();

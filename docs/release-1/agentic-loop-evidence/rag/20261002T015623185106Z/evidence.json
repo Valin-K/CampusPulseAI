@@ -1,0 +1,524 @@
+{
+  "schemaVersion": 1,
+  "assessmentEvidence": true,
+  "workflow": "RAG evidence collection -> implementation assessment -> independent review",
+  "validationMode": "rag",
+  "runId": "20261002T015623185106Z",
+  "recordedAtUtc": "2026-10-02T01:56:23.185757+00:00",
+  "goal": "Validate and improve the shared CampusPulseAI campus services solution.",
+  "serverUrl": "http://localhost:5267",
+  "stages": [
+    {
+      "name": "OBSERVE",
+      "status": "passed",
+      "recordedAtUtc": "2026-10-02T01:56:27.396080+00:00",
+      "details": "8 of 8 evidence checks passed; cosine similarity=0.8469; P@5=0.6; R@5=1.0; answer status=answered; negative-query status=insufficient_context."
+    },
+    {
+      "name": "IMPLEMENTATION",
+      "status": "passed",
+      "recordedAtUtc": "2026-10-02T01:56:39.747098+00:00",
+      "details": "Implementation model assessed the collected RAG execution evidence."
+    },
+    {
+      "name": "REVIEW",
+      "status": "passed",
+      "recordedAtUtc": "2026-10-02T01:56:41.482822+00:00",
+      "details": "Independent review completed against the same collected evidence."
+    }
+  ],
+  "models": [
+    {
+      "stage": "IMPLEMENTATION",
+      "requestedProvider": "openrouter",
+      "requestedModel": "qwen/qwen3.8-27b",
+      "usedProvider": "openrouter",
+      "usedModel": "qwen/qwen3.8-27b",
+      "maxTokens": 1200,
+      "systemPrompt": "You are a precise RAG implementation assessment agent. Use only the supplied execution evidence. Assess; do not write code.",
+      "userPrompt": "Assess the CampusPulseAI RAG implementation using the supplied execution evidence.\n\nMap the lab's refresh, retrieve, and answer concepts to this repository's .NET HTTP service. Check isolated corpus refresh, separate top-5 retrieval, P@5/R@5, grounded answer citations, negative-query abstention, and fixture cleanup.\n\nTreat cosine similarity as a retrieval score, not calibrated confidence. Do not assume Python files or MCP tool names are required. Do not claim behavior that the evidence does not show.\n\nValidation goal:\nValidate and improve the shared CampusPulseAI campus services solution.\n\nObserved RAG execution evidence (JSON):\n{\n  \"passed\": true,\n  \"error\": null,\n  \"checks\": [\n    {\n      \"name\": \"RAG health\",\n      \"passed\": true,\n      \"output\": \"Health contract validated.\"\n    },\n    {\n      \"name\": \"RAG collections\",\n      \"passed\": true,\n      \"output\": \"Collection names and document/chunk counts validated.\"\n    },\n    {\n      \"name\": \"RAG validation workspace\",\n      \"passed\": true,\n      \"output\": \"Selected unused collection coursemanagement for an isolated fixture.\"\n    },\n    {\n      \"name\": \"RAG validation corpus refresh\",\n      \"passed\": true,\n      \"output\": \"Isolated corpus refreshed with 8 one-chunk documents.\"\n    },\n    {\n      \"name\": \"RAG retrieval metrics\",\n      \"passed\": true,\n      \"output\": \"P@5=0.600; R@5=1.000; relevant chunks=3/3; cosine similarity=0.8469.\"\n    },\n    {\n      \"name\": \"RAG retrieval and grounded answer\",\n      \"passed\": true,\n      \"output\": \"Answered with cosine similarity 0.8469; fixture citation agentic-loop-validation-f7bad84956a34e1784a6f14004b98f33 was present.\"\n    },\n    {\n      \"name\": \"RAG negative-query abstention\",\n      \"passed\": true,\n      \"output\": \"Unanswerable query status='insufficient_context'; cosine similarity=0.5772; expected insufficient_context.\"\n    },\n    {\n      \"name\": \"RAG validation corpus cleanup\",\n      \"passed\": true,\n      \"output\": \"Removed the isolated collection after confirming it contained only the fixture.\"\n    }\n  ],\n  \"healthEvidence\": {\n    \"status\": \"healthy\",\n    \"service\": \"rag\",\n    \"embedder\": \"gemini-embedding-001\",\n    \"generationAvailable\": true,\n    \"collections\": 0,\n    \"allowedCollections\": [\n      \"academicrecords\",\n      \"coursemanagement\",\n      \"campushousing\",\n      \"financialaidbilling\",\n      \"eventscheduling\"\n    ]\n  },\n  \"collectionEvidence\": [],\n  \"validationEvidence\": {\n    \"collection\": \"coursemanagement\",\n    \"documentId\": \"agentic-loop-validation-f7bad84956a34e1784a6f14004b98f33\",\n    \"documentIds\": [\n      \"agentic-loop-validation-f7bad84956a34e1784a6f14004b98f33\",\n      \"agentic-loop-validation-ce64d81b33684f01a04134637601127a\",\n      \"agentic-loop-validation-965ac8d3e92d49c5b687c3bfe81a9895\",\n      \"agentic-loop-validation-decoy-a2449c736b034903a9acf7df18c2d97c\",\n      \"agentic-loop-validation-decoy-f43b416233c64057a371b0b64dd2e889\",\n      \"agentic-loop-validation-decoy-9b1cf1a408a449cb95b5d24c9e0f70af\",\n      \"agentic-loop-validation-decoy-e6a868b5a06c457bb220e5e71d95255c\",\n      \"agentic-loop-validation-decoy-fe4a8f9f0e7144e3a575743b1ca5d8e5\"\n    ],\n    \"expectedRelevantChunks\": 3,\n    \"question\": \"What facts are recorded for marker CAMPUSPULSEVALIDATION42cb73ce3fe1?\",\n    \"negativeQuestion\": \"Which municipal bylaw governs the 56e87f36413e festival in Novanthera?\",\n    \"ingestion\": {\n      \"collection\": \"coursemanagement\",\n      \"documents\": 8,\n      \"chunks\": 8,\n      \"embedder\": \"gemini-embedding-001\"\n    },\n    \"retrieval\": {\n      \"collection\": \"coursemanagement\",\n      \"question\": \"What facts are recorded for marker CAMPUSPULSEVALIDATION42cb73ce3fe1?\",\n      \"topK\": 5,\n      \"cosineSimilarity\": 0.8469,\n      \"sources\": [\n        {\n          \"rank\": 1,\n          \"documentId\": \"agentic-loop-validation-ce64d81b33684f01a04134637601127a\",\n          \"chunkIndex\": 0,\n          \"score\": 0.8469,\n          \"text\": \"Validation marker CAMPUSPULSEVALIDATION42cb73ce3fe1: the north arch is beside the eastern fountain.\",\n          \"metadata\": {\n            \"source\": \"agentic-loop-validation\",\n            \"relevance\": \"relevant\"\n          }\n        },\n        {\n          \"rank\": 2,\n          \"documentId\": \"agentic-loop-validation-965ac8d3e92d49c5b687c3bfe81a9895\",\n          \"chunkIndex\": 0,\n          \"score\": 0.8395,\n          \"text\": \"Validation marker CAMPUSPULSEVALIDATION42cb73ce3fe1: the north arch marks the start of the spring orientation route.\",\n          \"metadata\": {\n            \"source\": \"agentic-loop-validation\",\n            \"relevance\": \"relevant\"\n          }\n        },\n        {\n          \"rank\": 3,\n          \"documentId\": \"agentic-loop-validation-f7bad84956a34e1784a6f14004b98f33\",\n          \"chunkIndex\": 0,\n          \"score\": 0.8371,\n          \"text\": \"Validation marker CAMPUSPULSEVALIDATION42cb73ce3fe1: the north arch has a blue lantern.\",\n          \"metadata\": {\n            \"source\": \"agentic-loop-validation\",\n            \"relevance\": \"relevant\"\n          }\n        },\n        {\n          \"rank\": 4,\n          \"documentId\": \"agentic-loop-validation-decoy-9b1cf1a408a449cb95b5d24c9e0f70af\",\n          \"chunkIndex\": 0,\n          \"score\": 0.5773,\n          \"text\": \"Archival ink remains legible when stored away from sunlight.\",\n          \"metadata\": {\n            \"source\": \"agentic-loop-validation\",\n            \"relevance\": \"decoy\"\n          }\n        },\n        {\n          \"rank\": 5,\n          \"documentId\": \"agentic-loop-validation-decoy-f43b416233c64057a371b0b64dd2e889\",\n          \"chunkIndex\": 0,\n          \"score\": 0.5724,\n          \"text\": \"Kepler cycles describe repeated paths of distant planets.\",\n          \"metadata\": {\n            \"source\": \"agentic-loop-validation\",\n            \"relevance\": \"decoy\"\n          }\n        }\n      ],\n      \"embedder\": \"gemini-embedding-001\",\n      \"retrievedAtUtc\": \"2026-10-02T01:56:25.2039419+00:00\"\n    },\n    \"retrievalMetrics\": {\n      \"k\": 5,\n      \"retrievedCount\": 5,\n      \"relevantRetrieved\": 3,\n      \"relevantTotal\": 3,\n      \"pAt5\": 0.6,\n      \"rAt5\": 1.0,\n      \"cosineSimilarity\": 0.8469\n    },\n    \"answer\": {\n      \"collection\": \"coursemanagement\",\n      \"question\": \"What facts are recorded for marker CAMPUSPULSEVALIDATION42cb73ce3fe1?\",\n      \"status\": \"answered\",\n      \"answer\": \"Based on the provided context, the facts recorded for marker CAMPUSPULSEVALIDATION42cb73ce3fe1 are:\\n- The north arch is beside the eastern fountain [1].\\n- The north arch marks the start of the spring orientation route [2].\\n- The north arch has a blue lantern [3].\",\n      \"confidence\": 0.8469,\n      \"sources\": [\n        {\n          \"rank\": 1,\n          \"documentId\": \"agentic-loop-validation-ce64d81b33684f01a04134637601127a\",\n          \"chunkIndex\": 0,\n          \"score\": 0.8469,\n          \"text\": \"Validation marker CAMPUSPULSEVALIDATION42cb73ce3fe1: the north arch is beside the eastern fountain.\",\n          \"metadata\": {\n            \"source\": \"agentic-loop-validation\",\n            \"relevance\": \"relevant\"\n          }\n        },\n        {\n          \"rank\": 2,\n          \"documentId\": \"agentic-loop-validation-965ac8d3e92d49c5b687c3bfe81a9895\",\n          \"chunkIndex\": 0,\n          \"score\": 0.8395,\n          \"text\": \"Validation marker CAMPUSPULSEVALIDATION42cb73ce3fe1: the north arch marks the start of the spring orientation route.\",\n          \"metadata\": {\n            \"source\": \"agentic-loop-validation\",\n            \"relevance\": \"relevant\"\n          }\n        },\n        {\n          \"rank\": 3,\n          \"documentId\": \"agentic-loop-validation-f7bad84956a34e1784a6f14004b98f33\",\n          \"chunkIndex\": 0,\n          \"score\": 0.8371,\n          \"text\": \"Validation marker CAMPUSPULSEVALIDATION42cb73ce3fe1: the north arch has a blue lantern.\",\n          \"metadata\": {\n            \"source\": \"agentic-loop-validation\",\n            \"relevance\": \"relevant\"\n          }\n        },\n        {\n          \"rank\": 4,\n          \"documentId\": \"agentic-loop-validation-decoy-9b1cf1a408a449cb95b5d24c9e0f70af\",\n          \"chunkIndex\": 0,\n          \"score\": 0.5773,\n          \"text\": \"Archival ink remains legible when stored away from sunlight.\",\n          \"metadata\": {\n            \"source\": \"agentic-loop-validation\",\n            \"relevance\": \"decoy\"\n          }\n        },\n        {\n          \"rank\": 5,\n          \"documentId\": \"agentic-loop-validation-decoy-f43b416233c64057a371b0b64dd2e889\",\n          \"chunkIndex\": 0,\n          \"score\": 0.5724,\n          \"text\": \"Kepler cycles describe repeated paths of distant planets.\",\n          \"metadata\": {\n            \"source\": \"agentic-loop-validation\",\n            \"relevance\": \"decoy\"\n          }\n        }\n      ],\n      \"embedder\": \"gemini-embedding-001\",\n      \"detail\": null,\n      \"executedAtUtc\": \"2026-10-02T01:56:26.9389445+00:00\"\n    },\n    \"negativeAnswer\": {\n      \"collection\": \"coursemanagement\",\n      \"question\": \"Which municipal bylaw governs the 56e87f36413e festival in Novanthera?\",\n      \"status\": \"insufficient_context\",\n      \"answer\": \"The knowledge base does not contain enough information to answer this question.\",\n      \"confidence\": 0.5772,\n      \"sources\": [\n        {\n          \"rank\": 1,\n          \"documentId\": \"agentic-loop-validation-f7bad84956a34e1784a6f14004b98f33\",\n          \"chunkIndex\": 0,\n          \"score\": 0.5772,\n          \"text\": \"Validation marker CAMPUSPULSEVALIDATION42cb73ce3fe1: the north arch has a blue lantern.\",\n          \"metadata\": {\n            \"source\": \"agentic-loop-validation\",\n            \"relevance\": \"relevant\"\n          }\n        },\n        {\n          \"rank\": 2,\n          \"documentId\": \"agentic-loop-validation-965ac8d3e92d49c5b687c3bfe81a9895\",\n          \"chunkIndex\": 0,\n          \"score\": 0.5691,\n          \"text\": \"Validation marker CAMPUSPULSEVALIDATION42cb73ce3fe1: the north arch marks the start of the spring orientation route.\",\n          \"metadata\": {\n            \"source\": \"agentic-loop-validation\",\n            \"relevance\": \"relevant\"\n          }\n        },\n        {\n          \"rank\": 3,\n          \"documentId\": \"agentic-loop-validation-ce64d81b33684f01a04134637601127a\",\n          \"chunkIndex\": 0,\n          \"score\": 0.5671,\n          \"text\": \"Validation marker CAMPUSPULSEVALIDATION42cb73ce3fe1: the north arch is beside the eastern fountain.\",\n          \"metadata\": {\n            \"source\": \"agentic-loop-validation\",\n            \"relevance\": \"relevant\"\n          }\n        },\n        {\n          \"rank\": 4,\n          \"documentId\": \"agentic-loop-validation-decoy-f43b416233c64057a371b0b64dd2e889\",\n          \"chunkIndex\": 0,\n          \"score\": 0.5561,\n          \"text\": \"Kepler cycles describe repeated paths of distant planets.\",\n          \"metadata\": {\n            \"source\": \"agentic-loop-validation\",\n            \"relevance\": \"decoy\"\n          }\n        },\n        {\n          \"rank\": 5,\n          \"documentId\": \"agentic-loop-validation-decoy-9b1cf1a408a449cb95b5d24c9e0f70af\",\n          \"chunkIndex\": 0,\n          \"score\": 0.5334,\n          \"text\": \"Archival ink remains legible when stored away from sunlight.\",\n          \"metadata\": {\n            \"source\": \"agentic-loop-validation\",\n            \"relevance\": \"decoy\"\n          }\n        }\n      ],\n      \"embedder\": \"gemini-embedding-001\",\n      \"detail\": \"Top score 0.5772 is below the threshold 0.7.\",\n      \"executedAtUtc\": \"2026-10-02T01:56:27.3844332+00:00\"\n    },\n    \"cleanup\": {\n      \"collection\": \"coursemanagement\",\n      \"deleted\": true\n    }\n  }\n}\n\nAssess only what this evidence supports. Do not treat the Lab's Python files or MCP tool names as requirements for this .NET HTTP service. Reply in at most 40 words.",
+      "rawOutput": "All six concepts validated: isolated refresh, top-5 retrieval, P@5=0.6/R@5=1.0, cited grounded answer, threshold-based abstention, and fixture cleanup. Cosine similarity serves as retrieval score only. No gaps observed.",
+      "error": null
+    },
+    {
+      "stage": "REVIEW",
+      "requestedProvider": "openrouter",
+      "requestedModel": "qwen/qwen3.8-27b",
+      "usedProvider": "openrouter",
+      "usedModel": "qwen/qwen3.8-27b",
+      "maxTokens": 2400,
+      "systemPrompt": "Review RAG output quality using only the supplied evidence.\n\nCheck:\n- retrieval quality\n- P@5 and R@5 interpretation\n- citation quality\n- negative-query abstention\n- cosine-similarity calibration claims\n- unsupported claims\n\nReturn exactly:\nRisk:\nCorrection:\nRetest:\n\nMaximum 35 words.\n\nEvaluate RAG architecture using only the supplied evidence.\n\nCheck:\n- corpus design\n- chunking\n- embedding strategy\n- vector store usage\n- benchmark coverage and relevance labels\n- governance risks\n\nReturn exactly:\nStrengths:\nRisks:\nRecommendations:\n\nMaximum 45 words.\n\nTreat these as two review sections and return both formats in order: Risk/Correction/Retest, then Strengths/Risks/Recommendations. Use at most 80 words total.",
+      "userPrompt": "Implementation assessment:\nAll six concepts validated: isolated refresh, top-5 retrieval, P@5=0.6/R@5=1.0, cited grounded answer, threshold-based abstention, and fixture cleanup. Cosine similarity serves as retrieval score only. No gaps observed.\n\nObserved RAG execution evidence (JSON):\n{\n  \"passed\": true,\n  \"error\": null,\n  \"checks\": [\n    {\n      \"name\": \"RAG health\",\n      \"passed\": true,\n      \"output\": \"Health contract validated.\"\n    },\n    {\n      \"name\": \"RAG collections\",\n      \"passed\": true,\n      \"output\": \"Collection names and document/chunk counts validated.\"\n    },\n    {\n      \"name\": \"RAG validation workspace\",\n      \"passed\": true,\n      \"output\": \"Selected unused collection coursemanagement for an isolated fixture.\"\n    },\n    {\n      \"name\": \"RAG validation corpus refresh\",\n      \"passed\": true,\n      \"output\": \"Isolated corpus refreshed with 8 one-chunk documents.\"\n    },\n    {\n      \"name\": \"RAG retrieval metrics\",\n      \"passed\": true,\n      \"output\": \"P@5=0.600; R@5=1.000; relevant chunks=3/3; cosine similarity=0.8469.\"\n    },\n    {\n      \"name\": \"RAG retrieval and grounded answer\",\n      \"passed\": true,\n      \"output\": \"Answered with cosine similarity 0.8469; fixture citation agentic-loop-validation-f7bad84956a34e1784a6f14004b98f33 was present.\"\n    },\n    {\n      \"name\": \"RAG negative-query abstention\",\n      \"passed\": true,\n      \"output\": \"Unanswerable query status='insufficient_context'; cosine similarity=0.5772; expected insufficient_context.\"\n    },\n    {\n      \"name\": \"RAG validation corpus cleanup\",\n      \"passed\": true,\n      \"output\": \"Removed the isolated collection after confirming it contained only the fixture.\"\n    }\n  ],\n  \"healthEvidence\": {\n    \"status\": \"healthy\",\n    \"service\": \"rag\",\n    \"embedder\": \"gemini-embedding-001\",\n    \"generationAvailable\": true,\n    \"collections\": 0,\n    \"allowedCollections\": [\n      \"academicrecords\",\n      \"coursemanagement\",\n      \"campushousing\",\n      \"financialaidbilling\",\n      \"eventscheduling\"\n    ]\n  },\n  \"collectionEvidence\": [],\n  \"validationEvidence\": {\n    \"collection\": \"coursemanagement\",\n    \"documentId\": \"agentic-loop-validation-f7bad84956a34e1784a6f14004b98f33\",\n    \"documentIds\": [\n      \"agentic-loop-validation-f7bad84956a34e1784a6f14004b98f33\",\n      \"agentic-loop-validation-ce64d81b33684f01a04134637601127a\",\n      \"agentic-loop-validation-965ac8d3e92d49c5b687c3bfe81a9895\",\n      \"agentic-loop-validation-decoy-a2449c736b034903a9acf7df18c2d97c\",\n      \"agentic-loop-validation-decoy-f43b416233c64057a371b0b64dd2e889\",\n      \"agentic-loop-validation-decoy-9b1cf1a408a449cb95b5d24c9e0f70af\",\n      \"agentic-loop-validation-decoy-e6a868b5a06c457bb220e5e71d95255c\",\n      \"agentic-loop-validation-decoy-fe4a8f9f0e7144e3a575743b1ca5d8e5\"\n    ],\n    \"expectedRelevantChunks\": 3,\n    \"question\": \"What facts are recorded for marker CAMPUSPULSEVALIDATION42cb73ce3fe1?\",\n    \"negativeQuestion\": \"Which municipal bylaw governs the 56e87f36413e festival in Novanthera?\",\n    \"ingestion\": {\n      \"collection\": \"coursemanagement\",\n      \"documents\": 8,\n      \"chunks\": 8,\n      \"embedder\": \"gemini-embedding-001\"\n    },\n    \"retrieval\": {\n      \"collection\": \"coursemanagement\",\n      \"question\": \"What facts are recorded for marker CAMPUSPULSEVALIDATION42cb73ce3fe1?\",\n      \"topK\": 5,\n      \"cosineSimilarity\": 0.8469,\n      \"sources\": [\n        {\n          \"rank\": 1,\n          \"documentId\": \"agentic-loop-validation-ce64d81b33684f01a04134637601127a\",\n          \"chunkIndex\": 0,\n          \"score\": 0.8469,\n          \"text\": \"Validation marker CAMPUSPULSEVALIDATION42cb73ce3fe1: the north arch is beside the eastern fountain.\",\n          \"metadata\": {\n            \"source\": \"agentic-loop-validation\",\n            \"relevance\": \"relevant\"\n          }\n        },\n        {\n          \"rank\": 2,\n          \"documentId\": \"agentic-loop-validation-965ac8d3e92d49c5b687c3bfe81a9895\",\n          \"chunkIndex\": 0,\n          \"score\": 0.8395,\n          \"text\": \"Validation marker CAMPUSPULSEVALIDATION42cb73ce3fe1: the north arch marks the start of the spring orientation route.\",\n          \"metadata\": {\n            \"source\": \"agentic-loop-validation\",\n            \"relevance\": \"relevant\"\n          }\n        },\n        {\n          \"rank\": 3,\n          \"documentId\": \"agentic-loop-validation-f7bad84956a34e1784a6f14004b98f33\",\n          \"chunkIndex\": 0,\n          \"score\": 0.8371,\n          \"text\": \"Validation marker CAMPUSPULSEVALIDATION42cb73ce3fe1: the north arch has a blue lantern.\",\n          \"metadata\": {\n            \"source\": \"agentic-loop-validation\",\n            \"relevance\": \"relevant\"\n          }\n        },\n        {\n          \"rank\": 4,\n          \"documentId\": \"agentic-loop-validation-decoy-9b1cf1a408a449cb95b5d24c9e0f70af\",\n          \"chunkIndex\": 0,\n          \"score\": 0.5773,\n          \"text\": \"Archival ink remains legible when stored away from sunlight.\",\n          \"metadata\": {\n            \"source\": \"agentic-loop-validation\",\n            \"relevance\": \"decoy\"\n          }\n        },\n        {\n          \"rank\": 5,\n          \"documentId\": \"agentic-loop-validation-decoy-f43b416233c64057a371b0b64dd2e889\",\n          \"chunkIndex\": 0,\n          \"score\": 0.5724,\n          \"text\": \"Kepler cycles describe repeated paths of distant planets.\",\n          \"metadata\": {\n            \"source\": \"agentic-loop-validation\",\n            \"relevance\": \"decoy\"\n          }\n        }\n      ],\n      \"embedder\": \"gemini-embedding-001\",\n      \"retrievedAtUtc\": \"2026-10-02T01:56:25.2039419+00:00\"\n    },\n    \"retrievalMetrics\": {\n      \"k\": 5,\n      \"retrievedCount\": 5,\n      \"relevantRetrieved\": 3,\n      \"relevantTotal\": 3,\n      \"pAt5\": 0.6,\n      \"rAt5\": 1.0,\n      \"cosineSimilarity\": 0.8469\n    },\n    \"answer\": {\n      \"collection\": \"coursemanagement\",\n      \"question\": \"What facts are recorded for marker CAMPUSPULSEVALIDATION42cb73ce3fe1?\",\n      \"status\": \"answered\",\n      \"answer\": \"Based on the provided context, the facts recorded for marker CAMPUSPULSEVALIDATION42cb73ce3fe1 are:\\n- The north arch is beside the eastern fountain [1].\\n- The north arch marks the start of the spring orientation route [2].\\n- The north arch has a blue lantern [3].\",\n      \"confidence\": 0.8469,\n      \"sources\": [\n        {\n          \"rank\": 1,\n          \"documentId\": \"agentic-loop-validation-ce64d81b33684f01a04134637601127a\",\n          \"chunkIndex\": 0,\n          \"score\": 0.8469,\n          \"text\": \"Validation marker CAMPUSPULSEVALIDATION42cb73ce3fe1: the north arch is beside the eastern fountain.\",\n          \"metadata\": {\n            \"source\": \"agentic-loop-validation\",\n            \"relevance\": \"relevant\"\n          }\n        },\n        {\n          \"rank\": 2,\n          \"documentId\": \"agentic-loop-validation-965ac8d3e92d49c5b687c3bfe81a9895\",\n          \"chunkIndex\": 0,\n          \"score\": 0.8395,\n          \"text\": \"Validation marker CAMPUSPULSEVALIDATION42cb73ce3fe1: the north arch marks the start of the spring orientation route.\",\n          \"metadata\": {\n            \"source\": \"agentic-loop-validation\",\n            \"relevance\": \"relevant\"\n          }\n        },\n        {\n          \"rank\": 3,\n          \"documentId\": \"agentic-loop-validation-f7bad84956a34e1784a6f14004b98f33\",\n          \"chunkIndex\": 0,\n          \"score\": 0.8371,\n          \"text\": \"Validation marker CAMPUSPULSEVALIDATION42cb73ce3fe1: the north arch has a blue lantern.\",\n          \"metadata\": {\n            \"source\": \"agentic-loop-validation\",\n            \"relevance\": \"relevant\"\n          }\n        },\n        {\n          \"rank\": 4,\n          \"documentId\": \"agentic-loop-validation-decoy-9b1cf1a408a449cb95b5d24c9e0f70af\",\n          \"chunkIndex\": 0,\n          \"score\": 0.5773,\n          \"text\": \"Archival ink remains legible when stored away from sunlight.\",\n          \"metadata\": {\n            \"source\": \"agentic-loop-validation\",\n            \"relevance\": \"decoy\"\n          }\n        },\n        {\n          \"rank\": 5,\n          \"documentId\": \"agentic-loop-validation-decoy-f43b416233c64057a371b0b64dd2e889\",\n          \"chunkIndex\": 0,\n          \"score\": 0.5724,\n          \"text\": \"Kepler cycles describe repeated paths of distant planets.\",\n          \"metadata\": {\n            \"source\": \"agentic-loop-validation\",\n            \"relevance\": \"decoy\"\n          }\n        }\n      ],\n      \"embedder\": \"gemini-embedding-001\",\n      \"detail\": null,\n      \"executedAtUtc\": \"2026-10-02T01:56:26.9389445+00:00\"\n    },\n    \"negativeAnswer\": {\n      \"collection\": \"coursemanagement\",\n      \"question\": \"Which municipal bylaw governs the 56e87f36413e festival in Novanthera?\",\n      \"status\": \"insufficient_context\",\n      \"answer\": \"The knowledge base does not contain enough information to answer this question.\",\n      \"confidence\": 0.5772,\n      \"sources\": [\n        {\n          \"rank\": 1,\n          \"documentId\": \"agentic-loop-validation-f7bad84956a34e1784a6f14004b98f33\",\n          \"chunkIndex\": 0,\n          \"score\": 0.5772,\n          \"text\": \"Validation marker CAMPUSPULSEVALIDATION42cb73ce3fe1: the north arch has a blue lantern.\",\n          \"metadata\": {\n            \"source\": \"agentic-loop-validation\",\n            \"relevance\": \"relevant\"\n          }\n        },\n        {\n          \"rank\": 2,\n          \"documentId\": \"agentic-loop-validation-965ac8d3e92d49c5b687c3bfe81a9895\",\n          \"chunkIndex\": 0,\n          \"score\": 0.5691,\n          \"text\": \"Validation marker CAMPUSPULSEVALIDATION42cb73ce3fe1: the north arch marks the start of the spring orientation route.\",\n          \"metadata\": {\n            \"source\": \"agentic-loop-validation\",\n            \"relevance\": \"relevant\"\n          }\n        },\n        {\n          \"rank\": 3,\n          \"documentId\": \"agentic-loop-validation-ce64d81b33684f01a04134637601127a\",\n          \"chunkIndex\": 0,\n          \"score\": 0.5671,\n          \"text\": \"Validation marker CAMPUSPULSEVALIDATION42cb73ce3fe1: the north arch is beside the eastern fountain.\",\n          \"metadata\": {\n            \"source\": \"agentic-loop-validation\",\n            \"relevance\": \"relevant\"\n          }\n        },\n        {\n          \"rank\": 4,\n          \"documentId\": \"agentic-loop-validation-decoy-f43b416233c64057a371b0b64dd2e889\",\n          \"chunkIndex\": 0,\n          \"score\": 0.5561,\n          \"text\": \"Kepler cycles describe repeated paths of distant planets.\",\n          \"metadata\": {\n            \"source\": \"agentic-loop-validation\",\n            \"relevance\": \"decoy\"\n          }\n        },\n        {\n          \"rank\": 5,\n          \"documentId\": \"agentic-loop-validation-decoy-9b1cf1a408a449cb95b5d24c9e0f70af\",\n          \"chunkIndex\": 0,\n          \"score\": 0.5334,\n          \"text\": \"Archival ink remains legible when stored away from sunlight.\",\n          \"metadata\": {\n            \"source\": \"agentic-loop-validation\",\n            \"relevance\": \"decoy\"\n          }\n        }\n      ],\n      \"embedder\": \"gemini-embedding-001\",\n      \"detail\": \"Top score 0.5772 is below the threshold 0.7.\",\n      \"executedAtUtc\": \"2026-10-02T01:56:27.3844332+00:00\"\n    },\n    \"cleanup\": {\n      \"collection\": \"coursemanagement\",\n      \"deleted\": true\n    }\n  }\n}\n\nReview the assessment against the evidence only. Flag unsupported claims and missing validation.",
+      "rawOutput": "Risk:\nP@5=0.6 reflects 2/5 decoys, not a retrieval defect; single-query metrics lack statistical power.\n\nCorrection:\nCosine similarity is a retrieval score, not a calibrated confidence; threshold 0.7 is unvalidated.\n\nRetest:\nAdd multi-query benchmark and threshold sensitivity analysis.\n\nStrengths:\nIsolated fixture, clean cleanup, grounded citations, correct abstention.\n\nRisks:\nSingle-query metrics; uncalibrated threshold; no chunking/embedding strategy documented.\n\nRecommendations:\nExpand benchmark; validate threshold; document chunking and embedding choices.",
+      "error": null
+    }
+  ],
+  "serviceStartupChecks": [
+    {
+      "name": "Start AI Gateway",
+      "passed": true,
+      "skipped": false,
+      "exitCode": 0,
+      "durationSeconds": 0.01,
+      "output": "Already healthy at http://localhost:5269/health."
+    },
+    {
+      "name": "Start RAG server",
+      "passed": true,
+      "skipped": false,
+      "exitCode": 0,
+      "durationSeconds": 0.0,
+      "output": "Already healthy at http://localhost:5267/health."
+    }
+  ],
+  "ragEvidence": {
+    "passed": true,
+    "healthEvidence": {
+      "status": "healthy",
+      "service": "rag",
+      "embedder": "gemini-embedding-001",
+      "generationAvailable": true,
+      "collections": 0,
+      "allowedCollections": [
+        "academicrecords",
+        "coursemanagement",
+        "campushousing",
+        "financialaidbilling",
+        "eventscheduling"
+      ]
+    },
+    "collectionEvidence": [],
+    "validationEvidence": {
+      "collection": "coursemanagement",
+      "documentId": "agentic-loop-validation-f7bad84956a34e1784a6f14004b98f33",
+      "documentIds": [
+        "agentic-loop-validation-f7bad84956a34e1784a6f14004b98f33",
+        "agentic-loop-validation-ce64d81b33684f01a04134637601127a",
+        "agentic-loop-validation-965ac8d3e92d49c5b687c3bfe81a9895",
+        "agentic-loop-validation-decoy-a2449c736b034903a9acf7df18c2d97c",
+        "agentic-loop-validation-decoy-f43b416233c64057a371b0b64dd2e889",
+        "agentic-loop-validation-decoy-9b1cf1a408a449cb95b5d24c9e0f70af",
+        "agentic-loop-validation-decoy-e6a868b5a06c457bb220e5e71d95255c",
+        "agentic-loop-validation-decoy-fe4a8f9f0e7144e3a575743b1ca5d8e5"
+      ],
+      "relevantDocumentIds": [
+        "agentic-loop-validation-f7bad84956a34e1784a6f14004b98f33",
+        "agentic-loop-validation-ce64d81b33684f01a04134637601127a",
+        "agentic-loop-validation-965ac8d3e92d49c5b687c3bfe81a9895"
+      ],
+      "relevantFixtures": [
+        {
+          "documentId": "agentic-loop-validation-f7bad84956a34e1784a6f14004b98f33",
+          "text": "Validation marker CAMPUSPULSEVALIDATION42cb73ce3fe1: the north arch has a blue lantern."
+        },
+        {
+          "documentId": "agentic-loop-validation-ce64d81b33684f01a04134637601127a",
+          "text": "Validation marker CAMPUSPULSEVALIDATION42cb73ce3fe1: the north arch is beside the eastern fountain."
+        },
+        {
+          "documentId": "agentic-loop-validation-965ac8d3e92d49c5b687c3bfe81a9895",
+          "text": "Validation marker CAMPUSPULSEVALIDATION42cb73ce3fe1: the north arch marks the start of the spring orientation route."
+        }
+      ],
+      "expectedRelevantChunks": 3,
+      "marker": "CAMPUSPULSEVALIDATION42cb73ce3fe1",
+      "fixtureText": "Validation marker CAMPUSPULSEVALIDATION42cb73ce3fe1: the north arch has a blue lantern.",
+      "question": "What facts are recorded for marker CAMPUSPULSEVALIDATION42cb73ce3fe1?",
+      "negativeQuestion": "Which municipal bylaw governs the 56e87f36413e festival in Novanthera?",
+      "ingestion": {
+        "collection": "coursemanagement",
+        "documents": 8,
+        "chunks": 8,
+        "embedder": "gemini-embedding-001"
+      },
+      "retrieval": {
+        "collection": "coursemanagement",
+        "question": "What facts are recorded for marker CAMPUSPULSEVALIDATION42cb73ce3fe1?",
+        "topK": 5,
+        "cosineSimilarity": 0.8469,
+        "sources": [
+          {
+            "rank": 1,
+            "documentId": "agentic-loop-validation-ce64d81b33684f01a04134637601127a",
+            "chunkIndex": 0,
+            "score": 0.8469,
+            "text": "Validation marker CAMPUSPULSEVALIDATION42cb73ce3fe1: the north arch is beside the eastern fountain.",
+            "metadata": {
+              "source": "agentic-loop-validation",
+              "relevance": "relevant"
+            }
+          },
+          {
+            "rank": 2,
+            "documentId": "agentic-loop-validation-965ac8d3e92d49c5b687c3bfe81a9895",
+            "chunkIndex": 0,
+            "score": 0.8395,
+            "text": "Validation marker CAMPUSPULSEVALIDATION42cb73ce3fe1: the north arch marks the start of the spring orientation route.",
+            "metadata": {
+              "source": "agentic-loop-validation",
+              "relevance": "relevant"
+            }
+          },
+          {
+            "rank": 3,
+            "documentId": "agentic-loop-validation-f7bad84956a34e1784a6f14004b98f33",
+            "chunkIndex": 0,
+            "score": 0.8371,
+            "text": "Validation marker CAMPUSPULSEVALIDATION42cb73ce3fe1: the north arch has a blue lantern.",
+            "metadata": {
+              "source": "agentic-loop-validation",
+              "relevance": "relevant"
+            }
+          },
+          {
+            "rank": 4,
+            "documentId": "agentic-loop-validation-decoy-9b1cf1a408a449cb95b5d24c9e0f70af",
+            "chunkIndex": 0,
+            "score": 0.5773,
+            "text": "Archival ink remains legible when stored away from sunlight.",
+            "metadata": {
+              "source": "agentic-loop-validation",
+              "relevance": "decoy"
+            }
+          },
+          {
+            "rank": 5,
+            "documentId": "agentic-loop-validation-decoy-f43b416233c64057a371b0b64dd2e889",
+            "chunkIndex": 0,
+            "score": 0.5724,
+            "text": "Kepler cycles describe repeated paths of distant planets.",
+            "metadata": {
+              "source": "agentic-loop-validation",
+              "relevance": "decoy"
+            }
+          }
+        ],
+        "embedder": "gemini-embedding-001",
+        "retrievedAtUtc": "2026-10-02T01:56:25.2039419+00:00"
+      },
+      "retrievalMetrics": {
+        "k": 5,
+        "retrievedCount": 5,
+        "relevantRetrieved": 3,
+        "relevantTotal": 3,
+        "pAt5": 0.6,
+        "rAt5": 1.0,
+        "cosineSimilarity": 0.8469
+      },
+      "answer": {
+        "collection": "coursemanagement",
+        "question": "What facts are recorded for marker CAMPUSPULSEVALIDATION42cb73ce3fe1?",
+        "status": "answered",
+        "answer": "Based on the provided context, the facts recorded for marker CAMPUSPULSEVALIDATION42cb73ce3fe1 are:\n- The north arch is beside the eastern fountain [1].\n- The north arch marks the start of the spring orientation route [2].\n- The north arch has a blue lantern [3].",
+        "confidence": 0.8469,
+        "sources": [
+          {
+            "rank": 1,
+            "documentId": "agentic-loop-validation-ce64d81b33684f01a04134637601127a",
+            "chunkIndex": 0,
+            "score": 0.8469,
+            "text": "Validation marker CAMPUSPULSEVALIDATION42cb73ce3fe1: the north arch is beside the eastern fountain.",
+            "metadata": {
+              "source": "agentic-loop-validation",
+              "relevance": "relevant"
+            }
+          },
+          {
+            "rank": 2,
+            "documentId": "agentic-loop-validation-965ac8d3e92d49c5b687c3bfe81a9895",
+            "chunkIndex": 0,
+            "score": 0.8395,
+            "text": "Validation marker CAMPUSPULSEVALIDATION42cb73ce3fe1: the north arch marks the start of the spring orientation route.",
+            "metadata": {
+              "source": "agentic-loop-validation",
+              "relevance": "relevant"
+            }
+          },
+          {
+            "rank": 3,
+            "documentId": "agentic-loop-validation-f7bad84956a34e1784a6f14004b98f33",
+            "chunkIndex": 0,
+            "score": 0.8371,
+            "text": "Validation marker CAMPUSPULSEVALIDATION42cb73ce3fe1: the north arch has a blue lantern.",
+            "metadata": {
+              "source": "agentic-loop-validation",
+              "relevance": "relevant"
+            }
+          },
+          {
+            "rank": 4,
+            "documentId": "agentic-loop-validation-decoy-9b1cf1a408a449cb95b5d24c9e0f70af",
+            "chunkIndex": 0,
+            "score": 0.5773,
+            "text": "Archival ink remains legible when stored away from sunlight.",
+            "metadata": {
+              "source": "agentic-loop-validation",
+              "relevance": "decoy"
+            }
+          },
+          {
+            "rank": 5,
+            "documentId": "agentic-loop-validation-decoy-f43b416233c64057a371b0b64dd2e889",
+            "chunkIndex": 0,
+            "score": 0.5724,
+            "text": "Kepler cycles describe repeated paths of distant planets.",
+            "metadata": {
+              "source": "agentic-loop-validation",
+              "relevance": "decoy"
+            }
+          }
+        ],
+        "embedder": "gemini-embedding-001",
+        "detail": null,
+        "executedAtUtc": "2026-10-02T01:56:26.9389445+00:00"
+      },
+      "negativeAnswer": {
+        "collection": "coursemanagement",
+        "question": "Which municipal bylaw governs the 56e87f36413e festival in Novanthera?",
+        "status": "insufficient_context",
+        "answer": "The knowledge base does not contain enough information to answer this question.",
+        "confidence": 0.5772,
+        "sources": [
+          {
+            "rank": 1,
+            "documentId": "agentic-loop-validation-f7bad84956a34e1784a6f14004b98f33",
+            "chunkIndex": 0,
+            "score": 0.5772,
+            "text": "Validation marker CAMPUSPULSEVALIDATION42cb73ce3fe1: the north arch has a blue lantern.",
+            "metadata": {
+              "source": "agentic-loop-validation",
+              "relevance": "relevant"
+            }
+          },
+          {
+            "rank": 2,
+            "documentId": "agentic-loop-validation-965ac8d3e92d49c5b687c3bfe81a9895",
+            "chunkIndex": 0,
+            "score": 0.5691,
+            "text": "Validation marker CAMPUSPULSEVALIDATION42cb73ce3fe1: the north arch marks the start of the spring orientation route.",
+            "metadata": {
+              "source": "agentic-loop-validation",
+              "relevance": "relevant"
+            }
+          },
+          {
+            "rank": 3,
+            "documentId": "agentic-loop-validation-ce64d81b33684f01a04134637601127a",
+            "chunkIndex": 0,
+            "score": 0.5671,
+            "text": "Validation marker CAMPUSPULSEVALIDATION42cb73ce3fe1: the north arch is beside the eastern fountain.",
+            "metadata": {
+              "source": "agentic-loop-validation",
+              "relevance": "relevant"
+            }
+          },
+          {
+            "rank": 4,
+            "documentId": "agentic-loop-validation-decoy-f43b416233c64057a371b0b64dd2e889",
+            "chunkIndex": 0,
+            "score": 0.5561,
+            "text": "Kepler cycles describe repeated paths of distant planets.",
+            "metadata": {
+              "source": "agentic-loop-validation",
+              "relevance": "decoy"
+            }
+          },
+          {
+            "rank": 5,
+            "documentId": "agentic-loop-validation-decoy-9b1cf1a408a449cb95b5d24c9e0f70af",
+            "chunkIndex": 0,
+            "score": 0.5334,
+            "text": "Archival ink remains legible when stored away from sunlight.",
+            "metadata": {
+              "source": "agentic-loop-validation",
+              "relevance": "decoy"
+            }
+          }
+        ],
+        "embedder": "gemini-embedding-001",
+        "detail": "Top score 0.5772 is below the threshold 0.7.",
+        "executedAtUtc": "2026-10-02T01:56:27.3844332+00:00"
+      },
+      "cleanup": {
+        "collection": "coursemanagement",
+        "deleted": true
+      }
+    },
+    "checks": [
+      {
+        "name": "RAG health",
+        "passed": true,
+        "skipped": false,
+        "exitCode": 0,
+        "durationSeconds": 0.02,
+        "output": "Health contract validated."
+      },
+      {
+        "name": "RAG collections",
+        "passed": true,
+        "skipped": false,
+        "exitCode": 0,
+        "durationSeconds": 0.0,
+        "output": "Collection names and document/chunk counts validated."
+      },
+      {
+        "name": "RAG validation workspace",
+        "passed": true,
+        "skipped": false,
+        "exitCode": 0,
+        "durationSeconds": 0.0,
+        "output": "Selected unused collection coursemanagement for an isolated fixture."
+      },
+      {
+        "name": "RAG validation corpus refresh",
+        "passed": true,
+        "skipped": false,
+        "exitCode": 0,
+        "durationSeconds": 1.5,
+        "output": "Isolated corpus refreshed with 8 one-chunk documents."
+      },
+      {
+        "name": "RAG retrieval metrics",
+        "passed": true,
+        "skipped": false,
+        "exitCode": 0,
+        "durationSeconds": 0.48,
+        "output": "P@5=0.600; R@5=1.000; relevant chunks=3/3; cosine similarity=0.8469."
+      },
+      {
+        "name": "RAG retrieval and grounded answer",
+        "passed": true,
+        "skipped": false,
+        "exitCode": 0,
+        "durationSeconds": 1.74,
+        "output": "Answered with cosine similarity 0.8469; fixture citation agentic-loop-validation-f7bad84956a34e1784a6f14004b98f33 was present."
+      },
+      {
+        "name": "RAG negative-query abstention",
+        "passed": true,
+        "skipped": false,
+        "exitCode": 0,
+        "durationSeconds": 0.45,
+        "output": "Unanswerable query status='insufficient_context'; cosine similarity=0.5772; expected insufficient_context."
+      },
+      {
+        "name": "RAG validation corpus cleanup",
+        "passed": true,
+        "skipped": false,
+        "exitCode": 0,
+        "durationSeconds": 0.01,
+        "output": "Removed the isolated collection after confirming it contained only the fixture."
+      }
+    ]
+  },
+  "checks": [
+    {
+      "name": "Start AI Gateway",
+      "passed": true,
+      "skipped": false,
+      "exitCode": 0,
+      "durationSeconds": 0.01,
+      "output": "Already healthy at http://localhost:5269/health."
+    },
+    {
+      "name": "Start RAG server",
+      "passed": true,
+      "skipped": false,
+      "exitCode": 0,
+      "durationSeconds": 0.0,
+      "output": "Already healthy at http://localhost:5267/health."
+    },
+    {
+      "name": "RAG health",
+      "passed": true,
+      "skipped": false,
+      "exitCode": 0,
+      "durationSeconds": 0.02,
+      "output": "Health contract validated."
+    },
+    {
+      "name": "RAG collections",
+      "passed": true,
+      "skipped": false,
+      "exitCode": 0,
+      "durationSeconds": 0.0,
+      "output": "Collection names and document/chunk counts validated."
+    },
+    {
+      "name": "RAG validation workspace",
+      "passed": true,
+      "skipped": false,
+      "exitCode": 0,
+      "durationSeconds": 0.0,
+      "output": "Selected unused collection coursemanagement for an isolated fixture."
+    },
+    {
+      "name": "RAG validation corpus refresh",
+      "passed": true,
+      "skipped": false,
+      "exitCode": 0,
+      "durationSeconds": 1.5,
+      "output": "Isolated corpus refreshed with 8 one-chunk documents."
+    },
+    {
+      "name": "RAG retrieval metrics",
+      "passed": true,
+      "skipped": false,
+      "exitCode": 0,
+      "durationSeconds": 0.48,
+      "output": "P@5=0.600; R@5=1.000; relevant chunks=3/3; cosine similarity=0.8469."
+    },
+    {
+      "name": "RAG retrieval and grounded answer",
+      "passed": true,
+      "skipped": false,
+      "exitCode": 0,
+      "durationSeconds": 1.74,
+      "output": "Answered with cosine similarity 0.8469; fixture citation agentic-loop-validation-f7bad84956a34e1784a6f14004b98f33 was present."
+    },
+    {
+      "name": "RAG negative-query abstention",
+      "passed": true,
+      "skipped": false,
+      "exitCode": 0,
+      "durationSeconds": 0.45,
+      "output": "Unanswerable query status='insufficient_context'; cosine similarity=0.5772; expected insufficient_context."
+    },
+    {
+      "name": "RAG validation corpus cleanup",
+      "passed": true,
+      "skipped": false,
+      "exitCode": 0,
+      "durationSeconds": 0.01,
+      "output": "Removed the isolated collection after confirming it contained only the fixture."
+    }
+  ],
+  "implementationAssessment": {
+    "output": "All six concepts validated: isolated refresh, top-5 retrieval, P@5=0.6/R@5=1.0, cited grounded answer, threshold-based abstention, and fixture cleanup. Cosine similarity serves as retrieval score only. No gaps observed.",
+    "error": null
+  },
+  "independentReview": {
+    "output": "Risk:\nP@5=0.6 reflects 2/5 decoys, not a retrieval defect; single-query metrics lack statistical power.\n\nCorrection:\nCosine similarity is a retrieval score, not a calibrated confidence; threshold 0.7 is unvalidated.\n\nRetest:\nAdd multi-query benchmark and threshold sensitivity analysis.\n\nStrengths:\nIsolated fixture, clean cleanup, grounded citations, correct abstention.\n\nRisks:\nSingle-query metrics; uncalibrated threshold; no chunking/embedding strategy documented.\n\nRecommendations:\nExpand benchmark; validate threshold; document chunking and embedding choices.",
+    "error": null
+  },
+  "humanReview": {
+    "decision": "pending",
+    "notes": ""
+  },
+  "reportFiles": {
+    "evidence": "rag/20261002T015623185106Z/evidence.json",
+    "validationReport": "rag/20261002T015623185106Z/rag-validation-report.md"
+  },
+  "privacy": {
+    "sourceCodeSentToAi": false,
+    "ragExecutionEvidenceSentToAi": true,
+    "apiKeysRecorded": false
+  },
+  "improvement": {
+    "status": "recommendations_recorded",
+    "recommendations": "Risk:\nP@5=0.6 reflects 2/5 decoys, not a retrieval defect; single-query metrics lack statistical power.\n\nCorrection:\nCosine similarity is a retrieval score, not a calibrated confidence; threshold 0.7 is unvalidated.\n\nRetest:\nAdd multi-query benchmark and threshold sensitivity analysis.\n\nStrengths:\nIsolated fixture, clean cleanup, grounded citations, correct abstention.\n\nRisks:\nSingle-query metrics; uncalibrated threshold; no chunking/embedding strategy documented.\n\nRecommendations:\nExpand benchmark; validate threshold; document chunking and embedding choices.",
+    "sourceChangesApplied": false
+  },
+  "passed": true,
+  "summary": "OBSERVE: PASSED\nIMPLEMENTATION: PASSED\nREVIEW: PASSED"
+}

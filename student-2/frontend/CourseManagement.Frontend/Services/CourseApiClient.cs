@@ -72,20 +72,20 @@ public sealed class CourseApiClient(HttpClient httpClient)
             ?? throw new JsonException("The Course API returned an empty response.");
     }
 
-    public async Task<CourseQuestionResponse> AskCourseQuestionAsync(
-        CourseQuestionRequest request,
+    public async Task<KnowledgeAnswer> AskKnowledgeQuestionAsync(
+        KnowledgeQuestionRequest request,
         CancellationToken cancellationToken = default)
     {
         using var response = await httpClient.PostAsJsonAsync(
-            "api/ai/course-questions",
+            "api/ai/knowledge",
             request,
             cancellationToken);
         await EnsureSuccessAsync(response, cancellationToken);
 
-        return await response.Content.ReadFromJsonAsync<CourseQuestionResponse>(
+        return await response.Content.ReadFromJsonAsync<KnowledgeAnswer>(
                 cancellationToken)
             ?? throw new JsonException(
-                "The Course AI API returned an empty response.");
+                "The Course knowledge API returned an empty response.");
     }
 
     public async Task<CourseSummary> CreateAsync(

@@ -1,5 +1,7 @@
+using System.Net;
 using AcademicRecords.Backend.Models;
 using AcademicRecords.Backend.Services;
+using CampusPulse.Shared.Mcp.Client;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AcademicRecords.Backend.Controllers;
@@ -50,11 +52,26 @@ public sealed class AiController(
         {
             return Problem(exception.Message, statusCode: StatusCodes.Status503ServiceUnavailable);
         }
-        catch (HttpRequestException)
+        catch (McpResponseException exception)
         {
+            return Problem(exception.Message, statusCode: StatusCodes.Status503ServiceUnavailable);
+        }
+        catch (HttpRequestException exception)
+        {
+            var statusCode = exception.StatusCode switch
+            {
+                HttpStatusCode.BadGateway => StatusCodes.Status502BadGateway,
+                HttpStatusCode.GatewayTimeout => StatusCodes.Status504GatewayTimeout,
+                HttpStatusCode.ServiceUnavailable or HttpStatusCode.TooManyRequests =>
+                    StatusCodes.Status503ServiceUnavailable,
+                null => StatusCodes.Status503ServiceUnavailable,
+                _ => StatusCodes.Status502BadGateway
+            };
             return Problem(
-                "The shared RAG server is unavailable. Start it on the host at http://localhost:5267 before using this feature.",
-                statusCode: StatusCodes.Status503ServiceUnavailable);
+                statusCode == StatusCodes.Status502BadGateway
+                    ? "A required AI service returned an invalid response."
+                    : "A required AI service is unavailable.",
+                statusCode: statusCode);
         }
         catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
         {

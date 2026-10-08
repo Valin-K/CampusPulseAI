@@ -94,6 +94,13 @@ td small { display: block; margin-top: .15rem; color: var(--university-muted); }
 .ai-card p { color: var(--university-muted); margin-bottom: 0; }
 .ai-response { grid-column: 1 / -1; padding: 1.15rem; border-radius: var(--radius-md); background: white; box-shadow: inset 4px 0 var(--university-gold); }
 .ai-response p { margin: .75rem 0 0; color: var(--university-ink); line-height: 1.65; white-space: pre-wrap; }
+.rag-answer { color: var(--university-ink); line-height: 1.65; }
+.rag-answer > :first-child { margin-top: .75rem; }
+.rag-answer > :last-child { margin-bottom: 0; }
+.rag-answer h3 { margin-bottom: .35rem; font-size: 1rem; }
+.rag-answer ul, .rag-answer ol { margin: .75rem 0; padding-left: 1.5rem; }
+.rag-answer li + li { margin-top: .35rem; }
+.rag-answer code { padding: .08rem .3rem; border-radius: .25rem; background: var(--university-sky); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
 
 .modal-backdrop { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; padding: 1rem; background: rgba(9, 30, 50, .72); backdrop-filter: blur(4px); }
 .modal-card { position: relative; width: min(32rem, 100%); padding: 1.6rem; border-radius: var(--radius-lg); background: white; box-shadow: var(--shadow-md); animation: modal-in .18s ease-out; }

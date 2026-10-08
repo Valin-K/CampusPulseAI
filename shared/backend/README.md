@@ -72,7 +72,7 @@ unit-testable with no key or network.
         └─ AnswerAsync(question, persona) ──┤
    │                                        ▼
    │                          RAG SERVER  (ai-services/rag-server, on the host :5267)
-   │                            embed → vector search → confidence gate (0.55)
+   │                            embed → vector search → confidence gate (0.70)
    │                            → RagPromptBuilder.Build()   ← shared library, runs HERE
    │                            → Gemini generate → { answer w/ [n], sources }
    │                                        │

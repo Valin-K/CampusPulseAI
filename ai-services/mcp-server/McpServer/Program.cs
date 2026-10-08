@@ -17,6 +17,11 @@ builder.Services.AddHttpClient("academicRecords", client =>
     client.BaseAddress = new Uri(builder.Configuration["Services:AcademicRecordsBackend"] ?? "http://localhost:5020");
     client.Timeout = TimeSpan.FromSeconds(30);
 });
+builder.Services.AddHttpClient("campusHousing", client =>
+{
+    client.BaseAddress = new Uri(builder.Configuration["Services:CampusHousingDatabase"] ?? "http://localhost:5093");
+    client.Timeout = TimeSpan.FromSeconds(10);
+});
 builder.Services.AddMcpTools();
 
 var app = builder.Build();
@@ -45,7 +50,8 @@ app.MapGet("/api/mcp/tools", (
     {
         tool.Name,
         tool.Description,
-        tool.InputSchema
+        tool.InputSchema,
+        tool.Owner
     }));
 });
 app.MapPost("/api/mcp/tools/call", async Task<IResult> (
@@ -69,7 +75,17 @@ app.MapPost("/api/mcp/tools/call", async Task<IResult> (
         return Results.NotFound(new { error = $"Tool '{request.Tool}' is not registered." });
     }
 
-    return await tool.ExecuteAsync(request, cancellationToken);
+    var executionRequest = request with
+    {
+        RegisteredTools = tools
+            .Select(candidate => new McpToolDescriptor(
+                candidate.Name,
+                candidate.Owner,
+                candidate.Description,
+                candidate.InputSchema))
+            .ToArray()
+    };
+    return await tool.ExecuteAsync(executionRequest, cancellationToken);
 });
 
 app.Run();

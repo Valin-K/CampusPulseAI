@@ -1,0 +1,176 @@
+@using System.Text.RegularExpressions
+@using Microsoft.AspNetCore.Components.Rendering
+
+@foreach (var block in ParseBlocks(Content))
+{
+    @switch (block)
+    {
+        case HeadingBlock heading:
+            <h3>@RenderInline(heading.Text)</h3>
+            break;
+        case ListBlock list:
+            @if (list.IsOrdered)
+            {
+                <ol>
+                    @foreach (var item in list.Items)
+                    {
+                        <li>@RenderInline(item)</li>
+                    }
+                </ol>
+            }
+            else
+            {
+                <ul>
+                    @foreach (var item in list.Items)
+                    {
+                        <li>@RenderInline(item)</li>
+                    }
+                </ul>
+            }
+            break;
+        case ParagraphBlock paragraph:
+            <p>@RenderInline(paragraph.Text)</p>
+            break;
+    }
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public string Content { get; set; } = string.Empty;
+
+    private static readonly Regex HeadingPattern = new(@"^(#{1,3})\s+(.+)$", RegexOptions.CultureInvariant);
+    private static readonly Regex OrderedItemPattern = new(@"^\d+[.)]\s+(.+)$", RegexOptions.CultureInvariant);
+    private static readonly Regex UnorderedItemPattern = new(@"^[-*+]\s+(.+)$", RegexOptions.CultureInvariant);
+    private static readonly Regex InlinePattern = new(
+        @"(\*\*(?<strong>.+?)\*\*|`(?<code>.+?)`|\*(?<emphasis>.+?)\*)",
+        RegexOptions.CultureInvariant);
+
+    private static IReadOnlyList<MarkdownBlock> ParseBlocks(string content)
+    {
+        var blocks = new List<MarkdownBlock>();
+        var paragraph = new List<string>();
+        List<string>? listItems = null;
+        bool? orderedList = null;
+
+        void FlushParagraph()
+        {
+            if (paragraph.Count > 0)
+            {
+                blocks.Add(new ParagraphBlock(string.Join("\n", paragraph)));
+                paragraph.Clear();
+            }
+        }
+
+        void FlushList()
+        {
+            if (listItems is { Count: > 0 } && orderedList is not null)
+            {
+                blocks.Add(new ListBlock(orderedList.Value, listItems));
+            }
+
+            listItems = null;
+            orderedList = null;
+        }
+
+        foreach (var line in content.ReplaceLineEndings("\n").Split('\n'))
+        {
+            if (string.IsNullOrWhiteSpace(line))
+            {
+                FlushParagraph();
+                FlushList();
+                continue;
+            }
+
+            var heading = HeadingPattern.Match(line);
+            if (heading.Success)
+            {
+                FlushParagraph();
+                FlushList();
+                blocks.Add(new HeadingBlock(heading.Groups[2].Value));
+                continue;
+            }
+
+            var orderedItem = OrderedItemPattern.Match(line);
+            var unorderedItem = UnorderedItemPattern.Match(line);
+            if (orderedItem.Success || unorderedItem.Success)
+            {
+                var isOrdered = orderedItem.Success;
+                if (orderedList != isOrdered)
+                {
+                    FlushParagraph();
+                    FlushList();
+                    orderedList = isOrdered;
+                    listItems = [];
+                }
+
+                listItems!.Add((isOrdered ? orderedItem : unorderedItem).Groups[1].Value);
+                continue;
+            }
+
+            FlushList();
+            paragraph.Add(line);
+        }
+
+        FlushParagraph();
+        FlushList();
+        return blocks;
+    }
+
+    private static RenderFragment RenderInline(string text) => builder =>
+    {
+        var sequence = 0;
+        var index = 0;
+        foreach (Match match in InlinePattern.Matches(text))
+        {
+            if (match.Index > index)
+            {
+                AddTextWithLineBreaks(builder, ref sequence, text[index..match.Index]);
+            }
+
+            if (match.Groups["strong"].Success)
+            {
+                builder.OpenElement(sequence++, "strong");
+                builder.AddContent(sequence++, match.Groups["strong"].Value);
+                builder.CloseElement();
+            }
+            else if (match.Groups["code"].Success)
+            {
+                builder.OpenElement(sequence++, "code");
+                builder.AddContent(sequence++, match.Groups["code"].Value);
+                builder.CloseElement();
+            }
+            else
+            {
+                builder.OpenElement(sequence++, "em");
+                builder.AddContent(sequence++, match.Groups["emphasis"].Value);
+                builder.CloseElement();
+            }
+
+            index = match.Index + match.Length;
+        }
+
+        if (index < text.Length)
+        {
+            AddTextWithLineBreaks(builder, ref sequence, text[index..]);
+        }
+    };
+
+    private static void AddTextWithLineBreaks(RenderTreeBuilder builder, ref int sequence, string text)
+    {
+        var lines = text.Split('\n');
+        for (var index = 0; index < lines.Length; index++)
+        {
+            if (index > 0)
+            {
+                builder.AddMarkupContent(sequence++, "<br />");
+            }
+
+            builder.AddContent(sequence++, lines[index]);
+        }
+    }
+
+    private abstract record MarkdownBlock;
+    private sealed record HeadingBlock(string Text) : MarkdownBlock;
+    private sealed record ListBlock(bool IsOrdered, IReadOnlyList<string> Items) : MarkdownBlock;
+    private sealed record ParagraphBlock(string Text) : MarkdownBlock;
+}

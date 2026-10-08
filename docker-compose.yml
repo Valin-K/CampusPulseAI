@@ -114,6 +114,8 @@ services:
       Services__AcademicRecordsDatabase: http://academicrecords.database:8080
     volumes:
       - campushousing-data:/app/data
+    ports:
+      - "5093:8080"
     healthcheck:
       test: ["CMD-SHELL", "curl --fail --silent http://localhost:8080/health || exit 1"]
       interval: 5s
