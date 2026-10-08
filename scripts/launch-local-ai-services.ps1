@@ -25,12 +25,20 @@ function Start-LocalService {
         [string]$Url
     )
 
+    & dotnet build (Join-Path $repositoryRoot $ProjectPath) --nologo --verbosity quiet
+    if ($LASTEXITCODE -ne 0) {
+        throw "Could not build local AI service $ProjectPath."
+    }
+
     Start-Process -FilePath dotnet -WorkingDirectory $repositoryRoot -WindowStyle Hidden -ArgumentList @(
         'run',
+        '--no-build',
         '--no-launch-profile',
         '--project',
         $ProjectPath,
         '--',
+        '--MultiAgent:Enabled',
+        'true',
         '--urls',
         $Url
     )
@@ -48,6 +56,12 @@ $services = @(
         Url = 'http://0.0.0.0:5267'
         HealthUrl = 'http://localhost:5267/health'
         ServiceName = 'rag'
+    },
+    @{
+        ProjectPath = 'ai-services\multi-agent-server\MultiAgentServer\MultiAgentServer.csproj'
+        Url = 'http://0.0.0.0:5270'
+        HealthUrl = 'http://localhost:5270/health'
+        ServiceName = 'multi-agent'
     }
 )
 
@@ -74,5 +88,5 @@ do {
     Start-Sleep -Seconds 1
 } while ((Get-Date) -lt $deadline)
 
-Write-Error 'The local MCP or RAG server did not become healthy within 90 seconds.'
+Write-Error 'The local MCP, RAG, or Multi-Agent server did not become healthy within 90 seconds.'
 exit 1

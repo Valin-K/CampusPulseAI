@@ -25,6 +25,7 @@ builder.Services.AddHttpClient<IMcpClient, McpClient>(client =>
     client.Timeout = TimeSpan.FromSeconds(30);
 });
 builder.Services.AddAiGateway(builder.Configuration);
+builder.Services.AddMultiAgentCaller(builder.Configuration);
 builder.Services.AddSingleton<ITranscriptPdfGenerator, TranscriptPdfGenerator>();
 builder.Services.AddScoped<GeminiAcademicProgressService>();
 builder.Services.AddScoped<StudentCourseMetadataService>();
@@ -56,5 +57,6 @@ app.UseCors("Frontend");
 
 app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
 app.MapControllers();
+app.MapMultiAgentCaller("academicrecords", "courseManagementDatabase", "/api/courses");
 
 app.Run();

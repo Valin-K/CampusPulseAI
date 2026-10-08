@@ -45,8 +45,10 @@ builder.Services.AddSingleton<RagCitationParser>();
 builder.Services.AddScoped<RagKnowledgeService>();
 builder.Services.AddScoped<IFinancialAidKnowledgeService, FinancialAidKnowledgeService>();
 builder.Services.AddAiGateway(builder.Configuration);
+builder.Services.AddMultiAgentCaller(builder.Configuration);
 
 var app = builder.Build();
+app.MapMultiAgentCaller("financialaidbilling", "billingDatabase", "/api/scholarships");
 
 app.MapOpenApi();
 app.UseCors();
