@@ -46,12 +46,14 @@ builder.Services.AddScoped<IEventRagService, EventKnowledgeService>();
 builder.Services.AddScoped<IEventKnowledgeService, LocalEventAiOrchestrator>();
 
 builder.Services.AddAiGateway(builder.Configuration);
+builder.Services.AddMultiAgentCaller(builder.Configuration);
 
 var app = builder.Build();
 
 app.MapOpenApi();
 app.UseCors();
 app.MapControllers();
+app.MapMultiAgentCaller("eventscheduling", "eventDatabase", "/api/rooms");
 
 app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
 

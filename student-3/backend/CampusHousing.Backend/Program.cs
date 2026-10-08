@@ -11,6 +11,7 @@ builder.Services.AddHttpClient("CampusHousingDatabaseHistory", client => client.
 var academicRecordsUrl = builder.Configuration["Services:AcademicRecordsDatabase"] ?? "http://localhost:5021";
 builder.Services.AddHttpClient("AcademicRecordsDatabase", client => client.BaseAddress = new Uri(academicRecordsUrl.TrimEnd('/') + "/"));
 builder.Services.AddAiGateway(builder.Configuration);
+builder.Services.AddMultiAgentCaller(builder.Configuration);
 builder.Services.AddTransient<CampusHousing.Backend.Services.MaintenanceClassifier>();
 builder.Services.AddHttpClient<IMcpClient, McpClient>(client =>
 {
@@ -41,5 +42,6 @@ app.UseCors();
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapMultiAgentCaller("campushousing", "CampusHousingDatabase", "/api/rooms");
 
 app.Run();

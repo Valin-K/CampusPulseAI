@@ -76,7 +76,7 @@ When the solution is first opened, allow Visual Studio to restore NuGet packages
 5. In the Visual Studio debug target selector, choose **Docker Compose**.
 6. Press **F5** to build the images, start the services, attach the debugger, and launch the configured browser target. Use **Ctrl+F5** to run without the debugger.
 
-The Compose configuration starts the databases, backend APIs, shared AI gateway, and frontend containers. Visual Studio starts MCP and RAG on the host through `scripts\launch-local-ai-services.ps1`; multi-agent routing is not part of this gateway. The frontend URLs are:
+The Compose configuration starts the databases, backend APIs, shared AI gateway, and frontend containers. Visual Studio starts MCP, RAG, and the separate Multi-Agent Server on the host through `scripts\launch-local-ai-services.ps1`. Multi-agent coordination is not part of the Gemini transport gateway. The frontend URLs are:
 
 | Application | URL |
 | --- | --- |
@@ -185,7 +185,7 @@ Set `GEMINI_API_KEY` in the repository-root `.env` (never commit it). Compose in
 - This is a Gemini transport gateway, **not** a multi-agent server, router, or tool executor.
 
 Start the gateway with `docker compose up --build -d ai.gateway`. For terminal-based
-development, also run `.\scripts\launch-local-ai-services.ps1` for MCP and RAG.
+development, also run `.\scripts\launch-local-ai-services.ps1` for MCP, RAG, and Multi-Agent.
 Host services connect to `http://localhost:5269`; Compose backends use `http://ai.gateway:8080`.
 Override `Services__AiGateway` when using another address. Only the gateway configures
 `Gemini__GenerationModel`, `Gemini__EmbeddingModel`, and `Gemini__EmbeddingDimensions`.
@@ -202,6 +202,30 @@ The gateway has no public authentication layer: it is for the trusted Compose ne
 and its host port is bound to loopback only. Do not expose it publicly without
 service authentication and rate limiting. The separate Python developer agentic-loop
 tool below is not part of the application gateway migration.
+
+## Shared local Multi-Agent Server
+
+All five applications expose the same reviewed workflow through **Ask AI > Planner /
+Worker / Reviewer workflow**. Each backend collects its live catalogue before calling
+the host server at `http://localhost:5270`. The agents run sequentially using the
+existing Gemini gateway. No additional model-provider key is required; the gateway
+also accepts `GEMINI_API_KEY` inherited from the Windows user environment.
+
+Generated advice stays a draft until a human explicitly approves, corrects, or
+rejects it. Corrections rerun all three agents, preserving earlier rounds. MCP/RAG
+can be turned off or can explicitly fall back to application evidence when
+unavailable; gateway/model failures do **not** generate fake successful outputs.
+Workflow state and coordination events survive server restarts.
+
+Start the host services with `.\scripts\launch-local-ai-services.ps1`, or run
+`dotnet run --project .\ai-services\multi-agent-server\MultiAgentServer\MultiAgentServer.csproj`.
+Terminal callers use `.\scripts\invoke-multi-agent.ps1`; full setup, API contracts,
+human-review commands, evidence exports, and validation are documented in
+[the Multi-Agent guide](ai-services/multi-agent-server/README.md).
+
+This implementation covers the server and application callers only. Pre-commit
+scans, student CI endpoint workflows, Azure deployment, and developer agentic-loop
+review-mode changes are separate Release 2 tasks.
 
 ## Run and test .NET projects locally
 
