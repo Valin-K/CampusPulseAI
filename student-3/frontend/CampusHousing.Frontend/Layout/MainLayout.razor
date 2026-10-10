@@ -10,6 +10,7 @@
              UserInitials="@(UserContext.IsAdministrator ? "HA" : "JW")"
              HomeHref="http://localhost:8080"
              PortalHref="http://localhost:8080"
+             RequireSignedInUser="true"
              ContextLabel="@ContextLabel">
     <UserSelector>
         <div class="housing-user-selector">
@@ -63,7 +64,10 @@
     </ChildContent>
 </CampusShell>
 
-<CampusAiChat StudentUserId="@UserContext.CurrentUser?.UserId" />
+@if (Account.CurrentUser is not null)
+{
+    <CampusAiChat StudentUserId="@UserContext.CurrentUser?.UserId" />
+}
 
 @code {
     string? selectionErrorMessage;

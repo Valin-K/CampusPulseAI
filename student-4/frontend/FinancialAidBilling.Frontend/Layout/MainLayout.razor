@@ -7,7 +7,8 @@
              UserName="@(UserContext.CurrentUser?.FullName ?? "")"
              UserDetails="@(UserContext.CurrentUser is null ? "" : $"{UserContext.CurrentUser.StudyDescriptor} · {UserContext.CurrentUser.StudentId}")"
              UserInitials="@(UserContext.CurrentUser?.Initials ?? "")"
-             HomeHref="http://localhost:8080">
+             HomeHref="http://localhost:8080"
+             RequireSignedInUser="true">
     <UserSelector>
         @if (!UserContext.IsInitialized)
         {
@@ -52,7 +53,10 @@
     </ChildContent>
 </CampusShell>
 
-<CampusAiChat />
+@if (Account.CurrentUser is not null)
+{
+    <CampusAiChat />
+}
 
 @code {
     protected override async Task OnInitializedAsync()

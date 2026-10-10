@@ -78,6 +78,84 @@
     outline-offset: 3px;
 }
 
+.campus-account-sign-in .account-role-selection {
+    display: grid;
+    gap: 1.25rem;
+}
+
+.campus-account-sign-in .account-role-selection h2 {
+    margin: .2rem 0 .4rem;
+}
+
+.campus-account-sign-in .account-role-selection p {
+    margin-bottom: 0;
+}
+
+.campus-account-sign-in .account-role-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+}
+
+.campus-account-sign-in .account-role-card {
+    min-width: 0;
+    display: grid;
+    justify-items: start;
+    align-content: start;
+    gap: .7rem;
+    padding: 1.35rem;
+    border: 1px solid var(--university-border);
+    border-radius: var(--radius-md);
+    color: var(--university-ink);
+    background: var(--university-surface);
+    text-decoration: none;
+    transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease;
+}
+
+.campus-account-sign-in .account-role-card:hover {
+    transform: translateY(-2px);
+    border-color: var(--university-blue);
+    box-shadow: var(--shadow-sm);
+}
+
+.campus-account-sign-in .account-role-card:focus-visible {
+    outline: 3px solid rgba(23, 105, 170, .28);
+    outline-offset: 3px;
+}
+
+.campus-account-sign-in .account-role-icon {
+    width: 2.75rem;
+    height: 2.75rem;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    color: var(--university-blue);
+    background: var(--university-sky);
+    font-size: 1.2rem;
+    font-weight: 800;
+}
+
+.campus-account-sign-in .account-role-title {
+    color: var(--university-navy);
+    font-size: 1.15rem;
+    font-weight: 800;
+}
+
+.campus-account-sign-in .account-role-description,
+.campus-account-sign-in .account-role-count {
+    color: var(--university-muted);
+    line-height: 1.5;
+}
+
+.campus-account-sign-in .account-role-action {
+    display: flex;
+    gap: .4rem;
+    align-items: center;
+    margin-top: .3rem;
+    color: var(--university-blue);
+    font-weight: 750;
+}
+
 @media (max-width: 620px) {
     .campus-account-sign-in .account-sign-in-hero {
         gap: 1rem;
@@ -90,5 +168,9 @@
 
     .campus-account-sign-in .section-heading > div {
         min-width: 0;
+    }
+
+    .campus-account-sign-in .account-role-grid {
+        grid-template-columns: 1fr;
     }
 }

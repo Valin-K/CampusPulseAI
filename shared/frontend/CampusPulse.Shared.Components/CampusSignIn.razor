@@ -1,4 +1,5 @@
 @page "/login"
+@page "/login/{Role}"
 @layout CampusAccountLayout
 @using System.ComponentModel.DataAnnotations
 @using System.Text.Json
@@ -6,19 +7,21 @@
 @inject CampusAccountService Account
 @inject NavigationManager Navigation
 
-<PageTitle>Sign in | CampusPulse</PageTitle>
+<PageTitle>@(IsRoleView ? $"{RoleName} sign in | CampusPulse" : "Sign in | CampusPulse")</PageTitle>
 
 <div class="campus-account-sign-in">
 <header class="dashboard-hero account-sign-in-hero">
     <div>
         <span class="eyebrow">CampusPulse account</span>
-        <h1>Sign in</h1>
-        <p>Select a student or staff account to continue. This demonstration sign-in does not use passwords.</p>
+        <h1>@(IsRoleView ? $"{RoleName} sign in" : "Choose your account type")</h1>
+        <p>@(IsRoleView
+            ? $"Select a {RoleLabel} account to continue. This demonstration sign-in does not use passwords."
+            : "Choose whether you are signing in as a student or staff member.")</p>
     </div>
     <div class="term-summary">
-        <span>Directory</span>
-        <strong>@Account.Users.Count people</strong>
-        <small>Students and staff</small>
+        <span>@(IsRoleView ? $"{RoleName} accounts" : "Sign-in options")</span>
+        <strong>@(IsRoleView ? RoleUserCount.ToString() : "Choose a role")</strong>
+        <small>@(IsRoleView ? "Available accounts" : $"{StudentCount} students · {StaffCount} staff")</small>
     </div>
 </header>
 
@@ -38,19 +41,43 @@
     <div class="notice notice-error" role="alert">@signInError</div>
 }
 
-<CampusSectionTabs Items="accountTypeTabs" @bind-ActiveKey="activeTab" AriaLabel="Account type" />
-
-@if (creatingAccount)
+@if (!IsRoleView)
+{
+    <section class="surface-card account-role-selection" aria-labelledby="account-role-heading">
+        <div>
+            <span class="eyebrow">Choose access type</span>
+            <h2 id="account-role-heading">How would you like to sign in?</h2>
+            <p class="muted">Choose a role to view its available accounts.</p>
+        </div>
+        <div class="account-role-grid">
+            <a class="account-role-card" href="/login/student">
+                <span class="account-role-icon" aria-hidden="true">S</span>
+                <span class="account-role-title">Student login</span>
+                <span class="account-role-description">Access enrollments, grades, and graduation progress.</span>
+                <span class="account-role-count">@(Account.IsInitialized ? $"{StudentCount} available accounts" : "Loading accounts...")</span>
+                <span class="account-role-action">Continue as a student <span aria-hidden="true">→</span></span>
+            </a>
+            <a class="account-role-card" href="/login/staff">
+                <span class="account-role-icon" aria-hidden="true">F</span>
+                <span class="account-role-title">Staff login</span>
+                <span class="account-role-description">Access grading and registrar tools.</span>
+                <span class="account-role-count">@(Account.IsInitialized ? $"{StaffCount} available accounts" : "Loading accounts...")</span>
+                <span class="account-role-action">Continue as staff <span aria-hidden="true">→</span></span>
+            </a>
+        </div>
+    </section>
+}
+else if (creatingAccount)
 {
     <section class="surface-card account-registration-panel">
         <div class="section-heading">
             <div>
-                <span class="eyebrow">New @(IsStudentTab ? "student" : "staff")</span>
-                <h2>@(IsStudentTab ? "Create a student account" : "Create a staff account")</h2>
+                <span class="eyebrow">New @RoleLabel</span>
+                <h2>Create a @RoleLabel account</h2>
             </div>
             <button type="button" class="button button-secondary" @onclick="() => creatingAccount = false">Back to sign in</button>
         </div>
-        @if (IsStudentTab)
+        @if (IsStudentView)
         {
             <EditForm Model="studentRegistration" OnValidSubmit="CreateStudentAsync">
                 <DataAnnotationsValidator />
@@ -100,10 +127,13 @@ else
     <section class="surface-card table-panel account-directory-panel">
         <div class="section-heading">
             <div>
-                <span class="eyebrow">@(IsStudentTab ? "Students" : "Staff")</span>
-                <h2>@(IsStudentTab ? "Student directory" : "Staff directory")</h2>
+                <span class="eyebrow">@RoleName accounts</span>
+                <h2>@RoleName sign in</h2>
             </div>
-            <button type="button" class="button button-primary" @onclick="StartRegistration">+ Create @(IsStudentTab ? "student" : "staff") account</button>
+            <div class="button-row">
+                <a class="button button-secondary" href="/login">← Change account type</a>
+                <button type="button" class="button button-primary" @onclick="StartRegistration">+ Create @RoleLabel account</button>
+            </div>
         </div>
 
         <div class="form-stack" style="max-width: 24rem; margin-bottom: 1rem;">
@@ -119,7 +149,7 @@ else
         }
         else if (FilteredUsers.Count == 0)
         {
-            <p class="muted">No @(IsStudentTab ? "students" : "staff members") match the current filter.</p>
+            <p class="muted">No @RoleLabel accounts match the current filter.</p>
         }
         else
         {
@@ -162,13 +192,9 @@ else
 </div>
 
 @code {
-    private static readonly IReadOnlyList<CampusTabItem> accountTypeTabs =
-    [
-        new("students", "Students", "Student accounts"),
-        new("staff", "Staff", "Staff accounts")
-    ];
+    [Parameter]
+    public string? Role { get; set; }
 
-    private string activeTab = "students";
     private string filter = string.Empty;
     private bool creatingAccount;
     private bool submitting;
@@ -179,14 +205,21 @@ else
     private StudentRegistrationModel studentRegistration = new();
     private StaffRegistrationModel staffRegistration = new();
 
-    private bool IsStudentTab => activeTab == "students";
+    private bool IsStudentView => string.Equals(Role, "student", StringComparison.OrdinalIgnoreCase);
+    private bool IsStaffView => string.Equals(Role, "staff", StringComparison.OrdinalIgnoreCase);
+    private bool IsRoleView => IsStudentView || IsStaffView;
+    private string RoleLabel => IsStudentView ? "student" : "staff";
+    private string RoleName => IsStudentView ? "Student" : "Staff";
+    private int StudentCount => Account.Users.Count(CampusAccountService.IsStudent);
+    private int StaffCount => Account.Users.Count(CampusAccountService.IsStaff);
+    private int RoleUserCount => IsStudentView ? StudentCount : StaffCount;
 
     private List<CampusAccountUser> FilteredUsers
     {
         get
         {
             IEnumerable<CampusAccountUser> users = Account.Users.Where(user =>
-                IsStudentTab ? CampusAccountService.IsStudent(user) : CampusAccountService.IsStaff(user));
+                IsStudentView ? CampusAccountService.IsStudent(user) : CampusAccountService.IsStaff(user));
             if (!string.IsNullOrWhiteSpace(filter))
             {
                 var term = filter.Trim();
@@ -210,6 +243,14 @@ else
             };
 
             return sorted.ThenBy(user => user.UserId).ToList();
+        }
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (!string.IsNullOrWhiteSpace(Role) && !IsRoleView)
+        {
+            Navigation.NavigateTo("/login", replace: true);
         }
     }
 

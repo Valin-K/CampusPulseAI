@@ -7,6 +7,7 @@
              UserName=""
              HomeHref="http://localhost:8080"
              PortalHref="http://localhost:8080"
+             RequireSignedInUser="true"
              ContextLabel="@ContextLabel">
     <UserSelector>
         <div class="course-user-selector">
@@ -62,7 +63,10 @@
     </ChildContent>
 </CampusShell>
 
-<CampusAiChat />
+@if (Account.CurrentUser is not null)
+{
+    <CampusAiChat />
+}
 
 @code {
     string? selectionErrorMessage;

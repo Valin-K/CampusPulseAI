@@ -8,8 +8,9 @@
              UserName="@(Account.CurrentUser?.FullName ?? "CampusPulse account")"
              UserDetails="@(Account.CurrentUser is null ? "Student and staff sign-in" : $"{Account.CurrentUser.Role} · {Account.CurrentUser.ExternalId}")"
              UserInitials="@(Account.CurrentUser?.Initials ?? "CP")"
-             HomeHref="/"
+             HomeHref="http://localhost:8080"
              PortalHref="http://localhost:8080"
+             RequireSignedInUser="@(!IsLoginPage)"
              ShowAccountActions="@ShowAccountActions"
              ContextLabel="@(Account.CurrentUser is null ? "Sign in to CampusPulse" : $"Signed in as {Account.CurrentUser.Role}")">
     <ChildContent>
@@ -18,10 +19,17 @@
 </CampusShell>
 
 @code {
-    private bool ShowAccountActions => !string.Equals(
-        Navigation.ToBaseRelativePath(Navigation.Uri).Split('?', 2)[0].Trim('/'),
-        "login",
-        StringComparison.OrdinalIgnoreCase);
+    private bool IsLoginPage
+    {
+        get
+        {
+            var path = Navigation.ToBaseRelativePath(Navigation.Uri).Split('?', 2)[0].Trim('/');
+            return string.Equals(path, "login", StringComparison.OrdinalIgnoreCase)
+                || path.StartsWith("login/", StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    private bool ShowAccountActions => !IsLoginPage;
 
     protected override void OnInitialized()
     {

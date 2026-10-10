@@ -7,7 +7,8 @@
              UserName="@userName"
              UserDetails="@userDetails"
              UserInitials="@userInitials"
-             HomeHref="http://localhost:8080">
+             HomeHref="http://localhost:8080"
+             RequireSignedInUser="true">
     <UserSelector>
         <div class="event-user-selector">
             @if (!CurrentUser.IsInitialized)
@@ -46,9 +47,11 @@
     </ChildContent>
 </CampusShell>
 
-<AssistantWidget />
-
-<CampusAiChat />
+@if (Account.CurrentUser is not null)
+{
+    <AssistantWidget />
+    <CampusAiChat />
+}
 
 @code {
     private string userName = "Loading…";

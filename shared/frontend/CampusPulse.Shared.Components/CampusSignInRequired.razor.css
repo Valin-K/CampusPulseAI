@@ -1,0 +1,12 @@
+.campus-sign-in-required {
+    max-width: 48rem;
+    margin: clamp(1.5rem, 6vh, 4rem) auto;
+}
+
+.campus-sign-in-required h1 {
+    margin: .4rem 0 .75rem;
+}
+
+.campus-sign-in-required .notice {
+    margin-bottom: 1rem;
+}
