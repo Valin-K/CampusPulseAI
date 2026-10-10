@@ -1,0 +1,11 @@
+.workflow-panel { border-bottom: 1px solid #d9e2ec; padding: .75rem; }
+.workflow-panel summary { cursor: pointer; font-weight: 600; }
+.workflow-panel label { display: block; margin: .5rem 0; }
+.workflow-panel textarea, .workflow-panel select, .workflow-panel input:not([type=checkbox]) {
+    display: block; width: 100%; box-sizing: border-box; padding: .4rem;
+}
+.workflow-panel textarea { min-height: 4rem; }
+.workflow-panel button { margin: .25rem; padding: .4rem; }
+.workflow-panel pre { max-height: 12rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+.workflow-panel small, .workflow-output { overflow-wrap: anywhere; white-space: pre-wrap; }
+.workflow-error { color: #a02121; }

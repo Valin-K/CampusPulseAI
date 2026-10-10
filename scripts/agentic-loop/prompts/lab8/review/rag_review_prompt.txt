@@ -1,0 +1,16 @@
+Review RAG output quality using only the supplied evidence.
+
+Check:
+- retrieval quality
+- P@5 and R@5 interpretation
+- citation quality
+- negative-query abstention
+- cosine-similarity calibration claims
+- unsupported claims
+
+Return exactly:
+Risk:
+Correction:
+Retest:
+
+Maximum 35 words.

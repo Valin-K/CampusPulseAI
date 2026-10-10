@@ -9,6 +9,7 @@
 
   <ItemGroup>
 	<PackageReference Include="Microsoft.AspNetCore.Components.Web" />
+    <ProjectReference Include="..\..\backend\CampusPulse.Shared.MultiAgent\CampusPulse.Shared.MultiAgent.csproj" />
   </ItemGroup>
 
 </Project>

@@ -70,7 +70,6 @@ builder.Services.AddHttpClient<ICourseCatalogueClient, CourseCatalogueClient>(
         client.Timeout = TimeSpan.FromSeconds(5);
     });
 builder.Services.AddScoped<DatabaseApiProxy>();
-builder.Services.AddScoped<ICourseQuestionService, GeminiCourseQuestionService>();
 builder.Services.AddHttpClient(CourseKnowledgeService.CatalogueClientName, client =>
 {
     client.BaseAddress = new Uri(courseManagementDatabaseAddress, UriKind.Absolute);
@@ -94,6 +93,7 @@ builder.Services.AddScoped<CampusPulse.Shared.Rag.Assistant.RagKnowledgeService>
 builder.Services.AddScoped<ICourseRagService, CourseKnowledgeService>();
 builder.Services.AddScoped<ICourseKnowledgeService, LocalCourseAiOrchestrator>();
 builder.Services.AddAiGateway(builder.Configuration);
+builder.Services.AddMultiAgentCaller(builder.Configuration);
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
@@ -116,6 +116,7 @@ MapDatabaseProxy(app, "/api/courses");
 MapDatabaseProxy(app, "/api/prerequisites");
 MapDatabaseProxy(app, "/api/faculty-assignments");
 app.MapControllers();
+app.MapMultiAgentCaller("coursemanagement", CourseKnowledgeService.CatalogueClientName, "/api/courses");
 app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
 
 await app.RunAsync();

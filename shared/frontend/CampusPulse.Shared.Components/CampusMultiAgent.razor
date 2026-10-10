@@ -1,0 +1,212 @@
+@using System.Net.Http.Json
+@using System.Text.Json
+@using CampusPulse.Shared.MultiAgent
+@implements IDisposable
+@inject HttpClient Http
+
+<details class="workflow-panel">
+    <summary>Planner / Worker / Reviewer workflow</summary>
+    <p>Read-only advice from this service's live catalogue. A human must approve, correct, or reject every draft.</p>
+    @if (error is not null)
+    {
+        <p role="alert" class="workflow-error">@error</p>
+    }
+    @if (workflow is not null)
+    {
+        <p role="status"><strong>Status: @workflow.Status</strong> - Round @workflow.Round, version @workflow.Version</p>
+    }
+    <form @onsubmit="StartAsync" @onsubmit:preventDefault="true">
+        <label>Task <textarea @bind="task" @bind:event="oninput" maxlength="4000" required disabled="@busy"></textarea></label>
+        <label>Additional evidence (optional, unverified)
+            <textarea @bind="additionalEvidence" @bind:event="oninput" maxlength="20000" disabled="@busy"></textarea>
+        </label>
+        <label><input type="checkbox" @bind="useMcp" disabled="@busy" /> Use MCP evidence</label>
+        <label><input type="checkbox" @bind="useRag" disabled="@busy" /> Retrieve RAG sources</label>
+        <label><input type="checkbox" @bind="allowFallback" disabled="@busy" /> Allow application-evidence fallback if MCP/RAG is unavailable</label>
+        <button type="submit" disabled="@(busy || string.IsNullOrWhiteSpace(task))">Start reviewed workflow</button>
+    </form>
+    <button type="button" @onclick="LoadHistoryAsync" disabled="@busy">Load workflow history</button>
+    @if (history.Count > 0)
+    {
+        <label>Previous workflow
+            <select @onchange="SelectWorkflowAsync" disabled="@busy">
+                <option value="">Select a workflow</option>
+                @foreach (var item in history)
+                {
+                    <option value="@item.Id">@item.CreatedAtUtc.ToLocalTime().ToString("g") - @item.Status - @item.Task</option>
+                }
+            </select>
+        </label>
+    }
+    @if (workflow is not null)
+    {
+        <section aria-live="polite">
+            <small>Workflow @workflow.Id</small>
+            @if (workflow.Status == WorkflowStatus.Running)
+            {
+                <p>The agents are working. Progress is saved by the server; you can reopen it from history.</p>
+                <button type="button" @onclick="ResumeAsync" disabled="@busy">Refresh progress</button>
+            }
+            @if (workflow.Error is not null) { <p role="alert" class="workflow-error">@workflow.Error</p> }
+            @foreach (var dependency in workflow.Dependencies)
+            {
+                <p><strong>@dependency.Service: @dependency.Status</strong> - @dependency.Detail</p>
+            }
+            @foreach (var agent in workflow.Agents)
+            {
+                <details open="@(agent.Round == workflow.Round)">
+                    <summary>@agent.Agent - round @agent.Round - @agent.Model</summary>
+                    @if (agent.Plan is { } plan)
+                    {
+                        <p>@plan.Objective</p>
+                        <ol>@foreach (var step in plan.Steps) { <li>@step</li> }</ol>
+                        <p>Evidence required: @string.Join("; ", plan.EvidenceRequired)</p>
+                    }
+                    @if (agent.Work is { } work)
+                    {
+                        <p class="workflow-output">@work.Output</p>
+                        <p>Evidence used: @string.Join(", ", work.EvidenceUsed)</p>
+                        <ul>@foreach (var limitation in work.Limitations) { <li>@limitation</li> }</ul>
+                    }
+                    @if (agent.Review is { } review)
+                    {
+                        <p>Reviewer recommendation: <strong>@review.Recommendation</strong> (not human approval)</p>
+                        <p>Evidence checked: @string.Join(", ", review.EvidenceChecked)</p>
+                        <p>Risks: @string.Join("; ", review.Risks)</p>
+                        <p>Corrections: @string.Join("; ", review.Corrections)</p>
+                        <p>Retest: @string.Join("; ", review.Retest)</p>
+                    }
+                </details>
+            }
+            <details>
+                <summary>Source evidence (@workflow.Evidence.Count)</summary>
+                @foreach (var item in workflow.Evidence)
+                {
+                    <h4>@item.Id - @item.Source</h4>
+                    <pre>@item.Content</pre>
+                }
+            </details>
+            @foreach (var decision in workflow.HumanReviews)
+            {
+                <p>Human @decision.Decision by @decision.Reviewer, round @decision.Round: @decision.Comments</p>
+            }
+            @if (workflow.Status == WorkflowStatus.AwaitingReview)
+            {
+                <label>Human reviewer name <input @bind="reviewer" @bind:event="oninput" maxlength="100" disabled="@busy" /></label>
+                <label>Review comments / correction instructions
+                    <textarea @bind="comments" @bind:event="oninput" maxlength="4000" disabled="@busy"></textarea>
+                </label>
+                <button type="button" @onclick='() => ReviewAsync("approve")' disabled="@(busy || string.IsNullOrWhiteSpace(reviewer))">Approve</button>
+                <button type="button" @onclick='() => ReviewAsync("correct")'
+                        disabled="@(busy || string.IsNullOrWhiteSpace(reviewer) || string.IsNullOrWhiteSpace(comments))">Correct and rerun all agents</button>
+                <button type="button" @onclick='() => ReviewAsync("reject")'
+                        disabled="@(busy || string.IsNullOrWhiteSpace(reviewer) || string.IsNullOrWhiteSpace(comments))">Reject</button>
+            }
+            <a href="@EvidenceUrl" target="_blank" rel="noopener">Open workflow and coordination audit evidence (JSON)</a>
+        </section>
+    }
+</details>
+
+@code {
+    private readonly CancellationTokenSource lifetime = new();
+    private Workflow? workflow;
+    private IReadOnlyList<Workflow> history = [];
+    private string task = "", additionalEvidence = "", reviewer = "", comments = "";
+    private string? error;
+    private bool useMcp = true, useRag = true, allowFallback = true, busy;
+    private string EvidenceUrl => new Uri(Http.BaseAddress!, $"/api/multi-agent/workflows/{workflow!.Id}/evidence").ToString();
+
+    private Task StartAsync() => ExecuteAsync(async () =>
+    {
+        using var response = await Http.PostAsJsonAsync("/api/multi-agent/workflows",
+            new WorkflowStartRequest(task, additionalEvidence, useMcp, useRag, allowFallback), lifetime.Token);
+        workflow = await ReadAsync<Workflow>(response);
+        comments = "";
+        await PollAsync();
+    });
+
+    private Task ReviewAsync(string decision) => ExecuteAsync(async () =>
+    {
+        using var response = await Http.PostAsJsonAsync($"/api/multi-agent/workflows/{workflow!.Id}/review",
+            new HumanReviewRequest(decision, reviewer, comments, workflow.Version), lifetime.Token);
+        workflow = await ReadAsync<Workflow>(response);
+        await PollAsync();
+    });
+
+    private Task LoadHistoryAsync() => ExecuteAsync(async () =>
+    {
+        using var response = await Http.GetAsync("/api/multi-agent/workflows", lifetime.Token);
+        history = await ReadAsync<List<Workflow>>(response);
+    });
+
+    private Task SelectWorkflowAsync(ChangeEventArgs args)
+    {
+        if (!Guid.TryParse(args.Value?.ToString(), out var id)) return Task.CompletedTask;
+        return ExecuteAsync(async () =>
+        {
+            workflow = await GetWorkflowAsync(id);
+            await PollAsync();
+        });
+    }
+
+    private Task ResumeAsync() => ExecuteAsync(async () =>
+    {
+        workflow = await GetWorkflowAsync(workflow!.Id);
+        await PollAsync();
+    });
+
+    private async Task PollAsync()
+    {
+        var deadline = DateTimeOffset.UtcNow.AddMinutes(6);
+        while (workflow?.Status == WorkflowStatus.Running && DateTimeOffset.UtcNow < deadline)
+        {
+            await InvokeAsync(StateHasChanged);
+            await Task.Delay(TimeSpan.FromSeconds(2), lifetime.Token);
+            workflow = await GetWorkflowAsync(workflow.Id);
+        }
+        if (workflow?.Status == WorkflowStatus.Running)
+            error = "The workflow is still queued or running. Refresh progress or reopen it from history later.";
+    }
+
+    private async Task<Workflow> GetWorkflowAsync(Guid id)
+    {
+        using var response = await Http.GetAsync($"/api/multi-agent/workflows/{id}", lifetime.Token);
+        return await ReadAsync<Workflow>(response);
+    }
+
+    private async Task<T> ReadAsync<T>(HttpResponseMessage response)
+    {
+        if (!response.IsSuccessStatusCode)
+        {
+            var text = await response.Content.ReadAsStringAsync(lifetime.Token);
+            using var problem = JsonDocument.Parse(text);
+            var root = problem.RootElement;
+            var message = root.TryGetProperty("title", out var title) ? title.GetString()
+                : root.TryGetProperty("error", out var detail) ? detail.GetString() : null;
+            throw new HttpRequestException(message ?? $"Workflow request failed (HTTP {(int)response.StatusCode}).");
+        }
+        return await response.Content.ReadFromJsonAsync<T>(lifetime.Token)
+            ?? throw new JsonException("The workflow API returned an empty response.");
+    }
+
+    private async Task ExecuteAsync(Func<Task> action)
+    {
+        if (busy) return;
+        busy = true;
+        error = null;
+        try { await action(); }
+        catch (Exception exception) when (exception is HttpRequestException or JsonException or OperationCanceledException)
+        {
+            if (!lifetime.IsCancellationRequested)
+                error = exception is OperationCanceledException
+                    ? "The request timed out. Reload workflow history before retrying." : exception.Message;
+        }
+        finally { busy = false; }
+    }
+
+    public void Dispose()
+    {
+        lifetime.Cancel();
+        lifetime.Dispose();
+    }
+}

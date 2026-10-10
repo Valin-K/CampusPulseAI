@@ -316,7 +316,10 @@ public sealed class HousingControllerTests
     {
         var controller = new HousingController(
             new TestHttpClientFactory(client),
-            new MaintenanceClassifier(new UnavailableGateway(), NullLogger<MaintenanceClassifier>.Instance));
+            new MaintenanceClassifier(
+                new UnavailableGateway(),
+                new TestHttpClientFactory(client),
+                NullLogger<MaintenanceClassifier>.Instance));
         var context = new DefaultHttpContext();
         if (administrator) context.Request.Headers["X-Housing-Role"] = "Administrator";
         if (studentId is not null) context.Request.Headers["X-Housing-User"] = studentId;
@@ -326,7 +329,18 @@ public sealed class HousingControllerTests
 
     private sealed class TestHttpClientFactory(HttpClient client) : IHttpClientFactory
     {
-        public HttpClient CreateClient(string name) => client;
+        public HttpClient CreateClient(string name) => name == "CampusHousingDatabaseHistory"
+            ? new HttpClient(new EmptyHistoryHandler()) { BaseAddress = client.BaseAddress }
+            : client;
+
+        private sealed class EmptyHistoryHandler : HttpMessageHandler
+        {
+            protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
+                Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = JsonContent.Create(Array.Empty<object>())
+                });
+        }
     }
 
     private sealed class UnavailableGateway : IAiGatewayClient
