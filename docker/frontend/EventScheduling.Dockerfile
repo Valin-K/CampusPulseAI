@@ -12,5 +12,7 @@ RUN dotnet publish "./EventScheduling.Frontend.csproj" -c $BUILD_CONFIGURATION -
 FROM nginx:alpine AS final
 WORKDIR /usr/share/nginx/html
 COPY --from=build /app/publish/wwwroot .
-COPY student-5/frontend/EventScheduling.Frontend/nginx.conf /etc/nginx/conf.d/default.conf
+ENV BACKEND_HOST=eventscheduling.backend
+ENV BACKEND_PORT=8080
+COPY student-5/frontend/EventScheduling.Frontend/nginx.conf.template /etc/nginx/templates/default.conf.template
 EXPOSE 80
