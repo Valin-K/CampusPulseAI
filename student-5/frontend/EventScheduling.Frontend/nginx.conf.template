@@ -6,20 +6,9 @@ server {
     root   /usr/share/nginx/html;
     index  index.html;
 
-    # Proxies API calls to the backend so the browser only ever talks to this
-    # frontend's own origin. BACKEND_HOST is the backend's cloud/compose
-    # service name; it is substituted in by the nginx image's built-in
-    # envsubst templating at container start. The backend is resolved via a
-    # variable (not a bare proxy_pass host) so nginx defers DNS lookup to
-    # request time instead of crashing at startup if the backend isn't
-    # resolvable yet (e.g. during a cold start).
     resolver 127.0.0.11 valid=10s;
 
     location /api/ {
-        # proxy_pass with a variable disables nginx's normal location-prefix
-        # URI rewriting, so the upstream URL is built explicitly from the
-        # original request URI (path + query string) instead of relying on
-        # an implicit rewrite.
         set $backend_upstream http://${BACKEND_HOST}:${BACKEND_PORT};
         proxy_pass $backend_upstream$request_uri;
         proxy_set_header Host $host;
