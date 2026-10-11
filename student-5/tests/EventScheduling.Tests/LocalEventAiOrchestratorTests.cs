@@ -7,6 +7,7 @@ using CampusPulse.Shared.Rag.Assistant;
 using EventScheduling.Backend.Models;
 using EventScheduling.Backend.Services;
 using CampusPulse.Shared.Ai;
+using Microsoft.Extensions.Configuration;
 
 namespace EventScheduling.Tests;
 
@@ -136,7 +137,8 @@ public sealed class LocalEventAiOrchestratorTests
     }
 
     private static LocalEventAiOrchestrator CreateService(
-        HttpMessageHandler gemini, IMcpClient mcp, IEventRagService rag, HttpMessageHandler? database)
+        HttpMessageHandler gemini, IMcpClient mcp, IEventRagService rag, HttpMessageHandler? database,
+        IConfiguration? configuration = null)
     {
         var factory = new NamedHttpClientFactory(new Dictionary<string, HttpMessageHandler>
         {
@@ -147,7 +149,7 @@ public sealed class LocalEventAiOrchestratorTests
         });
 
         var gateway = new AiGatewayClient(new HttpClient(gemini) { BaseAddress = new Uri("https://gateway.test/") });
-        return new LocalEventAiOrchestrator(factory, gateway, mcp, rag);
+        return new LocalEventAiOrchestrator(factory, gateway, mcp, rag, configuration ?? new ConfigurationManager());
     }
 
     private static KnowledgeQuestionRequest Request(string question) => new() { Question = question };
