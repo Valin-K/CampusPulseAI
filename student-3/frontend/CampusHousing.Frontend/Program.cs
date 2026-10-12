@@ -9,7 +9,10 @@ builder.RootComponents.Add<HeadOutlet>("head::after");
 builder.Services.AddScoped<HousingUserContext>();
 builder.Services.AddScoped<HousingRoleHandler>();
 
-var backendUrl = builder.Configuration["BackendUrl"] ?? "http://localhost:5083";
+var configuredBackendUrl = builder.Configuration["BackendUrl"];
+var backendUrl = string.IsNullOrWhiteSpace(configuredBackendUrl)
+    ? builder.HostEnvironment.BaseAddress
+    : configuredBackendUrl;
 builder.Services.AddScoped(sp =>
 {
     var handler = sp.GetRequiredService<HousingRoleHandler>();
