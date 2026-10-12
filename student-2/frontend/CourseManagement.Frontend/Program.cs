@@ -7,8 +7,12 @@ var builder = WebAssemblyHostBuilder.CreateDefault(args);
 builder.RootComponents.Add<App>("#app");
 builder.RootComponents.Add<HeadOutlet>("head::after");
 
-var apiBaseAddress = builder.Configuration["CourseManagementApi:BaseAddress"]
-    ?? throw new InvalidOperationException("Course Management API base address is not configured.");
+// Empty/missing BaseAddress (e.g. the cloud Production build) falls back to this app's own
+// origin, where nginx proxies /api/ to the real backend.
+var configuredApiBaseAddress = builder.Configuration["CourseManagementApi:BaseAddress"];
+var apiBaseAddress = string.IsNullOrWhiteSpace(configuredApiBaseAddress)
+    ? builder.HostEnvironment.BaseAddress
+    : configuredApiBaseAddress;
 builder.Services.AddScoped(_ => new HttpClient
 {
     BaseAddress = new Uri(apiBaseAddress, UriKind.Absolute)
