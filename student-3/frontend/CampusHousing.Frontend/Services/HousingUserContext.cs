@@ -35,7 +35,8 @@ public sealed class HousingUserContext(IJSRuntime js, NavigationManager navigati
 
         try
         {
-            var backendUrl = configuration["BackendUrl"] ?? "http://localhost:5083";
+            var configuredBackendUrl = configuration["BackendUrl"];
+            var backendUrl = string.IsNullOrWhiteSpace(configuredBackendUrl) ? navigation.BaseUri : configuredBackendUrl;
             using var http = new HttpClient { BaseAddress = new Uri(backendUrl.TrimEnd('/') + "/") };
             var directory = await http.GetFromJsonAsync<List<HousingDirectoryUser>>("api/housing/users");
             Users = (directory ?? [])

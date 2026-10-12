@@ -13,5 +13,7 @@ RUN dotnet publish "./CourseManagement.Frontend.csproj" -c $BUILD_CONFIGURATION 
 FROM nginx:alpine AS final
 WORKDIR /usr/share/nginx/html
 COPY --from=build /app/publish/wwwroot .
-COPY ["student-2/frontend/CourseManagement.Frontend/nginx.conf", "/etc/nginx/conf.d/default.conf"]
+ENV BACKEND_HOST=coursemanagement.backend
+ENV BACKEND_PORT=8080
+COPY ["student-2/frontend/CourseManagement.Frontend/nginx.conf.template", "/etc/nginx/templates/default.conf.template"]
 EXPOSE 80
