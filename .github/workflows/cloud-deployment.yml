@@ -32,6 +32,10 @@ concurrency:
   # already-outdated deploy first.
   cancel-in-progress: true
 
+permissions:
+  contents: read
+  pull-requests: read
+
 jobs:
   student-1:
     uses: ./.github/workflows/student-1-ci.yml
