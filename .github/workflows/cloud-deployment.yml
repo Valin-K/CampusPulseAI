@@ -28,9 +28,6 @@ on:
 
 concurrency:
   group: cloud-deployment
-  # A newer manual run supersedes an older queued one instead of wastefully finishing an
-  # already-outdated deploy first.
-  cancel-in-progress: true
 
 permissions:
   contents: read
