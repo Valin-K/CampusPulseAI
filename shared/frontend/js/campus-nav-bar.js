@@ -15,7 +15,7 @@ window.campusPulseAccountSession = {
 
 const campusAuthSessionKey = 'campuspulse.auth.session';
 const legacyCampusAuthSessionKey = 'campuspulse.demo-auth.session';
-const campusLogoutPorts = ['8080', '8081', '8082', '8083', '8084', '8085', '5062', '5186', '5254', '5128', '5236'];
+const campusLogoutPorts = ['8080', '8081', '8082', '8083', '8084', '8085'];
 const campusSpaPorts = new Set([
     '8080', '8081', '8082', '8083', '8084', '8085',
     '5062', '5186', '5254', '5128', '5236'
