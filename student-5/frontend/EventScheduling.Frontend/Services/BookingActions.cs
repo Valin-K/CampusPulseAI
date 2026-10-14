@@ -1,5 +1,4 @@
 using EventScheduling.Frontend.Models;
-using Microsoft.JSInterop;
 
 namespace EventScheduling.Frontend.Services;
 
@@ -52,26 +51,11 @@ public static class BookingActions
     }
 
     public static Task<BookingResult> RunAsync(
-        EventSchedulingApiClient api, IJSRuntime js, BookingResponse booking, BookingCardAction action) =>
+        EventSchedulingApiClient api, BookingResponse booking, BookingCardAction action) =>
         action.Kind switch
         {
-            BookingActionKind.Return => ReturnWithNoteAsync(api, js, booking),
+            BookingActionKind.Return => api.ReturnBookingAsync(booking.Id),
             BookingActionKind.End => api.EndBookingAsync(booking.Id),
             _ => api.CancelBookingAsync(booking)
         };
-
-    private static async Task<BookingResult> ReturnWithNoteAsync(
-        EventSchedulingApiClient api, IJSRuntime js, BookingResponse booking)
-    {
-        string? note = null;
-        try
-        {
-            note = await js.InvokeAsync<string?>("prompt", "Note on the equipment's condition (optional):");
-        }
-        catch (JSException)
-        {
-        }
-
-        return await api.ReturnBookingAsync(booking.Id, note);
-    }
 }

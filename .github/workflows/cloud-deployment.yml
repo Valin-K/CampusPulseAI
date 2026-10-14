@@ -1,0 +1,179 @@
+name: Cloud Deployment
+
+# Deploys the integrated application to Azure, only after every student's CI and the
+# integration CI have passed (via `needs:` on reusable workflows - not `workflow_run`, which
+# only waits for one of them, not all). See docs/release-2/cloud-deployment-plan.md.
+#
+# Prerequisites this workflow assumes are already set up (Phase 0, not done by this file):
+#   - AZURE_CLIENT_ID / AZURE_TENANT_ID / AZURE_SUBSCRIPTION_ID repo secrets, from an OIDC
+#     federated credential - no stored Azure password/secret exists anywhere.
+#   - A 'production' GitHub Environment (used below so the Azure login step is reviewable).
+# GHCR push needs no extra secret - just the built-in GITHUB_TOKEN with packages: write.
+
+on:
+  # Manual trigger only for now, while the deployment is being proven out - every merge to
+  # master would otherwise redeploy on every PR, including unrelated ones. Switch this to
+  # `push: branches: [master]` (see git history for the exact block) once the team is
+  # confident a merge should always redeploy automatically.
+  workflow_dispatch:
+    inputs:
+      enable_ai:
+        description: 'Deploy with AI-Mode/MCP/RAG/Multi-Agent enabled (bonus profile). Leave off for the required baseline.'
+        type: boolean
+        default: false
+      warm_up:
+        description: 'Set minReplicas to 1 on every app (showcase/marking window). Leave off otherwise.'
+        type: boolean
+        default: false
+
+concurrency:
+  group: cloud-deployment
+  # A newer manual run supersedes an older queued one instead of wastefully finishing an
+  # already-outdated deploy first.
+  cancel-in-progress: true
+
+jobs:
+  student-1:
+    uses: ./.github/workflows/student-1-ci.yml
+    secrets: inherit
+  student-2:
+    uses: ./.github/workflows/student-2-ci.yml
+    secrets: inherit
+  student-3:
+    uses: ./.github/workflows/student-3.yml
+    secrets: inherit
+  student-4:
+    uses: ./.github/workflows/student-4-ci.yml
+    secrets: inherit
+  student-5:
+    uses: ./.github/workflows/student-5-ci.yml
+    secrets: inherit
+  integration-ci:
+    uses: ./.github/workflows/integration-ci.yml
+    secrets: inherit
+
+  prepare:
+    needs: [student-1, student-2, student-3, student-4, student-5, integration-ci]
+    runs-on: ubuntu-latest
+    outputs:
+      owner: ${{ steps.vars.outputs.owner }}
+      tag: ${{ steps.vars.outputs.tag }}
+    steps:
+      - id: vars
+        run: |
+          # GHCR image paths must be lowercase; the repo owner isn't guaranteed to be.
+          echo "owner=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+          echo "tag=${{ github.sha }}" >> "$GITHUB_OUTPUT"
+
+  build-and-push:
+    needs: prepare
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - app: academicrecords-db
+            dockerfile: student-1/database/AcademicRecords.Database/Dockerfile
+          - app: academicrecords-api
+            dockerfile: student-1/backend/AcademicRecords.Backend/Dockerfile
+          - app: academicrecords-web
+            dockerfile: docker/frontend/AcademicRecords.Dockerfile
+          - app: coursemgmt-db
+            dockerfile: student-2/database/CourseManagement.Database/Dockerfile
+          - app: coursemgmt-api
+            dockerfile: student-2/backend/CourseManagement.Backend/Dockerfile
+          - app: coursemgmt-web
+            dockerfile: student-2/frontend/CourseManagement.Frontend/Dockerfile
+          - app: campushousing-db
+            dockerfile: student-3/database/CampusHousing.Database/Dockerfile
+          - app: campushousing-api
+            dockerfile: student-3/backend/CampusHousing.Backend/Dockerfile
+          - app: campushousing-web
+            dockerfile: docker/frontend/CampusHousing.Dockerfile
+          - app: finaid-db
+            dockerfile: student-4/database/FinancialAidBilling.Database/Dockerfile
+          - app: finaid-api
+            dockerfile: student-4/backend/FinancialAidBilling.Backend/Dockerfile
+          - app: finaid-web
+            dockerfile: docker/frontend/FinancialAidBilling.Dockerfile
+          - app: eventscheduling-db
+            dockerfile: student-5/database/EventScheduling.Database/Dockerfile
+          - app: eventscheduling-api
+            dockerfile: student-5/backend/EventScheduling.Backend/Dockerfile
+          - app: eventscheduling-web
+            dockerfile: docker/frontend/EventScheduling.Dockerfile
+          - app: campuspulse-portal
+            dockerfile: docker/frontend/SharedUi.Dockerfile
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ needs.prepare.outputs.owner }}/campuspulse-${{ matrix.app }}
+          tags: type=raw,value=${{ needs.prepare.outputs.tag }}
+
+      # Tagged with the git SHA, never :latest - Container Apps only creates a new revision
+      # when the image reference actually changes.
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.app }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.app }}
+
+  deploy:
+    needs: [build-and-push, prepare]
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy infrastructure (idempotent)
+        shell: pwsh
+        run: ./scripts/deploy/Deploy-Infrastructure.ps1 -Location australiaeast
+
+      - name: Deploy apps
+        shell: pwsh
+        run: |
+          $params = @{
+            GitHubOwner = '${{ needs.prepare.outputs.owner }}'
+            Tag         = '${{ needs.prepare.outputs.tag }}'
+          }
+          if ('${{ github.event.inputs.warm_up }}' -eq 'true') { $params.WarmUp = $true }
+          if ('${{ github.event.inputs.enable_ai }}' -eq 'true') { $params.EnableAi = $true }
+          ./scripts/deploy/Deploy-Apps.ps1 @params
+
+      - name: Smoke test
+        shell: pwsh
+        run: ./scripts/deploy/Test-CloudDeployment.ps1
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cloud-deployment-evidence
+          path: docs/release-2/cloud-deployment-evidence/

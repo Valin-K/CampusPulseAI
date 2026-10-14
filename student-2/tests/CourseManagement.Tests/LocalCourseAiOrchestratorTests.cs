@@ -7,6 +7,7 @@ using CampusPulse.Shared.Rag.Assistant;
 using CourseManagement.Backend.Contracts.Ai;
 using CourseManagement.Backend.Services;
 using CampusPulse.Shared.Ai;
+using Microsoft.Extensions.Configuration;
 
 namespace CourseManagement.Tests;
 
@@ -189,7 +190,8 @@ public sealed class LocalCourseAiOrchestratorTests
     static LocalCourseAiOrchestrator CreateService(
         HttpMessageHandler gemini,
         IMcpClient mcp,
-        ICourseRagService rag)
+        ICourseRagService rag,
+        IConfiguration? configuration = null)
     {
         var client = new HttpClient(gemini)
         {
@@ -199,7 +201,8 @@ public sealed class LocalCourseAiOrchestratorTests
         return new LocalCourseAiOrchestrator(
             new AiGatewayClient(client),
             mcp,
-            rag);
+            rag,
+            configuration ?? new ConfigurationManager());
     }
 
     static KnowledgeQuestionRequest Request(string question) =>

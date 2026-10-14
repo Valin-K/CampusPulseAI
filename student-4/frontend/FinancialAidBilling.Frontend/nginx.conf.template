@@ -1,0 +1,36 @@
+server {
+    listen       80;
+    listen  [::]:80;
+    server_name  localhost;
+
+    root   /usr/share/nginx/html;
+    index  index.html;
+
+    resolver 127.0.0.11 valid=10s;
+
+    location /api/ {
+        set $backend_upstream http://${BACKEND_HOST}:${BACKEND_PORT};
+        proxy_pass $backend_upstream$request_uri;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 120s;
+    }
+
+    location /_framework/ {
+        try_files $uri =404;
+    }
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    location = /index.html {
+        add_header Cache-Control "no-cache, no-store, must-revalidate";
+    }
+
+    location /js/ {
+        add_header Cache-Control "no-cache";
+    }
+}

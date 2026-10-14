@@ -11,8 +11,10 @@ builder.RootComponents.Add<HeadOutlet>("head::after");
 
 var academicRecordsBackendUrl = builder.Configuration["AcademicRecordsBackendUrl"] ?? "http://localhost:5020";
 builder.Services.AddCampusDemoAuthentication(academicRecordsBackendUrl);
-var apiBaseAddress = builder.Configuration["CourseManagementApi:BaseAddress"]
-    ?? throw new InvalidOperationException("Course Management API base address is not configured.");
+var configuredApiBaseAddress = builder.Configuration["CourseManagementApi:BaseAddress"];
+var apiBaseAddress = string.IsNullOrWhiteSpace(configuredApiBaseAddress)
+    ? builder.HostEnvironment.BaseAddress
+    : configuredApiBaseAddress;
 builder.Services.AddCampusAccountServices(academicRecordsBackendUrl);
 builder.Services.AddScoped(serviceProvider =>
 {

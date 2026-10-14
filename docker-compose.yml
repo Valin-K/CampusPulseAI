@@ -267,14 +267,12 @@ services:
         condition: service_started
 
   shared-ui:
-    image: nginx:alpine
-    depends_on:
-      - academicrecords.frontend
+    image: ${DOCKER_REGISTRY-}campuspulseportal
+    build:
+      context: .
+      dockerfile: docker/frontend/SharedUi.Dockerfile
     ports:
       - "8080:80"
-    volumes:
-      - ./shared/frontend:/usr/share/nginx/html:ro
-      - ./shared/frontend/nginx.conf:/etc/nginx/conf.d/default.conf:ro
 
 volumes:
   coursemanagement-data:

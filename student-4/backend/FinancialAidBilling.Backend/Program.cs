@@ -145,8 +145,14 @@ scholarships.MapPut("/{id:int}", async (int id, ScholarshipRequest request, IHtt
 scholarships.MapDelete("/{id:int}", async (int id, IHttpClientFactory clients, CancellationToken cancellationToken) =>
     await (await clients.CreateClient("billingDatabase").DeleteAsync($"/api/scholarships/{id}", cancellationToken)).ToResultAsync(cancellationToken));
 
-scholarships.MapPost("/recommendations/student/{userId:int}", async (int userId, IHttpClientFactory clients, GeminiScholarshipService service, CancellationToken cancellationToken) =>
+scholarships.MapPost("/recommendations/student/{userId:int}", async (
+    int userId, IHttpClientFactory clients, GeminiScholarshipService service, IConfiguration configuration, CancellationToken cancellationToken) =>
 {
+    if (!configuration.GetValue("Mcp:Enabled", true))
+    {
+        return Results.Problem(statusCode: 403, title: "MCP is disabled in this deployment; scholarship recommendations are unavailable.");
+    }
+
     try
     {
         var profile = await clients.CreateClient("academicRecords")
@@ -195,8 +201,13 @@ scholarships.MapPost("/recommendations/student/{userId:int}", async (int userId,
 
 var assistant = app.MapGroup("/api/assistant");
 
-assistant.MapPost("/mcp/integration", async (IHttpClientFactory clients, CancellationToken cancellationToken) =>
+assistant.MapPost("/mcp/integration", async (IHttpClientFactory clients, IConfiguration configuration, CancellationToken cancellationToken) =>
 {
+    if (!configuration.GetValue("Mcp:Enabled", true))
+    {
+        return Results.Problem(statusCode: 403, title: "MCP is disabled in this deployment.");
+    }
+
     try
     {
         return await (await clients.CreateClient("mcp").PostAsJsonAsync(
@@ -221,8 +232,14 @@ assistant.MapPost("/mcp/integration", async (IHttpClientFactory clients, Cancell
 assistant.MapPost("/rag/scholarships", async (
     RagQuestionRequest request,
     IFinancialAidKnowledgeService knowledge,
+    IConfiguration configuration,
     CancellationToken cancellationToken) =>
 {
+    if (!configuration.GetValue("Rag:Enabled", true))
+    {
+        return Results.Problem(statusCode: 403, title: "RAG is disabled in this deployment.");
+    }
+
     if (string.IsNullOrWhiteSpace(request.Question) || request.Question.Length > 1000)
     {
         return Results.BadRequest(new { error = "Ask a scholarship question of up to 1000 characters." });
@@ -258,8 +275,14 @@ assistant.MapPost("/rag/scholarships", async (
 app.MapPost("/api/ai/knowledge", async (
     RagQuestionRequest request,
     IFinancialAidKnowledgeService knowledge,
+    IConfiguration configuration,
     CancellationToken cancellationToken) =>
 {
+    if (!configuration.GetValue("Rag:Enabled", true))
+    {
+        return Results.Problem(statusCode: 403, title: "RAG is disabled in this deployment.");
+    }
+
     if (string.IsNullOrWhiteSpace(request.Question) || request.Question.Length > 1000)
     {
         return Results.BadRequest(new { error = "Ask a question of up to 1000 characters." });

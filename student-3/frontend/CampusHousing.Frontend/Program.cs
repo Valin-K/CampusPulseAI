@@ -8,7 +8,10 @@ using Microsoft.JSInterop;
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 builder.RootComponents.Add<App>("#app");
 builder.RootComponents.Add<HeadOutlet>("head::after");
-var backendUrl = builder.Configuration["BackendUrl"] ?? "http://localhost:5083";
+var configuredBackendUrl = builder.Configuration["BackendUrl"];
+var backendUrl = string.IsNullOrWhiteSpace(configuredBackendUrl)
+    ? builder.HostEnvironment.BaseAddress
+    : configuredBackendUrl;
 var academicRecordsBackendUrl = builder.Configuration["AcademicRecordsBackendUrl"] ?? "http://localhost:5020";
 builder.Services.AddCampusDemoAuthentication(academicRecordsBackendUrl);
 builder.Services.AddCampusAccountServices(academicRecordsBackendUrl);

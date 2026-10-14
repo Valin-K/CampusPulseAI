@@ -121,31 +121,31 @@
                 </div>
 
                 <nav class="service-grid" aria-label="CampusPulse services">
-                    <a class="service-card" href="http://localhost:8081">
+                    <a class="service-card" href="${ACADEMICRECORDS_WEB_URL}">
                         <span class="service-card-top"><span class="service-number">01</span><span class="service-owner">Alec</span></span>
                         <h3>Academic Records</h3>
                         <p>Review student details, academic progress, and university record information.</p>
                         <span class="service-link">Open Academic Records &rarr;</span>
                     </a>
-                    <a class="service-card" href="http://localhost:8082">
+                    <a class="service-card" href="${COURSEMANAGEMENT_WEB_URL}">
                         <span class="service-card-top"><span class="service-number">02</span><span class="service-owner">Joyce</span></span>
                         <h3>Course Management</h3>
                         <p>Explore Courses, check eligibility, enrol, and manage curriculum information.</p>
                         <span class="service-link">Open Course Management &rarr;</span>
                     </a>
-                    <a class="service-card" href="http://localhost:8083">
+                    <a class="service-card" href="${CAMPUSHOUSING_WEB_URL}">
                         <span class="service-card-top"><span class="service-number">03</span><span class="service-owner">Jack</span></span>
                         <h3>Campus Housing</h3>
                         <p>Access accommodation information and manage the campus housing experience.</p>
                         <span class="service-link">Open Campus Housing &rarr;</span>
                     </a>
-                    <a class="service-card" href="http://localhost:8084">
+                    <a class="service-card" href="${FINAID_WEB_URL}">
                         <span class="service-card-top"><span class="service-number">04</span><span class="service-owner">Valin</span></span>
                         <h3>Financial Aid &amp; Billing</h3>
                         <p>Track charges and payments, then discover scholarship opportunities matched to your studies.</p>
                         <span class="service-link">Open Financial Aid &amp; Billing &rarr;</span>
                     </a>
-                    <a class="service-card" href="http://localhost:8085">
+                    <a class="service-card" href="${EVENTSCHEDULING_WEB_URL}">
                         <span class="service-card-top"><span class="service-number">05</span><span class="service-owner">Ryan</span></span>
                         <h3>Event Scheduling</h3>
                         <p>Find university events and organise activities around your academic calendar.</p>

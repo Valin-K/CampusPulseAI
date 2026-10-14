@@ -2,7 +2,6 @@
 @inject EventSchedulingApiClient Api
 @inject CurrentUser CurrentUser
 @inject NavigationManager Nav
-@inject IJSRuntime JS
 
 <PageTitle>@day.ToString("MMMM d") | Event & Facility Scheduling</PageTitle>
 
@@ -180,7 +179,7 @@ else
         busyId = booking.Id;
         errorMessage = null;
 
-        var result = await BookingActions.RunAsync(Api, JS, booking, action);
+        var result = await BookingActions.RunAsync(Api, booking, action);
 
         busyId = null;
 

@@ -2,7 +2,6 @@
 @inject EventSchedulingApiClient Api
 @inject CurrentUser CurrentUser
 @inject NavigationManager Nav
-@inject IJSRuntime JS
 
 <PageTitle>Event & Facility Scheduling</PageTitle>
 
@@ -149,7 +148,7 @@
     private async Task RunCardActionAsync(BookingResponse booking, BookingCardAction action)
     {
         busyBookingId = booking.Id;
-        var result = await BookingActions.RunAsync(Api, JS, booking, action);
+        var result = await BookingActions.RunAsync(Api, booking, action);
         busyBookingId = null;
 
         if (result.Success)

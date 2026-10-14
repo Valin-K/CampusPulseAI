@@ -12,4 +12,7 @@ RUN dotnet publish "./FinancialAidBilling.Frontend.csproj" -c $BUILD_CONFIGURATI
 FROM nginx:alpine AS final
 WORKDIR /usr/share/nginx/html
 COPY --from=build /app/publish/wwwroot .
+ENV BACKEND_HOST=financialaidbilling.backend
+ENV BACKEND_PORT=8080
+COPY student-4/frontend/FinancialAidBilling.Frontend/nginx.conf.template /etc/nginx/templates/default.conf.template
 EXPOSE 80
