@@ -9,40 +9,7 @@
              UserInitials="@(Account.CurrentUser?.Initials ?? "ES")"
              HomeHref="http://localhost:8080"
              RequireSignedInUser="true">
-    <UserSelector>
-        <div class="event-user-selector">
-            @if (!CurrentUser.IsInitialized)
-            {
-                <span role="status">Loading students…</span>
-            }
-            else if (CurrentUser.Users.Count > 0)
-            {
-                <label for="event-user-select">Viewing as</label>
-                <select id="event-user-select"
-                        value="@CurrentUser.UserId"
-                        @onchange="OnUserChangedAsync"
-                        aria-label="Choose which user to view the schedule as">
-                    @foreach (var user in CurrentUser.Users)
-                    {
-                        <option value="@user.UserId">@user.FullName (@user.Role)</option>
-                    }
-                </select>
-            }
-            else
-            {
-                <span><strong>@(Account.CurrentUser?.FullName ?? "Signed-in user")</strong></span>
-            }
-        </div>
-    </UserSelector>
     <ChildContent>
-        @if (CurrentUser.IsInitialized && CurrentUser.IsDegraded)
-        {
-            <div class="notice notice-error" role="alert">
-                The student directory is unavailable right now, so we can't confirm who you are.
-                You can still search and book, but you're being shown as a student - if you're
-                teaching staff, some rooms and options won't appear until this is back.
-            </div>
-        }
         @Body
     </ChildContent>
 </CampusShell>
@@ -56,16 +23,7 @@
 @code {
     protected override async Task OnInitializedAsync()
     {
-        var accountInitialization = Account.InitializeAsync();
+        await Account.InitializeAsync();
         await CurrentUser.LoadAsync();
-        await accountInitialization;
-    }
-
-    private async Task OnUserChangedAsync(ChangeEventArgs args)
-    {
-        if (int.TryParse(args.Value?.ToString(), out var userId) && userId != CurrentUser.UserId)
-        {
-            await CurrentUser.SelectAsync(userId);
-        }
     }
 }

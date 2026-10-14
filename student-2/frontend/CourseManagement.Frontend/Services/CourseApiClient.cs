@@ -8,19 +8,6 @@ namespace CourseManagement.Frontend.Services;
 
 public sealed class CourseApiClient(HttpClient httpClient)
 {
-    public async Task<IReadOnlyList<CourseAccessUser>> GetCourseAccessUsersAsync(
-        CancellationToken cancellationToken = default)
-    {
-        using var response = await httpClient.GetAsync(
-            "api/course-access/users",
-            cancellationToken);
-        await EnsureSuccessAsync(response, cancellationToken);
-
-        return await response.Content.ReadFromJsonAsync<List<CourseAccessUser>>(
-                cancellationToken)
-            ?? throw new JsonException("The Course access API returned an empty response.");
-    }
-
     public async Task<IReadOnlyList<CourseSummary>> GetAllAsync(
         CancellationToken cancellationToken = default)
     {
