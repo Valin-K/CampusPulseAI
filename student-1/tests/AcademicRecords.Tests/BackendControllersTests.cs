@@ -7,6 +7,7 @@ using AcademicRecords.Backend.Models;
 using AcademicRecords.Backend.Services;
 using CampusPulse.Shared.Mcp.Client;
 using CampusPulse.Shared.Rag.Assistant;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
@@ -58,6 +59,18 @@ public sealed class BackendControllersTests
             Assert.That(clients.Requests[5].Body, Is.EqualTo("grade update"));
             Assert.That(clients.Requests[5].ContentType, Is.EqualTo("application/json"));
         });
+    }
+
+    [TestCase(typeof(StudentsController), "Enroll", true)]
+    [TestCase(typeof(StaffController), "Enroll", true)]
+    [TestCase(typeof(StudentsController), "Update", false)]
+    [TestCase(typeof(StaffController), "Update", false)]
+    public void OnlyAccountCreationActionsAllowAnonymous(Type controllerType, string actionName, bool expected)
+    {
+        var action = controllerType.GetMethod(actionName);
+
+        Assert.That(action, Is.Not.Null);
+        Assert.That(action!.IsDefined(typeof(AllowAnonymousAttribute), inherit: true), Is.EqualTo(expected));
     }
 
     [Test]

@@ -39,7 +39,7 @@ public sealed class CampusAccountServiceTests
 
         Assert.That(service.CurrentUser, Is.Null);
         Assert.That(service.Users, Is.Empty);
-        Assert.That(service.CanRegisterStudent, Is.True);
+        Assert.That(service.CanRegisterAccount, Is.True);
         Assert.That(service.ErrorMessage, Does.Contain("not linked"));
     }
 
@@ -62,7 +62,7 @@ public sealed class CampusAccountServiceTests
     }
 
     [Test]
-    public async Task CreateStudentPostsStudentFieldsToTheStudentEnrollmentEndpoint()
+    public async Task UnauthenticatedUserCanCreateStudentAccount()
     {
         CapturedRequest? captured = null;
         var handler = new TestHttpMessageHandler(async (request, cancellationToken) =>
@@ -75,8 +75,9 @@ public sealed class CampusAccountServiceTests
             captured = await CaptureAsync(request, cancellationToken);
             return JsonResponse(HttpStatusCode.Created, new { studentId = "STU101", userId = 101 });
         });
-        var service = CreateService(handler, "riley@example.edu");
+        var service = CreateService(handler, null);
         await service.InitializeAsync();
+        Assert.That(service.IsAuthenticated, Is.False);
         var registration = new CampusStudentRegistration(
             "Riley", "Jones", "riley@example.edu", new DateOnly(2004, 5, 6),
             "1 Campus Way", "Jordan Jones", "0400000000", "0400000001", "Bachelor", "Science");
@@ -92,7 +93,7 @@ public sealed class CampusAccountServiceTests
     }
 
     [Test]
-    public async Task CreateStaffPostsToTheStaffEnrollmentEndpoint()
+    public async Task UnauthenticatedUserCanCreateStaffAccount()
     {
         CapturedRequest? captured = null;
         var handler = new TestHttpMessageHandler(async (request, cancellationToken) =>
@@ -105,8 +106,9 @@ public sealed class CampusAccountServiceTests
             captured = await CaptureAsync(request, cancellationToken);
             return JsonResponse(HttpStatusCode.Created, new { staffId = "STF102", userId = 102 });
         });
-        var service = CreateService(handler, "jamie@example.edu");
+        var service = CreateService(handler, null);
         await service.InitializeAsync();
+        Assert.That(service.IsAuthenticated, Is.False);
 
         var created = await service.CreateStaffAsync(new CampusStaffRegistration(
             "Jamie", "Lee", "jamie@example.edu", new DateOnly(1985, 7, 8), "0400000002"));

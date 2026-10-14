@@ -22,7 +22,7 @@ public sealed class CampusAccountService : IDisposable
     public CampusAccountUser? CurrentUser { get; private set; }
     public string? AuthenticatedEmail { get; private set; }
     public bool IsAuthenticated { get; private set; }
-    public bool CanRegisterStudent { get; private set; }
+    public bool CanRegisterAccount { get; private set; }
     public bool IsInitialized { get; private set; }
     public string? ErrorMessage { get; private set; }
 
@@ -39,7 +39,7 @@ public sealed class CampusAccountService : IDisposable
         ErrorMessage = null;
         CurrentUser = null;
         Users = [];
-        CanRegisterStudent = false;
+        CanRegisterAccount = false;
 
         try
         {
@@ -82,8 +82,8 @@ public sealed class CampusAccountService : IDisposable
             }
             else if (matches.Length == 0)
             {
-                CanRegisterStudent = true;
-                ErrorMessage = "This sign-in is not linked to a CampusPulse account. Register as a student or contact an administrator.";
+                CanRegisterAccount = true;
+                ErrorMessage = "This sign-in is not linked to a CampusPulse account. Create an account for the selected role or contact an administrator.";
             }
             else
             {
@@ -107,7 +107,6 @@ public sealed class CampusAccountService : IDisposable
 
     public async Task<CampusCreatedUser> CreateStudentAsync(CampusStudentRegistration registration)
     {
-        EnsureAuthenticatedEmail(registration.Email);
         using var response = await http.PostAsJsonAsync("api/students/enroll", registration);
         await EnsureSuccessAsync(response);
         return await response.Content.ReadFromJsonAsync<CampusCreatedUser>()
@@ -116,7 +115,6 @@ public sealed class CampusAccountService : IDisposable
 
     public async Task<CampusCreatedStaff> CreateStaffAsync(CampusStaffRegistration registration)
     {
-        EnsureAuthenticatedEmail(registration.Email);
         using var response = await http.PostAsJsonAsync("api/staff/enroll", registration);
         await EnsureSuccessAsync(response);
         return await response.Content.ReadFromJsonAsync<CampusCreatedStaff>()

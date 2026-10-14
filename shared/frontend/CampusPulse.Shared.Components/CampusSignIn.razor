@@ -17,9 +17,9 @@
                 <p>@SignInDescription</p>
             </div>
             <div class="term-summary">
-                <span>Single sign-on</span>
-                <strong>Demo account access</strong>
-                <small>Password-based sign-in can be added later</small>
+                <span>CampusPulse account</span>
+                <strong>Student and staff access</strong>
+                <small>Sign in or create an account</small>
             </div>
         </header>
 
@@ -43,13 +43,14 @@
             </div>
             <a class="button button-secondary" href="@SignInUrl">Choose another sign-in option</a>
         }
-        else if (Account.IsAuthenticated && Account.CanRegisterStudent && creatingAccount)
+        else if (creatingAccount
+            && !string.IsNullOrWhiteSpace(Role))
         {
             <section class="surface-card account-registration-panel">
                 <div class="section-heading">
                     <div>
-                        <span class="eyebrow">New student</span>
-                        <h2>Create a student account</h2>
+                        <span class="eyebrow">New @NormalizedRole.ToLowerInvariant()</span>
+                        <h2>Create a @NormalizedRole.ToLowerInvariant() account</h2>
                     </div>
                     <button type="button" class="button button-secondary" @onclick="() => creatingAccount = false">Back</button>
                 </div>
@@ -57,25 +58,63 @@
                 {
                     <div class="notice notice-error" role="alert">@registrationError</div>
                 }
-                <EditForm Model="studentRegistration" OnValidSubmit="CreateStudentAsync">
-                    <DataAnnotationsValidator />
-                    <ValidationSummary />
-                    <div class="form-grid">
-                        <label class="field"><span>First name</span><InputText @bind-Value="studentRegistration.FirstName" /></label>
-                        <label class="field"><span>Last name</span><InputText @bind-Value="studentRegistration.LastName" /></label>
-                        <label class="field"><span>Verified email</span><input type="email" value="@Account.AuthenticatedEmail" readonly /></label>
-                        <label class="field"><span>Date of birth</span><InputDate @bind-Value="studentRegistration.DateOfBirth" /></label>
-                        <label class="field"><span>Phone number</span><InputText @bind-Value="studentRegistration.PhoneNumber" /></label>
-                        <label class="field"><span>Mailing address</span><InputText @bind-Value="studentRegistration.MailingAddress" /></label>
-                        <label class="field"><span>Emergency contact name</span><InputText @bind-Value="studentRegistration.EmergencyContactName" /></label>
-                        <label class="field"><span>Emergency contact phone</span><InputText @bind-Value="studentRegistration.EmergencyContactPhone" /></label>
-                        <label class="field"><span>Degree</span><InputText @bind-Value="studentRegistration.Degree" /></label>
-                        <label class="field"><span>Major</span><InputText @bind-Value="studentRegistration.Major" /></label>
+                @if (IsStudentRole)
+                {
+                    <EditForm Model="studentRegistration" OnValidSubmit="CreateStudentAsync">
+                        <DataAnnotationsValidator />
+                        <ValidationSummary />
+                        <div class="form-grid">
+                            <label class="field"><span>First name</span><InputText @bind-Value="studentRegistration.FirstName" /></label>
+                            <label class="field"><span>Last name</span><InputText @bind-Value="studentRegistration.LastName" /></label>
+                            <label class="field"><span>Email</span><InputText type="email" @bind-Value="studentRegistration.Email" /></label>
+                            <label class="field"><span>Date of birth</span><InputDate @bind-Value="studentRegistration.DateOfBirth" /></label>
+                            <label class="field"><span>Phone number</span><InputText @bind-Value="studentRegistration.PhoneNumber" /></label>
+                            <label class="field"><span>Mailing address</span><InputText @bind-Value="studentRegistration.MailingAddress" /></label>
+                            <label class="field"><span>Emergency contact name</span><InputText @bind-Value="studentRegistration.EmergencyContactName" /></label>
+                            <label class="field"><span>Emergency contact phone</span><InputText @bind-Value="studentRegistration.EmergencyContactPhone" /></label>
+                            <label class="field"><span>Degree</span><InputText @bind-Value="studentRegistration.Degree" /></label>
+                            <label class="field"><span>Major</span><InputText @bind-Value="studentRegistration.Major" /></label>
+                        </div>
+                        <div class="button-row" style="margin-top: 1rem;">
+                            <button type="submit" class="button button-primary" disabled="@submitting">@(submitting ? "Creating account..." : "Create student account")</button>
+                        </div>
+                    </EditForm>
+                }
+                else
+                {
+                    <EditForm Model="staffRegistration" OnValidSubmit="CreateStaffAsync">
+                        <DataAnnotationsValidator />
+                        <ValidationSummary />
+                        <div class="form-grid">
+                            <label class="field"><span>First name</span><InputText @bind-Value="staffRegistration.FirstName" /></label>
+                            <label class="field"><span>Last name</span><InputText @bind-Value="staffRegistration.LastName" /></label>
+                            <label class="field"><span>Email</span><InputText type="email" @bind-Value="staffRegistration.Email" /></label>
+                            <label class="field"><span>Date of birth</span><InputDate @bind-Value="staffRegistration.DateOfBirth" /></label>
+                            <label class="field"><span>Phone number</span><InputText @bind-Value="staffRegistration.PhoneNumber" /></label>
+                        </div>
+                        <div class="button-row" style="margin-top: 1rem;">
+                            <button type="submit" class="button button-primary" disabled="@submitting">@(submitting ? "Creating account..." : "Create staff account")</button>
+                        </div>
+                    </EditForm>
+                }
+            </section>
+        }
+        else if (Account.IsAuthenticated && Account.CanRegisterAccount)
+        {
+            <section class="surface-card account-role-selection">
+                <h2>@SignInHeading</h2>
+                <p>@Account.ErrorMessage</p>
+                @if (string.IsNullOrWhiteSpace(Role))
+                {
+                    <div class="button-row">
+                        <a class="button button-primary" href="@RoleSignInUrl("student")">Create student account</a>
+                        <a class="button button-secondary" href="@RoleSignInUrl("staff")">Create staff account</a>
                     </div>
-                    <div class="button-row" style="margin-top: 1rem;">
-                        <button type="submit" class="button button-primary" disabled="@submitting">@(submitting ? "Creating account..." : "Create student account")</button>
-                    </div>
-                </EditForm>
+                }
+                else
+                {
+                    <button type="button" class="button button-primary" @onclick="BeginCreatingAccount">Create @NormalizedRole.ToLowerInvariant() account</button>
+                }
             </section>
         }
         else if (Account.IsAuthenticated)
@@ -99,7 +138,6 @@
         {
             <section class="surface-card account-role-selection">
                 <h2>@SignInHeading</h2>
-                <p class="notice notice-warning">Development demo only: no password is checked. Do not use this flow in production.</p>
                 @if (Account.ErrorMessage is not null)
                 {
                     <div class="notice notice-error" role="alert">@Account.ErrorMessage</div>
@@ -108,33 +146,38 @@
                 {
                     <div class="notice notice-error" role="alert">@loginErrorMessage</div>
                 }
+                @if (accountCreatedMessage is not null)
+                {
+                    <div class="notice notice-success" role="status">@accountCreatedMessage</div>
+                }
                 @if (usersLoading)
                 {
-                    <p class="muted" role="status">Loading test accounts...</p>
+                    <p class="muted" role="status">Loading accounts...</p>
                 }
-                else if (demoUsers.Count == 0)
+                else if (accounts.Count == 0)
                 {
-                    <button type="button" class="button button-primary" @onclick="LoadDemoUsersAsync">Load test accounts</button>
+                    <p class="muted">No accounts found yet. Create an account to get started.</p>
                 }
                 else
                 {
                     <EditForm Model="selection" OnValidSubmit="SignInAsync">
                         <DataAnnotationsValidator />
                         <label class="field">
-                            <span>@NormalizedRole test account</span>
+                            <span>@NormalizedRole account</span>
                             <InputSelect @bind-Value="selection.UserId">
                                 <option value="0">Select an account</option>
-                                @foreach (var demoUser in demoUsers)
+                                @foreach (var account in accounts)
                                 {
-                                    <option value="@demoUser.UserId">@demoUser.FullName (@demoUser.Email)</option>
+                                    <option value="@account.UserId">@account.FullName (@account.Email)</option>
                                 }
                             </InputSelect>
                         </label>
                         <button type="submit" class="button button-primary" disabled="@(submitting || selection.UserId <= 0)">
-                            @(submitting ? "Starting demo session..." : $"Continue as {NormalizedRole}")
+                            @(submitting ? "Signing in..." : $"Continue as {NormalizedRole}")
                         </button>
                     </EditForm>
                 }
+                <button type="button" class="button button-secondary" @onclick="BeginCreatingAccount">Create @NormalizedRole.ToLowerInvariant() account</button>
             </section>
         }
 </div>
@@ -156,15 +199,18 @@
         : $"Sign in to access CampusPulse {NormalizedRole.ToLowerInvariant()} services.";
     private string SafeReturnUrl => IsAllowedReturnUrl(ReturnUrl) ? ReturnUrl! : "/";
     private string SignInUrl => RoleSignInUrl(null);
+    private bool IsStudentRole => string.Equals(NormalizedRole, "Student", StringComparison.Ordinal);
 
     private bool creatingAccount;
     private bool submitting;
     private bool usersLoading;
     private string? loginErrorMessage;
     private string? registrationError;
-    private List<CampusAccountUser> demoUsers = [];
-    private DemoAccountSelection selection = new();
+    private string? accountCreatedMessage;
+    private List<CampusAccountUser> accounts = [];
+    private AccountSelection selection = new();
     private StudentRegistrationModel studentRegistration = new();
+    private StaffRegistrationModel staffRegistration = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -172,26 +218,33 @@
         await Account.InitializeAsync();
         if (!string.IsNullOrWhiteSpace(Role) && !Account.IsAuthenticated)
         {
-            await LoadDemoUsersAsync();
+            await LoadAccountsAsync();
         }
     }
 
     private void AccountChanged() => _ = InvokeAsync(StateHasChanged);
 
-    private async Task LoadDemoUsersAsync()
+    private void BeginCreatingAccount()
+    {
+        registrationError = null;
+        accountCreatedMessage = null;
+        creatingAccount = true;
+    }
+
+    private async Task LoadAccountsAsync()
     {
         usersLoading = true;
         loginErrorMessage = null;
         try
         {
-            demoUsers = (await DemoAuthentication.GetUsersAsync(NormalizedRole))
+            accounts = (await DemoAuthentication.GetUsersAsync(NormalizedRole))
                 .OrderBy(user => user.LastName)
                 .ThenBy(user => user.FirstName)
                 .ToList();
         }
         catch (Exception exception) when (exception is HttpRequestException or JsonException)
         {
-            loginErrorMessage = $"Demo accounts are unavailable: {exception.Message}";
+            loginErrorMessage = $"Accounts are unavailable: {exception.Message}";
         }
         finally
         {
@@ -271,10 +324,10 @@
         registrationError = null;
         try
         {
-            await Account.CreateStudentAsync(new CampusStudentRegistration(
+            var created = await Account.CreateStudentAsync(new CampusStudentRegistration(
                 studentRegistration.FirstName,
                 studentRegistration.LastName,
-                Account.AuthenticatedEmail ?? string.Empty,
+                studentRegistration.Email,
                 studentRegistration.DateOfBirth,
                 studentRegistration.MailingAddress,
                 studentRegistration.EmergencyContactName,
@@ -282,8 +335,10 @@
                 studentRegistration.PhoneNumber,
                 studentRegistration.Degree,
                 studentRegistration.Major));
-            await Account.RefreshUsersAsync();
-            Navigation.NavigateTo("/profile");
+            creatingAccount = false;
+            selection.UserId = created.UserId;
+            accountCreatedMessage = "Account created. Continue to sign in.";
+            await LoadAccountsAsync();
         }
         catch (Exception exception) when (exception is HttpRequestException or JsonException or InvalidOperationException)
         {
@@ -295,7 +350,34 @@
         }
     }
 
-    private sealed class DemoAccountSelection
+    private async Task CreateStaffAsync()
+    {
+        submitting = true;
+        registrationError = null;
+        try
+        {
+            var created = await Account.CreateStaffAsync(new CampusStaffRegistration(
+                staffRegistration.FirstName,
+                staffRegistration.LastName,
+                staffRegistration.Email,
+                staffRegistration.DateOfBirth,
+                staffRegistration.PhoneNumber));
+            creatingAccount = false;
+            selection.UserId = created.UserId;
+            accountCreatedMessage = "Account created. Continue to sign in.";
+            await LoadAccountsAsync();
+        }
+        catch (Exception exception) when (exception is HttpRequestException or JsonException or InvalidOperationException)
+        {
+            registrationError = exception.Message;
+        }
+        finally
+        {
+            submitting = false;
+        }
+    }
+
+    private sealed class AccountSelection
     {
         [Range(1, int.MaxValue)]
         public int UserId { get; set; }
@@ -309,6 +391,8 @@
         public string FirstName { get; set; } = string.Empty;
         [Required]
         public string LastName { get; set; } = string.Empty;
+        [Required, EmailAddress]
+        public string Email { get; set; } = string.Empty;
         [Required]
         public DateOnly? DateOfBirth { get; set; }
         [Required]
@@ -320,5 +404,18 @@
         public string? PhoneNumber { get; set; }
         public string? Degree { get; set; }
         public string? Major { get; set; }
+    }
+
+    private sealed class StaffRegistrationModel
+    {
+        [Required]
+        public string FirstName { get; set; } = string.Empty;
+        [Required]
+        public string LastName { get; set; } = string.Empty;
+        [Required, EmailAddress]
+        public string Email { get; set; } = string.Empty;
+        [Required]
+        public DateOnly? DateOfBirth { get; set; }
+        public string? PhoneNumber { get; set; }
     }
 }
