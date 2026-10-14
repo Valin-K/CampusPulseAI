@@ -53,7 +53,7 @@ else if (profile is not null)
                 <label class="field"><span>Role</span><input value="@profile.Role" readonly disabled /></label>
                 <label class="field"><span>First name</span><InputText @bind-Value="profile.FirstName" /></label>
                 <label class="field"><span>Last name</span><InputText @bind-Value="profile.LastName" /></label>
-                <label class="field"><span>Email</span><InputText type="email" @bind-Value="profile.Email" /></label>
+                <label class="field"><span>Email</span><input type="email" value="@profile.Email" readonly disabled /></label>
                 <label class="field"><span>Date of birth</span><InputDate @bind-Value="profile.DateOfBirth" /></label>
                 <label class="field"><span>Phone number</span><InputText @bind-Value="profile.PhoneNumber" /></label>
                 @if (profile.StudentId is not null)
@@ -91,7 +91,8 @@ else if (profile is not null)
 
         if (Account.CurrentUser is null)
         {
-            Navigation.NavigateTo("/login");
+            var returnUrl = Navigation.Uri;
+            Navigation.NavigateTo($"http://localhost:8081/login?returnUrl={Uri.EscapeDataString(returnUrl)}");
             return;
         }
 

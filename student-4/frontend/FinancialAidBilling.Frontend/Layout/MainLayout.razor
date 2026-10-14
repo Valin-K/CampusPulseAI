@@ -4,9 +4,9 @@
 
 <CampusShell PageName="Financial Aid &amp; Billing"
              SectionLabel="Student finance"
-             UserName="@(UserContext.CurrentUser?.FullName ?? "")"
-             UserDetails="@(UserContext.CurrentUser is null ? "" : $"{UserContext.CurrentUser.StudyDescriptor} · {UserContext.CurrentUser.StudentId}")"
-             UserInitials="@(UserContext.CurrentUser?.Initials ?? "")"
+             UserName="@(Account.CurrentUser?.FullName ?? "Financial Aid & Billing")"
+             UserDetails="@(Account.CurrentUser is null ? "Finance workspace" : $"{Account.CurrentUser.Role} · {Account.CurrentUser.ExternalId}")"
+             UserInitials="@(Account.CurrentUser?.Initials ?? "FA")"
              HomeHref="http://localhost:8080"
              RequireSignedInUser="true">
     <UserSelector>

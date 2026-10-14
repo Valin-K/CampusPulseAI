@@ -5,9 +5,9 @@
 
 <CampusShell PageName="Campus Housing"
              SectionLabel="Housing services"
-             UserName="@(UserContext.CurrentUser?.DisplayName ?? "")"
-             UserDetails="@(UserContext.CurrentUser is null ? "" : UserContext.IsAdministrator ? "Housing Administrator" : $"Student ID: {UserContext.CurrentUser.StudentId}")"
-             UserInitials="@(UserContext.IsAdministrator ? "HA" : "JW")"
+             UserName="@(Account.CurrentUser?.FullName ?? "Campus Housing")"
+             UserDetails="@(Account.CurrentUser is null ? "Housing workspace" : $"{Account.CurrentUser.Role} · {Account.CurrentUser.ExternalId}")"
+             UserInitials="@(Account.CurrentUser?.Initials ?? "CH")"
              HomeHref="http://localhost:8080"
              PortalHref="http://localhost:8080"
              RequireSignedInUser="true"

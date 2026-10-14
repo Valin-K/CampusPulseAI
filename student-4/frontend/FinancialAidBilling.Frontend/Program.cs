@@ -10,12 +10,15 @@ builder.RootComponents.Add<App>("#app");
 builder.RootComponents.Add<HeadOutlet>("head::after");
 
 var backendUrl = builder.Configuration["BackendUrl"] ?? "http://localhost:8089";
-builder.Services.AddCampusAccountServices(builder.Configuration["AcademicRecordsBackendUrl"] ?? "http://localhost:5020");
+var academicRecordsBackendUrl = builder.Configuration["AcademicRecordsBackendUrl"] ?? "http://localhost:5020";
+builder.Services.AddCampusDemoAuthentication(academicRecordsBackendUrl);
+builder.Services.AddCampusAccountServices(academicRecordsBackendUrl);
 builder.Services.AddScoped(serviceProvider =>
 {
     var handler = new CampusUserIdHeaderHandler(serviceProvider.GetRequiredService<IJSRuntime>())
     {
-        InnerHandler = new HttpClientHandler()
+        InnerHandler = CampusDemoAuthenticationServiceCollectionExtensions
+            .CreateCampusDemoTokenHandler(serviceProvider)
     };
     return new HttpClient(handler) { BaseAddress = new Uri(backendUrl) };
 });

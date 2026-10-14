@@ -1,314 +1,268 @@
 @page "/login"
 @page "/login/{Role}"
 @layout CampusAccountLayout
+@implements IDisposable
 @using System.ComponentModel.DataAnnotations
 @using System.Text.Json
-@using CampusPulse.Shared.Components.Models
 @inject CampusAccountService Account
 @inject NavigationManager Navigation
 
-<PageTitle>@(IsRoleView ? $"{RoleName} sign in | CampusPulse" : "Sign in | CampusPulse")</PageTitle>
+<PageTitle>Sign in | CampusPulse</PageTitle>
 
 <div class="campus-account-sign-in">
-<header class="dashboard-hero account-sign-in-hero">
-    <div>
-        <span class="eyebrow">CampusPulse account</span>
-        <h1>@(IsRoleView ? $"{RoleName} sign in" : "Choose your account type")</h1>
-        <p>@(IsRoleView
-            ? $"Select a {RoleLabel} account to continue. This demonstration sign-in does not use passwords."
-            : "Choose whether you are signing in as a student or staff member.")</p>
-    </div>
-    <div class="term-summary">
-        <span>@(IsRoleView ? $"{RoleName} accounts" : "Sign-in options")</span>
-        <strong>@(IsRoleView ? RoleUserCount.ToString() : "Choose a role")</strong>
-        <small>@(IsRoleView ? "Available accounts" : $"{StudentCount} students · {StaffCount} staff")</small>
-    </div>
-</header>
-
-@if (Account.CurrentUser is { } currentUser)
-{
-    <div class="notice notice-success" role="status">
-        Signed in as <strong>@currentUser.FullName</strong> (@currentUser.Role).
-        Signing in as another account replaces this session's current user.
-    </div>
-}
-@if (Account.ErrorMessage is not null)
-{
-    <div class="notice notice-error" role="alert">@Account.ErrorMessage</div>
-}
-@if (signInError is not null)
-{
-    <div class="notice notice-error" role="alert">@signInError</div>
-}
-
-@if (!IsRoleView)
-{
-    <section class="surface-card account-role-selection" aria-labelledby="account-role-heading">
-        <div>
-            <span class="eyebrow">Choose access type</span>
-            <h2 id="account-role-heading">How would you like to sign in?</h2>
-            <p class="muted">Choose a role to view its available accounts.</p>
-        </div>
-        <div class="account-role-grid">
-            <a class="account-role-card" href="/login/student">
-                <span class="account-role-icon" aria-hidden="true">S</span>
-                <span class="account-role-title">Student login</span>
-                <span class="account-role-description">Access enrollments, grades, and graduation progress.</span>
-                <span class="account-role-count">@(Account.IsInitialized ? $"{StudentCount} available accounts" : "Loading accounts...")</span>
-                <span class="account-role-action">Continue as a student <span aria-hidden="true">→</span></span>
-            </a>
-            <a class="account-role-card" href="/login/staff">
-                <span class="account-role-icon" aria-hidden="true">F</span>
-                <span class="account-role-title">Staff login</span>
-                <span class="account-role-description">Access grading and registrar tools.</span>
-                <span class="account-role-count">@(Account.IsInitialized ? $"{StaffCount} available accounts" : "Loading accounts...")</span>
-                <span class="account-role-action">Continue as staff <span aria-hidden="true">→</span></span>
-            </a>
-        </div>
-    </section>
-}
-else if (creatingAccount)
-{
-    <section class="surface-card account-registration-panel">
-        <div class="section-heading">
+        <header class="dashboard-hero account-sign-in-hero">
             <div>
-                <span class="eyebrow">New @RoleLabel</span>
-                <h2>Create a @RoleLabel account</h2>
+                <span class="eyebrow">CampusPulse account</span>
+                <h1>@SignInHeading</h1>
+                <p>@SignInDescription</p>
             </div>
-            <button type="button" class="button button-secondary" @onclick="() => creatingAccount = false">Back to sign in</button>
-        </div>
-        @if (IsStudentView)
-        {
-            <EditForm Model="studentRegistration" OnValidSubmit="CreateStudentAsync">
-                <DataAnnotationsValidator />
-                <ValidationSummary />
-                <div class="form-grid">
-                    <label class="field"><span>First name</span><InputText @bind-Value="studentRegistration.FirstName" /></label>
-                    <label class="field"><span>Last name</span><InputText @bind-Value="studentRegistration.LastName" /></label>
-                    <label class="field"><span>Email</span><InputText type="email" @bind-Value="studentRegistration.Email" /></label>
-                    <label class="field"><span>Date of birth</span><InputDate @bind-Value="studentRegistration.DateOfBirth" /></label>
-                    <label class="field"><span>Phone number</span><InputText @bind-Value="studentRegistration.PhoneNumber" /></label>
-                    <label class="field"><span>Mailing address</span><InputText @bind-Value="studentRegistration.MailingAddress" /></label>
-                    <label class="field"><span>Emergency contact name</span><InputText @bind-Value="studentRegistration.EmergencyContactName" /></label>
-                    <label class="field"><span>Emergency contact phone</span><InputText @bind-Value="studentRegistration.EmergencyContactPhone" /></label>
-                    <label class="field"><span>Degree</span><InputText @bind-Value="studentRegistration.Degree" /></label>
-                    <label class="field"><span>Major</span><InputText @bind-Value="studentRegistration.Major" /></label>
-                </div>
-                <div class="button-row" style="margin-top: 1rem;">
-                    <button type="submit" class="button button-primary" disabled="@submitting">@(submitting ? "Creating account..." : "Create student account")</button>
-                </div>
-            </EditForm>
-        }
-        else
-        {
-            <EditForm Model="staffRegistration" OnValidSubmit="CreateStaffAsync">
-                <DataAnnotationsValidator />
-                <ValidationSummary />
-                <div class="form-grid">
-                    <label class="field"><span>First name</span><InputText @bind-Value="staffRegistration.FirstName" /></label>
-                    <label class="field"><span>Last name</span><InputText @bind-Value="staffRegistration.LastName" /></label>
-                    <label class="field"><span>Email</span><InputText type="email" @bind-Value="staffRegistration.Email" /></label>
-                    <label class="field"><span>Date of birth</span><InputDate @bind-Value="staffRegistration.DateOfBirth" /></label>
-                    <label class="field"><span>Phone number</span><InputText @bind-Value="staffRegistration.PhoneNumber" /></label>
-                </div>
-                <div class="button-row" style="margin-top: 1rem;">
-                    <button type="submit" class="button button-primary" disabled="@submitting">@(submitting ? "Creating account..." : "Create staff account")</button>
-                </div>
-            </EditForm>
-        }
-        @if (registrationError is not null)
-        {
-            <div class="notice notice-error" role="alert" style="margin-top: 1rem;">Unable to create account: @registrationError</div>
-        }
-    </section>
-}
-else
-{
-    <section class="surface-card table-panel account-directory-panel">
-        <div class="section-heading">
-            <div>
-                <span class="eyebrow">@RoleName accounts</span>
-                <h2>@RoleName sign in</h2>
+            <div class="term-summary">
+                <span>Single sign-on</span>
+                <strong>Demo account access</strong>
+                <small>Password-based sign-in can be added later</small>
             </div>
-            <div class="button-row">
-                <a class="button button-secondary" href="/login">← Change account type</a>
-                <button type="button" class="button button-primary" @onclick="StartRegistration">+ Create @RoleLabel account</button>
-            </div>
-        </div>
-
-        <div class="form-stack" style="max-width: 24rem; margin-bottom: 1rem;">
-            <label class="field">
-                <span>Filter by name, ID, or email</span>
-                <input @bind="filter" @bind:event="oninput" placeholder="Type to filter..." />
-            </label>
-        </div>
+        </header>
 
         @if (!Account.IsInitialized)
         {
-            <p class="muted" role="status">Loading people...</p>
+            <p class="muted" role="status">Checking your sign-in session...</p>
         }
-        else if (FilteredUsers.Count == 0)
+        else if (Account.CurrentUser is { } user
+            && (string.IsNullOrWhiteSpace(Role)
+                || string.Equals(user.Role, NormalizedRole, StringComparison.OrdinalIgnoreCase)))
         {
-            <p class="muted">No @RoleLabel accounts match the current filter.</p>
+            <div class="notice notice-success" role="status">
+                Signed in as <strong>@user.FullName</strong> (@user.Role).
+            </div>
+            <a class="button button-primary" href="@SafeReturnUrl">Continue to CampusPulse</a>
+        }
+        else if (Account.CurrentUser is { } roleMismatchUser)
+        {
+            <div class="notice notice-error" role="alert">
+                This CampusPulse account is linked as @roleMismatchUser.Role, not @NormalizedRole.
+            </div>
+            <a class="button button-secondary" href="@SignInUrl">Choose another sign-in option</a>
+        }
+        else if (Account.IsAuthenticated && Account.CanRegisterStudent && creatingAccount)
+        {
+            <section class="surface-card account-registration-panel">
+                <div class="section-heading">
+                    <div>
+                        <span class="eyebrow">New student</span>
+                        <h2>Create a student account</h2>
+                    </div>
+                    <button type="button" class="button button-secondary" @onclick="() => creatingAccount = false">Back</button>
+                </div>
+                @if (registrationError is not null)
+                {
+                    <div class="notice notice-error" role="alert">@registrationError</div>
+                }
+                <EditForm Model="studentRegistration" OnValidSubmit="CreateStudentAsync">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary />
+                    <div class="form-grid">
+                        <label class="field"><span>First name</span><InputText @bind-Value="studentRegistration.FirstName" /></label>
+                        <label class="field"><span>Last name</span><InputText @bind-Value="studentRegistration.LastName" /></label>
+                        <label class="field"><span>Verified email</span><input type="email" value="@Account.AuthenticatedEmail" readonly /></label>
+                        <label class="field"><span>Date of birth</span><InputDate @bind-Value="studentRegistration.DateOfBirth" /></label>
+                        <label class="field"><span>Phone number</span><InputText @bind-Value="studentRegistration.PhoneNumber" /></label>
+                        <label class="field"><span>Mailing address</span><InputText @bind-Value="studentRegistration.MailingAddress" /></label>
+                        <label class="field"><span>Emergency contact name</span><InputText @bind-Value="studentRegistration.EmergencyContactName" /></label>
+                        <label class="field"><span>Emergency contact phone</span><InputText @bind-Value="studentRegistration.EmergencyContactPhone" /></label>
+                        <label class="field"><span>Degree</span><InputText @bind-Value="studentRegistration.Degree" /></label>
+                        <label class="field"><span>Major</span><InputText @bind-Value="studentRegistration.Major" /></label>
+                    </div>
+                    <div class="button-row" style="margin-top: 1rem;">
+                        <button type="submit" class="button button-primary" disabled="@submitting">@(submitting ? "Creating account..." : "Create student account")</button>
+                    </div>
+                </EditForm>
+            </section>
+        }
+        else if (Account.IsAuthenticated)
+        {
+            <div class="notice notice-error" role="alert">
+                @(Account.ErrorMessage ?? "Your university account is not linked to CampusPulse. Contact an administrator.")
+            </div>
+        }
+        else if (string.IsNullOrWhiteSpace(Role))
+        {
+            <section class="surface-card account-role-selection">
+                <h2>Choose your CampusPulse account</h2>
+                <p>Continue through the student or staff sign-in experience.</p>
+                <div class="button-row">
+                    <a class="button button-primary" href="@RoleSignInUrl("student")">Student sign in</a>
+                    <a class="button button-secondary" href="@RoleSignInUrl("staff")">Staff sign in</a>
+                </div>
+            </section>
         }
         else
         {
-            <div class="responsive-table">
-                <table class="account-directory-table">
-                    <colgroup>
-                        <col style="width: 30%;" />
-                        <col style="width: 18%;" />
-                        <col style="width: 36%;" />
-                        <col style="width: 16%;" />
-                    </colgroup>
-                    <thead>
-                        <tr>
-                            <th aria-sort="@(SortDirection("name"))"><button type="button" class="account-sort-button" @onclick="SortByName">Name <span aria-hidden="true">@SortGlyph("name")</span></button></th>
-                            <th aria-sort="@(SortDirection("id"))"><button type="button" class="account-sort-button" @onclick="SortById">ID <span aria-hidden="true">@SortGlyph("id")</span></button></th>
-                            <th aria-sort="@(SortDirection("email"))"><button type="button" class="account-sort-button" @onclick="SortByEmail">Email <span aria-hidden="true">@SortGlyph("email")</span></button></th>
-                            <th></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var person in FilteredUsers)
-                        {
-                            <tr>
-                                <td><strong>@person.FullName</strong></td>
-                                <td>@person.ExternalId</td>
-                                <td>@person.Email</td>
-                                <td>
-                                    <button type="button" class="button button-small button-primary" @onclick="() => SignInAsync(person.UserId)">
-                                        @(Account.CurrentUser?.UserId == person.UserId ? "Current user" : "Sign in")
-                                    </button>
-                                </td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
-            </div>
+            <section class="surface-card account-role-selection">
+                <h2>@SignInHeading</h2>
+                <p class="notice notice-warning">Development demo only: no password is checked. Do not use this flow in production.</p>
+                @if (Account.ErrorMessage is not null)
+                {
+                    <div class="notice notice-error" role="alert">@Account.ErrorMessage</div>
+                }
+                @if (loginErrorMessage is not null)
+                {
+                    <div class="notice notice-error" role="alert">@loginErrorMessage</div>
+                }
+                @if (usersLoading)
+                {
+                    <p class="muted" role="status">Loading test accounts...</p>
+                }
+                else if (demoUsers.Count == 0)
+                {
+                    <button type="button" class="button button-primary" @onclick="LoadDemoUsersAsync">Load test accounts</button>
+                }
+                else
+                {
+                    <EditForm Model="selection" OnValidSubmit="SignInAsync">
+                        <DataAnnotationsValidator />
+                        <label class="field">
+                            <span>@NormalizedRole test account</span>
+                            <InputSelect @bind-Value="selection.UserId">
+                                <option value="0">Select an account</option>
+                                @foreach (var demoUser in demoUsers)
+                                {
+                                    <option value="@demoUser.UserId">@demoUser.FullName (@demoUser.Email)</option>
+                                }
+                            </InputSelect>
+                        </label>
+                        <button type="submit" class="button button-primary" disabled="@(submitting || selection.UserId <= 0)">
+                            @(submitting ? "Starting demo session..." : $"Continue as {NormalizedRole}")
+                        </button>
+                    </EditForm>
+                }
+            </section>
         }
-    </section>
-}
 </div>
 
 @code {
-    [Parameter]
-    public string? Role { get; set; }
+    [Parameter] public string? Role { get; set; }
+    [SupplyParameterFromQuery(Name = "returnUrl")]
+    public string? ReturnUrl { get; set; }
+    [Inject] private CampusDemoAuthenticationStateProvider DemoAuthentication { get; set; } = default!;
 
-    private string filter = string.Empty;
+    private string NormalizedRole => string.Equals(Role, "staff", StringComparison.OrdinalIgnoreCase)
+        ? "Staff"
+        : "Student";
+    private string SignInHeading => string.IsNullOrWhiteSpace(Role)
+        ? "Sign in"
+        : $"{NormalizedRole} sign in";
+    private string SignInDescription => string.IsNullOrWhiteSpace(Role)
+        ? "Use your student or staff account to access CampusPulse services."
+        : $"Sign in to access CampusPulse {NormalizedRole.ToLowerInvariant()} services.";
+    private string SafeReturnUrl => IsAllowedReturnUrl(ReturnUrl) ? ReturnUrl! : "/";
+    private string SignInUrl => RoleSignInUrl(null);
+
     private bool creatingAccount;
     private bool submitting;
-    private string sortColumn = "name";
-    private bool sortAscending = true;
-    private string? signInError;
+    private bool usersLoading;
+    private string? loginErrorMessage;
     private string? registrationError;
+    private List<CampusAccountUser> demoUsers = [];
+    private DemoAccountSelection selection = new();
     private StudentRegistrationModel studentRegistration = new();
-    private StaffRegistrationModel staffRegistration = new();
-
-    private bool IsStudentView => string.Equals(Role, "student", StringComparison.OrdinalIgnoreCase);
-    private bool IsStaffView => string.Equals(Role, "staff", StringComparison.OrdinalIgnoreCase);
-    private bool IsRoleView => IsStudentView || IsStaffView;
-    private string RoleLabel => IsStudentView ? "student" : "staff";
-    private string RoleName => IsStudentView ? "Student" : "Staff";
-    private int StudentCount => Account.Users.Count(CampusAccountService.IsStudent);
-    private int StaffCount => Account.Users.Count(CampusAccountService.IsStaff);
-    private int RoleUserCount => IsStudentView ? StudentCount : StaffCount;
-
-    private List<CampusAccountUser> FilteredUsers
-    {
-        get
-        {
-            IEnumerable<CampusAccountUser> users = Account.Users.Where(user =>
-                IsStudentView ? CampusAccountService.IsStudent(user) : CampusAccountService.IsStaff(user));
-            if (!string.IsNullOrWhiteSpace(filter))
-            {
-                var term = filter.Trim();
-                users = users.Where(user => user.FirstName.Contains(term, StringComparison.OrdinalIgnoreCase)
-                    || user.LastName.Contains(term, StringComparison.OrdinalIgnoreCase)
-                    || user.ExternalId.Contains(term, StringComparison.OrdinalIgnoreCase)
-                    || user.Email.Contains(term, StringComparison.OrdinalIgnoreCase));
-            }
-
-            var sorted = sortColumn switch
-            {
-                "id" => sortAscending
-                    ? users.OrderBy(user => user.ExternalId, StringComparer.OrdinalIgnoreCase)
-                    : users.OrderByDescending(user => user.ExternalId, StringComparer.OrdinalIgnoreCase),
-                "email" => sortAscending
-                    ? users.OrderBy(user => user.Email, StringComparer.OrdinalIgnoreCase)
-                    : users.OrderByDescending(user => user.Email, StringComparer.OrdinalIgnoreCase),
-                _ => sortAscending
-                    ? users.OrderBy(user => user.FullName, StringComparer.OrdinalIgnoreCase)
-                    : users.OrderByDescending(user => user.FullName, StringComparer.OrdinalIgnoreCase)
-            };
-
-            return sorted.ThenBy(user => user.UserId).ToList();
-        }
-    }
-
-    protected override void OnParametersSet()
-    {
-        if (!string.IsNullOrWhiteSpace(Role) && !IsRoleView)
-        {
-            Navigation.NavigateTo("/login", replace: true);
-        }
-    }
-
-    private void SortByName() => SortBy("name");
-    private void SortById() => SortBy("id");
-    private void SortByEmail() => SortBy("email");
-
-    private void SortBy(string column)
-    {
-        if (sortColumn == column)
-        {
-            sortAscending = !sortAscending;
-        }
-        else
-        {
-            sortColumn = column;
-            sortAscending = true;
-        }
-    }
-
-    private string SortDirection(string column) => sortColumn == column
-        ? sortAscending ? "ascending" : "descending"
-        : "none";
-
-    private string SortGlyph(string column) => sortColumn == column
-        ? sortAscending ? "▲" : "▼"
-        : "↕";
 
     protected override async Task OnInitializedAsync()
     {
-        if (!Account.IsInitialized)
+        Account.Changed += AccountChanged;
+        await Account.InitializeAsync();
+        if (!string.IsNullOrWhiteSpace(Role) && !Account.IsAuthenticated)
         {
-            await Account.InitializeAsync();
+            await LoadDemoUsersAsync();
         }
     }
 
-    private void StartRegistration()
-    {
-        registrationError = null;
-        creatingAccount = true;
-    }
+    private void AccountChanged() => _ = InvokeAsync(StateHasChanged);
 
-    private async Task SignInAsync(int userId)
+    private async Task LoadDemoUsersAsync()
     {
-        signInError = null;
+        usersLoading = true;
+        loginErrorMessage = null;
         try
         {
-            await Account.SignInAsync(userId);
-            Navigation.NavigateTo("/", forceLoad: true);
+            demoUsers = (await DemoAuthentication.GetUsersAsync(NormalizedRole))
+                .OrderBy(user => user.LastName)
+                .ThenBy(user => user.FirstName)
+                .ToList();
         }
-        catch (JSException)
+        catch (Exception exception) when (exception is HttpRequestException or JsonException)
         {
-            signInError = "Browser session storage is unavailable. Sign-in could not be saved.";
+            loginErrorMessage = $"Demo accounts are unavailable: {exception.Message}";
         }
-        catch (InvalidOperationException exception)
+        finally
         {
-            signInError = exception.Message;
+            usersLoading = false;
         }
+    }
+
+    private async Task SignInAsync()
+    {
+        submitting = true;
+        loginErrorMessage = null;
+        try
+        {
+            await DemoAuthentication.SignInAsync(selection.UserId, NormalizedRole);
+            await Account.InitializeAsync(forceRefresh: true);
+            Navigation.NavigateTo(BuildReturnUrl());
+        }
+        catch (Exception exception) when (exception is HttpRequestException or JsonException or InvalidOperationException)
+        {
+            loginErrorMessage = exception.Message;
+        }
+        finally
+        {
+            submitting = false;
+        }
+    }
+
+    private static bool IsAllowedReturnUrl(string? returnUrl)
+    {
+        if (string.IsNullOrWhiteSpace(returnUrl))
+        {
+            return false;
+        }
+
+        if (returnUrl.StartsWith("/", StringComparison.Ordinal))
+        {
+            return !returnUrl.StartsWith("//", StringComparison.Ordinal)
+                && !returnUrl.StartsWith("/\\", StringComparison.Ordinal);
+        }
+
+        return Uri.TryCreate(returnUrl, UriKind.Absolute, out var destination)
+            && destination.Scheme == Uri.UriSchemeHttp
+            && string.Equals(destination.Host, "localhost", StringComparison.OrdinalIgnoreCase)
+            && destination.Port is >= 8080 and <= 8085;
+    }
+
+    private string BuildReturnUrl()
+    {
+        if (!Uri.TryCreate(SafeReturnUrl, UriKind.Absolute, out var destination)
+            || !Uri.TryCreate(Navigation.BaseUri, UriKind.Absolute, out var current)
+            || destination.Authority.Equals(current.Authority, StringComparison.OrdinalIgnoreCase))
+        {
+            return SafeReturnUrl;
+        }
+
+        var builder = new UriBuilder(destination)
+        {
+            Fragment = $"campuspulse_session={Uri.EscapeDataString(JsonSerializer.Serialize(
+                DemoAuthentication.CurrentSession,
+                new JsonSerializerOptions(JsonSerializerDefaults.Web)))}"
+        };
+        return builder.Uri.ToString();
+    }
+
+    private string RoleSignInUrl(string? role)
+    {
+        var path = string.IsNullOrWhiteSpace(role) ? "/login" : $"/login/{role}";
+        var query = IsAllowedReturnUrl(ReturnUrl)
+            ? $"?returnUrl={Uri.EscapeDataString(ReturnUrl!)}"
+            : string.Empty;
+        return $"http://localhost:8081{path}{query}";
     }
 
     private async Task CreateStudentAsync()
@@ -317,10 +271,10 @@ else
         registrationError = null;
         try
         {
-            var created = await Account.CreateStudentAsync(new CampusStudentRegistration(
+            await Account.CreateStudentAsync(new CampusStudentRegistration(
                 studentRegistration.FirstName,
                 studentRegistration.LastName,
-                studentRegistration.Email,
+                Account.AuthenticatedEmail ?? string.Empty,
                 studentRegistration.DateOfBirth,
                 studentRegistration.MailingAddress,
                 studentRegistration.EmergencyContactName,
@@ -329,10 +283,9 @@ else
                 studentRegistration.Degree,
                 studentRegistration.Major));
             await Account.RefreshUsersAsync();
-            await Account.SignInAsync(created.UserId);
             Navigation.NavigateTo("/profile");
         }
-        catch (Exception exception) when (exception is HttpRequestException or JsonException or JSException or InvalidOperationException)
+        catch (Exception exception) when (exception is HttpRequestException or JsonException or InvalidOperationException)
         {
             registrationError = exception.Message;
         }
@@ -342,31 +295,13 @@ else
         }
     }
 
-    private async Task CreateStaffAsync()
+    private sealed class DemoAccountSelection
     {
-        submitting = true;
-        registrationError = null;
-        try
-        {
-            var created = await Account.CreateStaffAsync(new CampusStaffRegistration(
-                staffRegistration.FirstName,
-                staffRegistration.LastName,
-                staffRegistration.Email,
-                staffRegistration.DateOfBirth,
-                staffRegistration.PhoneNumber));
-            await Account.RefreshUsersAsync();
-            await Account.SignInAsync(created.UserId);
-            Navigation.NavigateTo("/profile");
-        }
-        catch (Exception exception) when (exception is HttpRequestException or JsonException or JSException or InvalidOperationException)
-        {
-            registrationError = exception.Message;
-        }
-        finally
-        {
-            submitting = false;
-        }
+        [Range(1, int.MaxValue)]
+        public int UserId { get; set; }
     }
+
+    public void Dispose() => Account.Changed -= AccountChanged;
 
     private sealed class StudentRegistrationModel
     {
@@ -374,8 +309,6 @@ else
         public string FirstName { get; set; } = string.Empty;
         [Required]
         public string LastName { get; set; } = string.Empty;
-        [Required, EmailAddress]
-        public string Email { get; set; } = string.Empty;
         [Required]
         public DateOnly? DateOfBirth { get; set; }
         [Required]
@@ -387,18 +320,5 @@ else
         public string? PhoneNumber { get; set; }
         public string? Degree { get; set; }
         public string? Major { get; set; }
-    }
-
-    private sealed class StaffRegistrationModel
-    {
-        [Required]
-        public string FirstName { get; set; } = string.Empty;
-        [Required]
-        public string LastName { get; set; } = string.Empty;
-        [Required, EmailAddress]
-        public string Email { get; set; } = string.Empty;
-        [Required]
-        public DateOnly? DateOfBirth { get; set; }
-        public string? PhoneNumber { get; set; }
     }
 }

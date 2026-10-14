@@ -6,11 +6,45 @@ using CampusPulse.Shared.Rag.Generation;
 using FinancialAidBilling.Backend.Models;
 using FinancialAidBilling.Backend.Services;
 using System.Net.Http.Json;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddOpenApi();
-builder.Services.AddAuthorization();
+var issuer = builder.Configuration["Authentication:Issuer"] ?? "CampusPulse.Dev";
+var audience = builder.Configuration["Authentication:Audience"] ?? "CampusPulse.Api";
+var signingKey = builder.Configuration["Authentication:SigningKey"]
+    ?? (builder.Environment.IsDevelopment()
+        ? "campuspulse-demo-only-signing-key-change-before-any-use"
+        : throw new InvalidOperationException("The token signing key is not configured."));
+var keyBytes = System.Text.Encoding.UTF8.GetBytes(signingKey);
+if (keyBytes.Length < 32)
+{
+    throw new InvalidOperationException("The token signing key must contain at least 32 bytes.");
+}
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidIssuer = issuer,
+            ValidateAudience = true,
+            ValidAudience = audience,
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new Microsoft.IdentityModel.Tokens.SymmetricSecurityKey(keyBytes),
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.FromSeconds(30)
+        };
+    });
+builder.Services.AddAuthorization(options =>
+{
+    options.FallbackPolicy = new AuthorizationPolicyBuilder(JwtBearerDefaults.AuthenticationScheme)
+        .RequireAuthenticatedUser()
+        .RequireClaim("scope", "CampusPulse.Access")
+        .Build();
+});
 builder.Services.AddControllers();
 builder.Services.AddCors(options => options.AddDefaultPolicy(policy => policy
     .AllowAnyOrigin()
@@ -52,10 +86,23 @@ app.MapMultiAgentCaller("financialaidbilling", "billingDatabase", "/api/scholars
 
 app.MapOpenApi();
 app.UseCors();
+app.UseAuthentication();
+app.UseAuthorization();
 
-app.MapGet("/api/students", async (IHttpClientFactory clients, CancellationToken cancellationToken) =>
-    await (await clients.CreateClient("academicRecords").GetAsync("/api/students", cancellationToken))
-        .ToResultAsync(cancellationToken));
+app.MapGet("/api/students", async (
+    IHttpClientFactory clients,
+    HttpContext context,
+    CancellationToken cancellationToken) =>
+{
+    using var request = new HttpRequestMessage(HttpMethod.Get, "/api/students");
+    if (context.Request.Headers.Authorization.Count > 0)
+    {
+        request.Headers.TryAddWithoutValidation("Authorization", context.Request.Headers.Authorization.ToArray());
+    }
+
+    var response = await clients.CreateClient("academicRecords").SendAsync(request, cancellationToken);
+    return await response.ToResultAsync(cancellationToken);
+});
 
 var invoices = app.MapGroup("/api/invoices");
 
@@ -244,6 +291,6 @@ app.MapPost("/api/ai/knowledge", async (
     }
 });
 
-app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
+app.MapGet("/health", () => Results.Ok(new { status = "healthy" })).AllowAnonymous();
 
 app.Run();

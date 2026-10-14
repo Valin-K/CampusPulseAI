@@ -1,41 +1,49 @@
 @implements IDisposable
 @inject CampusAccountService Account
 @inject NavigationManager Navigation
+@inject CampusDemoAuthenticationStateProvider DemoAuthentication
+@inject IJSRuntime JavaScript
 
 <div class="campus-account-menu" aria-label="Account">
-    @if (Account.CurrentUser is { } user)
+    @if (Account.IsAuthenticated)
     {
         <span class="campus-account-identity">
-            <strong>@user.FullName</strong>
-            <small>@user.Role · @user.ExternalId</small>
+            <strong>@(Account.CurrentUser?.FullName ?? Account.AuthenticatedEmail)</strong>
+            @if (Account.CurrentUser is { } user)
+            {
+                <small>@user.Role · @user.ExternalId</small>
+            }
         </span>
-        <a class="button button-small button-secondary" href="/profile">Profile</a>
+        @if (Account.CurrentUser is not null)
+        {
+            <a class="button button-small button-secondary" href="@ProfileUrl">Profile</a>
+        }
         <button type="button" class="button button-small button-danger" @onclick="SignOutAsync">Sign out</button>
     }
     else
     {
-        <a class="button button-small button-accent" href="/login">Sign in</a>
+        <a class="button button-small button-accent" href="@SignInUrl">Sign in</a>
     }
 </div>
 
 @code {
-    protected override void OnInitialized()
+    private string ProfileUrl => $"http://localhost:8081/profile?returnUrl={Uri.EscapeDataString(Navigation.Uri)}";
+
+    private string SignInUrl => $"http://localhost:8081/login?returnUrl={Uri.EscapeDataString(Navigation.Uri)}";
+
+    protected override async Task OnInitializedAsync()
     {
         Account.Changed += AccountChanged;
+        await Account.InitializeAsync();
     }
 
     private void AccountChanged() => _ = InvokeAsync(StateHasChanged);
 
     private async Task SignOutAsync()
     {
-        try
-        {
-            await Account.SignOutAsync();
-            Navigation.NavigateTo("/login");
-        }
-        catch (JSException)
-        {
-        }
+        await DemoAuthentication.SignOutAsync();
+        await Account.InitializeAsync(forceRefresh: true);
+        await JavaScript.InvokeVoidAsync("campusPulseNavigation.signOutEverywhere");
     }
 
     public void Dispose() => Account.Changed -= AccountChanged;

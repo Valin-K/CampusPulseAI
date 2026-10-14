@@ -1,16 +1,28 @@
 using System.Net.Http.Json;
+using System.Security.Claims;
 using System.Text.Json;
 using CampusPulse.Shared.Components.Models;
-using Microsoft.JSInterop;
+using Microsoft.AspNetCore.Components.Authorization;
 
 namespace CampusPulse.Shared.Components.Services;
 
-public sealed class CampusAccountService(HttpClient http, IJSRuntime javaScript)
+public sealed class CampusAccountService : IDisposable
 {
-    public const string SessionStorageKey = "campuspulse.account.user-id";
+    private readonly HttpClient http;
+    private readonly AuthenticationStateProvider authenticationStateProvider;
+
+    public CampusAccountService(HttpClient http, AuthenticationStateProvider authenticationStateProvider)
+    {
+        this.http = http;
+        this.authenticationStateProvider = authenticationStateProvider;
+        authenticationStateProvider.AuthenticationStateChanged += AuthenticationStateChanged;
+    }
 
     public IReadOnlyList<CampusAccountUser> Users { get; private set; } = [];
     public CampusAccountUser? CurrentUser { get; private set; }
+    public string? AuthenticatedEmail { get; private set; }
+    public bool IsAuthenticated { get; private set; }
+    public bool CanRegisterStudent { get; private set; }
     public bool IsInitialized { get; private set; }
     public string? ErrorMessage { get; private set; }
 
@@ -26,45 +38,65 @@ public sealed class CampusAccountService(HttpClient http, IJSRuntime javaScript)
         IsInitialized = false;
         ErrorMessage = null;
         CurrentUser = null;
+        Users = [];
+        CanRegisterStudent = false;
 
         try
         {
-            Users = await http.GetFromJsonAsync<List<CampusAccountUser>>("api/users") ?? [];
-            ValidateUsers(Users);
+            var principal = (await authenticationStateProvider.GetAuthenticationStateAsync()).User;
+            IsAuthenticated = principal.Identity?.IsAuthenticated == true;
+            AuthenticatedEmail = IsAuthenticated ? GetEmail(principal) : null;
+
+            if (!IsAuthenticated)
+            {
+                return;
+            }
+
+            if (authenticationStateProvider is CampusDemoAuthenticationStateProvider demoAuthentication
+                && demoAuthentication.CurrentSession is { } session)
+            {
+                ValidateUsers([session.User]);
+                AuthenticatedEmail = session.User.Email;
+                CurrentUser = session.User;
+                Users = [session.User];
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(AuthenticatedEmail))
+            {
+                ErrorMessage = "The identity provider did not include an email address for this account.";
+                return;
+            }
+
+            var directoryUsers = await http.GetFromJsonAsync<List<CampusAccountUser>>("api/users") ?? [];
+            ValidateUsers(directoryUsers);
+            var matches = directoryUsers
+                .Where(user => string.Equals(user.Email, AuthenticatedEmail, StringComparison.OrdinalIgnoreCase))
+                .ToArray();
+
+            if (matches.Length == 1)
+            {
+                var matchedUser = matches[0];
+                CurrentUser = matchedUser;
+                Users = [matchedUser];
+            }
+            else if (matches.Length == 0)
+            {
+                CanRegisterStudent = true;
+                ErrorMessage = "This sign-in is not linked to a CampusPulse account. Register as a student or contact an administrator.";
+            }
+            else
+            {
+                ErrorMessage = "More than one CampusPulse account is linked to this email address. Contact an administrator.";
+            }
         }
         catch (HttpRequestException exception)
         {
-            Users = [];
             ErrorMessage = $"The Academic Records directory is unavailable: {exception.Message}";
-            IsInitialized = true;
-            Changed?.Invoke();
-            return;
         }
         catch (JsonException)
         {
-            Users = [];
             ErrorMessage = "The Academic Records directory returned invalid data.";
-            IsInitialized = true;
-            Changed?.Invoke();
-            return;
-        }
-
-        try
-        {
-            var storedId = await javaScript.InvokeAsync<string?>("campusPulseAccountSession.getUserId");
-            if (int.TryParse(storedId, out var userId))
-            {
-                CurrentUser = Users.SingleOrDefault(user => user.UserId == userId);
-            }
-
-            if (CurrentUser is null && storedId is not null)
-            {
-                await javaScript.InvokeVoidAsync("campusPulseAccountSession.removeUserId");
-            }
-        }
-        catch (JSException)
-        {
-            ErrorMessage = "Browser session storage is unavailable. Sign-in cannot be saved in this tab.";
         }
         finally
         {
@@ -73,28 +105,9 @@ public sealed class CampusAccountService(HttpClient http, IJSRuntime javaScript)
         }
     }
 
-    public async Task SignInAsync(int userId)
-    {
-        var user = Users.SingleOrDefault(candidate => candidate.UserId == userId)
-            ?? throw new InvalidOperationException("The selected account is not in the Academic Records directory.");
-
-        await javaScript.InvokeVoidAsync(
-            "campusPulseAccountSession.setUserId",
-            user.UserId.ToString(System.Globalization.CultureInfo.InvariantCulture));
-        CurrentUser = user;
-        ErrorMessage = null;
-        Changed?.Invoke();
-    }
-
-    public async Task SignOutAsync()
-    {
-        await javaScript.InvokeVoidAsync("campusPulseAccountSession.removeUserId");
-        CurrentUser = null;
-        Changed?.Invoke();
-    }
-
     public async Task<CampusCreatedUser> CreateStudentAsync(CampusStudentRegistration registration)
     {
+        EnsureAuthenticatedEmail(registration.Email);
         using var response = await http.PostAsJsonAsync("api/students/enroll", registration);
         await EnsureSuccessAsync(response);
         return await response.Content.ReadFromJsonAsync<CampusCreatedUser>()
@@ -103,6 +116,7 @@ public sealed class CampusAccountService(HttpClient http, IJSRuntime javaScript)
 
     public async Task<CampusCreatedStaff> CreateStaffAsync(CampusStaffRegistration registration)
     {
+        EnsureAuthenticatedEmail(registration.Email);
         using var response = await http.PostAsJsonAsync("api/staff/enroll", registration);
         await EnsureSuccessAsync(response);
         return await response.Content.ReadFromJsonAsync<CampusCreatedStaff>()
@@ -154,6 +168,7 @@ public sealed class CampusAccountService(HttpClient http, IJSRuntime javaScript)
     public async Task SaveCurrentProfileAsync(CampusUserProfile profile)
     {
         var user = CurrentUser ?? throw new InvalidOperationException("Sign in before editing a profile.");
+        EnsureAuthenticatedEmail(profile.Email);
         if (profile.UserId != user.UserId)
         {
             throw new InvalidOperationException("Only the signed-in account can be updated.");
@@ -205,6 +220,45 @@ public sealed class CampusAccountService(HttpClient http, IJSRuntime javaScript)
         Users = Users.Select(candidate => candidate.UserId == user.UserId ? CurrentUser : candidate).ToArray();
         Changed?.Invoke();
     }
+
+    private static string? GetEmail(ClaimsPrincipal principal) =>
+        principal.FindFirst(ClaimTypes.Email)?.Value
+        ?? principal.FindFirst("email")?.Value
+        ?? principal.FindFirst("preferred_username")?.Value
+        ?? principal.FindFirst("upn")?.Value;
+
+    private void EnsureAuthenticatedEmail(string email)
+    {
+        if (!IsAuthenticated
+            || string.IsNullOrWhiteSpace(AuthenticatedEmail)
+            || !string.Equals(email, AuthenticatedEmail, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("The account email must match the authenticated identity.");
+        }
+    }
+
+    private void AuthenticationStateChanged(Task<AuthenticationState> authenticationState) =>
+        _ = RefreshAuthenticationStateAsync(authenticationState);
+
+    private async Task RefreshAuthenticationStateAsync(Task<AuthenticationState> authenticationState)
+    {
+        try
+        {
+            await authenticationState;
+            await InitializeAsync(forceRefresh: true);
+        }
+        catch (HttpRequestException)
+        {
+            CurrentUser = null;
+            Users = [];
+            IsAuthenticated = false;
+            IsInitialized = true;
+            Changed?.Invoke();
+        }
+    }
+
+    public void Dispose() =>
+        authenticationStateProvider.AuthenticationStateChanged -= AuthenticationStateChanged;
 
     public async Task RefreshUsersAsync()
     {

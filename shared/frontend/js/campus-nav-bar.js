@@ -13,6 +13,124 @@ window.campusPulseAccountSession = {
     }
 };
 
+const campusAuthSessionKey = 'campuspulse.auth.session';
+const legacyCampusAuthSessionKey = 'campuspulse.demo-auth.session';
+const campusLogoutPorts = ['8080', '8081', '8082', '8083', '8084', '8085', '5062', '5186', '5254', '5128', '5236'];
+const campusSpaPorts = new Set([
+    '8080', '8081', '8082', '8083', '8084', '8085',
+    '5062', '5186', '5254', '5128', '5236'
+]);
+const clearCampusSession = () => {
+    sessionStorage.removeItem(campusAuthSessionKey);
+    sessionStorage.removeItem(legacyCampusAuthSessionKey);
+    window.campusPulseAccountSession.removeUserId();
+};
+window.campusPulseNavigation = {
+    getSessionFragment() {
+        return new URLSearchParams(window.location.hash.slice(1)).get('campuspulse_session');
+    },
+    cleanSessionFragment() {
+        const fragment = new URLSearchParams(window.location.hash.slice(1));
+        fragment.delete('campuspulse_session');
+        const hash = fragment.size ? `#${fragment}` : '';
+        window.history.replaceState(
+            window.history.state,
+            '',
+            `${window.location.pathname}${window.location.search}${hash}`);
+    },
+    signOutEverywhere() {
+        clearCampusSession();
+        const remainingPorts = campusLogoutPorts
+            .filter(port => port !== window.location.port && port !== '8080')
+            .concat('8080');
+        navigateToNextLogoutOrigin(remainingPorts);
+    }
+};
+function navigateToNextLogoutOrigin(remainingPorts) {
+    const [nextPort, ...portsAfterNext] = remainingPorts;
+    if (!nextPort) {
+        window.location.replace('http://localhost:8080/');
+        return;
+    }
+
+    const destination = new URL(`http://localhost:${nextPort}/`);
+    destination.searchParams.set('campuspulse_logout', '1');
+    destination.searchParams.set('campuspulse_logout_remaining', portsAfterNext.join(','));
+    window.location.assign(destination.toString());
+}
+
+const navigationQuery = new URLSearchParams(window.location.search);
+if (navigationQuery.get('campuspulse_logout') === '1') {
+    clearCampusSession();
+    const currentPort = window.location.port || '80';
+    const remainingPorts = [...new Set(
+        (navigationQuery.get('campuspulse_logout_remaining') ?? '')
+            .split(',')
+            .filter(port => campusLogoutPorts.includes(port) && port !== currentPort))];
+    if (!remainingPorts.includes('8080') && currentPort !== '8080') {
+        remainingPorts.push('8080');
+    }
+
+    if (remainingPorts.length > 0) {
+        navigateToNextLogoutOrigin(remainingPorts);
+    } else {
+        window.location.replace('http://localhost:8080/');
+    }
+}
+const incomingSession = new URLSearchParams(window.location.hash.slice(1)).get('campuspulse_session');
+if (incomingSession) {
+    try {
+        const session = JSON.parse(incomingSession);
+        if (session.accessToken && new Date(session.expiresAt) > new Date() && session.user?.userId) {
+            sessionStorage.setItem(campusAuthSessionKey, JSON.stringify(session));
+            window.campusPulseAccountSession.setUserId(String(session.user.userId));
+        } else {
+            sessionStorage.removeItem(campusAuthSessionKey);
+            window.campusPulseAccountSession.removeUserId();
+        }
+    } catch {
+        sessionStorage.removeItem(campusAuthSessionKey);
+        window.campusPulseAccountSession.removeUserId();
+    }
+
+    window.campusPulseNavigation.cleanSessionFragment();
+}
+
+document.addEventListener('click', event => {
+    if (event.defaultPrevented || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) {
+        return;
+    }
+
+    const anchor = event.composedPath().find(element => element instanceof HTMLAnchorElement);
+    if (!anchor || anchor.target && anchor.target !== '_self') {
+        return;
+    }
+
+    const destination = new URL(anchor.href, window.location.href);
+    if (destination.pathname.endsWith('/index.html')) {
+        event.preventDefault();
+        window.location.assign(destination.toString());
+        return;
+    }
+
+    if (destination.hostname !== 'localhost'
+        || !campusSpaPorts.has(destination.port)
+        || destination.origin === window.location.origin) {
+        return;
+    }
+
+    const session = sessionStorage.getItem(campusAuthSessionKey);
+    if (!session) {
+        return;
+    }
+
+    const hash = new URLSearchParams(destination.hash.slice(1));
+    hash.set('campuspulse_session', session);
+    destination.hash = hash.toString();
+    event.preventDefault();
+    window.location.assign(destination.toString());
+});
+
 class CampusNavBar extends HTMLElement {
     static observedAttributes = [
         'page-name',
@@ -62,7 +180,12 @@ class CampusNavBar extends HTMLElement {
         }
 
         try {
-            const response = await fetch('/api/users', { cache: 'no-store' });
+            const sessionJson = sessionStorage.getItem(campusAuthSessionKey);
+            const session = sessionJson ? JSON.parse(sessionJson) : null;
+            const headers = session?.accessToken
+                ? { Authorization: `Bearer ${session.accessToken}` }
+                : {};
+            const response = await fetch('/api/users', { cache: 'no-store', headers });
             if (!response.ok) throw new Error('Unable to load account directory.');
             const users = await response.json();
             this.accountUser = users.find(user => String(user.userId) === userId) ?? null;
@@ -86,6 +209,8 @@ class CampusNavBar extends HTMLElement {
         const pageName = escape(value('page-name', 'CampusPulse'));
         const sectionLabel = escape(value('section-label', 'Student services'));
         const homeHref = escape(value('home-href', '/'));
+        const profileHref = `/profile?returnUrl=${encodeURIComponent(`${window.location.origin}/index.html`)}`;
+        const signInHref = `/login?returnUrl=${encodeURIComponent(`${window.location.origin}/`)}`;
         const portalHref = value('portal-href');
         const userName = value('user-name');
         const userDetails = escape(value('user-details'));
@@ -103,8 +228,8 @@ class CampusNavBar extends HTMLElement {
         const accountUser = this.accountUser;
         const sessionActions = this.hasAttribute('account-session')
             ? accountUser
-                ? `<div class="session-actions"><span class="session-identity"><strong>${escape(`${accountUser.firstName ?? ''} ${accountUser.lastName ?? ''}`.trim())}</strong><small>${escape(accountUser.role ?? '')}</small></span><a class="account-button" href="/profile">Profile</a><button class="account-button sign-out" type="button">Sign out</button></div>`
-                : '<div class="session-actions"><a class="account-button sign-in" href="/login">Sign in</a></div>'
+                ? `<div class="session-actions"><span class="session-identity"><strong>${escape(`${accountUser.firstName ?? ''} ${accountUser.lastName ?? ''}`.trim())}</strong><small>${escape(accountUser.role ?? '')}</small></span><a class="account-button" href="${escape(profileHref)}">Profile</a><button class="account-button sign-out" type="button">Sign out</button></div>`
+                : `<div class="session-actions"><a class="account-button sign-in" href="${escape(signInHref)}">Sign in</a></div>`
             : '';
         const user = `<slot name="user-selector">${fallbackUser}</slot>`;
         const count = serviceCount
@@ -182,7 +307,7 @@ class CampusNavBar extends HTMLElement {
             <div class="context-bar"><span><i aria-hidden="true"></i>${contextLabel}</span></div>`;
 
         this.shadowRoot.querySelector('.sign-out')?.addEventListener('click', () => {
-            window.campusPulseAccountSession.removeUserId();
+            window.campusPulseNavigation.signOutEverywhere();
         });
     }
 }

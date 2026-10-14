@@ -6,7 +6,7 @@ namespace CampusHousing.Frontend.Services;
 
 public sealed record HousingUser(int UserId, string DisplayName, string StudentId, bool IsAdministrator);
 
-public sealed class HousingUserContext(IJSRuntime js, NavigationManager navigation, IConfiguration configuration)
+public sealed class HousingUserContext(IJSRuntime js, NavigationManager navigation, HttpClient http)
 {
     private const string StorageKey = "campuspulse.campus-housing.selected-user-id";
 
@@ -35,8 +35,6 @@ public sealed class HousingUserContext(IJSRuntime js, NavigationManager navigati
 
         try
         {
-            var backendUrl = configuration["BackendUrl"] ?? "http://localhost:5083";
-            using var http = new HttpClient { BaseAddress = new Uri(backendUrl.TrimEnd('/') + "/") };
             var directory = await http.GetFromJsonAsync<List<HousingDirectoryUser>>("api/housing/users");
             Users = (directory ?? [])
                 .Where(user => string.Equals(user.Role, "Student", StringComparison.OrdinalIgnoreCase)
@@ -60,6 +58,10 @@ public sealed class HousingUserContext(IJSRuntime js, NavigationManager navigati
         catch (JSException)
         {
             ErrorMessage = "The selected Housing user could not be read from this browser.";
+        }
+        catch (HttpRequestException exception)
+        {
+            ErrorMessage = $"Housing users could not be loaded: {exception.Message}";
         }
         finally
         {

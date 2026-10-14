@@ -4,9 +4,9 @@
 
 <CampusShell PageName="Event &amp; Facility Scheduling"
              SectionLabel="Campus scheduling"
-             UserName="@userName"
-             UserDetails="@userDetails"
-             UserInitials="@userInitials"
+             UserName="@(Account.CurrentUser?.FullName ?? "Event Scheduling")"
+             UserDetails="@(Account.CurrentUser is null ? "Scheduling workspace" : $"{Account.CurrentUser.Role} · {Account.CurrentUser.ExternalId}")"
+             UserInitials="@(Account.CurrentUser?.Initials ?? "ES")"
              HomeHref="http://localhost:8080"
              RequireSignedInUser="true">
     <UserSelector>
@@ -30,7 +30,7 @@
             }
             else
             {
-                <span><strong>@userName</strong></span>
+                <span><strong>@(Account.CurrentUser?.FullName ?? "Signed-in user")</strong></span>
             }
         </div>
     </UserSelector>
@@ -54,28 +54,11 @@
 }
 
 @code {
-    private string userName = "Loading…";
-    private string userDetails = string.Empty;
-    private string userInitials = string.Empty;
-
     protected override async Task OnInitializedAsync()
     {
         var accountInitialization = Account.InitializeAsync();
-        var profile = await CurrentUser.LoadAsync();
+        await CurrentUser.LoadAsync();
         await accountInitialization;
-
-        if (profile is not null)
-        {
-            userName = profile.FullName;
-            userDetails = profile.Descriptor;
-            userInitials = profile.Initials;
-        }
-        else
-        {
-            userName = "Unknown user";
-            userDetails = string.Empty;
-            userInitials = "?";
-        }
     }
 
     private async Task OnUserChangedAsync(ChangeEventArgs args)

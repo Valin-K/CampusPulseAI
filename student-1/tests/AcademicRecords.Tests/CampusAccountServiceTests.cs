@@ -1,8 +1,10 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Security.Claims;
 using System.Text.Json;
 using CampusPulse.Shared.Components.Models;
 using CampusPulse.Shared.Components.Services;
+using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.JSInterop;
 
 namespace AcademicRecords.Tests;
@@ -16,63 +18,47 @@ public sealed class CampusAccountServiceTests
     ];
 
     [Test]
-    public async Task InitializeRestoresOnlyTheAccountIdStoredInSession()
+    public async Task InitializeMatchesTheAuthenticatedEmailToOneDirectoryAccount()
     {
-        var javaScript = new TestJsRuntime("12");
-        var service = CreateService(javaScript, DirectoryHandler());
+        var service = CreateService(DirectoryHandler(), "avery@example.edu");
 
         await service.InitializeAsync();
 
         Assert.That(service.IsInitialized, Is.True);
-        Assert.That(service.Users, Has.Count.EqualTo(2));
+        Assert.That(service.Users, Has.Count.EqualTo(1));
         Assert.That(service.CurrentUser, Is.EqualTo(DirectoryUsers[0]));
         Assert.That(service.ErrorMessage, Is.Null);
     }
 
     [Test]
-    public async Task InitializeRemovesUnknownStoredAccountWithoutSelectingAnotherUser()
+    public async Task InitializeDoesNotSelectAnAccountWhenTheAuthenticatedEmailIsUnknown()
     {
-        var javaScript = new TestJsRuntime("999");
-        var service = CreateService(javaScript, DirectoryHandler());
+        var service = CreateService(DirectoryHandler(), "unknown@example.edu");
 
         await service.InitializeAsync();
 
         Assert.That(service.CurrentUser, Is.Null);
-        Assert.That(service.Users, Has.Count.EqualTo(2));
-        Assert.That(javaScript.SessionUserId, Is.Null);
-        Assert.That(javaScript.Invocations, Does.Contain("campusPulseAccountSession.removeUserId"));
+        Assert.That(service.Users, Is.Empty);
+        Assert.That(service.CanRegisterStudent, Is.True);
+        Assert.That(service.ErrorMessage, Does.Contain("not linked"));
     }
 
     [Test]
-    public async Task SignInReplacesTheSingleSessionUserAndSignOutClearsIt()
+    public async Task UnauthenticatedInitializationDoesNotLoadTheDirectory()
     {
-        var javaScript = new TestJsRuntime("12");
-        var service = CreateService(javaScript, DirectoryHandler());
+        var requests = 0;
+        var handler = new TestHttpMessageHandler((_, _) =>
+        {
+            requests++;
+            return Task.FromResult(JsonResponse(HttpStatusCode.OK, DirectoryUsers));
+        });
+        var service = CreateService(handler, null);
+
         await service.InitializeAsync();
-        var changeCount = 0;
-        service.Changed += () => changeCount++;
-
-        await service.SignInAsync(23);
-
-        Assert.That(service.CurrentUser, Is.EqualTo(DirectoryUsers[1]));
-        Assert.That(javaScript.SessionUserId, Is.EqualTo("23"));
-
-        await service.SignOutAsync();
 
         Assert.That(service.CurrentUser, Is.Null);
-        Assert.That(javaScript.SessionUserId, Is.Null);
-        Assert.That(changeCount, Is.EqualTo(2));
-    }
-
-    [Test]
-    public async Task SignInRejectsAnAccountOutsideTheLoadedDirectory()
-    {
-        var javaScript = new TestJsRuntime();
-        var service = CreateService(javaScript, DirectoryHandler());
-        await service.InitializeAsync();
-
-        Assert.ThrowsAsync<InvalidOperationException>(() => service.SignInAsync(404));
-        Assert.That(javaScript.SessionUserId, Is.Null);
+        Assert.That(service.IsAuthenticated, Is.False);
+        Assert.That(requests, Is.Zero);
     }
 
     [Test]
@@ -81,10 +67,16 @@ public sealed class CampusAccountServiceTests
         CapturedRequest? captured = null;
         var handler = new TestHttpMessageHandler(async (request, cancellationToken) =>
         {
+            if (request.RequestUri!.AbsolutePath == "/api/users")
+            {
+                return JsonResponse(HttpStatusCode.OK, Array.Empty<CampusAccountUser>());
+            }
+
             captured = await CaptureAsync(request, cancellationToken);
             return JsonResponse(HttpStatusCode.Created, new { studentId = "STU101", userId = 101 });
         });
-        var service = CreateService(new TestJsRuntime(), handler);
+        var service = CreateService(handler, "riley@example.edu");
+        await service.InitializeAsync();
         var registration = new CampusStudentRegistration(
             "Riley", "Jones", "riley@example.edu", new DateOnly(2004, 5, 6),
             "1 Campus Way", "Jordan Jones", "0400000000", "0400000001", "Bachelor", "Science");
@@ -105,10 +97,16 @@ public sealed class CampusAccountServiceTests
         CapturedRequest? captured = null;
         var handler = new TestHttpMessageHandler(async (request, cancellationToken) =>
         {
+            if (request.RequestUri!.AbsolutePath == "/api/users")
+            {
+                return JsonResponse(HttpStatusCode.OK, Array.Empty<CampusAccountUser>());
+            }
+
             captured = await CaptureAsync(request, cancellationToken);
             return JsonResponse(HttpStatusCode.Created, new { staffId = "STF102", userId = 102 });
         });
-        var service = CreateService(new TestJsRuntime(), handler);
+        var service = CreateService(handler, "jamie@example.edu");
+        await service.InitializeAsync();
 
         var created = await service.CreateStaffAsync(new CampusStaffRegistration(
             "Jamie", "Lee", "jamie@example.edu", new DateOnly(1985, 7, 8), "0400000002"));
@@ -153,8 +151,7 @@ public sealed class CampusAccountServiceTests
 
             return new HttpResponseMessage(HttpStatusCode.NoContent);
         });
-        var javaScript = new TestJsRuntime("12");
-        var service = CreateService(javaScript, handler);
+        var service = CreateService(handler, "avery@example.edu");
         await service.InitializeAsync();
 
         var profile = await service.GetCurrentProfileAsync();
@@ -205,7 +202,7 @@ public sealed class CampusAccountServiceTests
             updateRequest = await CaptureAsync(request, cancellationToken);
             return new HttpResponseMessage(HttpStatusCode.NoContent);
         });
-        var service = CreateService(new TestJsRuntime("23"), handler);
+        var service = CreateService(handler, "morgan@example.edu");
         await service.InitializeAsync();
 
         var profile = await service.GetCurrentProfileAsync();
@@ -228,7 +225,7 @@ public sealed class CampusAccountServiceTests
             requests++;
             return Task.FromResult(JsonResponse(HttpStatusCode.OK, DirectoryUsers));
         });
-        var service = CreateService(new TestJsRuntime("12"), handler);
+        var service = CreateService(handler, "avery@example.edu");
         await service.InitializeAsync();
 
         Assert.ThrowsAsync<InvalidOperationException>(() => service.SaveCurrentProfileAsync(new CampusUserProfile
@@ -267,7 +264,7 @@ public sealed class CampusAccountServiceTests
     public async Task DirectoryFailureLeavesAccountSignedOutAndReportsAnError()
     {
         var handler = new TestHttpMessageHandler((_, _) => throw new HttpRequestException("offline"));
-        var service = CreateService(new TestJsRuntime("12"), handler);
+        var service = CreateService(handler, "avery@example.edu");
 
         await service.InitializeAsync();
 
@@ -277,8 +274,10 @@ public sealed class CampusAccountServiceTests
         Assert.That(service.IsInitialized, Is.True);
     }
 
-    private static CampusAccountService CreateService(TestJsRuntime javaScript, HttpMessageHandler handler) =>
-        new(new HttpClient(handler) { BaseAddress = new Uri("https://academic-records.test/") }, javaScript);
+    private static CampusAccountService CreateService(HttpMessageHandler handler, string? email) =>
+        new(
+            new HttpClient(handler) { BaseAddress = new Uri("https://academic-records.test/") },
+            new TestAuthenticationStateProvider(email));
 
     private static TestHttpMessageHandler DirectoryHandler() => new((_, _) =>
         Task.FromResult(JsonResponse(HttpStatusCode.OK, DirectoryUsers)));
@@ -298,6 +297,17 @@ public sealed class CampusAccountServiceTests
     private sealed record CapturedRequest(HttpMethod Method, string Path, string Body);
 
     private sealed record HeaderResponse(string? UserIdHeader);
+
+    private sealed class TestAuthenticationStateProvider(string? email) : AuthenticationStateProvider
+    {
+        public override Task<AuthenticationState> GetAuthenticationStateAsync()
+        {
+            var identity = email is null
+                ? new ClaimsIdentity()
+                : new ClaimsIdentity([new Claim("preferred_username", email)], "test");
+            return Task.FromResult(new AuthenticationState(new ClaimsPrincipal(identity)));
+        }
+    }
 
     private sealed class TestHttpMessageHandler(
         Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> responder) : HttpMessageHandler

@@ -1,4 +1,5 @@
 @inject CampusAccountService Account
+@inject NavigationManager Navigation
 
 <PageTitle>Sign in required | CampusPulse</PageTitle>
 
@@ -14,5 +15,9 @@
         <p>No signed-in user was found for this browser session.</p>
     }
     <p>Sign in with your student or staff account to access this page.</p>
-    <a class="button button-primary" href="/login">Go to sign in</a>
+    <a class="button button-primary" href="@SignInUrl">Go to sign in</a>
 </section>
+
+@code {
+    private string SignInUrl => $"http://localhost:8081/login?returnUrl={Uri.EscapeDataString(Navigation.Uri)}";
+}

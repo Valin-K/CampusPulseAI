@@ -1,5 +1,5 @@
-using Microsoft.JSInterop;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.AspNetCore.Components.Authorization;
 
 namespace CampusPulse.Shared.Components.Services;
 
@@ -9,18 +9,16 @@ public static class CampusAccountServiceCollectionExtensions
         this IServiceCollection services,
         string academicRecordsBackendUrl)
     {
-        services.AddScoped(serviceProvider =>
+        services.AddScoped<CampusAccountService>(serviceProvider =>
         {
-            var javaScript = serviceProvider.GetRequiredService<IJSRuntime>();
-            var handler = new CampusUserIdHeaderHandler(javaScript)
-            {
-                InnerHandler = new HttpClientHandler()
-            };
+            var handler = CampusDemoAuthenticationServiceCollectionExtensions.CreateCampusDemoTokenHandler(serviceProvider);
             var http = new HttpClient(handler)
             {
                 BaseAddress = new Uri(EnsureTrailingSlash(academicRecordsBackendUrl))
             };
-            return new CampusAccountService(http, javaScript);
+            return new CampusAccountService(
+                http,
+                serviceProvider.GetRequiredService<AuthenticationStateProvider>());
         });
 
         return services;
