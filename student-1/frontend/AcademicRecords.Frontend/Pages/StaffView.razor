@@ -1,5 +1,7 @@
 @page "/staff/{UserId:int}"
 @using System.Net.Http.Json
+@inject CampusAccountService Account
+@inject NavigationManager Navigation
 
 <PageTitle>Staff | Academic Records</PageTitle>
 
@@ -62,7 +64,35 @@ else if (staff is not null)
 
     protected override async Task OnParametersSetAsync()
     {
+        staff = null;
         loadError = null;
+
+        await Account.InitializeAsync();
+        var signedInUser = Account.CurrentUser;
+        if (signedInUser is null)
+        {
+            loadError = Account.ErrorMessage ?? "Sign in with a staff account to view Academic Records.";
+            return;
+        }
+
+        if (CampusAccountService.IsStudent(signedInUser))
+        {
+            Navigation.NavigateTo($"students/{signedInUser.UserId}", replace: true);
+            return;
+        }
+
+        if (!CampusAccountService.IsStaff(signedInUser))
+        {
+            loadError = "This account does not have access to the staff view.";
+            return;
+        }
+
+        if (UserId != signedInUser.UserId)
+        {
+            Navigation.NavigateTo($"staff/{signedInUser.UserId}", replace: true);
+            return;
+        }
+
         try
         {
             staff = await Http.GetFromJsonAsync<StaffHeader>($"api/staff/by-user/{UserId}");
