@@ -1,5 +1,6 @@
 services:
   academicrecords.backend:
     environment:
+      ASPNETCORE_ENVIRONMENT: Development
       Rag__Enabled: "false"
       Mcp__Enabled: "false"

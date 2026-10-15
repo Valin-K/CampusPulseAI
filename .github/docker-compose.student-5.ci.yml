@@ -4,6 +4,10 @@ services:
       - "15521:8080"
 
   eventscheduling.backend:
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      Mcp__Enabled: "false"
+      Rag__Enabled: "false"
     ports: !override
       - "18085:8080"
 
