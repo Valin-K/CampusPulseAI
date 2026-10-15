@@ -6,7 +6,7 @@
     <meta name="description" content="CampusPulse student services portal">
     <title>CampusPulse | Student Services</title>
     <link rel="stylesheet" href="css/university-theme.css">
-    <script src="js/campus-nav-bar.js" defer></script>
+    <script src="js/campus-nav-bar.js?v=6" defer></script>
     <style>
         .portal-shell {
             min-height: 100vh;
@@ -95,7 +95,7 @@
 </head>
 <body>
     <div class="portal-shell">
-        <campus-nav-bar page-name="Service directory" section-label="Student services" service-count="5 services"></campus-nav-bar>
+        <campus-nav-bar page-name="Service directory" section-label="Student services" service-count="5 services" account-session home-href="/"></campus-nav-bar>
 
         <main class="portal-workspace">
             <section class="dashboard-hero portal-hero">

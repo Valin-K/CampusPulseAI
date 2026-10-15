@@ -13,7 +13,7 @@
         <h1>Campus housing & maintenance</h1>
         <p>Submit a housing request, check room availability, or report a maintenance issue.</p>
     </div>
-    <div class="term-summary"><span>Current demo user</span><strong>@UserContext.CurrentUser?.DisplayName</strong><small>@(UserContext.IsAdministrator ? "Housing Administrator" : UserContext.CurrentUser?.StudentId)</small></div>
+    <div class="term-summary"><span>Signed-in account</span><strong>@UserContext.CurrentUser?.FullName</strong><small>@(UserContext.IsAdministrator ? "Housing Administrator" : UserContext.CurrentUser?.StudentId)</small></div>
 </header>
 
 <section class="metric-grid" aria-label="Housing summary">

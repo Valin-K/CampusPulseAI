@@ -48,6 +48,10 @@ services:
     depends_on:
       - ai.gateway
       - academicrecords.database
+    networks:
+      default:
+        aliases:
+          - academicrecords-backend-upstream
 
   coursemanagement.backend:
     image: ${DOCKER_REGISTRY-}coursemanagementbackend
@@ -211,6 +215,10 @@ services:
       - "8081:80"
     depends_on:
       - academicrecords.backend
+    networks:
+      default:
+        aliases:
+          - academicrecords-frontend-upstream
 
 
   coursemanagement.frontend:

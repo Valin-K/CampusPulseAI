@@ -1,23 +1,31 @@
 using CampusHousing.Frontend;
 using CampusHousing.Frontend.Services;
+using CampusPulse.Shared.Components.Services;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
+using Microsoft.JSInterop;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 builder.RootComponents.Add<App>("#app");
 builder.RootComponents.Add<HeadOutlet>("head::after");
-builder.Services.AddScoped<HousingUserContext>();
-builder.Services.AddScoped<HousingRoleHandler>();
-
 var configuredBackendUrl = builder.Configuration["BackendUrl"];
 var backendUrl = string.IsNullOrWhiteSpace(configuredBackendUrl)
     ? builder.HostEnvironment.BaseAddress
     : configuredBackendUrl;
+var academicRecordsBackendUrl = builder.Configuration["AcademicRecordsBackendUrl"] ?? "http://localhost:5020";
+builder.Services.AddCampusDemoAuthentication(academicRecordsBackendUrl);
+builder.Services.AddCampusAccountServices(academicRecordsBackendUrl);
+builder.Services.AddScoped<HousingUserContext>();
+builder.Services.AddScoped<HousingRoleHandler>();
 builder.Services.AddScoped(sp =>
 {
-    var handler = sp.GetRequiredService<HousingRoleHandler>();
-    handler.InnerHandler = new HttpClientHandler();
-    return new HttpClient(handler) { BaseAddress = new Uri(backendUrl) };
+    var housingHandler = sp.GetRequiredService<HousingRoleHandler>();
+    housingHandler.InnerHandler = CampusDemoAuthenticationServiceCollectionExtensions
+        .CreateCampusDemoTokenHandler(sp);
+    var userIdHandler = new CampusUserIdHeaderHandler(sp.GetRequiredService<IJSRuntime>())
+    {
+        InnerHandler = housingHandler
+    };
+    return new HttpClient(userIdHandler) { BaseAddress = new Uri(backendUrl) };
 });
-
 await builder.Build().RunAsync();

@@ -1,0 +1,137 @@
+@page "/profile"
+@layout CampusAccountLayout
+@using System.Text.Json
+@inject CampusAccountService Account
+@inject NavigationManager Navigation
+
+<PageTitle>My profile | CampusPulse</PageTitle>
+
+<header class="dashboard-hero">
+    <div>
+        <span class="eyebrow">CampusPulse account</span>
+        <h1>My profile</h1>
+        <p>View and update your Academic Records profile.</p>
+    </div>
+    @if (Account.CurrentUser is { } user)
+    {
+        <div class="term-summary">
+            <span>@user.Role account</span>
+            <strong>@user.ExternalId</strong>
+            <small>@user.Email</small>
+        </div>
+    }
+</header>
+
+@if (isLoading)
+{
+    <p class="muted" role="status">Loading profile...</p>
+}
+else if (loadError is not null)
+{
+    <div class="notice notice-error" role="alert">Unable to load profile: @loadError</div>
+}
+else if (profile is not null)
+{
+    @if (saveError is not null)
+    {
+        <div class="notice notice-error" role="alert">Unable to save profile: @saveError</div>
+    }
+    @if (saveSucceeded)
+    {
+        <div class="notice notice-success" role="status">Profile updated successfully.</div>
+    }
+
+    <EditForm Model="profile" OnValidSubmit="SaveAsync">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+        <section class="surface-card">
+            <div class="section-heading">
+                <div><span class="eyebrow">@profile.Role profile</span><h2>@profile.FirstName @profile.LastName</h2></div>
+            </div>
+            <div class="form-grid">
+                <label class="field"><span>ID</span><input value="@(profile.StudentId ?? profile.StaffId)" readonly disabled /></label>
+                <label class="field"><span>Role</span><input value="@profile.Role" readonly disabled /></label>
+                <label class="field"><span>First name</span><InputText @bind-Value="profile.FirstName" /></label>
+                <label class="field"><span>Last name</span><InputText @bind-Value="profile.LastName" /></label>
+                <label class="field"><span>Email</span><input type="email" value="@profile.Email" readonly disabled /></label>
+                <label class="field"><span>Date of birth</span><InputDate @bind-Value="profile.DateOfBirth" /></label>
+                <label class="field"><span>Phone number</span><InputText @bind-Value="profile.PhoneNumber" /></label>
+                @if (profile.StudentId is not null)
+                {
+                    <label class="field"><span>Mailing address</span><InputText @bind-Value="profile.MailingAddress" /></label>
+                    <label class="field"><span>Emergency contact name</span><InputText @bind-Value="profile.EmergencyContactName" /></label>
+                    <label class="field"><span>Emergency contact phone</span><InputText @bind-Value="profile.EmergencyContactPhone" /></label>
+                    <label class="field"><span>Enrollment date</span><input value="@profile.EnrollmentDate" readonly disabled /></label>
+                    <label class="field"><span>Degree</span><InputText @bind-Value="profile.Degree" /></label>
+                    <label class="field"><span>Major</span><InputText @bind-Value="profile.Major" /></label>
+                    <label class="field"><span>Minor (SubMajor)</span><InputText @bind-Value="profile.SubMajor" /></label>
+                }
+            </div>
+            <div class="button-row" style="margin-top: 1rem;">
+                <button type="submit" class="button button-primary" disabled="@isSaving">@(isSaving ? "Saving..." : "Save changes")</button>
+            </div>
+        </section>
+    </EditForm>
+}
+
+@code {
+    private CampusUserProfile? profile;
+    private bool isLoading = true;
+    private bool isSaving;
+    private bool saveSucceeded;
+    private string? loadError;
+    private string? saveError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Account.IsInitialized)
+        {
+            await Account.InitializeAsync();
+        }
+
+        if (Account.CurrentUser is null)
+        {
+            var returnUrl = Navigation.Uri;
+            Navigation.NavigateTo($"http://localhost:8081/login?returnUrl={Uri.EscapeDataString(returnUrl)}");
+            return;
+        }
+
+        try
+        {
+            profile = await Account.GetCurrentProfileAsync();
+        }
+        catch (Exception exception) when (exception is HttpRequestException or JsonException or InvalidOperationException)
+        {
+            loadError = exception.Message;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        if (profile is null)
+        {
+            return;
+        }
+
+        isSaving = true;
+        saveError = null;
+        saveSucceeded = false;
+        try
+        {
+            await Account.SaveCurrentProfileAsync(profile);
+            saveSucceeded = true;
+        }
+        catch (Exception exception) when (exception is HttpRequestException or JsonException or InvalidOperationException)
+        {
+            saveError = exception.Message;
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+}

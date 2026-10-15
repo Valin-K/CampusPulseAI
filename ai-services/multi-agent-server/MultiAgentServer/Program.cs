@@ -5,7 +5,7 @@ using MultiAgentServer;
 var builder = WebApplication.CreateBuilder(args);
 builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = 1024 * 1024);
 builder.Services.AddAiGateway(builder.Configuration);
-builder.Services.AddHttpClient<IMcpClient, McpClient>(client =>
+builder.Services.AddMcpClient(client =>
 {
     client.BaseAddress = new Uri(builder.Configuration["Services:McpServer"] ?? "http://localhost:5268");
     client.Timeout = TimeSpan.FromSeconds(15);

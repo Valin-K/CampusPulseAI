@@ -1,40 +1,16 @@
 ﻿@inherits LayoutComponentBase
 @inject HousingUserContext UserContext
-@using Microsoft.JSInterop
+@inject CampusAccountService Account
 
 <CampusShell PageName="Campus Housing"
              SectionLabel="Housing services"
-             UserName="@(UserContext.CurrentUser?.DisplayName ?? "")"
-             UserDetails="@(UserContext.CurrentUser is null ? "" : UserContext.IsAdministrator ? "Housing Administrator" : $"Student ID: {UserContext.CurrentUser.StudentId}")"
-             UserInitials="@(UserContext.IsAdministrator ? "HA" : "JW")"
+             UserName="@(Account.CurrentUser?.FullName ?? "Campus Housing")"
+             UserDetails="@(Account.CurrentUser is null ? "Housing workspace" : $"{Account.CurrentUser.Role} · {Account.CurrentUser.ExternalId}")"
+             UserInitials="@(Account.CurrentUser?.Initials ?? "CH")"
              HomeHref="http://localhost:8080"
              PortalHref="http://localhost:8080"
+             RequireSignedInUser="true"
              ContextLabel="@ContextLabel">
-    <UserSelector>
-        <div class="housing-user-selector">
-            @if (!UserContext.IsInitialized)
-            {
-                <span role="status">Verifying Housing access...</span>
-            }
-            else if (UserContext.IsAvailable)
-            {
-                <label for="housing-user-select">Viewing as</label>
-                <select id="housing-user-select"
-                        value="@UserContext.CurrentUser!.UserId"
-                        @onchange="ChangeUserAsync"
-                        aria-label="Select demonstration housing user">
-                    @foreach (var user in UserContext.Users)
-                    {
-                        <option value="@user.UserId">@user.DisplayName (@DisplayRole(user))</option>
-                    }
-                </select>
-            }
-            else
-            {
-                <span>Housing access unavailable</span>
-            }
-        </div>
-    </UserSelector>
     <ChildContent>
         @if (!UserContext.IsInitialized)
         {
@@ -50,59 +26,29 @@
         }
         else
         {
-            @if (selectionErrorMessage is not null)
-            {
-                <FeedbackPanel Kind="FeedbackKind.Error"
-                               Title="User selection could not be saved"
-                               Message="@selectionErrorMessage" />
-            }
-
             @Body
         }
     </ChildContent>
 </CampusShell>
 
-<CampusAiChat StudentUserId="@UserContext.CurrentUser?.UserId" />
+@if (Account.CurrentUser is not null)
+{
+    <CampusAiChat StudentUserId="@UserContext.CurrentUser?.UserId" />
+}
 
 @code {
-    string? selectionErrorMessage;
-
     string ContextLabel => UserContext.CurrentUser is null
         ? "Housing services workspace"
-        : $"{DisplayRole(UserContext.CurrentUser)} housing workspace";
+        : $"{(UserContext.IsAdministrator ? "Staff" : "Student")} housing workspace";
 
     protected override async Task OnInitializedAsync()
     {
+        await Account.InitializeAsync();
         await UserContext.InitializeAsync();
-    }
-
-    async Task ChangeUserAsync(ChangeEventArgs args)
-    {
-        if (int.TryParse(args.Value?.ToString(), out var userId))
-        {
-            selectionErrorMessage = null;
-            try
-            {
-                await UserContext.SelectUserAsync(userId);
-            }
-            catch (JSException)
-            {
-                selectionErrorMessage =
-                    "This browser did not allow the selected user to be saved. Try again or use another browser window.";
-            }
-            catch (InvalidOperationException)
-            {
-                selectionErrorMessage =
-                    "The selected user is no longer available. Refresh Campus Housing and try again.";
-            }
-        }
     }
 
     async Task RetryAsync()
     {
         await UserContext.InitializeAsync(forceRefresh: true);
     }
-
-    static string DisplayRole(HousingUser user) =>
-        user.IsAdministrator ? "Staff" : "Student";
 }

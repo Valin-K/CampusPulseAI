@@ -16,8 +16,8 @@
     @if (UserContext.CurrentUser is not null)
     {
         <div class="term-summary">
-            <span>Current demo user</span>
-            <strong>@UserContext.CurrentUser.DisplayName</strong>
+            <span>Signed-in account</span>
+            <strong>@UserContext.CurrentUser.FullName</strong>
             <small>@UserContext.CurrentUser.ExternalId | @RoleLabel</small>
         </div>
     }

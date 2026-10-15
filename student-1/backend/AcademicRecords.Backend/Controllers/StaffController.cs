@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AcademicRecords.Backend.Controllers;
@@ -20,6 +21,7 @@ public sealed class StaffController(IHttpClientFactory clients) : AcademicRecord
         return await ForwardResponseAsync(response, cancellationToken);
     }
 
+    [AllowAnonymous]
     [HttpPost("enroll")]
     public Task<IActionResult> Enroll(CancellationToken cancellationToken) =>
         ForwardJsonRequestAsync(AcademicRecordsDatabase, HttpMethod.Post, "/api/staff/enroll", cancellationToken);

@@ -1,22 +1,14 @@
-using System.Globalization;
+using CampusPulse.Shared.Components.Services;
 using EventScheduling.Frontend.Models;
-using Microsoft.AspNetCore.Components;
-using Microsoft.JSInterop;
 
 namespace EventScheduling.Frontend.Services;
 
-public sealed class CurrentUser(EventSchedulingApiClient api, IJSRuntime js, NavigationManager navigation)
+public sealed class CurrentUser(CampusAccountService account)
 {
-    private const string StorageKey = "campuspulse.event-scheduling.selected-user-id";
-    private const int DefaultUserId = 4;
-
-    public IReadOnlyList<UserProfile> Users { get; private set; } = [];
     public UserProfile? Profile { get; private set; }
     public bool IsInitialized { get; private set; }
 
-    public bool IsDegraded { get; private set; }
-
-    public int UserId => Profile?.UserId ?? DefaultUserId;
+    public int UserId => Profile?.UserId ?? 0;
 
     public bool IsStaff => string.Equals(Profile?.Role, "Staff", StringComparison.OrdinalIgnoreCase);
 
@@ -26,44 +18,28 @@ public sealed class CurrentUser(EventSchedulingApiClient api, IJSRuntime js, Nav
 
     private async Task<UserProfile?> InitializeAsync()
     {
-        Users = await api.GetUsersAsync();
-        IsDegraded = Users.Count == 0;
-
-        int? storedId = null;
         try
         {
-            var raw = await js.InvokeAsync<string?>("campusPulseUser.get", StorageKey);
-            if (int.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed))
+            await account.InitializeAsync();
+            if (account.CurrentUser is { } signedInUser
+                && (CampusAccountService.IsStudent(signedInUser)
+                    || CampusAccountService.IsStaff(signedInUser)))
             {
-                storedId = parsed;
+                Profile = new UserProfile(
+                    signedInUser.UserId,
+                    signedInUser.FirstName,
+                    signedInUser.LastName,
+                    signedInUser.Email,
+                    signedInUser.Role,
+                    signedInUser.StudentId,
+                    signedInUser.StaffId);
             }
+
+            return Profile;
         }
-        catch (JSException)
+        finally
         {
-            // storage not available - fall back to the default
+            IsInitialized = true;
         }
-
-        Profile =
-            (storedId is { } id ? Users.FirstOrDefault(user => user.UserId == id) : null)
-            ?? Users.FirstOrDefault(user => user.UserId == DefaultUserId)
-            ?? Users.FirstOrDefault();
-
-        IsInitialized = true;
-        return Profile;
-    }
-
-    public async Task SelectAsync(int userId)
-    {
-        try
-        {
-            await js.InvokeVoidAsync("campusPulseUser.set", StorageKey,
-                userId.ToString(CultureInfo.InvariantCulture));
-        }
-        catch (JSException)
-        {
-            return;
-        }
-
-        navigation.NavigateTo(navigation.Uri, forceLoad: true);
     }
 }

@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using AcademicRecords.Backend.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AcademicRecords.Backend.Controllers;
@@ -18,6 +19,7 @@ public sealed class StudentsController(
     public Task<IActionResult> GetAll(CancellationToken cancellationToken) =>
         ForwardStudentResponseAsync("/api/students", cancellationToken);
 
+    [AllowAnonymous]
     [HttpPost("enroll")]
     public Task<IActionResult> Enroll(CancellationToken cancellationToken) =>
         ForwardJsonRequestAsync(AcademicRecordsDatabase, HttpMethod.Post, "/api/students/enroll", cancellationToken);
