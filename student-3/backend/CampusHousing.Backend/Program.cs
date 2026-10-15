@@ -48,7 +48,7 @@ builder.Services.AddHttpClient("AcademicRecordsDatabase", client => client.BaseA
 builder.Services.AddAiGateway(builder.Configuration);
 builder.Services.AddMultiAgentCaller(builder.Configuration);
 builder.Services.AddTransient<CampusHousing.Backend.Services.MaintenanceClassifier>();
-builder.Services.AddHttpClient<IMcpClient, McpClient>(client =>
+builder.Services.AddMcpClient(client =>
 {
     client.BaseAddress = new Uri(builder.Configuration["Services:McpServer"] ?? "http://localhost:5268");
     client.Timeout = TimeSpan.FromSeconds(30);

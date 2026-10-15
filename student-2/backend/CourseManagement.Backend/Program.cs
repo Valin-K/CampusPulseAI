@@ -110,7 +110,7 @@ builder.Services.AddHttpClient(CourseKnowledgeService.CatalogueClientName, clien
     client.BaseAddress = new Uri(courseManagementDatabaseAddress, UriKind.Absolute);
     client.Timeout = TimeSpan.FromSeconds(30);
 });
-builder.Services.AddHttpClient<IMcpClient, McpClient>(client =>
+builder.Services.AddMcpClient(client =>
 {
     client.BaseAddress = new Uri(
         builder.Configuration["Services:McpServer"]

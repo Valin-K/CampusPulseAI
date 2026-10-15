@@ -62,8 +62,8 @@ builder.Services.AddHttpClient("academicRecords", client =>
 builder.Services.AddHttpClient("mcp", client =>
 {
     client.BaseAddress = new Uri(builder.Configuration["Services:McpServer"] ?? "http://localhost:5268");
-});
-builder.Services.AddHttpClient<IMcpClient, McpClient>(client =>
+}).AddHttpMessageHandler<McpAuthorizationHeaderHandler>();
+builder.Services.AddMcpClient(client =>
 {
     client.BaseAddress = new Uri(builder.Configuration["Services:McpServer"] ?? "http://localhost:5268");
     client.Timeout = TimeSpan.FromSeconds(30);

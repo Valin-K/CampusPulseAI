@@ -54,7 +54,7 @@ builder.Services.AddHttpClient("courseManagementDatabase", client =>
 {
     client.BaseAddress = new Uri(builder.Configuration["Services:CourseManagementDatabase"] ?? "http://coursemanagement.database:8080");
 });
-builder.Services.AddHttpClient<IMcpClient, McpClient>(client =>
+builder.Services.AddMcpClient(client =>
 {
     client.BaseAddress = new Uri(builder.Configuration["Services:McpServer"] ?? "http://localhost:5268");
     client.Timeout = TimeSpan.FromSeconds(30);
