@@ -123,9 +123,18 @@ else if (activeTab == "scholarships")
                 <button class="button button-secondary" @onclick="CheckMcpIntegrationAsync" disabled="@isCheckingMcp">@(isCheckingMcp ? "Checking…" : "Check MCP registration")</button>
             </div>
         </div>
-        @if (mcpIntegration is { IsError: false, Result.Valid: true })
+        @if (mcpIntegration is { IsError: false, Result.Checks: not null })
         {
-            <div class="ai-response" role="status"><strong>MCP interaction succeeded</strong><p>Student 4 is registered: @string.Join(", ", mcpIntegration.Result.Checks).</p></div>
+            <div class="ai-response" role="status">
+                <strong>@(mcpIntegration.Result.Valid ? "MCP integration check succeeded" : "MCP integration check failed")</strong>
+                <p>Shared MCP registry validation for @mcpIntegration.Result.Feature.</p>
+                <ul class="detail-list">
+                    @foreach (var check in mcpIntegration.Result.Checks)
+                    {
+                        <li><strong>@check.Name</strong>: @(check.Passed ? "Passed" : "Failed")</li>
+                    }
+                </ul>
+            </div>
         }
         @if (ragAnswer is not null)
         {
@@ -373,11 +382,16 @@ else
             using var response = await Http.PostAsync("/api/assistant/mcp/integration", null);
             if (!response.IsSuccessStatusCode) { errorMessage = await response.Content.ReadAsStringAsync(); return; }
             mcpIntegration = await response.Content.ReadFromJsonAsync<McpIntegrationResponse>();
-            if (mcpIntegration is null || mcpIntegration.IsError || !mcpIntegration.Result.Valid)
+            if (mcpIntegration?.Result is null || mcpIntegration.Result.Checks is null)
+            {
+                errorMessage = "The MCP integration service returned an invalid response.";
+            }
+            else if (mcpIntegration.IsError || !mcpIntegration.Result.Valid)
             {
                 errorMessage = "The MCP integration check did not succeed.";
             }
         }
+        catch (System.Text.Json.JsonException) { errorMessage = "The MCP integration service returned an invalid response."; }
         catch (HttpRequestException) { errorMessage = "The shared MCP server is currently unavailable."; }
         finally { isCheckingMcp = false; }
     }

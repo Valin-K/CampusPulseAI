@@ -66,7 +66,7 @@ public static class AcademicRecordsSeedData
 
     public static Staff[] StaffMembers =>
     [
-        new() { UserId = 11, StaffId = "STF001", FirstName = "Grace", LastName = "Brillis", Email = "grace.brillis@example.edu", DateOfBirth = new(1985, 4, 18), Status = "ACT", PhoneNumber = "0400000011" },
+        new() { UserId = 11, StaffId = "STF001", FirstName = "Grace", LastName = "Billiris", Email = "grace.billiris@example.edu", DateOfBirth = new(1985, 4, 18), Status = "ACT", PhoneNumber = "0400000011" },
         new() { UserId = 12, StaffId = "STF002", FirstName = "Georges", LastName = "Bou Ghantous", Email = "georges.boughantous@example.edu", DateOfBirth = new(1979, 9, 7), Status = "ACT", PhoneNumber = "0400000012" },
         new() { UserId = 13, StaffId = "STF003", FirstName = "Olivia", LastName = "Davis", Email = "olivia.davis@example.edu", DateOfBirth = new(1990, 1, 25), Status = "ACT", PhoneNumber = "0400000013" },
         new() { UserId = 14, StaffId = "STF004", FirstName = "Marcus", LastName = "Lee", Email = "marcus.lee@example.edu", DateOfBirth = new(1982, 11, 11), Status = "ACT", PhoneNumber = "0400000014" },

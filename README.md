@@ -115,8 +115,10 @@ Run Academic Records, the billing database/backend, the AI gateway, and the host
 MCP/RAG services (`.\scripts\launch-local-ai-services.ps1`). Student 4 uses
 `Services:McpServer` (default `http://localhost:5268`) and `Services:RagServer`
 (default `http://localhost:5267`); Compose supplies `host.docker.internal` URLs.
-MCP must also be able to reach Academic Records. Dependency failures and timeouts
-are surfaced, not replaced with fabricated statistics or an incomplete catalogue.
+Authenticated MCP and multi-agent workflow requests forward their bearer token
+through the host services to protected Academic Records or Course Management APIs.
+MCP must also be able to reach those APIs. Dependency failures and timeouts are
+surfaced, not replaced with fabricated statistics or an incomplete catalogue.
 
 To demonstrate both features, find matches for the selected student and confirm
 the MCP evidence appears, then ask "Which scholarships are open to computing

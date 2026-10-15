@@ -74,6 +74,13 @@ h3 { color: var(--university-navy); font-size: 1.08rem; }
 .campus-account-identity strong { overflow: hidden; color: white; font-size: .76rem; text-overflow: ellipsis; white-space: nowrap; }
 .campus-account-identity small { overflow: hidden; color: #b9d1e2; font-size: .68rem; text-overflow: ellipsis; white-space: nowrap; }
 .campus-account-menu .button { flex: 0 0 auto; white-space: nowrap; }
+.campus-account-menu .campus-account-control { text-decoration: none; }
+.campus-account-menu .campus-account-profile,
+.campus-account-menu .campus-account-sign-in { color: var(--university-navy); border-color: var(--university-gold); background: var(--university-gold); }
+.campus-account-menu .campus-account-profile:hover:not(:disabled),
+.campus-account-menu .campus-account-sign-in:hover:not(:disabled) { color: var(--university-navy); background: #ffcf62; }
+.campus-account-menu .campus-account-sign-out { color: white; border-color: var(--university-danger); background: var(--university-danger); }
+.campus-account-menu .campus-account-sign-out:hover:not(:disabled) { color: white; background: #912018; }
 
 .form-stack { display: grid; gap: .9rem; }
 .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; }

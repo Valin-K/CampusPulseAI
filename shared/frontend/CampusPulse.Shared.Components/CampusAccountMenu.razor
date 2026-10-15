@@ -16,13 +16,13 @@
         </span>
         @if (Account.CurrentUser is not null)
         {
-            <a class="button button-small button-secondary" href="@ProfileUrl">Profile</a>
+            <a class="button button-small campus-account-control campus-account-profile" href="@ProfileUrl">Profile</a>
         }
-        <button type="button" class="button button-small button-danger" @onclick="SignOutAsync">Sign out</button>
+        <button type="button" class="button button-small campus-account-control campus-account-sign-out" @onclick="SignOutAsync">Sign out</button>
     }
     else
     {
-        <a class="button button-small button-accent" href="@SignInUrl">Sign in</a>
+        <a class="button button-small campus-account-control campus-account-sign-in" href="@SignInUrl">Sign in</a>
     }
 </div>
 

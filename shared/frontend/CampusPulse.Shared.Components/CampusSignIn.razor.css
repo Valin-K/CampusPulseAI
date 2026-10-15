@@ -91,6 +91,19 @@
     margin-bottom: 0;
 }
 
+.campus-account-sign-in .account-login-form {
+    display: grid;
+    gap: .75rem;
+}
+
+.campus-account-sign-in .account-login-form > .button {
+    justify-self: start;
+}
+
+.campus-account-sign-in .account-role-selection > .button {
+    justify-self: start;
+}
+
 .campus-account-sign-in .account-role-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -172,5 +185,9 @@
 
     .campus-account-sign-in .account-role-grid {
         grid-template-columns: 1fr;
+    }
+
+    .campus-account-sign-in .account-role-selection > .button {
+        justify-self: stretch;
     }
 }
