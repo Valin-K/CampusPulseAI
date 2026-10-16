@@ -57,6 +57,10 @@ jobs:
           echo "The following containers did not reach the running state: ${missing_services[*]}"
           exit 1
 
+      - name: Validate AI container integration and persistence
+        shell: pwsh
+        run: ./scripts/test/validate-ai-containers.ps1 -ComposeProjectName campuspulse-integration-ci
+
       - name: Remove integration containers
         if: always()
         shell: bash

@@ -218,7 +218,7 @@ assistant.MapPost("/mcp/integration", async (IHttpClientFactory clients, IConfig
     catch (HttpRequestException)
     {
         return Results.Problem(
-            "The shared MCP server is unavailable. Start it on the host at http://localhost:5268 before using this feature.",
+            "The shared MCP server is unavailable. Check that it is running and reachable at the configured Services:McpServer address.",
             statusCode: StatusCodes.Status503ServiceUnavailable);
     }
     catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
