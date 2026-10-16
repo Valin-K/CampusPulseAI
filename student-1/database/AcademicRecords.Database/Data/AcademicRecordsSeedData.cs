@@ -1,4 +1,5 @@
 using AcademicRecords.Database.Models;
+using AcademicRecords.Database.Services;
 using Microsoft.EntityFrameworkCore;
 
 namespace AcademicRecords.Database.Data;
@@ -9,12 +10,12 @@ public static class AcademicRecordsSeedData
     {
         if (!await database.Students.AnyAsync())
         {
-            database.Students.AddRange(Students);
+            database.Students.AddRange(WithSeedPasswords(Students));
         }
 
         if (!await database.Set<Staff>().AnyAsync())
         {
-            database.Set<Staff>().AddRange(StaffMembers);
+            database.Set<Staff>().AddRange(WithSeedPasswords(StaffMembers));
         }
 
         if (!await database.AcademicTerms.AnyAsync())
@@ -48,6 +49,16 @@ public static class AcademicRecordsSeedData
         }
 
         await database.SaveChangesAsync();
+    }
+
+    private static T[] WithSeedPasswords<T>(T[] users) where T : User
+    {
+        foreach (var user in users)
+        {
+            user.PasswordHash = UserPasswordSecurity.HashPassword(user, "test");
+        }
+
+        return users;
     }
 
     public static Student[] Students =>

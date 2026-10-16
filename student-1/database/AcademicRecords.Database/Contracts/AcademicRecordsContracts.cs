@@ -3,14 +3,17 @@ namespace AcademicRecords.Database.Contracts;
 public sealed record EnrollStudentRequest(string FirstName, string LastName, string Email, DateOnly? DateOfBirth,
     string MailingAddress, string EmergencyContactName, string EmergencyContactPhone, string? PhoneNumber = null,
     DateOnly? EnrollmentDate = null, string? Degree = null, string? Major = null, string? SubMajor = null,
-    int? AcademicTermId = null, string? CourseCode = null, int? AcademicYear = null);
+    int? AcademicTermId = null, string? CourseCode = null, int? AcademicYear = null,
+    string Password = "", string ConfirmPassword = "");
 
 public sealed record AddEnrollmentRequest(string CourseCode, int AcademicTermId, int? AcademicYear = null);
 
 public sealed record GradeEntryRequest(decimal? GradeValue);
 
 public sealed record EnrollStaffRequest(string FirstName, string LastName, string Email, DateOnly? DateOfBirth,
-    string? PhoneNumber = null);
+    string? PhoneNumber = null, string Password = "", string ConfirmPassword = "");
+
+public sealed record AuthenticateUserRequest(int UserId, string Role, string Password);
 
 public sealed record StudentProfileResponse(int UserId, string StudentId, string FirstName, string LastName, string Email,
     DateOnly? DateOfBirth, string? PhoneNumber, string MailingAddress, string EmergencyContactName, string EmergencyContactPhone,

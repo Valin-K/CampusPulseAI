@@ -72,6 +72,8 @@
                             <label class="field"><span>Mailing address</span><InputText @bind-Value="studentRegistration.MailingAddress" /></label>
                             <label class="field"><span>Emergency contact name</span><InputText @bind-Value="studentRegistration.EmergencyContactName" /></label>
                             <label class="field"><span>Emergency contact phone</span><InputText @bind-Value="studentRegistration.EmergencyContactPhone" /></label>
+                            <label class="field"><span>Password</span><InputText type="password" autocomplete="new-password" @bind-Value="studentRegistration.Password" /></label>
+                            <label class="field"><span>Confirm password</span><InputText type="password" autocomplete="new-password" @bind-Value="studentRegistration.ConfirmPassword" /></label>
                             <label class="field"><span>Degree</span><InputText @bind-Value="studentRegistration.Degree" /></label>
                             <label class="field"><span>Major</span><InputText @bind-Value="studentRegistration.Major" /></label>
                         </div>
@@ -91,6 +93,8 @@
                             <label class="field"><span>Email</span><InputText type="email" @bind-Value="staffRegistration.Email" /></label>
                             <label class="field"><span>Date of birth</span><InputDate @bind-Value="staffRegistration.DateOfBirth" /></label>
                             <label class="field"><span>Phone number</span><InputText @bind-Value="staffRegistration.PhoneNumber" /></label>
+                            <label class="field"><span>Password</span><InputText type="password" autocomplete="new-password" @bind-Value="staffRegistration.Password" /></label>
+                            <label class="field"><span>Confirm password</span><InputText type="password" autocomplete="new-password" @bind-Value="staffRegistration.ConfirmPassword" /></label>
                         </div>
                         <div class="button-row" style="margin-top: 1rem;">
                             <button type="submit" class="button button-primary" disabled="@submitting">@(submitting ? "Creating account..." : "Create staff account")</button>
@@ -172,6 +176,10 @@
                                 }
                             </InputSelect>
                         </label>
+                        <label class="field">
+                            <span>Password</span>
+                            <InputText type="password" autocomplete="current-password" @bind-Value="selection.Password" />
+                        </label>
                         <button type="submit" class="button button-primary" disabled="@(submitting || selection.UserId <= 0)">
                             @(submitting ? "Signing in..." : $"Continue as {NormalizedRole}")
                         </button>
@@ -186,7 +194,7 @@
     [Parameter] public string? Role { get; set; }
     [SupplyParameterFromQuery(Name = "returnUrl")]
     public string? ReturnUrl { get; set; }
-    [Inject] private CampusDemoAuthenticationStateProvider DemoAuthentication { get; set; } = default!;
+    [Inject] private AuthenticationStateProvider DemoAuthentication { get; set; } = default!;
 
     private string NormalizedRole => string.Equals(Role, "staff", StringComparison.OrdinalIgnoreCase)
         ? "Staff"
@@ -234,6 +242,7 @@
         selection.UserId = 0;
         loginErrorMessage = null;
         usersLoading = false;
+        selection.Password = string.Empty;
 
         if (role is not null && !Account.IsAuthenticated)
         {
@@ -287,7 +296,7 @@
         loginErrorMessage = null;
         try
         {
-            await DemoAuthentication.SignInAsync(selection.UserId, NormalizedRole);
+            await DemoAuthentication.SignInAsync(selection.UserId, NormalizedRole, selection.Password);
             await Account.InitializeAsync(forceRefresh: true);
             Navigation.NavigateTo(BuildReturnUrl());
         }
@@ -297,6 +306,7 @@
         }
         finally
         {
+            selection.Password = string.Empty;
             submitting = false;
         }
     }
@@ -358,6 +368,8 @@
                 studentRegistration.LastName,
                 studentRegistration.Email,
                 studentRegistration.DateOfBirth,
+                studentRegistration.Password,
+                studentRegistration.ConfirmPassword,
                 studentRegistration.MailingAddress,
                 studentRegistration.EmergencyContactName,
                 studentRegistration.EmergencyContactPhone,
@@ -366,6 +378,8 @@
                 studentRegistration.Major));
             creatingAccount = false;
             selection.UserId = created.UserId;
+            studentRegistration.Password = string.Empty;
+            studentRegistration.ConfirmPassword = string.Empty;
             accountCreatedMessage = "Account created. Continue to sign in.";
             await LoadAccountsAsync(NormalizedRole, accountLoadVersion);
         }
@@ -390,9 +404,13 @@
                 staffRegistration.LastName,
                 staffRegistration.Email,
                 staffRegistration.DateOfBirth,
+                staffRegistration.Password,
+                staffRegistration.ConfirmPassword,
                 staffRegistration.PhoneNumber));
             creatingAccount = false;
             selection.UserId = created.UserId;
+            staffRegistration.Password = string.Empty;
+            staffRegistration.ConfirmPassword = string.Empty;
             accountCreatedMessage = "Account created. Continue to sign in.";
             await LoadAccountsAsync(NormalizedRole, accountLoadVersion);
         }
@@ -410,6 +428,8 @@
     {
         [Range(1, int.MaxValue)]
         public int UserId { get; set; }
+        [Required]
+        public string Password { get; set; } = string.Empty;
     }
 
     public void Dispose() => Account.Changed -= AccountChanged;
@@ -424,6 +444,10 @@
         public string Email { get; set; } = string.Empty;
         [Required]
         public DateOnly? DateOfBirth { get; set; }
+        [Required, MinLength(12), MaxLength(128)]
+        public string Password { get; set; } = string.Empty;
+        [Required, Compare(nameof(Password)), MaxLength(128)]
+        public string ConfirmPassword { get; set; } = string.Empty;
         [Required]
         public string MailingAddress { get; set; } = string.Empty;
         [Required]
@@ -445,6 +469,10 @@
         public string Email { get; set; } = string.Empty;
         [Required]
         public DateOnly? DateOfBirth { get; set; }
+        [Required, MinLength(12), MaxLength(128)]
+        public string Password { get; set; } = string.Empty;
+        [Required, Compare(nameof(Password)), MaxLength(128)]
+        public string ConfirmPassword { get; set; } = string.Empty;
         public string? PhoneNumber { get; set; }
     }
 }

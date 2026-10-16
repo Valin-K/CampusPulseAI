@@ -1,6 +1,7 @@
 using AcademicRecords.Database.Contracts;
 using AcademicRecords.Database.Controllers;
 using AcademicRecords.Database.Models;
+using AcademicRecords.Database.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -80,7 +81,19 @@ public sealed class StudentsControllerTests
     {
         await using var testDatabase = await ControllerTestDatabase.CreateAsync();
         var request = new EnrollStudentRequest(" ", "Student", "student@example.edu", new DateOnly(2000, 1, 1),
-            "1 Campus Way", "Contact", "0400000000");
+            "1 Campus Way", "Contact", "0400000000", Password: "StrongPassword!2026", ConfirmPassword: "StrongPassword!2026");
+
+        var result = await new StudentsController(testDatabase.Context).Enroll(request, CancellationToken.None);
+
+        Assert.That(result, Is.InstanceOf<BadRequestObjectResult>());
+        Assert.That(await testDatabase.Context.Students.CountAsync(), Is.Zero);
+    }
+
+    [Test]
+    public async Task EnrollStudentRejectsMismatchedPasswordConfirmation()
+    {
+        await using var testDatabase = await ControllerTestDatabase.CreateAsync();
+        var request = CreateEnrollmentRequest() with { ConfirmPassword = "DifferentPassword!2026" };
 
         var result = await new StudentsController(testDatabase.Context).Enroll(request, CancellationToken.None);
 
@@ -129,6 +142,8 @@ public sealed class StudentsControllerTests
         Assert.That(student.FirstName, Is.EqualTo("Avery"));
         Assert.That(student.LastName, Is.EqualTo("Student"));
         Assert.That(student.Email, Is.EqualTo("avery@example.edu"));
+        Assert.That(student.PasswordHash, Is.Not.EqualTo("StrongPassword!2026"));
+        Assert.That(UserPasswordSecurity.VerifyPassword(student, "StrongPassword!2026"), Is.True);
         var enrollment = await database.Enrollments.SingleAsync();
         Assert.That(enrollment.StudentId, Is.EqualTo(student.UserId));
         Assert.That(enrollment.CourseCode, Is.EqualTo("CS101"));
@@ -270,7 +285,8 @@ public sealed class StudentsControllerTests
 
     private static EnrollStudentRequest CreateEnrollmentRequest() => new(
         " Avery ", " Student ", "avery@example.edu", new DateOnly(2000, 1, 1),
-        "1 Campus Way", "Emergency Contact", "0400000000");
+        "1 Campus Way", "Emergency Contact", "0400000000",
+        Password: "StrongPassword!2026", ConfirmPassword: "StrongPassword!2026");
 
     private static Student CreateStudent(string studentId, string firstName, string lastName, string email) => new()
     {

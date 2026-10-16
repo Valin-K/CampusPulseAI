@@ -22,7 +22,7 @@ public sealed class StudentsController(
     [AllowAnonymous]
     [HttpPost("enroll")]
     public Task<IActionResult> Enroll(CancellationToken cancellationToken) =>
-        ForwardJsonRequestAsync(AcademicRecordsDatabase, HttpMethod.Post, "/api/students/enroll", cancellationToken);
+        ForwardJsonRequestAsync(AcademicRecordsCredentialsDatabase, HttpMethod.Post, "/api/students/enroll", cancellationToken);
 
     [HttpPost("{studentId}/enrollments")]
     public Task<IActionResult> AddEnrollment(string studentId, CancellationToken cancellationToken) =>

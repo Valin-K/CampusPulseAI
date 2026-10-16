@@ -35,6 +35,7 @@ services:
     environment:
       ASPNETCORE_HTTP_PORTS: 8080
       Services__AcademicRecordsDatabase: http://academicrecords.database:8080
+      Services__AcademicRecordsCredentials: http://academicrecords.database:8080
       Services__CourseManagementDatabase: http://coursemanagement.database:8080
       Services__McpServer: http://host.docker.internal:5268
       Services__RagServer: http://host.docker.internal:5267

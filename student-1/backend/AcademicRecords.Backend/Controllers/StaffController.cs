@@ -24,7 +24,7 @@ public sealed class StaffController(IHttpClientFactory clients) : AcademicRecord
     [AllowAnonymous]
     [HttpPost("enroll")]
     public Task<IActionResult> Enroll(CancellationToken cancellationToken) =>
-        ForwardJsonRequestAsync(AcademicRecordsDatabase, HttpMethod.Post, "/api/staff/enroll", cancellationToken);
+        ForwardJsonRequestAsync(AcademicRecordsCredentialsDatabase, HttpMethod.Post, "/api/staff/enroll", cancellationToken);
 
     [HttpPut("{staffId}")]
     public Task<IActionResult> Update(string staffId, CancellationToken cancellationToken) =>

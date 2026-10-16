@@ -9,9 +9,11 @@ using AcademicRecords.Backend.Services;
 using CampusPulse.Shared.Mcp.Client;
 using CampusPulse.Shared.Rag.Assistant;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.FileProviders;
 
 namespace AcademicRecords.Tests;
 
@@ -49,7 +51,7 @@ public sealed class BackendControllersTests
                     ("academicRecordsDatabase", "GET", "/api/users"),
                     ("academicRecordsDatabase", "GET", "/api/staff"),
                     ("academicRecordsDatabase", "GET", "/api/staff/by-user/42"),
-                    ("academicRecordsDatabase", "POST", "/api/staff/enroll"),
+                    ("academicRecordsCredentials", "POST", "/api/staff/enroll"),
                     ("academicRecordsDatabase", "PUT", "/api/staff/STF001"),
                     ("academicRecordsDatabase", "PUT", "/api/enrollments/17/grade"),
                     ("courseManagementDatabase", "GET", "/api/courses"),
@@ -60,6 +62,38 @@ public sealed class BackendControllersTests
             Assert.That(clients.Requests[5].Body, Is.EqualTo("grade update"));
             Assert.That(clients.Requests[5].ContentType, Is.EqualTo("application/json"));
         });
+    }
+
+    [Test]
+    public async Task DemoSignInForwardsPasswordThroughCredentialClientBeforeIssuingToken()
+    {
+        const string authenticatedUser = """
+            {"userId":42,"firstName":"Avery","lastName":"Student","email":"avery@example.edu","role":"Student","studentId":"STU042","staffId":null}
+            """;
+        using var clients = new RecordingHttpClientFactory(
+            (_, _, _) => Task.FromResult(JsonResponse(authenticatedUser)),
+            new Uri("http://academicrecords.database:8080"));
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Authentication:Issuer"] = "CampusPulse.Dev",
+                ["Authentication:Audience"] = "CampusPulse.Api",
+                ["Authentication:SigningKey"] = "a-test-signing-key-with-more-than-32-bytes"
+            })
+            .Build();
+        var controller = new AuthenticationController(clients, configuration, new TestWebHostEnvironment());
+
+        var result = await controller.CreateToken(
+            new AuthenticationController.DemoTokenRequest(42, "Student", "StrongPassword!2026"),
+            CancellationToken.None);
+
+        Assert.That(result.Result, Is.InstanceOf<OkObjectResult>());
+        var request = clients.Requests.Single();
+        Assert.That(request.ClientName, Is.EqualTo("academicRecordsCredentials"));
+        Assert.That(request.Scheme, Is.EqualTo(Uri.UriSchemeHttp));
+        Assert.That(request.Path, Is.EqualTo("/api/users/authenticate"));
+        using var body = JsonDocument.Parse(request.Body!);
+        Assert.That(body.RootElement.GetProperty("password").GetString(), Is.EqualTo("StrongPassword!2026"));
     }
 
     [TestCase(typeof(StudentsController), "Enroll", true)]
@@ -335,12 +369,13 @@ public sealed class BackendControllersTests
     }
 
     private sealed class RecordingHttpClientFactory(
-        Func<string, HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> respond) : IHttpClientFactory, IDisposable
+        Func<string, HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> respond,
+        Uri? baseAddress = null) : IHttpClientFactory, IDisposable
     {
         public List<RecordedRequest> Requests { get; } = [];
 
         public HttpClient CreateClient(string name) =>
-            new(new RecordingHandler(name, Requests, respond)) { BaseAddress = new Uri("http://backend.test") };
+            new(new RecordingHandler(name, Requests, respond)) { BaseAddress = baseAddress ?? new Uri("http://backend.test") };
 
         public void Dispose()
         {
@@ -358,6 +393,7 @@ public sealed class BackendControllersTests
             requests.Add(new RecordedRequest(
                 clientName,
                 request.Method.Method,
+                request.RequestUri!.Scheme,
                 request.RequestUri!.PathAndQuery,
                 body,
                 request.Content?.Headers.ContentType?.MediaType));
@@ -365,7 +401,17 @@ public sealed class BackendControllersTests
         }
     }
 
-    private sealed record RecordedRequest(string ClientName, string Method, string Path, string? Body, string? ContentType);
+    private sealed record RecordedRequest(string ClientName, string Method, string Scheme, string Path, string? Body, string? ContentType);
+
+    private sealed class TestWebHostEnvironment : IWebHostEnvironment
+    {
+        public string ApplicationName { get; set; } = "AcademicRecords.Tests";
+        public IFileProvider WebRootFileProvider { get; set; } = new NullFileProvider();
+        public string WebRootPath { get; set; } = string.Empty;
+        public string EnvironmentName { get; set; } = "Development";
+        public string ContentRootPath { get; set; } = string.Empty;
+        public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
+    }
 
     private sealed class StubTranscriptPdfGenerator : ITranscriptPdfGenerator
     {

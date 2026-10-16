@@ -1,4 +1,7 @@
 using AcademicRecords.Backend;
+using System.Net.Security;
+using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 using CampusPulse.Shared.Ai;
 using AcademicRecords.Backend.Services;
 using CampusPulse.Shared.Mcp.Client;
@@ -50,6 +53,12 @@ builder.Services.AddHttpClient("academicRecordsDatabase", client =>
 {
     client.BaseAddress = new Uri(builder.Configuration["Services:AcademicRecordsDatabase"] ?? "http://academicrecords.database:8080");
 });
+var academicRecordsCredentialsAddress = builder.Configuration["Services:AcademicRecordsCredentials"] ?? "http://localhost:55691";
+builder.Services.AddHttpClient("academicRecordsCredentials", client =>
+{
+    client.BaseAddress = new Uri(academicRecordsCredentialsAddress, UriKind.Absolute);
+}).ConfigurePrimaryHttpMessageHandler(() => CreateCredentialHttpHandler(
+    builder.Configuration["Services:AcademicRecordsCredentialsCaCertificate"]));
 builder.Services.AddHttpClient("courseManagementDatabase", client =>
 {
     client.BaseAddress = new Uri(builder.Configuration["Services:CourseManagementDatabase"] ?? "http://coursemanagement.database:8080");
@@ -107,3 +116,37 @@ app.MapControllers();
 app.MapMultiAgentCaller("academicrecords", "courseManagementDatabase", "/api/courses");
 
 app.Run();
+
+static HttpMessageHandler CreateCredentialHttpHandler(string? certificateAuthorityPath)
+{
+    if (string.IsNullOrWhiteSpace(certificateAuthorityPath))
+    {
+        return new HttpClientHandler();
+    }
+
+    if (!File.Exists(certificateAuthorityPath))
+    {
+        throw new InvalidOperationException("The Academic Records credential CA certificate was not found.");
+    }
+
+    return new HttpClientHandler
+    {
+        ServerCertificateCustomValidationCallback = (_, certificate, _, errors) =>
+        {
+            if (certificate is null
+                || (errors & (SslPolicyErrors.RemoteCertificateNameMismatch | SslPolicyErrors.RemoteCertificateNotAvailable)) != 0)
+            {
+                return false;
+            }
+
+            using var serverCertificate = X509CertificateLoader.LoadCertificate(certificate.GetRawCertData());
+            using var rootCertificate = X509CertificateLoader.LoadCertificateFromFile(certificateAuthorityPath);
+            using var chain = new X509Chain();
+            chain.ChainPolicy.TrustMode = X509ChainTrustMode.CustomRootTrust;
+            chain.ChainPolicy.CustomTrustStore.Add(rootCertificate);
+            chain.ChainPolicy.ApplicationPolicy.Add(new Oid("1.3.6.1.5.5.7.3.1"));
+            chain.ChainPolicy.RevocationMode = X509RevocationMode.NoCheck;
+            return chain.Build(serverCertificate);
+        }
+    };
+}

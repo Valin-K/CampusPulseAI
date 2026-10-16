@@ -1,6 +1,7 @@
 using AcademicRecords.Database.Contracts;
 using AcademicRecords.Database.Data;
 using AcademicRecords.Database.Models;
+using AcademicRecords.Database.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -41,6 +42,11 @@ public sealed class StudentsController(AcademicRecordsDbContext database) : Cont
         EnrollStudentRequest request,
         CancellationToken cancellationToken)
     {
+        if (!UserPasswordSecurity.IsValidNewPassword(request.Password, request.ConfirmPassword))
+        {
+            return BadRequest("Password must be 12 to 128 characters and match the confirmation.");
+        }
+
         if (string.IsNullOrWhiteSpace(request.FirstName) || string.IsNullOrWhiteSpace(request.LastName) ||
             string.IsNullOrWhiteSpace(request.Email) || request.DateOfBirth is null ||
             string.IsNullOrWhiteSpace(request.MailingAddress) || string.IsNullOrWhiteSpace(request.EmergencyContactName) ||
@@ -79,6 +85,7 @@ public sealed class StudentsController(AcademicRecordsDbContext database) : Cont
             Major = request.Major?.Trim(),
             SubMajor = request.SubMajor?.Trim()
         };
+        student.PasswordHash = UserPasswordSecurity.HashPassword(student, request.Password);
         database.Add(student);
 
         if (request.AcademicTermId is not null)

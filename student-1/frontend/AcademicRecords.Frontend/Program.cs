@@ -12,14 +12,14 @@ var backendUrl = string.IsNullOrWhiteSpace(configuredBackendUrl)
     ? builder.HostEnvironment.BaseAddress
     : configuredBackendUrl;
 var academicRecordsBackendUrl = builder.Configuration["AcademicRecordsBackendUrl"] ?? backendUrl;
-builder.Services.AddCampusDemoAuthentication(academicRecordsBackendUrl);
+builder.Services.AddAuthentication(academicRecordsBackendUrl);
 builder.Services.AddCampusAccountServices(academicRecordsBackendUrl);
 builder.Services.AddScoped(serviceProvider =>
 {
-    var userIdHandler = new CampusUserIdHeaderHandler(serviceProvider.GetRequiredService<Microsoft.JSInterop.IJSRuntime>())
+    var userIdHandler = new UserIdHeaderHandler(serviceProvider.GetRequiredService<Microsoft.JSInterop.IJSRuntime>())
     {
-        InnerHandler = CampusDemoAuthenticationServiceCollectionExtensions
-            .CreateCampusDemoTokenHandler(serviceProvider)
+        InnerHandler = AuthenticationServiceCollectionExtensions
+            .CreateTokenHandler(serviceProvider)
     };
     return new HttpClient(userIdHandler) { BaseAddress = new Uri(backendUrl) };
 });

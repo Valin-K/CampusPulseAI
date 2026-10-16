@@ -1,6 +1,8 @@
 using AcademicRecords.Database.Contracts;
 using AcademicRecords.Database.Controllers;
+using AcademicRecords.Database.Data;
 using AcademicRecords.Database.Models;
+using AcademicRecords.Database.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using DatabaseUserResponse = AcademicRecords.Database.Contracts.UserResponse;
@@ -49,6 +51,69 @@ public sealed class UsersAndStaffControllerTests
         Assert.That(users[1].Role, Is.EqualTo("Student"));
         Assert.That(users[1].StudentId, Is.EqualTo("STU002"));
         Assert.That(users[1].StaffId, Is.Null);
+    }
+
+    [Test]
+    public async Task SeededUsersHaveUniqueHashesForTheTestPassword()
+    {
+        await using var testDatabase = await ControllerTestDatabase.CreateAsync();
+        await AcademicRecordsSeedData.InitializeAsync(testDatabase.Context);
+
+        var users = await testDatabase.Context.Users.AsNoTracking().ToListAsync();
+
+        Assert.That(users, Has.Count.EqualTo(20));
+        Assert.That(users.All(user => UserPasswordSecurity.VerifyPassword(user, "test")), Is.True);
+        Assert.That(users.All(user => user.PasswordHash != "test"), Is.True);
+        Assert.That(users.Select(user => user.PasswordHash).Distinct().Count(), Is.EqualTo(users.Count));
+    }
+
+    [Test]
+    public async Task AuthenticateVerifiesPasswordAndReturnsNoHash()
+    {
+        await using var testDatabase = await ControllerTestDatabase.CreateAsync();
+        var database = testDatabase.Context;
+        var student = new Student
+        {
+            StudentId = "STU001",
+            FirstName = "Avery",
+            LastName = "Student",
+            Email = "avery@example.edu",
+            Status = "ACT",
+            MailingAddress = "1 Campus Way",
+            EmergencyContactName = "Contact",
+            EmergencyContactPhone = "0400000000"
+        };
+        student.PasswordHash = UserPasswordSecurity.HashPassword(student, "StrongPassword!2026");
+        database.Add(student);
+        await database.SaveChangesAsync();
+        var controller = new UsersController(database);
+
+        var valid = await controller.Authenticate(
+            new AuthenticateUserRequest(student.UserId, "Student", "StrongPassword!2026"), CancellationToken.None);
+        var invalid = await controller.Authenticate(
+            new AuthenticateUserRequest(student.UserId, "Student", "WrongPassword!2026"), CancellationToken.None);
+        var wrongRole = await controller.Authenticate(
+            new AuthenticateUserRequest(student.UserId, "Staff", "StrongPassword!2026"), CancellationToken.None);
+
+        Assert.That(valid.Result, Is.InstanceOf<OkObjectResult>());
+        Assert.That((valid.Result as OkObjectResult)!.Value, Is.TypeOf<DatabaseUserResponse>());
+        Assert.That(invalid.Result, Is.InstanceOf<UnauthorizedResult>());
+        Assert.That(wrongRole.Result, Is.InstanceOf<UnauthorizedResult>());
+    }
+
+    [Test]
+    public async Task EnrollStaffRejectsMismatchedPasswordConfirmation()
+    {
+        await using var testDatabase = await ControllerTestDatabase.CreateAsync();
+        var request = CreateStaffRegistration("Sam", "Staff", "sam@example.edu", "0400000000") with
+        {
+            ConfirmPassword = "DifferentPassword!2026"
+        };
+
+        var result = await new StaffController(testDatabase.Context).Enroll(request, CancellationToken.None);
+
+        Assert.That(result, Is.InstanceOf<BadRequestObjectResult>());
+        Assert.That(await testDatabase.Context.Set<Staff>().CountAsync(), Is.Zero);
     }
 
     [Test]
@@ -104,7 +169,7 @@ public sealed class UsersAndStaffControllerTests
     public async Task EnrollStaffRejectsInvalidEmailAndDoesNotPersist()
     {
         await using var testDatabase = await ControllerTestDatabase.CreateAsync();
-        var request = new EnrollStaffRequest("Sam", "Staff", "not-an-email", new DateOnly(1990, 1, 1));
+        var request = CreateStaffRegistration("Sam", "Staff", "not-an-email", " ");
 
         var result = await new StaffController(testDatabase.Context).Enroll(request, CancellationToken.None);
 
@@ -116,7 +181,7 @@ public sealed class UsersAndStaffControllerTests
     public async Task EnrollStaffRejectsInvalidPhoneNumberAndDoesNotPersist()
     {
         await using var testDatabase = await ControllerTestDatabase.CreateAsync();
-        var request = new EnrollStaffRequest("Sam", "Staff", "sam@example.edu", new DateOnly(1990, 1, 1), "12345");
+        var request = CreateStaffRegistration("Sam", "Staff", "sam@example.edu", "12345");
 
         var result = await new StaffController(testDatabase.Context).Enroll(request, CancellationToken.None);
 
@@ -131,7 +196,7 @@ public sealed class UsersAndStaffControllerTests
         var database = testDatabase.Context;
         database.Add(CreateStaff("STF001", "Existing", "Staff", "existing@example.edu"));
         await database.SaveChangesAsync();
-        var request = new EnrollStaffRequest(" Sam ", " Staff ", "sam@example.edu", new DateOnly(1990, 1, 1), "0400000000");
+        var request = CreateStaffRegistration(" Sam ", " Staff ", "sam@example.edu", "0400000000");
 
         var result = await new StaffController(database).Enroll(request, CancellationToken.None);
 
@@ -142,6 +207,8 @@ public sealed class UsersAndStaffControllerTests
         Assert.That(persisted.FirstName, Is.EqualTo("Sam"));
         Assert.That(persisted.LastName, Is.EqualTo("Staff"));
         Assert.That(persisted.PhoneNumber, Is.EqualTo("0400000000"));
+        Assert.That(persisted.PasswordHash, Is.Not.EqualTo("StrongPassword!2026"));
+        Assert.That(UserPasswordSecurity.VerifyPassword(persisted, "StrongPassword!2026"), Is.True);
     }
 
     [Test]
@@ -200,4 +267,17 @@ public sealed class UsersAndStaffControllerTests
         DateOfBirth = new DateOnly(1985, 1, 1),
         Status = "ACT"
     };
+
+    private static EnrollStaffRequest CreateStaffRegistration(
+        string firstName,
+        string lastName,
+        string email,
+        string phoneNumber) => new(
+            firstName,
+            lastName,
+            email,
+            new DateOnly(1990, 1, 1),
+            phoneNumber,
+            "StrongPassword!2026",
+            "StrongPassword!2026");
 }
