@@ -10,7 +10,7 @@ builder.RootComponents.Add<App>("#app");
 builder.RootComponents.Add<HeadOutlet>("head::after");
 
 var academicRecordsBackendUrl = builder.Configuration["AcademicRecordsBackendUrl"] ?? "http://localhost:5020";
-builder.Services.AddCampusDemoAuthentication(academicRecordsBackendUrl);
+builder.Services.AddAuthentication(academicRecordsBackendUrl);
 var configuredApiBaseAddress = builder.Configuration["CourseManagementApi:BaseAddress"];
 var apiBaseAddress = string.IsNullOrWhiteSpace(configuredApiBaseAddress)
     ? builder.HostEnvironment.BaseAddress
@@ -18,10 +18,10 @@ var apiBaseAddress = string.IsNullOrWhiteSpace(configuredApiBaseAddress)
 builder.Services.AddCampusAccountServices(academicRecordsBackendUrl);
 builder.Services.AddScoped(serviceProvider =>
 {
-    var handler = new CampusUserIdHeaderHandler(serviceProvider.GetRequiredService<IJSRuntime>())
+    var handler = new UserIdHeaderHandler(serviceProvider.GetRequiredService<IJSRuntime>())
     {
-        InnerHandler = CampusDemoAuthenticationServiceCollectionExtensions
-            .CreateCampusDemoTokenHandler(serviceProvider)
+        InnerHandler = AuthenticationServiceCollectionExtensions
+            .CreateTokenHandler(serviceProvider)
     };
     return new HttpClient(handler) { BaseAddress = new Uri(apiBaseAddress, UriKind.Absolute) };
 });

@@ -4,7 +4,7 @@ using Microsoft.JSInterop;
 
 namespace CampusHousing.Frontend.Services;
 
-public sealed class HousingUserContext(CampusAccountService account)
+public sealed class HousingUserContext(AccountService account)
 {
     public CampusAccountUser? CurrentUser { get; private set; }
 
@@ -13,7 +13,7 @@ public sealed class HousingUserContext(CampusAccountService account)
     public bool IsAvailable => CurrentUser is not null;
 
     public bool IsAdministrator =>
-        CurrentUser is not null && CampusAccountService.IsStaff(CurrentUser);
+        CurrentUser is not null && AccountService.IsStaff(CurrentUser);
 
     public string? ErrorMessage { get; private set; }
 
@@ -39,8 +39,8 @@ public sealed class HousingUserContext(CampusAccountService account)
                 return;
             }
 
-            if (!CampusAccountService.IsStudent(signedInUser)
-                && !CampusAccountService.IsStaff(signedInUser))
+            if (!AccountService.IsStudent(signedInUser)
+                && !AccountService.IsStaff(signedInUser))
             {
                 ErrorMessage = "This CampusPulse account does not have Campus Housing access.";
                 return;

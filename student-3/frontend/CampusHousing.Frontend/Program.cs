@@ -13,16 +13,16 @@ var backendUrl = string.IsNullOrWhiteSpace(configuredBackendUrl)
     ? builder.HostEnvironment.BaseAddress
     : configuredBackendUrl;
 var academicRecordsBackendUrl = builder.Configuration["AcademicRecordsBackendUrl"] ?? "http://localhost:5020";
-builder.Services.AddCampusDemoAuthentication(academicRecordsBackendUrl);
+builder.Services.AddAuthentication(academicRecordsBackendUrl);
 builder.Services.AddCampusAccountServices(academicRecordsBackendUrl);
 builder.Services.AddScoped<HousingUserContext>();
 builder.Services.AddScoped<HousingRoleHandler>();
 builder.Services.AddScoped(sp =>
 {
     var housingHandler = sp.GetRequiredService<HousingRoleHandler>();
-    housingHandler.InnerHandler = CampusDemoAuthenticationServiceCollectionExtensions
-        .CreateCampusDemoTokenHandler(sp);
-    var userIdHandler = new CampusUserIdHeaderHandler(sp.GetRequiredService<IJSRuntime>())
+    housingHandler.InnerHandler = AuthenticationServiceCollectionExtensions
+        .CreateTokenHandler(sp);
+    var userIdHandler = new UserIdHeaderHandler(sp.GetRequiredService<IJSRuntime>())
     {
         InnerHandler = housingHandler
     };

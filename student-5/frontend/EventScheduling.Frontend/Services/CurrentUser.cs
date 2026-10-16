@@ -3,7 +3,7 @@ using EventScheduling.Frontend.Models;
 
 namespace EventScheduling.Frontend.Services;
 
-public sealed class CurrentUser(CampusAccountService account)
+public sealed class CurrentUser(AccountService account)
 {
     public UserProfile? Profile { get; private set; }
     public bool IsInitialized { get; private set; }
@@ -22,8 +22,8 @@ public sealed class CurrentUser(CampusAccountService account)
         {
             await account.InitializeAsync();
             if (account.CurrentUser is { } signedInUser
-                && (CampusAccountService.IsStudent(signedInUser)
-                    || CampusAccountService.IsStaff(signedInUser)))
+                && (AccountService.IsStudent(signedInUser)
+                    || AccountService.IsStaff(signedInUser)))
             {
                 Profile = new UserProfile(
                     signedInUser.UserId,
