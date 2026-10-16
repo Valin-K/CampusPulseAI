@@ -4,30 +4,30 @@ using Microsoft.JSInterop;
 
 namespace CampusPulse.Shared.Components.Services;
 
-public static class CampusDemoAuthenticationServiceCollectionExtensions
+public static class AuthenticationServiceCollectionExtensions
 {
-    public static IServiceCollection AddCampusDemoAuthentication(
+    public static IServiceCollection AddAuthentication(
         this IServiceCollection services,
         string academicRecordsBackendUrl)
     {
         services.AddAuthorizationCore();
         services.AddScoped(serviceProvider =>
         {
-            var http = new HttpClient(CreateCampusDemoTokenHandler(serviceProvider))
+            var http = new HttpClient(CreateTokenHandler(serviceProvider))
             {
                 BaseAddress = new Uri(EnsureTrailingSlash(academicRecordsBackendUrl))
             };
-            return new CampusDemoAuthenticationStateProvider(
+            return new AuthenticationStateProvider(
                 http,
                 serviceProvider.GetRequiredService<IJSRuntime>());
         });
-        services.AddScoped<AuthenticationStateProvider>(serviceProvider =>
-            serviceProvider.GetRequiredService<CampusDemoAuthenticationStateProvider>());
+        services.AddScoped<Microsoft.AspNetCore.Components.Authorization.AuthenticationStateProvider>(serviceProvider =>
+            serviceProvider.GetRequiredService<AuthenticationStateProvider>());
         return services;
     }
 
-    public static HttpMessageHandler CreateCampusDemoTokenHandler(IServiceProvider services) =>
-        new CampusDemoTokenHandler(services.GetRequiredService<IJSRuntime>())
+    public static HttpMessageHandler CreateTokenHandler(IServiceProvider services) =>
+        new TokenHandler(services.GetRequiredService<IJSRuntime>())
         {
             InnerHandler = new HttpClientHandler()
         };

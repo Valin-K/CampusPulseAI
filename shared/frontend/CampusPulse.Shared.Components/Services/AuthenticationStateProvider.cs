@@ -7,27 +7,27 @@ using Microsoft.JSInterop;
 
 namespace CampusPulse.Shared.Components.Services;
 
-public sealed record CampusDemoSession(
+public sealed record Session(
     string AccessToken,
     DateTime ExpiresAt,
     CampusAccountUser User);
 
-public sealed class CampusDemoAuthenticationStateProvider : AuthenticationStateProvider
+public sealed class AuthenticationStateProvider : Microsoft.AspNetCore.Components.Authorization.AuthenticationStateProvider
 {
     private static readonly ClaimsPrincipal Anonymous = new(new ClaimsIdentity());
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly HttpClient http;
     private readonly IJSRuntime javaScript;
-    private CampusDemoSession? currentSession;
+    private Session? currentSession;
     private bool initialized;
 
-    public CampusDemoAuthenticationStateProvider(HttpClient http, IJSRuntime javaScript)
+    public AuthenticationStateProvider(HttpClient http, IJSRuntime javaScript)
     {
         this.http = http;
         this.javaScript = javaScript;
     }
 
-    public CampusDemoSession? CurrentSession => currentSession;
+    public Session? CurrentSession => currentSession;
 
     public async Task<IReadOnlyList<CampusAccountUser>> GetUsersAsync(string role)
     {
@@ -36,17 +36,17 @@ public sealed class CampusDemoAuthenticationStateProvider : AuthenticationStateP
         return await response.Content.ReadFromJsonAsync<List<CampusAccountUser>>(JsonOptions) ?? [];
     }
 
-    public async Task SignInAsync(int userId, string role)
+    public async Task SignInAsync(int userId, string role, string password)
     {
-        using var response = await http.PostAsJsonAsync("api/auth/demo/token", new { userId, role });
+        using var response = await http.PostAsJsonAsync("api/auth/demo/token", new { userId, role, password });
         if (!response.IsSuccessStatusCode)
         {
-            throw new HttpRequestException("The selected demo account could not be signed in.", null, response.StatusCode);
+            throw new HttpRequestException("The account or password is incorrect.", null, response.StatusCode);
         }
 
         var token = await response.Content.ReadFromJsonAsync<DemoTokenResponse>(JsonOptions)
             ?? throw new JsonException("The Academic Records API returned no demo token.");
-        currentSession = new CampusDemoSession(token.AccessToken, token.ExpiresAt, token.User);
+        currentSession = new Session(token.AccessToken, token.ExpiresAt, token.User);
         await StoreSessionAsync(currentSession);
         initialized = true;
         NotifyAuthenticationStateChanged(Task.FromResult(CreateAuthenticationState(currentSession)));
@@ -56,7 +56,7 @@ public sealed class CampusDemoAuthenticationStateProvider : AuthenticationStateP
     {
         currentSession = null;
         initialized = true;
-        await javaScript.InvokeVoidAsync("sessionStorage.removeItem", CampusDemoTokenHandler.SessionStorageKey);
+        await javaScript.InvokeVoidAsync("sessionStorage.removeItem", TokenHandler.SessionStorageKey);
         await javaScript.InvokeVoidAsync("campusPulseAccountSession.removeUserId");
         NotifyAuthenticationStateChanged(Task.FromResult(new AuthenticationState(Anonymous)));
     }
@@ -68,14 +68,14 @@ public sealed class CampusDemoAuthenticationStateProvider : AuthenticationStateP
             initialized = true;
             var value = await javaScript.InvokeAsync<string?>(
                 "sessionStorage.getItem",
-                CampusDemoTokenHandler.SessionStorageKey);
+                TokenHandler.SessionStorageKey);
             if (!string.IsNullOrWhiteSpace(value))
             {
-                currentSession = JsonSerializer.Deserialize<CampusDemoSession>(value, JsonOptions);
+                currentSession = JsonSerializer.Deserialize<Session>(value, JsonOptions);
                 if (currentSession is not null && currentSession.ExpiresAt <= DateTime.UtcNow)
                 {
                     currentSession = null;
-                    await javaScript.InvokeVoidAsync("sessionStorage.removeItem", CampusDemoTokenHandler.SessionStorageKey);
+                    await javaScript.InvokeVoidAsync("sessionStorage.removeItem", TokenHandler.SessionStorageKey);
                     await javaScript.InvokeVoidAsync("campusPulseAccountSession.removeUserId");
                 }
                 else if (currentSession is not null)
@@ -94,7 +94,7 @@ public sealed class CampusDemoAuthenticationStateProvider : AuthenticationStateP
                 {
                     try
                     {
-                        currentSession = JsonSerializer.Deserialize<CampusDemoSession>(transferredSession, JsonOptions);
+                        currentSession = JsonSerializer.Deserialize<Session>(transferredSession, JsonOptions);
                         if (currentSession is not null && currentSession.ExpiresAt > DateTime.UtcNow)
                         {
                             await StoreSessionAsync(currentSession);
@@ -119,7 +119,7 @@ public sealed class CampusDemoAuthenticationStateProvider : AuthenticationStateP
             : CreateAuthenticationState(currentSession);
     }
 
-    private static AuthenticationState CreateAuthenticationState(CampusDemoSession session)
+    private static AuthenticationState CreateAuthenticationState(Session session)
     {
         var user = session.User;
         var claims = new[]
@@ -132,11 +132,11 @@ public sealed class CampusDemoAuthenticationStateProvider : AuthenticationStateP
         return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity(claims, "CampusPulseDemo")));
     }
 
-    private async Task StoreSessionAsync(CampusDemoSession session)
+    private async Task StoreSessionAsync(Session session)
     {
         await javaScript.InvokeVoidAsync(
             "sessionStorage.setItem",
-            CampusDemoTokenHandler.SessionStorageKey,
+            TokenHandler.SessionStorageKey,
             JsonSerializer.Serialize(session, JsonOptions));
         await javaScript.InvokeVoidAsync(
             "campusPulseAccountSession.setUserId",

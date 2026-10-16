@@ -6,12 +6,12 @@ using Microsoft.AspNetCore.Components.Authorization;
 
 namespace CampusPulse.Shared.Components.Services;
 
-public sealed class CampusAccountService : IDisposable
+public sealed class AccountService : IDisposable
 {
     private readonly HttpClient http;
-    private readonly AuthenticationStateProvider authenticationStateProvider;
+    private readonly Microsoft.AspNetCore.Components.Authorization.AuthenticationStateProvider authenticationStateProvider;
 
-    public CampusAccountService(HttpClient http, AuthenticationStateProvider authenticationStateProvider)
+    public AccountService(HttpClient http, Microsoft.AspNetCore.Components.Authorization.AuthenticationStateProvider authenticationStateProvider)
     {
         this.http = http;
         this.authenticationStateProvider = authenticationStateProvider;
@@ -52,7 +52,7 @@ public sealed class CampusAccountService : IDisposable
                 return;
             }
 
-            if (authenticationStateProvider is CampusDemoAuthenticationStateProvider demoAuthentication
+            if (authenticationStateProvider is AuthenticationStateProvider demoAuthentication
                 && demoAuthentication.CurrentSession is { } session)
             {
                 ValidateUsers([session.User]);

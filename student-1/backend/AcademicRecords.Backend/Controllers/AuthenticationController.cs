@@ -10,7 +10,7 @@ namespace AcademicRecords.Backend.Controllers;
 
 [ApiController]
 [Route("api/auth/demo")]
-public sealed class DemoAuthenticationController(
+public sealed class AuthenticationController(
     IHttpClientFactory clients,
     IConfiguration configuration,
     IWebHostEnvironment environment) : ControllerBase
@@ -44,13 +44,16 @@ public sealed class DemoAuthenticationController(
             return NotFound();
         }
 
-        var users = await GetDirectoryUsersAsync(cancellationToken);
-        var user = users.SingleOrDefault(candidate => candidate.UserId == request.UserId
-            && string.Equals(candidate.Role, request.Role, StringComparison.OrdinalIgnoreCase));
-        if (user is null)
+        using var response = await clients.CreateClient("academicRecordsCredentials")
+            .PostAsJsonAsync("/api/users/authenticate", request, cancellationToken);
+        if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
         {
             return Unauthorized();
         }
+
+        response.EnsureSuccessStatusCode();
+        var user = await response.Content.ReadFromJsonAsync<DemoUser>(cancellationToken: cancellationToken)
+            ?? throw new InvalidOperationException("The Academic Records database returned no authenticated user.");
 
         var issuer = configuration["Authentication:Issuer"]
             ?? throw new InvalidOperationException("The token issuer is not configured.");
@@ -100,7 +103,7 @@ public sealed class DemoAuthenticationController(
         return await response.Content.ReadFromJsonAsync<List<DemoUser>>(cancellationToken: cancellationToken) ?? [];
     }
 
-    public sealed record DemoTokenRequest(int UserId, string Role);
+    public sealed record DemoTokenRequest(int UserId, string Role, string Password);
 
     public sealed record DemoTokenResponse(string AccessToken, string TokenType, DateTime ExpiresAt, DemoUser User);
 
