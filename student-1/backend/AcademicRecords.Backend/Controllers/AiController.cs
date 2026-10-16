@@ -44,6 +44,23 @@ public sealed class AiController(
             return BadRequest(new { error = "User ID must be positive." });
         }
 
+        var authenticatedUser = ControllerContext.HttpContext?.User;
+        if (authenticatedUser?.IsInRole("Student") == true)
+        {
+            var userIdClaim = authenticatedUser.FindFirst("user_id")?.Value;
+            if (!int.TryParse(userIdClaim, out var authenticatedUserId) || authenticatedUserId <= 0
+                || request.UserId is not null && request.UserId != authenticatedUserId)
+            {
+                return Forbid();
+            }
+
+            request.UserId = authenticatedUserId;
+        }
+        else if (request.UserId is not null)
+        {
+            return Forbid();
+        }
+
         try
         {
             return Ok(await knowledge.AskAsync(request, cancellationToken));

@@ -1,6 +1,28 @@
-@MultiAgentServer_HostAddress = http://localhost:5171
+@MultiAgentServer_HostAddress = http://localhost:5270
 
-GET {{MultiAgentServer_HostAddress}}/weatherforecast/
+GET {{MultiAgentServer_HostAddress}}/health
 Accept: application/json
 
 ###
+POST {{MultiAgentServer_HostAddress}}/api/workflows
+Content-Type: application/json
+
+{
+  "feature": "coursemanagement",
+  "task": "Summarise the supplied course evidence without inventing prerequisites.",
+  "evidence": [
+    {
+      "id": "manual-course",
+      "source": "Manually supplied example (unverified)",
+      "content": "ASD101 is an Advanced Software Development course.",
+      "collectedAtUtc": "2026-10-08T08:00:00Z"
+    }
+  ],
+  "useMcp": false,
+  "useRag": false,
+  "allowFallback": true
+}
+
+###
+GET {{MultiAgentServer_HostAddress}}/api/workflows?feature=coursemanagement
+Accept: application/json

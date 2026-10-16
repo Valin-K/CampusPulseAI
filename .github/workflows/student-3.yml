@@ -7,6 +7,7 @@ on:
       - master
   pull_request:
   workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read
@@ -44,6 +45,7 @@ jobs:
               - 'shared/backend/CampusPulse.Shared.Mcp/**'
               - 'shared/backend/CampusPulse.Shared.Rag/**'
               - 'docker-compose.yml'
+              - '.github/docker-compose.student-3-ci.yml'
               - '.github/workflows/student-3.yml'
 
       - name: Setup .NET 10
@@ -98,9 +100,9 @@ jobs:
         if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.student3 == 'true'
         shell: bash
         run: |
-          docker compose -f docker-compose.yml -p student-3-ci config --quiet
-          docker compose -f docker-compose.yml -p student-3-ci build ai.gateway academicrecords.database campushousing.database campushousing.backend campushousing.frontend
-          docker compose -f docker-compose.yml -p student-3-ci up --detach --wait --no-build ai.gateway academicrecords.database campushousing.database campushousing.backend campushousing.frontend
+          docker compose -f docker-compose.yml -f .github/docker-compose.student-3-ci.yml -p student-3-ci config --quiet
+          docker compose -f docker-compose.yml -f .github/docker-compose.student-3-ci.yml -p student-3-ci build ai.gateway academicrecords.database campushousing.database campushousing.backend campushousing.frontend
+          docker compose -f docker-compose.yml -f .github/docker-compose.student-3-ci.yml -p student-3-ci up --detach --wait --no-build ai.gateway academicrecords.database campushousing.database campushousing.backend campushousing.frontend
 
       - name: Smoke test Student 3 containers
         if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.student3 == 'true'
@@ -134,10 +136,10 @@ jobs:
         if: failure() && (github.event_name == 'workflow_dispatch' || steps.filter.outputs.student3 == 'true')
         shell: bash
         run: |
-          docker compose -f docker-compose.yml -p student-3-ci ps
-          docker compose -f docker-compose.yml -p student-3-ci logs --no-color ai.gateway academicrecords.database campushousing.database campushousing.backend campushousing.frontend
+          docker compose -f docker-compose.yml -f .github/docker-compose.student-3-ci.yml -p student-3-ci ps
+          docker compose -f docker-compose.yml -f .github/docker-compose.student-3-ci.yml -p student-3-ci logs --no-color ai.gateway academicrecords.database campushousing.database campushousing.backend campushousing.frontend
 
       - name: Remove Student 3 containers
         if: always() && (github.event_name == 'workflow_dispatch' || steps.filter.outputs.student3 == 'true')
         shell: bash
-        run: docker compose -f docker-compose.yml -p student-3-ci down --volumes --remove-orphans
+        run: docker compose -f docker-compose.yml -f .github/docker-compose.student-3-ci.yml -p student-3-ci down --volumes --remove-orphans

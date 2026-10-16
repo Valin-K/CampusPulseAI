@@ -81,7 +81,9 @@ public sealed record RagQuestionRequest(string Question);
 
 public sealed record McpIntegrationResponse(string Tool, bool IsError, McpIntegrationResult Result, DateTimeOffset ExecutedAtUtc);
 
-public sealed record McpIntegrationResult(string Feature, bool Valid, IReadOnlyList<string> Checks);
+public sealed record McpIntegrationResult(string Feature, bool Valid, IReadOnlyList<McpIntegrationCheck> Checks);
+
+public sealed record McpIntegrationCheck(string Name, bool Passed);
 
 public sealed record RagAnswerResponse(
     string Collection,

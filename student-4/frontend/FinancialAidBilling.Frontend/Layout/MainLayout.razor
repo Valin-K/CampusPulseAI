@@ -1,41 +1,29 @@
 ﻿@inherits LayoutComponentBase
 @inject FinancialAidUserContext UserContext
+@inject CampusAccountService Account
 
 <CampusShell PageName="Financial Aid &amp; Billing"
              SectionLabel="Student finance"
-             UserName="@(UserContext.CurrentUser?.FullName ?? "")"
-             UserDetails="@(UserContext.CurrentUser is null ? "" : $"{UserContext.CurrentUser.StudyDescriptor} · {UserContext.CurrentUser.StudentId}")"
-             UserInitials="@(UserContext.CurrentUser?.Initials ?? "")"
-             HomeHref="http://localhost:8080">
-    <UserSelector>
-        @if (!UserContext.IsInitialized)
-        {
-            <span role="status">Loading students...</span>
-        }
-        else if (UserContext.IsAvailable)
-        {
-            <div class="financial-aid-user-selector">
-                <label for="financial-aid-user-select">Viewing as</label>
-                <select id="financial-aid-user-select"
-                        value="@UserContext.CurrentUser!.UserId"
-                        @onchange="ChangeUserAsync"
-                        aria-label="Choose which student to view financial information for">
-                    @foreach (var user in UserContext.Users)
-                    {
-                        <option value="@user.UserId">@user.FullName (@user.StudentId)</option>
-                    }
-                </select>
-            </div>
-        }
-        else
-        {
-            <span>Student information unavailable</span>
-        }
-    </UserSelector>
+             UserName="@(Account.CurrentUser?.FullName ?? "Financial Aid & Billing")"
+             UserDetails="@(Account.CurrentUser is null ? "Finance workspace" : $"{Account.CurrentUser.Role} · {Account.CurrentUser.ExternalId}")"
+             UserInitials="@(Account.CurrentUser?.Initials ?? "FA")"
+             HomeHref="http://localhost:8080"
+             RequireSignedInUser="true">
     <ChildContent>
         @if (!UserContext.IsInitialized)
         {
             <div class="notice" role="status">Loading student information...</div>
+        }
+        else if (IsStaffAccount)
+        {
+            <section class="notice notice-error" role="alert">
+                <h1>Student access required</h1>
+                <p>Financial Aid &amp; Billing is available to students only. Staff accounts cannot access this workspace.</p>
+                <p>You will be redirected to student sign-in shortly.</p>
+                <button class="button button-primary" @onclick="RedirectToStudentLoginAsync">
+                    Continue to student sign-in
+                </button>
+            </section>
         }
         else if (!UserContext.IsAvailable)
         {
@@ -51,20 +39,63 @@
     </ChildContent>
 </CampusShell>
 
-<CampusAiChat />
+@if (Account.CurrentUser is not null)
+{
+    <CampusAiChat />
+}
 
 @code {
+    [Inject]
+    private CampusDemoAuthenticationStateProvider DemoAuthentication { get; set; } = default!;
+
+    [Inject]
+    private NavigationManager Navigation { get; set; } = default!;
+
+    private bool redirectingToStudentLogin;
+    private bool staffRedirectStarted;
+    private bool IsStaffAccount => Account.CurrentUser is { } user
+        && CampusAccountService.IsStaff(user);
+
     protected override async Task OnInitializedAsync()
     {
+        await Account.InitializeAsync();
         await UserContext.InitializeAsync();
     }
 
-    private async Task ChangeUserAsync(ChangeEventArgs args)
+    protected override Task OnAfterRenderAsync(bool firstRender)
     {
-        if (int.TryParse(args.Value?.ToString(), out var userId) && userId != UserContext.CurrentUser?.UserId)
+        if (UserContext.IsInitialized && IsStaffAccount && !staffRedirectStarted)
         {
-            await UserContext.SelectUserAsync(userId);
+            staffRedirectStarted = true;
+            _ = RedirectAfterDelayAsync();
         }
+
+        return Task.CompletedTask;
+    }
+
+    private async Task RedirectAfterDelayAsync()
+    {
+        await Task.Delay(TimeSpan.FromSeconds(3));
+        await RedirectToStudentLoginAsync();
+    }
+
+    private async Task RedirectToStudentLoginAsync()
+    {
+        if (redirectingToStudentLogin)
+        {
+            return;
+        }
+
+        redirectingToStudentLogin = true;
+        if (IsStaffAccount)
+        {
+            await DemoAuthentication.SignOutAsync();
+        }
+
+        var returnUrl = Uri.EscapeDataString(Navigation.BaseUri);
+        Navigation.NavigateTo(
+            $"http://localhost:8081/login/student?returnUrl={returnUrl}",
+            forceLoad: true);
     }
 
     private async Task RetryAsync()

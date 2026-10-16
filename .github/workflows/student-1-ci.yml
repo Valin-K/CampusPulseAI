@@ -7,6 +7,7 @@ on:
       - master
   pull_request:
   workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read
@@ -108,6 +109,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          authorization_header="Authorization: Bearer $(python3 .github/scripts/create-ci-auth-token.py)"
 
           endpoints=(
             "http://localhost:5269/health"
@@ -122,7 +124,8 @@ jobs:
           for endpoint in "${endpoints[@]}"; do
             reachable=0
             for attempt in {1..30}; do
-              if curl --silent --show-error --fail --max-time 5 "$endpoint" > /dev/null; then
+              if curl --silent --show-error --fail --max-time 5 \
+                --header "$authorization_header" "$endpoint" > /dev/null; then
                 reachable=1
                 break
               fi
@@ -137,6 +140,7 @@ jobs:
 
           student_response=$(curl --silent --show-error --fail --max-time 5 \
             -X POST http://localhost:5020/api/students/enroll \
+            --header "$authorization_header" \
             -H 'Content-Type: application/json' \
             -d '{"firstName":"CI","lastName":"Student","email":"ci.student@example.edu","dateOfBirth":"2000-01-01","mailingAddress":"1 CI Way","emergencyContactName":"CI Contact","emergencyContactPhone":"0400000000","phoneNumber":"0400000001","degree":"Bachelor of Testing","major":"Software Engineering","academicTermId":15,"courseCode":"CI999","academicYear":2026}')
           student_id=$(printf '%s' "$student_response" | jq --raw-output '.studentId')
@@ -146,10 +150,12 @@ jobs:
           fi
 
           curl --silent --show-error --fail --max-time 5 \
+            --header "$authorization_header" \
             "http://localhost:5020/api/students/$student_id" > /dev/null
 
           curl --silent --show-error --fail --max-time 5 \
             -X PUT "http://localhost:5020/api/students/$student_id" \
+            --header "$authorization_header" \
             -H 'Content-Type: application/json' \
             -d '{"firstName":"Updated CI","lastName":"Student","email":"updated.ci.student@example.edu","dateOfBirth":"2000-01-01","mailingAddress":"2 CI Way","emergencyContactName":"Updated CI Contact","emergencyContactPhone":"0400000000","phoneNumber":"0400000002","degree":"Bachelor of Testing","major":"Quality Engineering"}' > /dev/null
 

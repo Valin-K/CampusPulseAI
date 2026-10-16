@@ -11,4 +11,7 @@ RUN dotnet publish "./AcademicRecords.Frontend.csproj" -c $BUILD_CONFIGURATION -
 FROM nginx:alpine AS final
 WORKDIR /usr/share/nginx/html
 COPY --from=build /app/publish/wwwroot .
+ENV BACKEND_HOST=academicrecords.backend
+ENV BACKEND_PORT=8080
+COPY student-1/frontend/AcademicRecords.Frontend/nginx.conf.template /etc/nginx/templates/default.conf.template
 EXPOSE 80

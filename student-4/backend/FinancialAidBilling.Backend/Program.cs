@@ -6,11 +6,45 @@ using CampusPulse.Shared.Rag.Generation;
 using FinancialAidBilling.Backend.Models;
 using FinancialAidBilling.Backend.Services;
 using System.Net.Http.Json;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddOpenApi();
-builder.Services.AddAuthorization();
+var issuer = builder.Configuration["Authentication:Issuer"] ?? "CampusPulse.Dev";
+var audience = builder.Configuration["Authentication:Audience"] ?? "CampusPulse.Api";
+var signingKey = builder.Configuration["Authentication:SigningKey"]
+    ?? (builder.Environment.IsDevelopment()
+        ? "campuspulse-demo-only-signing-key-change-before-any-use"
+        : throw new InvalidOperationException("The token signing key is not configured."));
+var keyBytes = System.Text.Encoding.UTF8.GetBytes(signingKey);
+if (keyBytes.Length < 32)
+{
+    throw new InvalidOperationException("The token signing key must contain at least 32 bytes.");
+}
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidIssuer = issuer,
+            ValidateAudience = true,
+            ValidAudience = audience,
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new Microsoft.IdentityModel.Tokens.SymmetricSecurityKey(keyBytes),
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.FromSeconds(30)
+        };
+    });
+builder.Services.AddAuthorization(options =>
+{
+    options.FallbackPolicy = new AuthorizationPolicyBuilder(JwtBearerDefaults.AuthenticationScheme)
+        .RequireAuthenticatedUser()
+        .RequireClaim("scope", "CampusPulse.Access")
+        .Build();
+});
 builder.Services.AddControllers();
 builder.Services.AddCors(options => options.AddDefaultPolicy(policy => policy
     .AllowAnyOrigin()
@@ -28,8 +62,8 @@ builder.Services.AddHttpClient("academicRecords", client =>
 builder.Services.AddHttpClient("mcp", client =>
 {
     client.BaseAddress = new Uri(builder.Configuration["Services:McpServer"] ?? "http://localhost:5268");
-});
-builder.Services.AddHttpClient<IMcpClient, McpClient>(client =>
+}).AddHttpMessageHandler<McpAuthorizationHeaderHandler>();
+builder.Services.AddMcpClient(client =>
 {
     client.BaseAddress = new Uri(builder.Configuration["Services:McpServer"] ?? "http://localhost:5268");
     client.Timeout = TimeSpan.FromSeconds(30);
@@ -45,15 +79,30 @@ builder.Services.AddSingleton<RagCitationParser>();
 builder.Services.AddScoped<RagKnowledgeService>();
 builder.Services.AddScoped<IFinancialAidKnowledgeService, FinancialAidKnowledgeService>();
 builder.Services.AddAiGateway(builder.Configuration);
+builder.Services.AddMultiAgentCaller(builder.Configuration);
 
 var app = builder.Build();
+app.MapMultiAgentCaller("financialaidbilling", "billingDatabase", "/api/scholarships");
 
 app.MapOpenApi();
 app.UseCors();
+app.UseAuthentication();
+app.UseAuthorization();
 
-app.MapGet("/api/students", async (IHttpClientFactory clients, CancellationToken cancellationToken) =>
-    await (await clients.CreateClient("academicRecords").GetAsync("/api/students", cancellationToken))
-        .ToResultAsync(cancellationToken));
+app.MapGet("/api/students", async (
+    IHttpClientFactory clients,
+    HttpContext context,
+    CancellationToken cancellationToken) =>
+{
+    using var request = new HttpRequestMessage(HttpMethod.Get, "/api/students");
+    if (context.Request.Headers.Authorization.Count > 0)
+    {
+        request.Headers.TryAddWithoutValidation("Authorization", context.Request.Headers.Authorization.ToArray());
+    }
+
+    var response = await clients.CreateClient("academicRecords").SendAsync(request, cancellationToken);
+    return await response.ToResultAsync(cancellationToken);
+});
 
 var invoices = app.MapGroup("/api/invoices");
 
@@ -96,8 +145,14 @@ scholarships.MapPut("/{id:int}", async (int id, ScholarshipRequest request, IHtt
 scholarships.MapDelete("/{id:int}", async (int id, IHttpClientFactory clients, CancellationToken cancellationToken) =>
     await (await clients.CreateClient("billingDatabase").DeleteAsync($"/api/scholarships/{id}", cancellationToken)).ToResultAsync(cancellationToken));
 
-scholarships.MapPost("/recommendations/student/{userId:int}", async (int userId, IHttpClientFactory clients, GeminiScholarshipService service, CancellationToken cancellationToken) =>
+scholarships.MapPost("/recommendations/student/{userId:int}", async (
+    int userId, IHttpClientFactory clients, GeminiScholarshipService service, IConfiguration configuration, CancellationToken cancellationToken) =>
 {
+    if (!configuration.GetValue("Mcp:Enabled", true))
+    {
+        return Results.Problem(statusCode: 403, title: "MCP is disabled in this deployment; scholarship recommendations are unavailable.");
+    }
+
     try
     {
         var profile = await clients.CreateClient("academicRecords")
@@ -146,8 +201,13 @@ scholarships.MapPost("/recommendations/student/{userId:int}", async (int userId,
 
 var assistant = app.MapGroup("/api/assistant");
 
-assistant.MapPost("/mcp/integration", async (IHttpClientFactory clients, CancellationToken cancellationToken) =>
+assistant.MapPost("/mcp/integration", async (IHttpClientFactory clients, IConfiguration configuration, CancellationToken cancellationToken) =>
 {
+    if (!configuration.GetValue("Mcp:Enabled", true))
+    {
+        return Results.Problem(statusCode: 403, title: "MCP is disabled in this deployment.");
+    }
+
     try
     {
         return await (await clients.CreateClient("mcp").PostAsJsonAsync(
@@ -172,8 +232,14 @@ assistant.MapPost("/mcp/integration", async (IHttpClientFactory clients, Cancell
 assistant.MapPost("/rag/scholarships", async (
     RagQuestionRequest request,
     IFinancialAidKnowledgeService knowledge,
+    IConfiguration configuration,
     CancellationToken cancellationToken) =>
 {
+    if (!configuration.GetValue("Rag:Enabled", true))
+    {
+        return Results.Problem(statusCode: 403, title: "RAG is disabled in this deployment.");
+    }
+
     if (string.IsNullOrWhiteSpace(request.Question) || request.Question.Length > 1000)
     {
         return Results.BadRequest(new { error = "Ask a scholarship question of up to 1000 characters." });
@@ -209,8 +275,14 @@ assistant.MapPost("/rag/scholarships", async (
 app.MapPost("/api/ai/knowledge", async (
     RagQuestionRequest request,
     IFinancialAidKnowledgeService knowledge,
+    IConfiguration configuration,
     CancellationToken cancellationToken) =>
 {
+    if (!configuration.GetValue("Rag:Enabled", true))
+    {
+        return Results.Problem(statusCode: 403, title: "RAG is disabled in this deployment.");
+    }
+
     if (string.IsNullOrWhiteSpace(request.Question) || request.Question.Length > 1000)
     {
         return Results.BadRequest(new { error = "Ask a question of up to 1000 characters." });
@@ -242,6 +314,6 @@ app.MapPost("/api/ai/knowledge", async (
     }
 });
 
-app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
+app.MapGet("/health", () => Results.Ok(new { status = "healthy" })).AllowAnonymous();
 
 app.Run();

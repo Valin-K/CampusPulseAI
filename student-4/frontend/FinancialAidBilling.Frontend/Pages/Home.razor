@@ -14,8 +14,8 @@
         <p>Track university charges, review payment activity, and discover funding opportunities in one focused dashboard.</p>
     </div>
     <div class="term-summary">
-        <span>Current study profile</span>
-        <strong>@UserContext.CurrentUser!.StudyDescriptor · Year @UserContext.CurrentUser.YearLevel</strong>
+        <span>Signed-in student</span>
+        <strong>@UserContext.CurrentUser!.FullName · @UserContext.CurrentUser.StudyDescriptor · Year @UserContext.CurrentUser.YearLevel</strong>
         <small>@UserContext.CurrentUser.Degree · @UserContext.CurrentUser.StudentId</small>
     </div>
 </header>
@@ -123,9 +123,18 @@ else if (activeTab == "scholarships")
                 <button class="button button-secondary" @onclick="CheckMcpIntegrationAsync" disabled="@isCheckingMcp">@(isCheckingMcp ? "Checking…" : "Check MCP registration")</button>
             </div>
         </div>
-        @if (mcpIntegration is { IsError: false, Result.Valid: true })
+        @if (mcpIntegration is { IsError: false, Result.Checks: not null })
         {
-            <div class="ai-response" role="status"><strong>MCP interaction succeeded</strong><p>Student 4 is registered: @string.Join(", ", mcpIntegration.Result.Checks).</p></div>
+            <div class="ai-response" role="status">
+                <strong>@(mcpIntegration.Result.Valid ? "MCP integration check succeeded" : "MCP integration check failed")</strong>
+                <p>Shared MCP registry validation for @mcpIntegration.Result.Feature.</p>
+                <ul class="detail-list">
+                    @foreach (var check in mcpIntegration.Result.Checks)
+                    {
+                        <li><strong>@check.Name</strong>: @(check.Passed ? "Passed" : "Failed")</li>
+                    }
+                </ul>
+            </div>
         }
         @if (ragAnswer is not null)
         {
@@ -319,7 +328,7 @@ else
         try
         {
             using var response = await Http.PostAsync($"/api/scholarships/recommendations/student/{StudentId}", null);
-            if (!response.IsSuccessStatusCode) { errorMessage = await response.Content.ReadAsStringAsync(); return; }
+            if (!response.IsSuccessStatusCode) { errorMessage = await ReadRecommendationErrorAsync(response); return; }
             var result = await response.Content.ReadFromJsonAsync<ScholarshipRecommendationResponse>();
             if (result?.AcademicContext is null) { errorMessage = "The recommendation service returned an invalid response."; return; }
             aiRecommendation = result.Recommendation;
@@ -333,6 +342,38 @@ else
         finally { isRecommending = false; }
     }
 
+    private static async Task<string> ReadRecommendationErrorAsync(HttpResponseMessage response)
+    {
+        var responseBody = await response.Content.ReadAsStringAsync();
+        if (!string.IsNullOrWhiteSpace(responseBody))
+        {
+            try
+            {
+                using var document = System.Text.Json.JsonDocument.Parse(responseBody);
+                var root = document.RootElement;
+                if (root.TryGetProperty("detail", out var detail)
+                    && detail.ValueKind == System.Text.Json.JsonValueKind.String
+                    && !string.IsNullOrWhiteSpace(detail.GetString()))
+                {
+                    return detail.GetString()!;
+                }
+
+                if (root.TryGetProperty("title", out var title)
+                    && title.ValueKind == System.Text.Json.JsonValueKind.String
+                    && !string.IsNullOrWhiteSpace(title.GetString()))
+                {
+                    return title.GetString()!;
+                }
+            }
+            catch (System.Text.Json.JsonException)
+            {
+                // Use the HTTP status below when the response is not ProblemDetails JSON.
+            }
+        }
+
+        return $"Scholarship recommendations are unavailable (HTTP {(int)response.StatusCode}).";
+    }
+
     private async Task CheckMcpIntegrationAsync()
     {
         isCheckingMcp = true; errorMessage = null; mcpIntegration = null;
@@ -341,11 +382,16 @@ else
             using var response = await Http.PostAsync("/api/assistant/mcp/integration", null);
             if (!response.IsSuccessStatusCode) { errorMessage = await response.Content.ReadAsStringAsync(); return; }
             mcpIntegration = await response.Content.ReadFromJsonAsync<McpIntegrationResponse>();
-            if (mcpIntegration is null || mcpIntegration.IsError || !mcpIntegration.Result.Valid)
+            if (mcpIntegration?.Result is null || mcpIntegration.Result.Checks is null)
+            {
+                errorMessage = "The MCP integration service returned an invalid response.";
+            }
+            else if (mcpIntegration.IsError || !mcpIntegration.Result.Valid)
             {
                 errorMessage = "The MCP integration check did not succeed.";
             }
         }
+        catch (System.Text.Json.JsonException) { errorMessage = "The MCP integration service returned an invalid response."; }
         catch (HttpRequestException) { errorMessage = "The shared MCP server is currently unavailable."; }
         finally { isCheckingMcp = false; }
     }

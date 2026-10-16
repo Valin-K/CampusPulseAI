@@ -1,0 +1,93 @@
+@inherits LayoutComponentBase
+@implements IDisposable
+@inject CampusAccountService Account
+@inject NavigationManager Navigation
+
+<CampusShell PageName="CampusPulse Account"
+             SectionLabel="Account access"
+             UserName="@(Account.CurrentUser?.FullName ?? "CampusPulse account")"
+             UserDetails="@(Account.CurrentUser is null ? "Student and staff sign-in" : $"{Account.CurrentUser.Role} · {Account.CurrentUser.ExternalId}")"
+             UserInitials="@(Account.CurrentUser?.Initials ?? "CP")"
+             HomeHref="@ReturnUrl"
+             PortalHref="@ReturnUrl"
+             RequireSignedInUser="@(!IsLoginPage)"
+             ShowAccountActions="@ShowAccountActions"
+             ContextLabel="@(Account.CurrentUser is null ? "Sign in to CampusPulse" : $"Signed in as {Account.CurrentUser.Role}")">
+    <ChildContent>
+        @Body
+    </ChildContent>
+</CampusShell>
+
+@code {
+    private string ReturnUrl
+    {
+        get
+        {
+            var requestedReturnUrl = GetQueryParameter(
+                Navigation.ToAbsoluteUri(Navigation.Uri).Query,
+                "returnUrl");
+            return IsAllowedReturnUrl(requestedReturnUrl)
+                ? requestedReturnUrl!
+                : "http://localhost:8080/index.html";
+        }
+    }
+
+    private static string? GetQueryParameter(string query, string parameterName)
+    {
+        foreach (var pair in query.TrimStart('?').Split('&', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var parts = pair.Split('=', 2);
+            var name = Uri.UnescapeDataString(parts[0].Replace('+', ' '));
+            if (string.Equals(name, parameterName, StringComparison.OrdinalIgnoreCase))
+            {
+                return parts.Length > 1
+                    ? Uri.UnescapeDataString(parts[1].Replace('+', ' '))
+                    : string.Empty;
+            }
+        }
+
+        return null;
+    }
+
+    private bool IsLoginPage
+    {
+        get
+        {
+            var path = Navigation.ToBaseRelativePath(Navigation.Uri).Split('?', 2)[0].Trim('/');
+            return string.Equals(path, "login", StringComparison.OrdinalIgnoreCase)
+                || path.StartsWith("login/", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(path, "authentication", StringComparison.OrdinalIgnoreCase)
+                || path.StartsWith("authentication/", StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    private bool ShowAccountActions => !IsLoginPage;
+
+    private static bool IsAllowedReturnUrl(string? returnUrl) =>
+        Uri.TryCreate(returnUrl, UriKind.Absolute, out var destination)
+        && destination.Scheme == Uri.UriSchemeHttp
+        && string.Equals(destination.Host, "localhost", StringComparison.OrdinalIgnoreCase)
+        && destination.Port is >= 8080 and <= 8085;
+
+    protected override void OnInitialized()
+    {
+        Account.Changed += AccountChanged;
+        Navigation.LocationChanged += LocationChanged;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Account.InitializeAsync();
+    }
+
+    private void AccountChanged() => _ = InvokeAsync(StateHasChanged);
+
+    private void LocationChanged(object? sender, LocationChangedEventArgs args) =>
+        _ = InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+    {
+        Account.Changed -= AccountChanged;
+        Navigation.LocationChanged -= LocationChanged;
+    }
+}

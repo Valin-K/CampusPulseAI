@@ -1,3 +1,6 @@
+@implements IDisposable
+@inject CampusAccountService Account
+
 <div class="campus-shell">
     <CampusNavBar PageName="@PageName"
                   SectionLabel="@SectionLabel"
@@ -7,10 +10,26 @@
                   HomeHref="@HomeHref"
                   PortalHref="@PortalHref"
                   ContextLabel="@ContextLabel"
-                  UserSelector="@UserSelector" />
+                  ShowAccountActions="@ShowAccountActions"
+                  UserSelector="@(!RequireSignedInUser || Account.CurrentUser is not null ? UserSelector : null)" />
 
     <main class="campus-workspace">
-        @ChildContent
+        @if (!RequireSignedInUser)
+        {
+            @ChildContent
+        }
+        else if (!Account.IsInitialized)
+        {
+            <p class="muted" role="status">Checking your sign-in session...</p>
+        }
+        else if (Account.CurrentUser is null)
+        {
+            <CampusSignInRequired />
+        }
+        else
+        {
+            @ChildContent
+        }
     </main>
 
     <footer class="campus-footer">
@@ -28,6 +47,14 @@
     [Parameter] public string HomeHref { get; set; } = "/";
     [Parameter] public string PortalHref { get; set; } = "http://localhost:8080";
     [Parameter] public string ContextLabel { get; set; } = "Student portal";
+    [Parameter] public bool ShowAccountActions { get; set; } = true;
+    [Parameter] public bool RequireSignedInUser { get; set; }
     [Parameter] public RenderFragment? UserSelector { get; set; }
     [Parameter, EditorRequired] public RenderFragment? ChildContent { get; set; }
+
+    protected override void OnInitialized() => Account.Changed += AccountChanged;
+
+    private void AccountChanged() => _ = InvokeAsync(StateHasChanged);
+
+    public void Dispose() => Account.Changed -= AccountChanged;
 }

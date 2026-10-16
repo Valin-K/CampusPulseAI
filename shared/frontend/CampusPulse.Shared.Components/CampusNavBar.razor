@@ -1,14 +1,20 @@
 <campus-nav-bar page-name="@PageName"
                 section-label="@SectionLabel"
-                user-name="@UserName"
-                user-details="@UserDetails"
+                user-name="@(ShowAccountActions ? string.Empty : UserName)"
+                user-details="@(ShowAccountActions ? string.Empty : UserDetails)"
                 user-initials="@UserInitials"
                 home-href="@HomeHref"
                 portal-href="@PortalHref"
                 context-label="@ContextLabel">
+    @if (ShowAccountActions)
+    {
+        <div slot="account-actions" class="nav-account-slot">
+            <CampusAccountMenu />
+        </div>
+    }
     @if (UserSelector is not null)
     {
-        <div slot="user-selector">
+        <div slot="user-selector" class="nav-user-slot">
             @UserSelector
         </div>
     }
@@ -20,8 +26,9 @@
     [Parameter] public string UserName { get; set; } = "Student";
     [Parameter] public string UserDetails { get; set; } = string.Empty;
     [Parameter] public string UserInitials { get; set; } = "ST";
-    [Parameter] public string HomeHref { get; set; } = "/";
+    [Parameter] public string HomeHref { get; set; } = "http://localhost:8080/";
     [Parameter] public string PortalHref { get; set; } = "http://localhost:8080";
     [Parameter] public string ContextLabel { get; set; } = "Student portal";
+    [Parameter] public bool ShowAccountActions { get; set; } = true;
     [Parameter] public RenderFragment? UserSelector { get; set; }
 }

@@ -14,16 +14,25 @@ public sealed class LocalEventAiOrchestrator(
     IHttpClientFactory clients,
     IAiGatewayClient gateway,
     IMcpClient mcp,
-    IEventRagService knowledge) : IEventKnowledgeService
+    IEventRagService knowledge,
+    IConfiguration configuration) : IEventKnowledgeService
 {
     private const int MaximumToolCalls = 4;
     private const string McpFeature = "student-5";
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
-    // The planner's action catalogue. list_*/get_* run directly against the event database;
-    // check_mcp_integration runs the shared MCP server's existing validate_integration tool.
-    private static readonly IReadOnlyList<McpToolDefinition> Tools =
+    private readonly bool ragEnabled = bool.TryParse(configuration["Rag:Enabled"], out var configuredRagEnabled)
+        ? configuredRagEnabled
+        : true;
+    private readonly bool mcpEnabled = bool.TryParse(configuration["Mcp:Enabled"], out var configuredMcpEnabled)
+        ? configuredMcpEnabled
+        : true;
+
+    // The planner's action catalogue. list_*/get_* run directly against the event database and are
+    // always offered; check_mcp_integration runs the shared MCP server's validate_integration tool and
+    // is only offered when MCP is enabled.
+    private IReadOnlyList<McpToolDefinition> Tools =>
     [
         new("list_rooms",
             "List every bookable room with its location, capacity, kind and description.",
@@ -37,12 +46,18 @@ public sealed class LocalEventAiOrchestrator(
         new("list_bookings",
             "List all current room and equipment bookings.",
             new Dictionary<string, string>()),
-        new("check_mcp_integration",
-            "Check whether the Event Scheduling feature is registered with the shared MCP server.",
-            new Dictionary<string, string>()),
+        .. mcpEnabled
+            ?
+            [
+                new McpToolDefinition(
+                    "check_mcp_integration",
+                    "Check whether the Event Scheduling feature is registered with the shared MCP server.",
+                    new Dictionary<string, string>()),
+            ]
+            : Array.Empty<McpToolDefinition>(),
     ];
 
-    private static readonly HashSet<string> ToolNames =
+    private HashSet<string> ToolNames =>
         Tools.Select(tool => tool.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
 
     public async Task<RagAssistantAnswer> AskAsync(
@@ -90,18 +105,31 @@ public sealed class LocalEventAiOrchestrator(
     private async Task<AiExecutionPlan> CreatePlanAsync(string question, CancellationToken cancellationToken)
     {
         var toolCatalogue = JsonSerializer.Serialize(Tools, JsonOptions);
+
+        var routeNames = new List<string> { "direct", "tools" };
+        var routeDescriptions = new List<string>
+        {
+            "- direct: a general explanation that needs no CampusPulse data.",
+            "- tools: current structured data - rooms, equipment or bookings"
+                + (mcpEnabled ? " - or the MCP integration status." : "."),
+        };
+        if (ragEnabled)
+        {
+            routeNames.Add("rag");
+            routeNames.Add("rag_and_tools");
+            routeDescriptions.Add("- rag: policy, eligibility, hire rules, opening hours, or other campus scheduling knowledge.");
+            routeDescriptions.Add("- rag_and_tools: the answer needs both policy knowledge and current structured data.");
+        }
+
         var prompt = $$"""
             You are the routing planner for the CampusPulse Event & Facility Scheduling assistant.
 
             Decide how to answer the user's question:
-            - direct: a general explanation that needs no CampusPulse data.
-            - rag: policy, eligibility, hire rules, opening hours, or other campus scheduling knowledge.
-            - tools: current structured data - rooms, equipment or bookings - or the MCP integration status.
-            - rag_and_tools: the answer needs both policy knowledge and current structured data.
+            {{string.Join("\n", routeDescriptions)}}
 
             Return JSON only in this exact shape:
             {
-              "route": "direct|rag|tools|rag_and_tools",
+              "route": "{{string.Join("|", routeNames)}}",
               "ragQuestion": "question for RAG or null",
               "toolCalls": [ { "tool": "exact tool name", "arguments": { } } ]
             }
@@ -203,7 +231,7 @@ public sealed class LocalEventAiOrchestrator(
         return new ToolResult(tool, !result.IsError, result.Result);
     }
 
-    private static void ValidatePlan(AiExecutionPlan plan)
+    private void ValidatePlan(AiExecutionPlan plan)
     {
         if (string.IsNullOrWhiteSpace(plan.Route))
         {
@@ -214,6 +242,11 @@ public sealed class LocalEventAiOrchestrator(
         if (route is not ("direct" or "rag" or "tools" or "rag_and_tools"))
         {
             throw new InvalidOperationException($"Gemini selected unsupported AI route '{plan.Route}'.");
+        }
+
+        if (!ragEnabled && UsesRag(route))
+        {
+            throw new InvalidOperationException("Gemini selected a RAG route while RAG is disabled.");
         }
 
         var calls = plan.ToolCalls ?? [];
