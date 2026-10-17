@@ -18,6 +18,7 @@
     <None Include="docker-compose.yml" />
     <None Include=".dockerignore" />
     <None Include="NuGet.Config" />
+    <None Include="scripts\test\validate-ai-authorization.ps1" />
     <None Include="scripts\test\validate-ai-containers.ps1" />
     <None Include="shared\frontend\assets\campus-pulse-logo.svg" />
     <None Include="shared\frontend\CampusPulse.Shared.Components\CampusMetricCard.razor" />

@@ -61,6 +61,10 @@ jobs:
         shell: pwsh
         run: ./scripts/test/validate-ai-containers.ps1 -ComposeProjectName campuspulse-integration-ci
 
+      - name: Validate AI authorization across all five applications
+        shell: pwsh
+        run: ./scripts/test/validate-ai-authorization.ps1 -IsolatedTestStack
+
       - name: Remove integration containers
         if: always()
         shell: bash

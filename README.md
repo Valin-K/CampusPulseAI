@@ -122,6 +122,8 @@ Run the complete environment with `docker compose up --build -d`. Student 4 uses
 `http://rag.server:8080` URLs.
 Authenticated MCP and multi-agent workflow requests forward their bearer token
 through the AI containers to protected Academic Records or Course Management APIs.
+Scholarship recommendations also forward that token on the direct Academic Records
+profile lookup; the downstream APIs still require authentication and the access scope.
 MCP must also be able to reach those APIs. Dependency failures and timeouts are
 surfaced, not replaced with fabricated statistics or an incomplete catalogue.
 
@@ -261,6 +263,13 @@ Integration CI also runs `scripts\test\validate-ai-containers.ps1` against its
 isolated keyless Compose stack. It checks AI health, container-to-container MCP/RAG
 evidence collection, explicit generation failure without a key, and workflow
 persistence after recreating the Multi-Agent container.
+
+`scripts\test\validate-ai-authorization.ps1 -IsolatedTestStack` also checks all
+five applications' protected AI endpoints, live workflow evidence, authenticated
+MCP calls, per-feature RAG retrieval, scholarship profile forwarding, and keyless
+knowledge, academic-progress, and booking-assistant responses. Run it
+only against an isolated keyless stack; it adds test documents/workflows and
+temporarily disables and restores scholarships to exercise a real no-match result.
 
 ## Run the shared agentic loop
 

@@ -54,6 +54,14 @@ The server uses container DNS for MCP, RAG, and the gateway, and stores SQLite
 workflow history in `/app/data/multi-agent.db` on the `multiagent-data` named volume.
 Do not use `docker compose down --volumes` unless you intend to delete that history.
 
+Backend callers forward the current bearer token when starting or correcting a
+workflow. The server retains it only in the in-memory queue for that execution and
+uses a separate MCP HTTP client per job. Tokens are never persisted with workflows,
+sent to models or RAG, or included in evidence exports. Correction rounds use the
+review request's current token. Protected downstream APIs still enforce token
+expiry and scope; expired credentials produce an explicit dependency failure (or
+the caller's selected optional-dependency fallback), not an authentication bypass.
+
 Alternatively run just the server on the host (stop its container first):
 
 ```powershell
