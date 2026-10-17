@@ -370,7 +370,7 @@ def run_all_deterministic_checks() -> list[dict[str, Any]]:
         ["docker", "compose", "config", "--quiet"],
     ))
 
-    # MCP and RAG run as local host services rather than Compose containers.
+    # These isolated validation runners use host processes, independent of Compose.
     for mode, validate in (("mcp", run_mcp_checks), ("rag", run_rag_checks)):
         startup_checks = start_validation_services(mode)
         checks.extend(startup_checks)

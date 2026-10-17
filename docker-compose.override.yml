@@ -46,13 +46,3 @@ services:
       - ASPNETCORE_HTTP_PORTS=8080
     ports:
       - "8080"
-
-# MCP runs locally outside Docker Compose.
-x-local-ai-boundary: true
-
-
-
-
-
-
-

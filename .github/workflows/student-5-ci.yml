@@ -88,8 +88,8 @@ jobs:
         if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.student5 == 'true'
         shell: bash
         run: |
-          docker compose -p student-5-ci -f docker-compose.yml -f .github/docker-compose.student-5.ci.yml build ai.gateway academicrecords.database eventscheduling.database eventscheduling.backend eventscheduling.frontend
-          docker compose -p student-5-ci -f docker-compose.yml -f .github/docker-compose.student-5.ci.yml up --detach --no-build --no-deps ai.gateway academicrecords.database eventscheduling.database eventscheduling.backend eventscheduling.frontend
+          docker compose -p student-5-ci -f docker-compose.yml -f .github/docker-compose.student-5.ci.yml build --with-dependencies ai.gateway academicrecords.database eventscheduling.database eventscheduling.backend eventscheduling.frontend
+          docker compose -p student-5-ci -f docker-compose.yml -f .github/docker-compose.student-5.ci.yml up --detach --no-build ai.gateway academicrecords.database eventscheduling.database eventscheduling.backend eventscheduling.frontend
 
       - name: Smoke test Student 5 containers
         if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.student5 == 'true'

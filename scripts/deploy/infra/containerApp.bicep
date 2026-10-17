@@ -1,4 +1,4 @@
-// Reusable module: one Container App. Called once per service (16 times) from main.bicep.
+// Reusable module: one Container App. Called once per service from main.bicep.
 // Every app in this deployment shares the same shape (Consumption, 0.25 CPU / 0.5 GiB,
 // scale-to-zero) - only ingress, port, env vars and replica/volume settings differ per app.
 
@@ -23,13 +23,17 @@ param external bool
 @description('Environment variables for this container, as {name, value} pairs.')
 param env array = []
 
+@secure()
+@description('Optional Gemini credential for the AI gateway, referenced via secretRef.')
+param geminiApiKey string = ''
+
 @description('0 normally (scale-to-zero); 1 during the showcase/marking window (Deploy-Apps.ps1 -WarmUp).')
 param minReplicas int = 0
 
 @description('Databases must stay at 1 - SQLite only tolerates a single writer. Api/web apps can go slightly higher.')
 param maxReplicas int = 1
 
-@description('Optional: mounts an Azure Files share at this container path (databases only).')
+@description('Optional: mounts an Azure Files share at this container path (SQLite services).')
 param volumeMount object = {}
 
 @description('Name of the environment storage definition to mount, required when volumeMount is set.')
@@ -46,6 +50,7 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
   properties: {
     environmentId: environmentId
     configuration: {
+      secrets: empty(geminiApiKey) ? [] : [{ name: 'gemini-api-key', value: geminiApiKey }]
       ingress: {
         external: external
         targetPort: targetPort

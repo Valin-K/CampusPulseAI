@@ -21,7 +21,7 @@ public sealed class DependencyAndAgentTests
     public async Task MissingMcpAndRagUseExplicitFallbackWithoutInventedEvidence()
     {
         using var factory = new HttpFactory(HttpStatusCode.ServiceUnavailable);
-        var collector = new WorkflowEvidenceCollector(new McpStub(false), factory, NullLogger<WorkflowEvidenceCollector>.Instance);
+        var collector = new WorkflowEvidenceCollector(factory, NullLogger<WorkflowEvidenceCollector>.Instance);
         var result = await collector.CollectAsync(Workflow(), CancellationToken.None);
         Assert.Multiple(() =>
         {
@@ -36,7 +36,7 @@ public sealed class DependencyAndAgentTests
     public void StrictDependencyPolicyFailsInsteadOfFallingBack()
     {
         using var factory = new HttpFactory(HttpStatusCode.ServiceUnavailable);
-        var collector = new WorkflowEvidenceCollector(new McpStub(false), factory, NullLogger<WorkflowEvidenceCollector>.Instance);
+        var collector = new WorkflowEvidenceCollector(factory, NullLogger<WorkflowEvidenceCollector>.Instance);
         Assert.ThrowsAsync<InvalidDataException>(() => collector.CollectAsync(Workflow(false), CancellationToken.None));
     }
 
@@ -44,14 +44,12 @@ public sealed class DependencyAndAgentTests
     public async Task DisabledDependenciesMakeNoExternalCalls()
     {
         using var factory = new HttpFactory(HttpStatusCode.OK);
-        var mcp = new McpStub(false);
-        var collector = new WorkflowEvidenceCollector(mcp, factory, NullLogger<WorkflowEvidenceCollector>.Instance);
+        var collector = new WorkflowEvidenceCollector(factory, NullLogger<WorkflowEvidenceCollector>.Instance);
         var result = await collector.CollectAsync(Workflow() with { UseMcp = false, UseRag = false }, CancellationToken.None);
         Assert.Multiple(() =>
         {
             Assert.That(result.Dependencies.Select(item => item.Status), Is.EqualTo(new[] { "disabled", "disabled" }));
             Assert.That(factory.Calls, Is.Zero);
-            Assert.That(mcp.Calls, Is.Zero);
         });
     }
 
@@ -67,7 +65,7 @@ public sealed class DependencyAndAgentTests
                 new { documentId = "unrelated", chunkIndex = 1, score = 0.6999, text = "Other policy" }
             }
         });
-        var collector = new WorkflowEvidenceCollector(new McpStub(true), factory, NullLogger<WorkflowEvidenceCollector>.Instance);
+        var collector = new WorkflowEvidenceCollector(factory, NullLogger<WorkflowEvidenceCollector>.Instance);
         var result = await collector.CollectAsync(Workflow(), CancellationToken.None);
         Assert.Multiple(() =>
         {
@@ -82,7 +80,7 @@ public sealed class DependencyAndAgentTests
     public async Task EmptyRagCorpusIsAnExplicitFallback()
     {
         using var factory = new HttpFactory(HttpStatusCode.OK, new { collection = "coursemanagement", sources = Array.Empty<object>() });
-        var collector = new WorkflowEvidenceCollector(new McpStub(true), factory, NullLogger<WorkflowEvidenceCollector>.Instance);
+        var collector = new WorkflowEvidenceCollector(factory, NullLogger<WorkflowEvidenceCollector>.Instance);
         var result = await collector.CollectAsync(Workflow(), CancellationToken.None);
         Assert.That(result.Dependencies.Single(item => item.Service == "rag").Status, Is.EqualTo("fallback"));
     }
@@ -91,7 +89,7 @@ public sealed class DependencyAndAgentTests
     public async Task MalformedRagSourcesAreAnExplicitFallback()
     {
         using var factory = new HttpFactory(HttpStatusCode.OK, new { collection = "coursemanagement", sources = new object?[] { null } });
-        var collector = new WorkflowEvidenceCollector(new McpStub(true), factory, NullLogger<WorkflowEvidenceCollector>.Instance);
+        var collector = new WorkflowEvidenceCollector(factory, NullLogger<WorkflowEvidenceCollector>.Instance);
         var result = await collector.CollectAsync(Workflow(), CancellationToken.None);
         Assert.That(result.Dependencies.Single(item => item.Service == "rag").Status, Is.EqualTo("fallback"));
     }
@@ -131,19 +129,6 @@ public sealed class DependencyAndAgentTests
         Assert.That(result.Plan!.Objective, Is.EqualTo("Plan"));
     }
 
-    private sealed class McpStub(bool available) : IMcpClient
-    {
-        public int Calls { get; private set; }
-        public Task<IReadOnlyList<McpToolDefinition>> GetToolsAsync(CancellationToken ct) => throw new NotSupportedException();
-        public Task<McpToolCallResponse> CallAsync(string tool, IReadOnlyDictionary<string, JsonElement> arguments, CancellationToken ct)
-        {
-            Calls++;
-            if (!available) throw new HttpRequestException("MCP connection refused");
-            return Task.FromResult(new McpToolCallResponse(tool, false,
-                JsonSerializer.SerializeToElement(new { course = "ASD101" }), DateTimeOffset.UtcNow));
-        }
-    }
-
     private sealed class HttpFactory(HttpStatusCode status, object? body = null) : IHttpClientFactory, IDisposable
     {
         public int Calls { get; private set; }
@@ -153,7 +138,11 @@ public sealed class DependencyAndAgentTests
             var client = new HttpClient(new Handler(() =>
             {
                 Calls++;
-                return new HttpResponseMessage(status) { Content = JsonContent.Create(body ?? new { error = "unavailable" }) };
+                object payload = name == "workflowMcp" && status == HttpStatusCode.OK
+                    ? new McpToolCallResponse("course.list_courses", false,
+                        JsonSerializer.SerializeToElement(new { course = "ASD101" }), DateTimeOffset.UtcNow)
+                    : body ?? new { error = "unavailable" };
+                return new HttpResponseMessage(status) { Content = JsonContent.Create(payload) };
             })) { BaseAddress = new Uri("http://local.test") };
             clients.Add(client);
             return client;

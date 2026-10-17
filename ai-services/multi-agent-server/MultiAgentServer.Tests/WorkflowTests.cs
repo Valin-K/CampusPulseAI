@@ -259,7 +259,7 @@ public sealed class WorkflowTests
 
     private sealed class PassthroughCollector : IWorkflowEvidenceCollector
     {
-        public Task<Workflow> CollectAsync(Workflow workflow, CancellationToken ct) => Task.FromResult(workflow);
+        public Task<Workflow> CollectAsync(Workflow workflow, CancellationToken ct, string? authorization = null) => Task.FromResult(workflow);
     }
 
     private sealed class RecordingAgents : IWorkflowAgents

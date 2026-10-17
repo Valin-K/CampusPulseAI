@@ -7,16 +7,16 @@ public sealed class WorkflowCoordinator(
     WorkflowStore store, IWorkflowAgents agents, IWorkflowEvidenceCollector collector,
     ILogger<WorkflowCoordinator> logger) : BackgroundService
 {
-    private readonly Channel<Guid> queue = Channel.CreateBounded<Guid>(100);
+    private readonly Channel<(Guid Id, string? Authorization)> queue = Channel.CreateBounded<(Guid, string?)>(100);
 
-    public Workflow Start(WorkflowRequest request)
+    public Workflow Start(WorkflowRequest request, string? authorization = null)
     {
         Validate(request);
         var now = DateTimeOffset.UtcNow;
         var workflow = store.Save(new Workflow(Guid.NewGuid(), request.Feature, request.Task.Trim(),
             WorkflowStatus.Running, 1, 0, now, now, request.Evidence, [], [], [],
             UseMcp: request.UseMcp, UseRag: request.UseRag, AllowFallback: request.AllowFallback), "workflow_created");
-        return Enqueue(workflow);
+        return Enqueue(workflow, authorization);
     }
 
     public static void Validate(WorkflowRequest request)
@@ -32,7 +32,7 @@ public sealed class WorkflowCoordinator(
             throw new ArgumentException("A supported feature, task (1-4000 characters), and 1-20 uniquely identified evidence items (at most 120000 characters) are required. mcp-/rag- IDs are reserved.");
     }
 
-    public Workflow Review(Workflow workflow, HumanReviewRequest request)
+    public Workflow Review(Workflow workflow, HumanReviewRequest request, string? authorization = null)
     {
         if (request.Decision is not ("approve" or "correct" or "reject")
             || string.IsNullOrWhiteSpace(request.Reviewer) || request.Reviewer.Length > 100
@@ -54,21 +54,21 @@ public sealed class WorkflowCoordinator(
             Round = request.Decision == "correct" ? workflow.Round + 1 : workflow.Round
         };
         next = store.Save(next, $"human_{request.Decision}");
-        return request.Decision == "correct" ? Enqueue(next) : next;
+        return request.Decision == "correct" ? Enqueue(next, authorization) : next;
     }
 
-    private Workflow Enqueue(Workflow workflow)
+    private Workflow Enqueue(Workflow workflow, string? authorization)
     {
-        if (queue.Writer.TryWrite(workflow.Id)) return workflow;
+        if (queue.Writer.TryWrite((workflow.Id, authorization))) return workflow;
         return store.Save(workflow with { Status = WorkflowStatus.Failed, Error = "The workflow queue is full. Retry later." }, "queue_full");
     }
 
-    public async Task ProcessAsync(Guid id, CancellationToken ct)
+    public async Task ProcessAsync(Guid id, CancellationToken ct, string? authorization = null)
     {
         var workflow = store.Get(id) ?? throw new InvalidOperationException("Queued workflow was not found.");
         try
         {
-            workflow = store.Save(await collector.CollectAsync(workflow, ct), "evidence_collected");
+            workflow = store.Save(await collector.CollectAsync(workflow, ct, authorization), "evidence_collected");
             foreach (var role in new[] { "planner", "worker", "reviewer" })
             {
                 workflow = store.Save(workflow, $"{role}_started");
@@ -92,7 +92,7 @@ public sealed class WorkflowCoordinator(
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        await foreach (var id in queue.Reader.ReadAllAsync(stoppingToken))
-            await ProcessAsync(id, stoppingToken);
+        await foreach (var job in queue.Reader.ReadAllAsync(stoppingToken))
+            await ProcessAsync(job.Id, stoppingToken, job.Authorization);
     }
 }
