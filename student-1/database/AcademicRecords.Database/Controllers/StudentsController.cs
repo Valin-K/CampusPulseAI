@@ -2,6 +2,7 @@ using AcademicRecords.Database.Contracts;
 using AcademicRecords.Database.Data;
 using AcademicRecords.Database.Models;
 using AcademicRecords.Database.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -38,6 +39,7 @@ public sealed class StudentsController(AcademicRecordsDbContext database) : Cont
     }
 
     [HttpPost("enroll")]
+    [AllowAnonymous]
     public async Task<IActionResult> Enroll(
         EnrollStudentRequest request,
         CancellationToken cancellationToken)

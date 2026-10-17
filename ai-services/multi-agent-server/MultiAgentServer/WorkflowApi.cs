@@ -15,9 +15,9 @@ public static class WorkflowApi
             catch (ArgumentException exception) { return Results.BadRequest(new { error = exception.Message }); }
             catch (WorkflowConflictException exception) { return Results.Conflict(new { error = exception.Message }); }
         });
-        api.MapPost("/", (WorkflowRequest request, WorkflowCoordinator coordinator) =>
+        api.MapPost("/", (WorkflowRequest request, WorkflowCoordinator coordinator, HttpContext context) =>
         {
-            var workflow = coordinator.Start(request);
+            var workflow = coordinator.Start(request, context.Request.Headers.Authorization.ToString());
             return Results.Json(workflow, statusCode: workflow.Status == WorkflowStatus.Failed ? 503 : 202);
         });
         api.MapGet("/", (string feature, WorkflowStore repository) =>
@@ -30,11 +30,11 @@ public static class WorkflowApi
             Find(repository, id, feature) is { } workflow
                 ? Results.Ok(new WorkflowEvidenceExport(workflow, repository.Audit(id))) : NotFound());
         api.MapPost("/{id:guid}/review", (Guid id, string feature, HumanReviewRequest request,
-            WorkflowStore repository, WorkflowCoordinator coordinator) =>
+            WorkflowStore repository, WorkflowCoordinator coordinator, HttpContext context) =>
         {
             var workflow = Find(repository, id, feature);
             if (workflow is null) return NotFound();
-            var reviewed = coordinator.Review(workflow, request);
+            var reviewed = coordinator.Review(workflow, request, context.Request.Headers.Authorization.ToString());
             return Results.Json(reviewed, statusCode: reviewed.Status == WorkflowStatus.Failed ? 503
                 : reviewed.Status == WorkflowStatus.Running ? 202 : 200);
         });

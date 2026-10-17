@@ -1,5 +1,7 @@
 using CampusHousing.Database.Data;
 using CampusHousing.Database.Models;
+using CampusPulse.Shared.Security;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 using System.Net.Http.Json;
@@ -8,6 +10,7 @@ var builder = Microsoft.AspNetCore.Builder.WebApplication.CreateBuilder(args);
 var connectionString = builder.Configuration.GetConnectionString("CampusHousing")
     ?? "Data Source=/app/data/campus-housing.db";
 builder.Services.AddDbContext<CampusHousingDbContext>(options => options.UseSqlite(connectionString));
+builder.Services.AddCampusPulseSecurity(builder.Configuration, builder.Environment);
 var academicRecordsUrl = builder.Configuration["Services:AcademicRecordsDatabase"] ?? "http://localhost:5021";
 builder.Services.AddHttpClient("AcademicRecords", client => client.BaseAddress = new Uri(academicRecordsUrl.TrimEnd('/') + "/"));
 builder.Services.AddCors(options => options.AddDefaultPolicy(policy => policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod()));
@@ -25,8 +28,10 @@ await using (var scope = app.Services.CreateAsyncScope())
     await CampusHousingSeedData.EnsureSeededAsync(db, users);
 }
 app.UseCors();
+app.UseAuthentication();
+app.UseAuthorization();
 
-app.MapGet("/health", () => Results.Ok(new { service = "campus-housing-database", status = " healthy".Trim() }));
+app.MapGet("/health", () => Results.Ok(new { service = "campus-housing-database", status = " healthy".Trim() })).AllowAnonymous();
 app.MapGet("/api/rooms", async (CampusHousingDbContext db) => Results.Ok(await db.DormRooms.AsNoTracking()
     .Select(room => new
     {

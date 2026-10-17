@@ -1,9 +1,12 @@
 using McpServer.Contracts;
 using McpServer.Tools;
 using CampusPulse.Shared.Mcp.Client;
+using CampusPulse.Shared.Security;
+using Microsoft.AspNetCore.Authorization;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddOpenApi();
+builder.Services.AddCampusPulseSecurity(builder.Configuration, builder.Environment);
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddTransient<McpAuthorizationHeaderHandler>();
 builder.Services.AddCors(options => options.AddDefaultPolicy(policy => policy
@@ -24,10 +27,12 @@ builder.Services.AddHttpClient("campusHousing", client =>
 {
     client.BaseAddress = new Uri(builder.Configuration["Services:CampusHousingDatabase"] ?? "http://localhost:5093");
     client.Timeout = TimeSpan.FromSeconds(10);
-});
+}).ForwardCampusPulseAuthorization();
 builder.Services.AddMcpTools();
 
 var app = builder.Build();
+app.UseAuthentication();
+app.UseAuthorization();
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
@@ -39,7 +44,7 @@ app.MapGet("/health", (IEnumerable<IMcpTool> tools) => Results.Ok(new
     status = "healthy",
     service = "mcp",
     toolCount = tools.Count()
-}));
+})).AllowAnonymous();
 app.MapGet("/api/mcp/tools", (
     IConfiguration configuration,
     IEnumerable<IMcpTool> tools) =>

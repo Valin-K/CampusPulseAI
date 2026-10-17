@@ -1,5 +1,6 @@
 using System.Net;
 using CampusPulse.Shared.Mcp.Client;
+using CampusPulse.Shared.Security;
 using Microsoft.AspNetCore.Http;
 
 namespace AcademicRecords.Tests;
@@ -14,7 +15,7 @@ public sealed class McpAuthorizationHeaderHandlerTests
         var handler = new McpAuthorizationHeaderHandler(new HttpContextAccessor
         {
             HttpContext = context
-        })
+        }, new AuthorizationRequestContext())
         {
             InnerHandler = new CapturingHandler()
         };
@@ -32,7 +33,7 @@ public sealed class McpAuthorizationHeaderHandlerTests
     [Test]
     public async Task LeavesAuthorizationUnsetWithoutCurrentRequest()
     {
-        var handler = new McpAuthorizationHeaderHandler(new HttpContextAccessor())
+        var handler = new McpAuthorizationHeaderHandler(new HttpContextAccessor(), new AuthorizationRequestContext())
         {
             InnerHandler = new CapturingHandler()
         };

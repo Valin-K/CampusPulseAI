@@ -55,10 +55,14 @@ public sealed class AccountService : IDisposable
             if (authenticationStateProvider is AuthenticationStateProvider demoAuthentication
                 && demoAuthentication.CurrentSession is { } session)
             {
-                ValidateUsers([session.User]);
-                AuthenticatedEmail = session.User.Email;
-                CurrentUser = session.User;
-                Users = [session.User];
+                var user = session.User with
+                {
+                    Role = principal.FindFirst(ClaimTypes.Role)?.Value ?? string.Empty
+                };
+                ValidateUsers([user]);
+                AuthenticatedEmail = user.Email;
+                CurrentUser = user;
+                Users = [user];
                 return;
             }
 

@@ -1,5 +1,7 @@
 using CampusPulse.Shared.Ai;
 using CampusPulse.Shared.Rag.Generation;
+using CampusPulse.Shared.Security;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Options;
 using RagServer.Models;
 using RagServer.Services;
@@ -7,6 +9,7 @@ using SharedRagSource = CampusPulse.Shared.Rag.Contracts.RagSource;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddOpenApi();
+builder.Services.AddCampusPulseSecurity(builder.Configuration, builder.Environment);
 builder.Services.AddCors(options => options.AddDefaultPolicy(policy => policy
     .AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod()));
 builder.Services.Configure<RagOptions>(builder.Configuration.GetSection("Rag"));
@@ -25,6 +28,8 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseCors();
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.MapGet("/health", (VectorStore store, RagAiClient ai, IOptions<RagOptions> options) => Results.Ok(new
 {
@@ -34,7 +39,7 @@ app.MapGet("/health", (VectorStore store, RagAiClient ai, IOptions<RagOptions> o
     generationAvailable = ai.GenerationAvailable,
     collections = store.Summaries().Count,
     allowedCollections = options.Value.AllowedCollections
-}));
+})).AllowAnonymous();
 
 app.MapGet("/api/rag/collections", (VectorStore store) => Results.Ok(store.Summaries()));
 

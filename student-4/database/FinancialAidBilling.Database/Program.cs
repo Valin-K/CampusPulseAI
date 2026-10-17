@@ -1,5 +1,7 @@
 using FinancialAidBilling.Database.Data;
 using FinancialAidBilling.Database.Models;
+using CampusPulse.Shared.Security;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -8,8 +10,11 @@ var connectionString = builder.Configuration.GetConnectionString("FinancialAidBi
 
 builder.Services.AddDbContext<FinancialAidBillingDbContext>(options => options.UseSqlite(connectionString));
 builder.Services.AddOpenApi();
+builder.Services.AddCampusPulseSecurity(builder.Configuration, builder.Environment);
 
 var app = builder.Build();
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.MapOpenApi();
 
@@ -248,7 +253,7 @@ scholarships.MapDelete("/{id:int}", async (int id, FinancialAidBillingDbContext 
     return Results.NoContent();
 });
 
-app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
+app.MapGet("/health", () => Results.Ok(new { status = "healthy" })).AllowAnonymous();
 
 await app.RunAsync();
 

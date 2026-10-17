@@ -13,6 +13,7 @@ namespace AcademicRecords.Database.Controllers;
 public sealed class UsersController(AcademicRecordsDbContext database) : ControllerBase
 {
     [HttpGet]
+    [AllowAnonymous]
     public async Task<ActionResult<IReadOnlyList<UserResponse>>> GetAll(CancellationToken cancellationToken)
     {
         var users = await database.Users

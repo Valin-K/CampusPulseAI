@@ -1,5 +1,7 @@
 using EventScheduling.Database.Data;
 using EventScheduling.Database.Models;
+using CampusPulse.Shared.Security;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -8,8 +10,11 @@ var connectionString = builder.Configuration.GetConnectionString("EventSchedulin
 
 builder.Services.AddDbContext<EventSchedulingDbContext>(options => options.UseSqlite(connectionString));
 builder.Services.AddOpenApi();
+builder.Services.AddCampusPulseSecurity(builder.Configuration, builder.Environment);
 
 var app = builder.Build();
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.MapOpenApi();
 
@@ -538,7 +543,7 @@ bookings.MapDelete("/{id:int}", async (int id, EventSchedulingDbContext database
     return Results.NoContent();
 });
 
-app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
+app.MapGet("/health", () => Results.Ok(new { status = "healthy" })).AllowAnonymous();
 
 await app.RunAsync();
 

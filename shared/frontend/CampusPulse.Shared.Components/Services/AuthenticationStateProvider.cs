@@ -122,14 +122,61 @@ public sealed class AuthenticationStateProvider : Microsoft.AspNetCore.Component
     private static AuthenticationState CreateAuthenticationState(Session session)
     {
         var user = session.User;
+        var role = ReadSessionRole(session.AccessToken);
+        if (role is null)
+        {
+            return new AuthenticationState(Anonymous);
+        }
+
         var claims = new[]
         {
             new Claim(ClaimTypes.NameIdentifier, user.UserId.ToString(System.Globalization.CultureInfo.InvariantCulture)),
             new Claim(ClaimTypes.Name, user.FullName),
             new Claim(ClaimTypes.Email, user.Email),
-            new Claim(ClaimTypes.Role, user.Role)
+            new Claim(ClaimTypes.Role, role)
         };
         return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity(claims, "CampusPulseDemo")));
+    }
+
+    private static string? ReadSessionRole(string accessToken)
+    {
+        var segments = accessToken.Split('.');
+        if (segments.Length != 3)
+        {
+            return null;
+        }
+
+        try
+        {
+            var payload = segments[1].Replace('-', '+').Replace('_', '/');
+            payload = payload.PadRight(payload.Length + ((4 - payload.Length % 4) % 4), '=');
+            using var document = JsonDocument.Parse(Convert.FromBase64String(payload));
+            if (!document.RootElement.TryGetProperty("role", out var roleClaim)
+                && !document.RootElement.TryGetProperty(ClaimTypes.Role, out roleClaim))
+            {
+                return null;
+            }
+
+            if (roleClaim.ValueKind != JsonValueKind.String)
+            {
+                return null;
+            }
+
+            return roleClaim.GetString()?.ToUpperInvariant() switch
+            {
+                "STUDENT" => "Student",
+                "STAFF" => "Staff",
+                _ => null
+            };
+        }
+        catch (FormatException)
+        {
+            return null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
     }
 
     private async Task StoreSessionAsync(Session session)

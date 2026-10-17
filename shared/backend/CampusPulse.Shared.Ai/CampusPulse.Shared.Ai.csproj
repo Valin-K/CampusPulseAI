@@ -7,6 +7,7 @@
   </PropertyGroup>
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <ProjectReference Include="..\CampusPulse.Shared.Security\CampusPulse.Shared.Security.csproj" />
     <ProjectReference Include="..\CampusPulse.Shared.MultiAgent\CampusPulse.Shared.MultiAgent.csproj" />
   </ItemGroup>
 </Project>

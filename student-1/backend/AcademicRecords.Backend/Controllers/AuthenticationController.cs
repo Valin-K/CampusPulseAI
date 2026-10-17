@@ -54,6 +54,13 @@ public sealed class AuthenticationController(
         response.EnsureSuccessStatusCode();
         var user = await response.Content.ReadFromJsonAsync<DemoUser>(cancellationToken: cancellationToken)
             ?? throw new InvalidOperationException("The Academic Records database returned no authenticated user.");
+        var role = user.Role.ToUpperInvariant() switch
+        {
+            "STUDENT" => "Student",
+            "STAFF" => "Staff",
+            _ => throw new InvalidOperationException("The Academic Records database returned an unsupported user role.")
+        };
+        user = user with { Role = role };
 
         var issuer = configuration["Authentication:Issuer"]
             ?? throw new InvalidOperationException("The token issuer is not configured.");
@@ -74,6 +81,7 @@ public sealed class AuthenticationController(
         var subject = new ClaimsIdentity(
         [
             new Claim(JwtRegisteredClaimNames.Sub, user.UserId.ToString(System.Globalization.CultureInfo.InvariantCulture)),
+            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString("N")),
             new Claim("user_id", user.UserId.ToString(System.Globalization.CultureInfo.InvariantCulture)),
             new Claim(ClaimTypes.NameIdentifier, user.UserId.ToString(System.Globalization.CultureInfo.InvariantCulture)),
             new Claim(ClaimTypes.Name, user.FirstName + " " + user.LastName),
@@ -81,6 +89,14 @@ public sealed class AuthenticationController(
             new Claim(ClaimTypes.Role, user.Role),
             new Claim("scope", "CampusPulse.Access")
         ]);
+        if (!string.IsNullOrWhiteSpace(user.StudentId))
+        {
+            subject.AddClaim(new Claim("student_id", user.StudentId));
+        }
+        if (!string.IsNullOrWhiteSpace(user.StaffId))
+        {
+            subject.AddClaim(new Claim("staff_id", user.StaffId));
+        }
         var descriptor = new SecurityTokenDescriptor
         {
             Issuer = issuer,

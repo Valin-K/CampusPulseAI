@@ -5,6 +5,7 @@ using CampusPulse.Shared.Ai;
 using CampusPulse.Shared.Mcp.Client;
 using CampusPulse.Shared.Mcp.Contracts;
 using CampusPulse.Shared.MultiAgent;
+using CampusPulse.Shared.Security;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Hosting.Server;
@@ -21,6 +22,8 @@ public sealed class WorkflowTests
     private string directory = null!;
     private WorkflowStore store = null!;
     private RecordingAgents agents = null!;
+    private PassthroughCollector collector = null!;
+    private AuthorizationRequestContext requestAuthorization = null!;
     private WorkflowCoordinator coordinator = null!;
 
     [SetUp]
@@ -29,7 +32,28 @@ public sealed class WorkflowTests
         directory = Path.Combine(Path.GetTempPath(), $"campus-workflow-{Guid.NewGuid():N}");
         store = new WorkflowStore(Path.Combine(directory, "workflow.db"));
         agents = new RecordingAgents();
-        coordinator = new WorkflowCoordinator(store, agents, new PassthroughCollector(), NullLogger<WorkflowCoordinator>.Instance);
+        requestAuthorization = new AuthorizationRequestContext();
+        collector = new PassthroughCollector(requestAuthorization);
+        coordinator = new WorkflowCoordinator(store, agents, collector, NullLogger<WorkflowCoordinator>.Instance, requestAuthorization);
+    }
+
+    [Test]
+    public async Task WorkflowRoundsForwardTheCallerSessionWithoutPersistingIt()
+    {
+        var created = coordinator.Start(Request(), "Bearer student-session");
+        await coordinator.ProcessAsync(created.Id, CancellationToken.None);
+        var ready = store.Get(created.Id)!;
+        var corrected = coordinator.Review(
+            ready,
+            new("correct", "Tutor", "Include course codes.", ready.Version),
+            "Bearer staff-session");
+        await coordinator.ProcessAsync(corrected.Id, CancellationToken.None);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(collector.Authorizations, Is.EqualTo(new[] { "Bearer student-session", "Bearer staff-session" }));
+            Assert.That(JsonSerializer.Serialize(store.Get(created.Id)), Does.Not.Contain("Bearer "));
+        });
     }
 
     [TearDown]
@@ -257,9 +281,15 @@ public sealed class WorkflowTests
         BaseAddress = new Uri(app.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.Single())
     };
 
-    private sealed class PassthroughCollector : IWorkflowEvidenceCollector
+    private sealed class PassthroughCollector(AuthorizationRequestContext requestAuthorization) : IWorkflowEvidenceCollector
     {
-        public Task<Workflow> CollectAsync(Workflow workflow, CancellationToken ct) => Task.FromResult(workflow);
+        public List<string?> Authorizations { get; } = [];
+
+        public Task<Workflow> CollectAsync(Workflow workflow, CancellationToken ct)
+        {
+            Authorizations.Add(requestAuthorization.CurrentAuthorization);
+            return Task.FromResult(workflow);
+        }
     }
 
     private sealed class RecordingAgents : IWorkflowAgents
