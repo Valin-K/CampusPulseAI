@@ -1,0 +1,31 @@
+# Pre-commit security testing for every student service (student-1 to student-5).
+# .NET equivalents: Ruff security rules -> .NET security analyzers, pip-audit -> NuGet vulnerable package audit.
+# Setup once per clone: pip install pre-commit detect-secrets, then run pre-commit install.
+# Run every hook manually: pre-commit run --all-files
+repos:
+  # 1. Secret detection.
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0
+    hooks:
+      - id: detect-secrets
+        name: detect-secrets (all students)
+        args: ["--baseline", ".secrets.baseline"]
+        files: ^student-[1-5]/
+
+  - repo: local
+    hooks:
+      # 2. Risky code patterns (Ruff security rules equivalent).
+      - id: dotnet-security-analyzers
+        name: .NET security analyzers (all students)
+        entry: pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/pre-commit/run-security-analyzers.ps1
+        language: system
+        pass_filenames: false
+        files: ^student-[1-5]/.*\.(cs|razor|csproj)$
+
+      # 3. Known vulnerable dependencies (pip-audit equivalent).
+      - id: nuget-vulnerable-packages
+        name: NuGet vulnerable package audit (all students)
+        entry: pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/pre-commit/check-vulnerable-packages.ps1
+        language: system
+        pass_filenames: false
+        files: ^student-[1-5]/.*\.csproj$
