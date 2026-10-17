@@ -88,6 +88,16 @@ public sealed class BackendControllersTests
             CancellationToken.None);
 
         Assert.That(result.Result, Is.InstanceOf<OkObjectResult>());
+        var tokenResponse = (AuthenticationController.DemoTokenResponse)((OkObjectResult)result.Result!).Value!;
+        var tokenPayload = tokenResponse.AccessToken.Split('.')[1].Replace('-', '+').Replace('_', '/');
+        tokenPayload = tokenPayload.PadRight(tokenPayload.Length + ((4 - tokenPayload.Length % 4) % 4), '=');
+        using var tokenDocument = JsonDocument.Parse(Convert.FromBase64String(tokenPayload));
+        Assert.Multiple(() =>
+        {
+            Assert.That(tokenDocument.RootElement.GetProperty("role").GetString(), Is.EqualTo("Student"));
+            Assert.That(tokenDocument.RootElement.GetProperty("student_id").GetString(), Is.EqualTo("STU042"));
+            Assert.That(tokenDocument.RootElement.GetProperty("jti").GetString(), Is.Not.Empty);
+        });
         var request = clients.Requests.Single();
         Assert.That(request.ClientName, Is.EqualTo("academicRecordsCredentials"));
         Assert.That(request.Scheme, Is.EqualTo(Uri.UriSchemeHttp));

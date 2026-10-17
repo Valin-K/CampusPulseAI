@@ -1,5 +1,5 @@
 @page "/"
-@inject CampusAccountService Account
+@inject AccountService Account
 @inject NavigationManager Navigation
 
 <PageTitle>Academic Records</PageTitle>
@@ -17,9 +17,9 @@
             return;
         }
 
-        var destination = CampusAccountService.IsStudent(user)
+        var destination = AccountService.IsStudent(user)
             ? $"students/{user.UserId}"
-            : CampusAccountService.IsStaff(user)
+            : AccountService.IsStaff(user)
                 ? $"staff/{user.UserId}"
                 : null;
 
