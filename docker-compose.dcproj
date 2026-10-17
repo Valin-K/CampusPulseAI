@@ -17,6 +17,8 @@
     </None>
     <None Include="docker-compose.yml" />
     <None Include=".dockerignore" />
+    <None Include="shared\backend\CampusPulse.Shared.Security\CampusPulse.Shared.Security.csproj" />
+    <None Include="shared\backend\CampusPulse.Shared.Security\CampusPulseSecurityExtensions.cs" />
     <None Include="shared\frontend\assets\campus-pulse-logo.svg" />
     <None Include="shared\frontend\CampusPulse.Shared.Components\CampusMetricCard.razor" />
     <None Include="shared\frontend\CampusPulse.Shared.Components\CampusMetricCard.razor.css" />
