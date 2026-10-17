@@ -77,16 +77,19 @@ jobs:
         shell: bash
         run: |
           cp .github/student-2-ci-appsettings.json student-2/frontend/CourseManagement.Frontend/wwwroot/appsettings.json
-          docker compose -p student-2-ci -f docker-compose.yml -f .github/docker-compose.student-2.ci.yml build ai.gateway academicrecords.database coursemanagement.database coursemanagement.backend coursemanagement.frontend
-          docker compose -p student-2-ci -f docker-compose.yml -f .github/docker-compose.student-2.ci.yml up --detach --no-build ai.gateway academicrecords.database coursemanagement.database coursemanagement.backend coursemanagement.frontend
+          docker compose -p student-2-ci -f docker-compose.yml -f .github/docker-compose.student-2.ci.yml build ai.gateway academicrecords.database academicrecords.backend coursemanagement.database coursemanagement.backend coursemanagement.frontend
+          docker compose -p student-2-ci -f docker-compose.yml -f .github/docker-compose.student-2.ci.yml up --detach --no-build ai.gateway academicrecords.database academicrecords.backend coursemanagement.database coursemanagement.backend coursemanagement.frontend
 
       - name: Smoke test Student 2 containers
         if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.student2 == 'true'
         shell: bash
         run: |
-          authorization_header="Authorization: Bearer $(python3 .github/scripts/create-ci-auth-token.py)"
+          set -euo pipefail
+          authorization_header="Authorization: Bearer $(python3 .github/scripts/create-ci-auth-token.py --user-id 1 --role Student)"
           endpoints=(
             "http://localhost:5269/health"
+            "http://localhost:5020/health"
+            "http://localhost:15021/health"
             "http://localhost:15118/health"
             "http://localhost:15118/api/courses"
             "http://localhost:15118/api/course-access/student"
@@ -144,7 +147,7 @@ jobs:
         shell: bash
         run: |
           docker compose -p student-2-ci -f docker-compose.yml -f .github/docker-compose.student-2.ci.yml ps
-          docker compose -p student-2-ci -f docker-compose.yml -f .github/docker-compose.student-2.ci.yml logs --no-color ai.gateway academicrecords.database coursemanagement.database coursemanagement.backend coursemanagement.frontend
+          docker compose -p student-2-ci -f docker-compose.yml -f .github/docker-compose.student-2.ci.yml logs --no-color ai.gateway academicrecords.database academicrecords.backend coursemanagement.database coursemanagement.backend coursemanagement.frontend
 
       - name: Remove Student 2 containers
         if: always() && (github.event_name == 'workflow_dispatch' || steps.filter.outputs.student2 == 'true')

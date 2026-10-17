@@ -83,8 +83,9 @@ jobs:
         if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.student4 == 'true'
         shell: bash
         run: |
-          authorization_header="Authorization: Bearer $(python3 .github/scripts/create-ci-auth-token.py)"
-          endpoints=("http://localhost:5269/health" "http://localhost:18080/health" "http://localhost:18080/api/invoices" "http://localhost:18084/")
+          set -euo pipefail
+          authorization_header="Authorization: Bearer $(python3 .github/scripts/create-ci-auth-token.py --user-id 1 --role Student)"
+          endpoints=("http://localhost:5269/health" "http://localhost:5020/health" "http://localhost:5021/health" "http://localhost:18080/health" "http://localhost:18080/api/invoices" "http://localhost:18084/")
           for endpoint in "${endpoints[@]}"; do
             reachable=false
             for attempt in {1..30}; do
