@@ -106,7 +106,7 @@ jobs:
             dockerfile: student-5/backend/EventScheduling.Backend/Dockerfile
           - app: eventscheduling-web
             dockerfile: docker/frontend/EventScheduling.Dockerfile
-          - app: campuspulse-portal
+          - app: portal
             dockerfile: docker/frontend/SharedUi.Dockerfile
     steps:
       - uses: actions/checkout@v4
