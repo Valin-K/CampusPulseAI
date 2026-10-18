@@ -1,7 +1,10 @@
 using System.Net;
 using System.Text.Json;
+using CampusPulse.Shared.Security;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Http;
 
 namespace CampusPulse.Shared.Ai.Tests;
 
@@ -276,6 +279,39 @@ public sealed class AiGatewayClientTests
             Assert.That(request.Headers.Values, Has.None.Contains("must-not-be-forwarded"));
             Assert.That(request.Body.GetRawText(), Does.Not.Contain("must-not-be-forwarded"));
         });
+    }
+
+    [Test]
+    public async Task AddAiGateway_ForwardsCurrentAuthorizationHeader()
+    {
+        var configuration = new ConfigurationBuilder().Build();
+        using var handler = new RecordingHttpMessageHandler("""{"text":"Answer","model":"server-model"}""");
+        var services = new ServiceCollection();
+        services.AddAiGateway(configuration);
+        services.ConfigureHttpClientDefaults(builder => builder.ConfigurePrimaryHttpMessageHandler(() => handler));
+        using var provider = services.BuildServiceProvider();
+        provider.GetRequiredService<IHttpContextAccessor>().HttpContext = new DefaultHttpContext();
+        provider.GetRequiredService<IHttpContextAccessor>().HttpContext!.Request.Headers.Authorization = "Bearer caller-token";
+
+        await provider.GetRequiredService<IAiGatewayClient>().GenerateAsync("Prompt", "Context");
+
+        Assert.That(handler.Requests.Single().Headers["Authorization"], Is.EqualTo("Bearer caller-token"));
+    }
+
+    [Test]
+    public async Task AddAiGateway_ForwardsAmbientAuthorizationDuringBackgroundWork()
+    {
+        var configuration = new ConfigurationBuilder().Build();
+        using var handler = new RecordingHttpMessageHandler("""{"text":"Answer","model":"server-model"}""");
+        var services = new ServiceCollection();
+        services.AddAiGateway(configuration);
+        services.ConfigureHttpClientDefaults(builder => builder.ConfigurePrimaryHttpMessageHandler(() => handler));
+        using var provider = services.BuildServiceProvider();
+        using var authorization = provider.GetRequiredService<AuthorizationRequestContext>().Push("Bearer background-token");
+
+        await provider.GetRequiredService<IAiGatewayClient>().GenerateAsync("Prompt", "Context");
+
+        Assert.That(handler.Requests.Single().Headers["Authorization"], Is.EqualTo("Bearer background-token"));
     }
 
     private static async Task Invoke(AiGatewayClient client, string operation, CancellationToken token = default)
