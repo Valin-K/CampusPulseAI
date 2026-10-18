@@ -5,7 +5,6 @@ using CampusPulse.Shared.Ai;
 using CampusPulse.Shared.Mcp.Client;
 using CampusPulse.Shared.Mcp.Contracts;
 using CampusPulse.Shared.MultiAgent;
-using CampusPulse.Shared.Security;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Hosting.Server;
@@ -23,7 +22,6 @@ public sealed class WorkflowTests
     private WorkflowStore store = null!;
     private RecordingAgents agents = null!;
     private PassthroughCollector collector = null!;
-    private AuthorizationRequestContext requestAuthorization = null!;
     private WorkflowCoordinator coordinator = null!;
 
     [SetUp]
@@ -32,22 +30,21 @@ public sealed class WorkflowTests
         directory = Path.Combine(Path.GetTempPath(), $"campus-workflow-{Guid.NewGuid():N}");
         store = new WorkflowStore(Path.Combine(directory, "workflow.db"));
         agents = new RecordingAgents();
-        requestAuthorization = new AuthorizationRequestContext();
-        collector = new PassthroughCollector(requestAuthorization);
-        coordinator = new WorkflowCoordinator(store, agents, collector, NullLogger<WorkflowCoordinator>.Instance, requestAuthorization);
+        collector = new PassthroughCollector();
+        coordinator = new WorkflowCoordinator(store, agents, collector, NullLogger<WorkflowCoordinator>.Instance);
     }
 
     [Test]
     public async Task WorkflowRoundsForwardTheCallerSessionWithoutPersistingIt()
     {
         var created = coordinator.Start(Request(), "Bearer student-session");
-        await coordinator.ProcessAsync(created.Id, CancellationToken.None);
+        await coordinator.ProcessAsync(created.Id, CancellationToken.None, "Bearer student-session");
         var ready = store.Get(created.Id)!;
         var corrected = coordinator.Review(
             ready,
             new("correct", "Tutor", "Include course codes.", ready.Version),
             "Bearer staff-session");
-        await coordinator.ProcessAsync(corrected.Id, CancellationToken.None);
+        await coordinator.ProcessAsync(corrected.Id, CancellationToken.None, "Bearer staff-session");
 
         Assert.Multiple(() =>
         {
@@ -281,13 +278,13 @@ public sealed class WorkflowTests
         BaseAddress = new Uri(app.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.Single())
     };
 
-    private sealed class PassthroughCollector(AuthorizationRequestContext requestAuthorization) : IWorkflowEvidenceCollector
+    private sealed class PassthroughCollector : IWorkflowEvidenceCollector
     {
         public List<string?> Authorizations { get; } = [];
 
-        public Task<Workflow> CollectAsync(Workflow workflow, CancellationToken ct)
+        public Task<Workflow> CollectAsync(Workflow workflow, CancellationToken ct, string? authorization = null)
         {
-            Authorizations.Add(requestAuthorization.CurrentAuthorization);
+            Authorizations.Add(authorization);
             return Task.FromResult(workflow);
         }
     }

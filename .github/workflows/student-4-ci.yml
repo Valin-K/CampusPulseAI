@@ -76,7 +76,7 @@ jobs:
         if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.student4 == 'true'
         shell: bash
         run: |
-          docker compose -p student-4-ci -f docker-compose.yml -f .github/docker-compose.student-4.ci.yml build ai.gateway academicrecords.database academicrecords.backend financialaidbilling.database financialaidbilling.backend financialaidbilling.frontend
+          docker compose -p student-4-ci -f docker-compose.yml -f .github/docker-compose.student-4.ci.yml build --with-dependencies ai.gateway academicrecords.database academicrecords.backend financialaidbilling.database financialaidbilling.backend financialaidbilling.frontend
           docker compose -p student-4-ci -f docker-compose.yml -f .github/docker-compose.student-4.ci.yml up --detach --no-build ai.gateway academicrecords.database academicrecords.backend financialaidbilling.database financialaidbilling.backend financialaidbilling.frontend
 
       - name: Smoke test Student 4 containers

@@ -1,5 +1,4 @@
 using CampusPulse.Shared.Ai;
-using CampusPulse.Shared.Mcp.Client;
 using MultiAgentServer;
 using CampusPulse.Shared.Security;
 using Microsoft.AspNetCore.Authorization;
@@ -8,7 +7,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = 1024 * 1024);
 builder.Services.AddCampusPulseSecurity(builder.Configuration, builder.Environment);
 builder.Services.AddAiGateway(builder.Configuration);
-builder.Services.AddMcpClient(client =>
+builder.Services.AddHttpClient("workflowMcp", client =>
 {
     client.BaseAddress = new Uri(builder.Configuration["Services:McpServer"] ?? "http://localhost:5268");
     client.Timeout = TimeSpan.FromSeconds(15);

@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Deploys (or updates) all 16 Container Apps from infra/main.bicep. Idempotent - re-running
+    Deploys (or updates) the 16 baseline apps and, with -EnableAi, four AI apps. Re-running
     with a new -Tag updates the existing apps to that image; it never creates duplicates.
 
 .PARAMETER GitHubOwner
@@ -12,6 +12,7 @@
 
 .PARAMETER EnableAi
     Switch. Omit for the required baseline (AI disabled). Pass it only for the bonus AI profile.
+    Reads GEMINI_API_KEY from the environment and stores it as an AI gateway secret.
 
 .PARAMETER WarmUp
     Switch. Sets minReplicas to 1 on every app instead of 0, so there's no cold-start delay.
@@ -37,13 +38,20 @@ $ErrorActionPreference = 'Stop'
 $bicepFile = Join-Path $PSScriptRoot 'infra/main.bicep'
 $minReplicas = 0
 if ($WarmUp) { $minReplicas = 1 }
+$geminiApiKey = ''
+if ($EnableAi) {
+    $geminiApiKey = $env:GEMINI_API_KEY
+    if ([string]::IsNullOrWhiteSpace($geminiApiKey)) {
+        throw 'Set GEMINI_API_KEY before deploying with -EnableAi.'
+    }
+}
 
 Write-Host "Deploying image tag '$Tag' to resource group '$ResourceGroupName' (AI enabled: $($EnableAi.IsPresent), minReplicas: $minReplicas)..." -ForegroundColor Cyan
 
 $deployment = az deployment group create `
     --resource-group $ResourceGroupName `
     --template-file $bicepFile `
-    --parameters githubOwner=$GitHubOwner imageTag=$Tag enableAi=$($EnableAi.IsPresent) minReplicas=$minReplicas `
+    --parameters githubOwner=$GitHubOwner imageTag=$Tag enableAi=$($EnableAi.IsPresent) minReplicas=$minReplicas geminiApiKey=$geminiApiKey `
     --output json | ConvertFrom-Json
 
 if ($LASTEXITCODE -ne 0) {

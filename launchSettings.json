@@ -8,6 +8,9 @@
       "composeLaunchUrl": "http://localhost:8081",
       "serviceActions": {
         "ai.gateway": "StartWithoutDebugging",
+        "mcp.server": "StartWithoutDebugging",
+        "rag.server": "StartWithoutDebugging",
+        "multiagent.server": "StartWithoutDebugging",
         "academicrecords.backend": "StartWithoutDebugging",
         "coursemanagement.database": "StartWithoutDebugging",
         "coursemanagement.backend": "StartWithoutDebugging",

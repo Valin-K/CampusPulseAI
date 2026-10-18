@@ -101,7 +101,7 @@ jobs:
         shell: bash
         run: |
           docker compose -f docker-compose.yml -f .github/docker-compose.student-1-ci.yml -p student-1-ci config --quiet
-          docker compose -f docker-compose.yml -f .github/docker-compose.student-1-ci.yml -p student-1-ci build ai.gateway academicrecords.database academicrecords.backend academicrecords.frontend
+          docker compose -f docker-compose.yml -f .github/docker-compose.student-1-ci.yml -p student-1-ci build --with-dependencies ai.gateway academicrecords.database academicrecords.backend academicrecords.frontend
           docker compose -f docker-compose.yml -f .github/docker-compose.student-1-ci.yml -p student-1-ci up --detach --wait --no-build ai.gateway academicrecords.database academicrecords.backend academicrecords.frontend
 
       - name: Smoke test Student 1 endpoints

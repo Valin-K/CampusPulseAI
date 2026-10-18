@@ -1,17 +1,13 @@
 using System.Threading.Channels;
-using System.Collections.Concurrent;
 using CampusPulse.Shared.MultiAgent;
-using CampusPulse.Shared.Security;
 
 namespace MultiAgentServer;
 
 public sealed class WorkflowCoordinator(
     WorkflowStore store, IWorkflowAgents agents, IWorkflowEvidenceCollector collector,
-    ILogger<WorkflowCoordinator> logger, AuthorizationRequestContext? requestAuthorization = null) : BackgroundService
+    ILogger<WorkflowCoordinator> logger) : BackgroundService
 {
-    private readonly Channel<Guid> queue = Channel.CreateBounded<Guid>(100);
-    private readonly ConcurrentDictionary<Guid, string> pendingAuthorizations = new();
-    private readonly AuthorizationRequestContext authorizationContext = requestAuthorization ?? new();
+    private readonly Channel<(Guid Id, string? Authorization)> queue = Channel.CreateBounded<(Guid, string?)>(100);
 
     public Workflow Start(WorkflowRequest request, string? authorization = null)
     {
@@ -61,26 +57,18 @@ public sealed class WorkflowCoordinator(
         return request.Decision == "correct" ? Enqueue(next, authorization) : next;
     }
 
-    private Workflow Enqueue(Workflow workflow, string? authorization = null)
+    private Workflow Enqueue(Workflow workflow, string? authorization)
     {
-        if (!string.IsNullOrWhiteSpace(authorization))
-        {
-            pendingAuthorizations[workflow.Id] = authorization;
-        }
-
-        if (queue.Writer.TryWrite(workflow.Id)) return workflow;
-        pendingAuthorizations.TryRemove(workflow.Id, out _);
+        if (queue.Writer.TryWrite((workflow.Id, authorization))) return workflow;
         return store.Save(workflow with { Status = WorkflowStatus.Failed, Error = "The workflow queue is full. Retry later." }, "queue_full");
     }
 
-    public async Task ProcessAsync(Guid id, CancellationToken ct)
+    public async Task ProcessAsync(Guid id, CancellationToken ct, string? authorization = null)
     {
-        pendingAuthorizations.TryRemove(id, out var authorization);
-        using var authorizationScope = authorizationContext.Push(authorization);
         var workflow = store.Get(id) ?? throw new InvalidOperationException("Queued workflow was not found.");
         try
         {
-            workflow = store.Save(await collector.CollectAsync(workflow, ct), "evidence_collected");
+            workflow = store.Save(await collector.CollectAsync(workflow, ct, authorization), "evidence_collected");
             foreach (var role in new[] { "planner", "worker", "reviewer" })
             {
                 workflow = store.Save(workflow, $"{role}_started");
@@ -104,7 +92,7 @@ public sealed class WorkflowCoordinator(
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        await foreach (var id in queue.Reader.ReadAllAsync(stoppingToken))
-            await ProcessAsync(id, stoppingToken);
+        await foreach (var job in queue.Reader.ReadAllAsync(stoppingToken))
+            await ProcessAsync(job.Id, stoppingToken, job.Authorization);
     }
 }

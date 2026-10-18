@@ -1,4 +1,51 @@
 services:
+  mcp.server:
+    image: ${DOCKER_REGISTRY-}campuspulse-mcp-server
+    build:
+      context: .
+      dockerfile: ai-services/mcp-server/McpServer/Dockerfile
+    environment:
+      ASPNETCORE_HTTP_PORTS: 8080
+      Services__AcademicRecordsBackend: http://academicrecords.backend:8080
+      Services__CourseManagementBackend: http://coursemanagement.backend:8080
+      Services__CampusHousingDatabase: http://campushousing.database:8080
+    ports:
+      - "127.0.0.1:5268:8080"
+
+  rag.server:
+    image: ${DOCKER_REGISTRY-}campuspulse-rag-server
+    build:
+      context: .
+      dockerfile: ai-services/rag-server/RagServer/Dockerfile
+    environment:
+      ASPNETCORE_HTTP_PORTS: 8080
+      Services__AiGateway: http://ai.gateway:8080
+    ports:
+      - "127.0.0.1:5267:8080"
+    depends_on:
+      - ai.gateway
+
+  multiagent.server:
+    image: ${DOCKER_REGISTRY-}campuspulse-multi-agent-server
+    build:
+      context: .
+      dockerfile: ai-services/multi-agent-server/MultiAgentServer/Dockerfile
+    environment:
+      ASPNETCORE_HTTP_PORTS: 8080
+      Services__AiGateway: http://ai.gateway:8080
+      Services__McpServer: http://mcp.server:8080
+      Services__RagServer: http://rag.server:8080
+      MultiAgent__Enabled: "true"
+      MultiAgent__DatabasePath: /app/data/multi-agent.db
+    ports:
+      - "127.0.0.1:5270:8080"
+    volumes:
+      - multiagent-data:/app/data
+    depends_on:
+      - ai.gateway
+      - mcp.server
+      - rag.server
+
   ai.gateway:
     image: ${DOCKER_REGISTRY-}campuspulse-ai-gateway
     build:
@@ -37,17 +84,16 @@ services:
       Services__AcademicRecordsDatabase: http://academicrecords.database:8080
       Services__AcademicRecordsCredentials: http://academicrecords.database:8080
       Services__CourseManagementDatabase: http://coursemanagement.database:8080
-      Services__McpServer: http://host.docker.internal:5268
-      Services__RagServer: http://host.docker.internal:5267
+      Services__McpServer: http://mcp.server:8080
+      Services__RagServer: http://rag.server:8080
       Services__AiGateway: http://ai.gateway:8080
-      Services__MultiAgentServer: http://host.docker.internal:5270
+      Services__MultiAgentServer: http://multiagent.server:8080
       MultiAgent__Enabled: "true"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     ports:
       - "5020:8080"
     depends_on:
       - ai.gateway
+      - multiagent.server
       - academicrecords.database
     networks:
       default:
@@ -62,15 +108,14 @@ services:
     environment:
       - Services__AcademicRecordsDatabase=http://academicrecords.database:8080
       - Services__CourseManagementDatabase=http://coursemanagement.database:8080
-      - Services__McpServer=http://host.docker.internal:5268
-      - Services__RagServer=http://host.docker.internal:5267
+      - Services__McpServer=http://mcp.server:8080
+      - Services__RagServer=http://rag.server:8080
       - Services__AiGateway=http://ai.gateway:8080
-      - Services__MultiAgentServer=http://host.docker.internal:5270
+      - Services__MultiAgentServer=http://multiagent.server:8080
       - MultiAgent__Enabled=true
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     depends_on:
       - ai.gateway
+      - multiagent.server
       - academicrecords.database
       - coursemanagement.database
 
@@ -97,17 +142,17 @@ services:
       ASPNETCORE_HTTP_PORTS: 8080
       Services__CampusHousingDatabase: http://campushousing.database:8080
       Services__AcademicRecordsDatabase: http://academicrecords.database:8080
-      Services__McpServer: http://host.docker.internal:5268
-      Services__RagServer: http://host.docker.internal:5267
+      Services__McpServer: http://mcp.server:8080
+      Services__RagServer: http://rag.server:8080
       Services__AiGateway: http://ai.gateway:8080
-      Services__MultiAgentServer: http://host.docker.internal:5270
+      Services__MultiAgentServer: http://multiagent.server:8080
       MultiAgent__Enabled: "true"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     ports:
       - "5083:8080"
     depends_on:
       ai.gateway:
+        condition: service_started
+      multiagent.server:
         condition: service_started
       campushousing.database:
         condition: service_healthy
@@ -144,17 +189,17 @@ services:
       ASPNETCORE_HTTP_PORTS: 8080
       Services__InvoiceDatabase: http://financialaidbilling.database:8080
       Services__AcademicRecordsBackend: http://academicrecords.backend:8080
-      Services__McpServer: http://host.docker.internal:5268
-      Services__RagServer: http://host.docker.internal:5267
+      Services__McpServer: http://mcp.server:8080
+      Services__RagServer: http://rag.server:8080
       Services__AiGateway: http://ai.gateway:8080
-      Services__MultiAgentServer: http://host.docker.internal:5270
+      Services__MultiAgentServer: http://multiagent.server:8080
       MultiAgent__Enabled: "true"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     ports:
       - "8089:8080"
     depends_on:
       ai.gateway:
+        condition: service_started
+      multiagent.server:
         condition: service_started
       financialaidbilling.database:
         condition: service_started
@@ -180,17 +225,17 @@ services:
       ASPNETCORE_HTTP_PORTS: 8080
       Services__EventDatabase: http://eventscheduling.database:8080
       Services__AcademicRecordsDatabase: http://academicrecords.database:8080
-      Services__McpServer: http://host.docker.internal:5268
-      Services__RagServer: http://host.docker.internal:5267
+      Services__McpServer: http://mcp.server:8080
+      Services__RagServer: http://rag.server:8080
       Services__AiGateway: http://ai.gateway:8080
-      Services__MultiAgentServer: http://host.docker.internal:5270
+      Services__MultiAgentServer: http://multiagent.server:8080
       MultiAgent__Enabled: "true"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     ports:
       - "8090:8080"
     depends_on:
       ai.gateway:
+        condition: service_started
+      multiagent.server:
         condition: service_started
       eventscheduling.database:
         condition: service_started
@@ -276,5 +321,6 @@ services:
       - "8080:80"
 
 volumes:
+  multiagent-data:
   coursemanagement-data:
   campushousing-data:
