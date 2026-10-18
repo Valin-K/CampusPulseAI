@@ -56,6 +56,7 @@ services:
       dockerfile: shared/backend/CampusPulse.Shared.Ai.Gateway/Dockerfile
     environment:
       ASPNETCORE_HTTP_PORTS: 8080
+      Authentication__SigningKey: ${CAMPUSPULSE_SIGNING_KEY:?Set CAMPUSPULSE_SIGNING_KEY to a secret of at least 32 bytes}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
     ports:
       - "127.0.0.1:5269:8080"

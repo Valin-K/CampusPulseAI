@@ -27,6 +27,10 @@ param env array = []
 @description('Optional Gemini credential for the AI gateway, referenced via secretRef.')
 param geminiApiKey string = ''
 
+@secure()
+@description('CampusPulse JWT signing key, referenced via secretRef by secured services.')
+param campusPulseSigningKey string = ''
+
 @description('0 normally (scale-to-zero); 1 during the showcase/marking window (Deploy-Apps.ps1 -WarmUp).')
 param minReplicas int = 0
 
@@ -50,7 +54,9 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
   properties: {
     environmentId: environmentId
     configuration: {
-      secrets: empty(geminiApiKey) ? [] : [{ name: 'gemini-api-key', value: geminiApiKey }]
+      secrets: concat(
+        empty(geminiApiKey) ? [] : [{ name: 'gemini-api-key', value: geminiApiKey }],
+        empty(campusPulseSigningKey) ? [] : [{ name: 'campuspulse-signing-key', value: campusPulseSigningKey }])
       ingress: {
         external: external
         targetPort: targetPort

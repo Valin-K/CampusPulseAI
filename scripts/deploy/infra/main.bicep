@@ -21,6 +21,10 @@ param enableAi bool = false
 @description('Gemini credential, stored as a Container Apps secret only on the AI gateway.')
 param geminiApiKey string = ''
 
+@secure()
+@description('JWT signing key shared by secured services, stored as a Container Apps secret.')
+param campusPulseSigningKey string
+
 @description('0 normally (scale-to-zero). 1 during the showcase/marking window.')
 param minReplicas int = 0
 
@@ -95,10 +99,11 @@ module aiApps 'containerApp.bicep' = [
       image: '${registry}/campuspulse-${ai.name}:${imageTag}'
       targetPort: 8080
       external: false
-      env: ai.name == 'ai-gateway'
-        ? concat(ai.env, [{ name: 'GEMINI_API_KEY', secretRef: 'gemini-api-key' }])
-        : ai.env
+      env: concat(ai.env,
+        ai.name == 'ai-gateway' ? [{ name: 'GEMINI_API_KEY', secretRef: 'gemini-api-key' }] : [],
+        [{ name: 'Authentication__SigningKey', secretRef: 'campuspulse-signing-key' }])
       geminiApiKey: ai.name == 'ai-gateway' ? geminiApiKey : ''
+      campusPulseSigningKey: campusPulseSigningKey
       minReplicas: ai.minReplicas
       maxReplicas: 1
       volumeMount: ai.name == 'multi-agent-server' ? { mountPath: '/app/data' } : {}
@@ -164,7 +169,8 @@ module databaseApps 'containerApp.bicep' = [
       image: '${registry}/campuspulse-${db.name}:${imageTag}'
       targetPort: 8080
       external: false
-      env: db.env
+      env: concat(db.env, [{ name: 'Authentication__SigningKey', secretRef: 'campuspulse-signing-key' }])
+      campusPulseSigningKey: campusPulseSigningKey
       minReplicas: minReplicas
       maxReplicas: 1
       volumeMount: { mountPath: '/app/data' }
@@ -248,8 +254,10 @@ module backendApps 'containerApp.bicep' = [
       env: api.needsCorsOrigin
         ? concat(api.env, [
             { name: 'Cors__AllowedOrigins__0', value: 'https://coursemgmt-web.${environment.outputs.defaultDomain}' }
+            { name: 'Authentication__SigningKey', secretRef: 'campuspulse-signing-key' }
           ])
-        : api.env
+        : concat(api.env, [{ name: 'Authentication__SigningKey', secretRef: 'campuspulse-signing-key' }])
+      campusPulseSigningKey: campusPulseSigningKey
       minReplicas: minReplicas
       maxReplicas: 2
     }

@@ -79,7 +79,8 @@ on your machine; those feeds remain unchanged for other repositories.
 3. In **Solution Explorer**, right-click the solution and choose **Set Startup Projects**.
 4. Select **Multiple startup projects** if necessary and set `docker-compose` to **Start**. Alternatively, select the `docker-compose` project directly and choose **Set as Startup Project**.
 5. In the Visual Studio debug target selector, choose **Docker Compose**.
-6. Press **F5** to build the images, start the services, attach the debugger, and launch the configured browser target. Use **Ctrl+F5** to run without the debugger.
+6. Set `CAMPUSPULSE_SIGNING_KEY` in the environment used by Visual Studio to a private random value of at least 32 bytes. Generate one in PowerShell with `[Convert]::ToHexString([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))`, then save it in a local, untracked `.env` file in the repository root. Never commit the value.
+7. Press **F5** to build the images, start the services, attach the debugger, and launch the configured browser target. Use **Ctrl+F5** to run without the debugger.
 
 The Compose configuration starts the databases, backend APIs, shared AI gateway, MCP, RAG, Multi-Agent Server, and frontend containers. No host-side AI launcher is needed. Multi-agent coordination is not part of the Gemini transport gateway. The frontend URLs are:
 
@@ -93,6 +94,10 @@ The Compose configuration starts the databases, backend APIs, shared AI gateway,
 | Shared UI | `http://localhost:8080` |
 
 Backend containers expose port `8080` inside the Compose network. Visual Studio may assign host ports dynamically for services that do not have an explicit host-port mapping. Use the **Containers** window to see the actual host ports and service status.
+
+Student and staff sign-in remain separate. Enter the Student ID or Staff ID and password
+on the appropriate role-specific sign-in page; the page does not request or display a
+directory of user accounts before authentication.
 
 ## Student 4: MCP and RAG features
 
@@ -145,6 +150,14 @@ Visual Studio provides a graphical view of the Docker resources used by the solu
 Do not remove running containers while Visual Studio is debugging unless you intend to stop the current Compose session. Stop debugging first, then restart the Compose profile to recreate the environment.
 
 ## Run with Docker Compose from a terminal
+
+Set a private signing key in the repository-root `.env` file before starting the stack:
+
+```powershell
+CAMPUSPULSE_SIGNING_KEY=<a private random value of at least 32 bytes>
+```
+
+Generate a value in PowerShell with `[Convert]::ToHexString([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))`. Keep it local and untracked; do not commit it.
 
 The same environment can be started without Visual Studio:
 

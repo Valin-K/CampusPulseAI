@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-	Checks authenticated AI data paths in an isolated, running, keyless Compose stack.
+	Checks authenticated AI data paths in an isolated, running, AI-provider-keyless Compose stack.
 	Adds test RAG documents and workflows; temporarily disables and restores scholarships.
 #>
 param(
@@ -10,6 +10,10 @@ param(
 
 $ErrorActionPreference = 'Stop'
 if (-not $IsolatedTestStack) { throw 'Run this only against an isolated test stack.' }
+$signingKey = $env:CAMPUSPULSE_SIGNING_KEY
+if ([string]::IsNullOrWhiteSpace($signingKey) -or [Text.Encoding]::UTF8.GetByteCount($signingKey) -lt 32) {
+	throw 'Set CAMPUSPULSE_SIGNING_KEY to match the isolated Compose stack; it must contain at least 32 bytes.'
+}
 
 function ConvertTo-Base64Url([byte[]]$Bytes) {
 	return [Convert]::ToBase64String($Bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_')
@@ -18,7 +22,7 @@ function ConvertTo-Base64Url([byte[]]$Bytes) {
 function New-TestHeaders([bool]$IncludeScope) {
 	$now = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
 	$claims = @{
-		iss = 'CampusPulse.Dev'; aud = 'CampusPulse.Api'; sub = '4'; user_id = '4'
+		iss = 'CampusPulse'; aud = 'CampusPulse.Api'; sub = '4'; user_id = '4'
 		role = 'Student'; nbf = $now; exp = $now + 600
 	}
 	if ($IncludeScope) { $claims.scope = 'CampusPulse.Access' }
@@ -27,7 +31,7 @@ function New-TestHeaders([bool]$IncludeScope) {
 	$unsigned = "$header.$payload"
 	$hmac = New-Object Security.Cryptography.HMACSHA256
 	try {
-		$hmac.Key = [Text.Encoding]::UTF8.GetBytes('campuspulse-demo-only-signing-key-change-before-any-use')
+		$hmac.Key = [Text.Encoding]::UTF8.GetBytes($signingKey)
 		$signature = ConvertTo-Base64Url ($hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($unsigned)))
 	}
 	finally { $hmac.Dispose() }
