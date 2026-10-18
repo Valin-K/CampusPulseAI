@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Authorization;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = 1024 * 1024);
-builder.Services.AddCampusPulseSecurity(builder.Configuration, builder.Environment);
+builder.Services.AddCampusPulseSecurity(builder.Configuration);
 builder.Services.AddAiGateway(builder.Configuration);
 builder.Services.AddHttpClient("workflowMcp", client =>
 {

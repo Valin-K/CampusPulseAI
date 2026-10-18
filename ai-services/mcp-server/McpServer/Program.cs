@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Authorization;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddOpenApi();
-builder.Services.AddCampusPulseSecurity(builder.Configuration, builder.Environment);
+builder.Services.AddCampusPulseSecurity(builder.Configuration);
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddTransient<McpAuthorizationHeaderHandler>();
 builder.Services.AddCors(options => options.AddDefaultPolicy(policy => policy

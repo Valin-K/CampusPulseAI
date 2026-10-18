@@ -141,10 +141,12 @@ public sealed class CampusAccountServiceTests
         var provider = new CampusPulse.Shared.Components.Services.AuthenticationStateProvider(
             new HttpClient(handler) { BaseAddress = new Uri("https://academic-records.test/") }, javaScript);
 
-        await provider.SignInAsync(DirectoryUsers[0].UserId, "Student", "StrongPassword!2026");
+        await provider.SignInAsync("STU012", "Student", "StrongPassword!2026");
 
-        Assert.That(captured!.Path, Is.EqualTo("/api/auth/demo/token"));
+        Assert.That(captured!.Path, Is.EqualTo("/api/auth/token"));
         using var body = JsonDocument.Parse(captured.Body);
+        Assert.That(body.RootElement.GetProperty("accountId").GetString(), Is.EqualTo("STU012"));
+        Assert.That(body.RootElement.GetProperty("role").GetString(), Is.EqualTo("Student"));
         Assert.That(body.RootElement.GetProperty("password").GetString(), Is.EqualTo("StrongPassword!2026"));
     }
 

@@ -10,7 +10,7 @@ var connectionString = builder.Configuration.GetConnectionString("FinancialAidBi
 
 builder.Services.AddDbContext<FinancialAidBillingDbContext>(options => options.UseSqlite(connectionString));
 builder.Services.AddOpenApi();
-builder.Services.AddCampusPulseSecurity(builder.Configuration, builder.Environment);
+builder.Services.AddCampusPulseSecurity(builder.Configuration);
 
 var app = builder.Build();
 app.UseAuthentication();

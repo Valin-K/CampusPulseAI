@@ -16,7 +16,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
-builder.Services.AddCampusPulseSecurity(builder.Configuration, builder.Environment);
+builder.Services.AddCampusPulseSecurity(builder.Configuration);
 builder.Services.AddHttpClient("academicRecordsDatabase", client =>
 {
     client.BaseAddress = new Uri(builder.Configuration["Services:AcademicRecordsDatabase"] ?? "http://academicrecords.database:8080");

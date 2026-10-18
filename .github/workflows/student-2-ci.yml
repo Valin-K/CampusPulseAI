@@ -32,6 +32,9 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Create ephemeral JWT signing key
+        run: echo "CAMPUSPULSE_SIGNING_KEY=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+
       - name: Detect changed paths
         id: filter
         uses: dorny/paths-filter@v3
@@ -85,7 +88,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          authorization_header="Authorization: Bearer $(python3 .github/scripts/create-ci-auth-token.py --user-id 1 --role Student)"
+          authorization_header="Authorization: Bearer $(python3 .github/scripts/create-ci-auth-token.py --account-id STU001 --role Student)"
           endpoints=(
             "http://localhost:5269/health"
             "http://localhost:5020/health"

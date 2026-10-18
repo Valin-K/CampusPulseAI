@@ -6,7 +6,6 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Http;
 using Microsoft.IdentityModel.Tokens;
 
@@ -20,15 +19,15 @@ public static class CampusPulseSecurityExtensions
 
     public static IServiceCollection AddCampusPulseSecurity(
         this IServiceCollection services,
-        IConfiguration configuration,
-        IHostEnvironment environment)
+        IConfiguration configuration)
     {
-        var issuer = configuration["Authentication:Issuer"] ?? "CampusPulse.Dev";
+        var issuer = configuration["Authentication:Issuer"] ?? "CampusPulse";
         var audience = configuration["Authentication:Audience"] ?? "CampusPulse.Api";
-        var signingKey = configuration["Authentication:SigningKey"]
-            ?? (environment.IsDevelopment()
-                ? "campuspulse-demo-only-signing-key-change-before-any-use"
-                : throw new InvalidOperationException("The token signing key is not configured."));
+        var signingKey = configuration["Authentication:SigningKey"];
+        if (string.IsNullOrWhiteSpace(signingKey))
+        {
+            throw new InvalidOperationException("The token signing key is not configured.");
+        }
         var keyBytes = Encoding.UTF8.GetBytes(signingKey);
         if (keyBytes.Length < 32)
         {

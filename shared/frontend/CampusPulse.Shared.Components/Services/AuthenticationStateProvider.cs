@@ -29,23 +29,16 @@ public sealed class AuthenticationStateProvider : Microsoft.AspNetCore.Component
 
     public Session? CurrentSession => currentSession;
 
-    public async Task<IReadOnlyList<CampusAccountUser>> GetUsersAsync(string role)
+    public async Task SignInAsync(string accountId, string role, string password)
     {
-        using var response = await http.GetAsync($"api/auth/demo/users?role={Uri.EscapeDataString(role)}");
-        response.EnsureSuccessStatusCode();
-        return await response.Content.ReadFromJsonAsync<List<CampusAccountUser>>(JsonOptions) ?? [];
-    }
-
-    public async Task SignInAsync(int userId, string role, string password)
-    {
-        using var response = await http.PostAsJsonAsync("api/auth/demo/token", new { userId, role, password });
+        using var response = await http.PostAsJsonAsync("api/auth/token", new { accountId, role, password });
         if (!response.IsSuccessStatusCode)
         {
             throw new HttpRequestException("The account or password is incorrect.", null, response.StatusCode);
         }
 
-        var token = await response.Content.ReadFromJsonAsync<DemoTokenResponse>(JsonOptions)
-            ?? throw new JsonException("The Academic Records API returned no demo token.");
+        var token = await response.Content.ReadFromJsonAsync<TokenResponse>(JsonOptions)
+            ?? throw new JsonException("The Academic Records API returned no access token.");
         currentSession = new Session(token.AccessToken, token.ExpiresAt, token.User);
         await StoreSessionAsync(currentSession);
         initialized = true;
@@ -135,7 +128,7 @@ public sealed class AuthenticationStateProvider : Microsoft.AspNetCore.Component
             new Claim(ClaimTypes.Email, user.Email),
             new Claim(ClaimTypes.Role, role)
         };
-        return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity(claims, "CampusPulseDemo")));
+        return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity(claims, "CampusPulse")));
     }
 
     private static string? ReadSessionRole(string accessToken)
@@ -190,7 +183,7 @@ public sealed class AuthenticationStateProvider : Microsoft.AspNetCore.Component
             session.User.UserId.ToString(System.Globalization.CultureInfo.InvariantCulture));
     }
 
-    private sealed record DemoTokenResponse(
+    private sealed record TokenResponse(
         string AccessToken,
         string TokenType,
         DateTime ExpiresAt,

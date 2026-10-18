@@ -46,7 +46,7 @@
 
 @code {
     [Inject]
-    private AuthenticationStateProvider DemoAuthentication { get; set; } = default!;
+    private AuthenticationStateProvider Authentication { get; set; } = default!;
 
     [Inject]
     private NavigationManager Navigation { get; set; } = default!;
@@ -89,7 +89,7 @@
         redirectingToStudentLogin = true;
         if (IsStaffAccount)
         {
-            await DemoAuthentication.SignOutAsync();
+            await Authentication.SignOutAsync();
         }
 
         var returnUrl = Uri.EscapeDataString(Navigation.BaseUri);

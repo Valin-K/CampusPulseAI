@@ -9,7 +9,7 @@ var connectionString = builder.Configuration.GetConnectionString("AcademicRecord
 
 builder.Services.AddDbContext<AcademicRecordsDbContext>(options => options.UseSqlite(connectionString));
 builder.Services.AddControllers();
-builder.Services.AddCampusPulseSecurity(builder.Configuration, builder.Environment);
+builder.Services.AddCampusPulseSecurity(builder.Configuration);
 
 var app = builder.Build();
 app.UseAuthentication();

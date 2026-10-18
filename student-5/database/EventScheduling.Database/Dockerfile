@@ -3,6 +3,7 @@ ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 
 COPY ["Directory.Packages.props", "."]
+COPY ["shared/backend/CampusPulse.Shared.Security/CampusPulse.Shared.Security.csproj", "shared/backend/CampusPulse.Shared.Security/"]
 COPY ["student-5/database/EventScheduling.Database/EventScheduling.Database.csproj", "student-5/database/EventScheduling.Database/"]
 RUN dotnet restore "./student-5/database/EventScheduling.Database/EventScheduling.Database.csproj"
 

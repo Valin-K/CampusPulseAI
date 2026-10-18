@@ -10,7 +10,7 @@ using Microsoft.AspNetCore.Authorization;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
-builder.Services.AddCampusPulseSecurity(builder.Configuration, builder.Environment);
+builder.Services.AddCampusPulseSecurity(builder.Configuration);
 const string courseManagementFrontendCorsPolicy = "CourseManagementFrontend";
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
     ?? throw new InvalidOperationException("Course Management CORS origins are not configured.");

@@ -13,7 +13,7 @@ public sealed record GradeEntryRequest(decimal? GradeValue);
 public sealed record EnrollStaffRequest(string FirstName, string LastName, string Email, DateOnly? DateOfBirth,
     string? PhoneNumber = null, string Password = "", string ConfirmPassword = "");
 
-public sealed record AuthenticateUserRequest(int UserId, string Role, string Password);
+public sealed record AuthenticateUserRequest(string AccountId, string Role, string Password);
 
 public sealed record StudentProfileResponse(int UserId, string StudentId, string FirstName, string LastName, string Email,
     DateOnly? DateOfBirth, string? PhoneNumber, string MailingAddress, string EmergencyContactName, string EmergencyContactPhone,

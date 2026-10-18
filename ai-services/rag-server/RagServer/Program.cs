@@ -9,7 +9,7 @@ using SharedRagSource = CampusPulse.Shared.Rag.Contracts.RagSource;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddOpenApi();
-builder.Services.AddCampusPulseSecurity(builder.Configuration, builder.Environment);
+builder.Services.AddCampusPulseSecurity(builder.Configuration);
 builder.Services.AddCors(options => options.AddDefaultPolicy(policy => policy
     .AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod()));
 builder.Services.Configure<RagOptions>(builder.Configuration.GetSection("Rag"));

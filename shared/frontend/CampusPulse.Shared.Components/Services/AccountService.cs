@@ -52,8 +52,8 @@ public sealed class AccountService : IDisposable
                 return;
             }
 
-            if (authenticationStateProvider is AuthenticationStateProvider demoAuthentication
-                && demoAuthentication.CurrentSession is { } session)
+            if (authenticationStateProvider is AuthenticationStateProvider campusPulseAuthentication
+                && campusPulseAuthentication.CurrentSession is { } session)
             {
                 var user = session.User with
                 {

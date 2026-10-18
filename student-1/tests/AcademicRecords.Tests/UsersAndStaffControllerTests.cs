@@ -84,19 +84,31 @@ public sealed class UsersAndStaffControllerTests
             EmergencyContactPhone = "0400000000"
         };
         student.PasswordHash = UserPasswordSecurity.HashPassword(student, "StrongPassword!2026");
-        database.Add(student);
+        var staff = new Staff
+        {
+            StaffId = "STF001",
+            FirstName = "Morgan",
+            LastName = "Staff",
+            Email = "morgan@example.edu",
+            Status = "ACT"
+        };
+        staff.PasswordHash = UserPasswordSecurity.HashPassword(staff, "StrongPassword!2026");
+        database.AddRange(student, staff);
         await database.SaveChangesAsync();
         var controller = new UsersController(database);
 
         var valid = await controller.Authenticate(
-            new AuthenticateUserRequest(student.UserId, "Student", "StrongPassword!2026"), CancellationToken.None);
+            new AuthenticateUserRequest("stu001", "Student", "StrongPassword!2026"), CancellationToken.None);
         var invalid = await controller.Authenticate(
-            new AuthenticateUserRequest(student.UserId, "Student", "WrongPassword!2026"), CancellationToken.None);
+            new AuthenticateUserRequest(student.StudentId, "Student", "WrongPassword!2026"), CancellationToken.None);
         var wrongRole = await controller.Authenticate(
-            new AuthenticateUserRequest(student.UserId, "Staff", "StrongPassword!2026"), CancellationToken.None);
+            new AuthenticateUserRequest(student.StudentId, "Staff", "StrongPassword!2026"), CancellationToken.None);
+        var validStaff = await controller.Authenticate(
+            new AuthenticateUserRequest("stf001", "Staff", "StrongPassword!2026"), CancellationToken.None);
 
         Assert.That(valid.Result, Is.InstanceOf<OkObjectResult>());
         Assert.That((valid.Result as OkObjectResult)!.Value, Is.TypeOf<DatabaseUserResponse>());
+        Assert.That(validStaff.Result, Is.InstanceOf<OkObjectResult>());
         Assert.That(invalid.Result, Is.InstanceOf<UnauthorizedResult>());
         Assert.That(wrongRole.Result, Is.InstanceOf<UnauthorizedResult>());
     }

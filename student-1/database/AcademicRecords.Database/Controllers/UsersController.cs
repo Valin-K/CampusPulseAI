@@ -39,10 +39,20 @@ public sealed class UsersController(AcademicRecordsDbContext database) : Control
         AuthenticateUserRequest request,
         CancellationToken cancellationToken)
     {
-        var user = await database.Users.AsNoTracking()
-            .SingleOrDefaultAsync(value => value.UserId == request.UserId, cancellationToken);
-        var roleMatches = user is Student && string.Equals(request.Role, "Student", StringComparison.OrdinalIgnoreCase)
-            || user is Staff && string.Equals(request.Role, "Staff", StringComparison.OrdinalIgnoreCase);
+        var role = request.Role.Trim();
+        User? user = null;
+        if (role.Equals("Student", StringComparison.OrdinalIgnoreCase))
+        {
+            user = await database.Students.AsNoTracking()
+                .SingleOrDefaultAsync(value => value.StudentId.ToLower() == request.AccountId.ToLower(), cancellationToken);
+        }
+        else if (role.Equals("Staff", StringComparison.OrdinalIgnoreCase))
+        {
+            user = await database.Users.OfType<Staff>().AsNoTracking()
+                .SingleOrDefaultAsync(value => value.StaffId.ToLower() == request.AccountId.ToLower(), cancellationToken);
+        }
+        var roleMatches = user is Student && role.Equals("Student", StringComparison.OrdinalIgnoreCase)
+            || user is Staff && role.Equals("Staff", StringComparison.OrdinalIgnoreCase);
         if (user is null || !roleMatches || !UserPasswordSecurity.VerifyPassword(user, request.Password))
         {
             return Unauthorized();

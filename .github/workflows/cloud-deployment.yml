@@ -168,6 +168,7 @@ jobs:
         shell: pwsh
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          CAMPUSPULSE_SIGNING_KEY: ${{ secrets.CAMPUSPULSE_SIGNING_KEY }}
         run: |
           $params = @{
             GitHubOwner = '${{ needs.prepare.outputs.owner }}'

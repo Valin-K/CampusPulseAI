@@ -65,7 +65,7 @@ public sealed class BackendControllersTests
     }
 
     [Test]
-    public async Task DemoSignInForwardsPasswordThroughCredentialClientBeforeIssuingToken()
+    public async Task RoleIdSignInForwardsCredentialsThroughDatabaseBeforeIssuingToken()
     {
         const string authenticatedUser = """
             {"userId":42,"firstName":"Avery","lastName":"Student","email":"avery@example.edu","role":"Student","studentId":"STU042","staffId":null}
@@ -76,19 +76,19 @@ public sealed class BackendControllersTests
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["Authentication:Issuer"] = "CampusPulse.Dev",
+                ["Authentication:Issuer"] = "CampusPulse",
                 ["Authentication:Audience"] = "CampusPulse.Api",
                 ["Authentication:SigningKey"] = "a-test-signing-key-with-more-than-32-bytes"
             })
             .Build();
-        var controller = new AuthenticationController(clients, configuration, new TestWebHostEnvironment());
+        var controller = new AuthenticationController(clients, configuration);
 
         var result = await controller.CreateToken(
-            new AuthenticationController.DemoTokenRequest(42, "Student", "StrongPassword!2026"),
+            new AuthenticationController.TokenRequest("STU042", "Student", "StrongPassword!2026"),
             CancellationToken.None);
 
         Assert.That(result.Result, Is.InstanceOf<OkObjectResult>());
-        var tokenResponse = (AuthenticationController.DemoTokenResponse)((OkObjectResult)result.Result!).Value!;
+        var tokenResponse = (AuthenticationController.TokenResponse)((OkObjectResult)result.Result!).Value!;
         var tokenPayload = tokenResponse.AccessToken.Split('.')[1].Replace('-', '+').Replace('_', '/');
         tokenPayload = tokenPayload.PadRight(tokenPayload.Length + ((4 - tokenPayload.Length % 4) % 4), '=');
         using var tokenDocument = JsonDocument.Parse(Convert.FromBase64String(tokenPayload));
@@ -103,6 +103,8 @@ public sealed class BackendControllersTests
         Assert.That(request.Scheme, Is.EqualTo(Uri.UriSchemeHttp));
         Assert.That(request.Path, Is.EqualTo("/api/users/authenticate"));
         using var body = JsonDocument.Parse(request.Body!);
+        Assert.That(body.RootElement.GetProperty("accountId").GetString(), Is.EqualTo("STU042"));
+        Assert.That(body.RootElement.GetProperty("role").GetString(), Is.EqualTo("Student"));
         Assert.That(body.RootElement.GetProperty("password").GetString(), Is.EqualTo("StrongPassword!2026"));
     }
 

@@ -14,6 +14,7 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 COPY ["Directory.Packages.props", "."]
+COPY ["shared/backend/CampusPulse.Shared.Security/CampusPulse.Shared.Security.csproj", "shared/backend/CampusPulse.Shared.Security/"]
 COPY ["shared/backend/CampusPulse.Shared.MultiAgent/CampusPulse.Shared.MultiAgent.csproj", "shared/backend/CampusPulse.Shared.MultiAgent/"]
 COPY ["shared/backend/CampusPulse.Shared.Mcp/CampusPulse.Shared.Mcp.csproj", "shared/backend/CampusPulse.Shared.Mcp/"]
 COPY ["shared/backend/CampusPulse.Shared.Ai/CampusPulse.Shared.Ai.csproj", "shared/backend/CampusPulse.Shared.Ai/"]

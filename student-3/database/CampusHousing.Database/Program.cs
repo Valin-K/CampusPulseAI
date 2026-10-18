@@ -10,7 +10,7 @@ var builder = Microsoft.AspNetCore.Builder.WebApplication.CreateBuilder(args);
 var connectionString = builder.Configuration.GetConnectionString("CampusHousing")
     ?? "Data Source=/app/data/campus-housing.db";
 builder.Services.AddDbContext<CampusHousingDbContext>(options => options.UseSqlite(connectionString));
-builder.Services.AddCampusPulseSecurity(builder.Configuration, builder.Environment);
+builder.Services.AddCampusPulseSecurity(builder.Configuration);
 var academicRecordsUrl = builder.Configuration["Services:AcademicRecordsDatabase"] ?? "http://localhost:5021";
 builder.Services.AddHttpClient("AcademicRecords", client => client.BaseAddress = new Uri(academicRecordsUrl.TrimEnd('/') + "/"));
 builder.Services.AddCors(options => options.AddDefaultPolicy(policy => policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod()));

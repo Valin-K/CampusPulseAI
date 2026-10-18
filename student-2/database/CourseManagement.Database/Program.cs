@@ -12,7 +12,7 @@ var connectionString = builder.Configuration.GetConnectionString(
 builder.Services.AddDbContext<CourseManagementDbContext>(options =>
     options.UseSqlite(connectionString));
 builder.Services.AddControllers();
-builder.Services.AddCampusPulseSecurity(builder.Configuration, builder.Environment);
+builder.Services.AddCampusPulseSecurity(builder.Configuration);
 builder.Services
     .AddOptions<SyllabusStorageOptions>()
     .Bind(builder.Configuration.GetSection(SyllabusStorageOptions.SectionName))

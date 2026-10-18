@@ -8,17 +8,17 @@ from urllib.request import Request, urlopen
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--user-id", type=int, required=True)
+parser.add_argument("--account-id", required=True)
 parser.add_argument("--role", choices=("Student", "Staff"), required=True)
 arguments = parser.parse_args()
 
 endpoint = os.environ.get(
     "CAMPUSPULSE_AUTH_URL",
-    "http://localhost:5020/api/auth/demo/token",
+    "http://localhost:5020/api/auth/token",
 )
 password = os.environ.get("CAMPUSPULSE_CI_PASSWORD", "test")
 payload = json.dumps(
-    {"userId": arguments.user_id, "role": arguments.role, "password": password}
+    {"accountId": arguments.account_id, "role": arguments.role, "password": password}
 ).encode("utf-8")
 last_error = None
 
