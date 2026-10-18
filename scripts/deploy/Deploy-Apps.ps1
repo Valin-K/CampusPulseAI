@@ -46,12 +46,16 @@ if ($EnableAi) {
     }
 }
 
+$signingKeyBytes = New-Object byte[] 48
+[System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($signingKeyBytes)
+$authSigningKey = [Convert]::ToBase64String($signingKeyBytes)
+
 Write-Host "Deploying image tag '$Tag' to resource group '$ResourceGroupName' (AI enabled: $($EnableAi.IsPresent), minReplicas: $minReplicas)..." -ForegroundColor Cyan
 
 $deployment = az deployment group create `
     --resource-group $ResourceGroupName `
     --template-file $bicepFile `
-    --parameters githubOwner=$GitHubOwner imageTag=$Tag enableAi=$($EnableAi.IsPresent) minReplicas=$minReplicas geminiApiKey=$geminiApiKey `
+    --parameters githubOwner=$GitHubOwner imageTag=$Tag enableAi=$($EnableAi.IsPresent) minReplicas=$minReplicas geminiApiKey=$geminiApiKey authSigningKey=$authSigningKey `
     --output json | ConvertFrom-Json
 
 if ($LASTEXITCODE -ne 0) {

@@ -15,5 +15,7 @@ WORKDIR /usr/share/nginx/html
 COPY --from=build /app/publish/wwwroot .
 ENV BACKEND_HOST=coursemanagement.backend
 ENV BACKEND_PORT=8080
+ENV ACADEMICRECORDS_API_HOST=academicrecords.backend
+ENV ACADEMICRECORDS_API_PORT=8080
 COPY ["student-2/frontend/CourseManagement.Frontend/nginx.conf.template", "/etc/nginx/templates/default.conf.template"]
 EXPOSE 80

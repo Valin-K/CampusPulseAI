@@ -11,8 +11,8 @@ server {
     }
 
     location /api/ {
-        set $academic_records_backend academicrecords-backend-upstream;
-        proxy_pass http://$academic_records_backend:8080;
+        set $academic_records_backend http://${ACADEMICRECORDS_BACKEND_HOST}:${ACADEMICRECORDS_BACKEND_PORT};
+        proxy_pass $academic_records_backend$request_uri;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -24,8 +24,8 @@ server {
     }
 
     location @academic_records {
-        set $academic_records_frontend academicrecords-frontend-upstream;
-        proxy_pass http://$academic_records_frontend;
+        set $academic_records_frontend http://${ACADEMICRECORDS_FRONTEND_HOST};
+        proxy_pass $academic_records_frontend$request_uri;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
