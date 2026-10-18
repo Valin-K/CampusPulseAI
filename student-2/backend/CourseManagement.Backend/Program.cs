@@ -4,10 +4,45 @@ using CourseManagement.Backend.Clients;
 using CourseManagement.Backend.Configuration;
 using CourseManagement.Backend.Infrastructure;
 using CourseManagement.Backend.Services;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
+var issuer = builder.Configuration["Authentication:Issuer"] ?? "CampusPulse.Dev";
+var audience = builder.Configuration["Authentication:Audience"] ?? "CampusPulse.Api";
+var signingKey = builder.Configuration["Authentication:SigningKey"]
+    ?? (builder.Environment.IsDevelopment()
+        ? "campuspulse-demo-only-signing-key-change-before-any-use"
+        : throw new InvalidOperationException("The token signing key is not configured."));
+var keyBytes = System.Text.Encoding.UTF8.GetBytes(signingKey);
+if (keyBytes.Length < 32)
+{
+    throw new InvalidOperationException("The token signing key must contain at least 32 bytes.");
+}
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidIssuer = issuer,
+            ValidateAudience = true,
+            ValidAudience = audience,
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new Microsoft.IdentityModel.Tokens.SymmetricSecurityKey(keyBytes),
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.FromSeconds(30)
+        };
+    });
+builder.Services.AddAuthorization(options =>
+{
+    options.FallbackPolicy = new AuthorizationPolicyBuilder(JwtBearerDefaults.AuthenticationScheme)
+        .RequireAuthenticatedUser()
+        .RequireClaim("scope", "CampusPulse.Access")
+        .Build();
+});
 const string courseManagementFrontendCorsPolicy = "CourseManagementFrontend";
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
     ?? throw new InvalidOperationException("Course Management CORS origins are not configured.");
@@ -75,7 +110,7 @@ builder.Services.AddHttpClient(CourseKnowledgeService.CatalogueClientName, clien
     client.BaseAddress = new Uri(courseManagementDatabaseAddress, UriKind.Absolute);
     client.Timeout = TimeSpan.FromSeconds(30);
 });
-builder.Services.AddHttpClient<IMcpClient, McpClient>(client =>
+builder.Services.AddMcpClient(client =>
 {
     client.BaseAddress = new Uri(
         builder.Configuration["Services:McpServer"]
@@ -110,6 +145,7 @@ if (!app.Environment.IsDevelopment())
 
 app.UseCors(courseManagementFrontendCorsPolicy);
 
+app.UseAuthentication();
 app.UseAuthorization();
 
 MapDatabaseProxy(app, "/api/courses");
@@ -117,7 +153,7 @@ MapDatabaseProxy(app, "/api/prerequisites");
 MapDatabaseProxy(app, "/api/faculty-assignments");
 app.MapControllers();
 app.MapMultiAgentCaller("coursemanagement", CourseKnowledgeService.CatalogueClientName, "/api/courses");
-app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
+app.MapGet("/health", () => Results.Ok(new { status = "healthy" })).AllowAnonymous();
 
 await app.RunAsync();
 

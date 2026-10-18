@@ -1,8 +1,8 @@
 # Shared RAG server
 
-One retrieval-augmented generation service shared by all five features. It runs on the
-host, not in Docker Compose, and each backend container reaches it at
-`http://host.docker.internal:5267` through the `Services__RagServer` environment variable.
+One retrieval-augmented generation service shared by all five features. Compose runs it
+as `rag.server`, and each backend container reaches it at `http://rag.server:8080`
+through the `Services__RagServer` environment variable. Host tools use `http://localhost:5267`.
 
 Each feature owns a **collection**. Documents you put into your collection are only ever
 retrieved by questions asked against your collection. Nothing is shared between features.
@@ -19,13 +19,15 @@ retrieved by questions asked against your collection. Nothing is shared between 
 
 ```powershell
 # from the repository root
-dotnet run --project ai-services\rag-server\RagServer\RagServer.csproj
+docker compose up --build -d rag.server
 ```
 
-Start it before `docker compose up`. RAG uses the shared AI gateway at
+Compose also starts the gateway and configures `Services__AiGateway=http://ai.gateway:8080`.
+For host-only development, use `dotnet run --project ai-services\rag-server\RagServer\RagServer.csproj`
+instead of the RAG container. RAG uses the shared AI gateway at
 `Services:AiGateway` (environment variable `Services__AiGateway`, default
 `http://localhost:5269`). All provider credentials and model configuration belong
-to the gateway, not this server. Compose starts the gateway; alternatively, run it
+to the gateway, not this server. Alternatively, run the gateway
 in another terminal before ingesting or asking questions:
 
 ```powershell

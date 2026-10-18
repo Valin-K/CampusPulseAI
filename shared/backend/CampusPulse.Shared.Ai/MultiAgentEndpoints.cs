@@ -15,11 +15,13 @@ public static class MultiAgentEndpoints
 {
     public static IServiceCollection AddMultiAgentCaller(this IServiceCollection services, IConfiguration configuration)
     {
+        services.AddHttpContextAccessor();
+        services.AddTransient<CurrentRequestAuthorizationHandler>();
         services.AddHttpClient("multiAgent", client =>
         {
             client.BaseAddress = new Uri((configuration["Services:MultiAgentServer"] ?? "http://localhost:5270").TrimEnd('/') + "/");
             client.Timeout = TimeSpan.FromMinutes(6);
-        });
+        }).AddHttpMessageHandler<CurrentRequestAuthorizationHandler>();
         return services;
     }
 
@@ -104,6 +106,22 @@ public static class MultiAgentEndpoints
                 logs.CreateLogger("MultiAgentCaller").LogWarning(exception, "Multi-agent server call failed.");
                 return Results.Problem(statusCode: 503, title: "The local multi-agent server is unreachable or timed out. Check workflow history before retrying.");
             }
+        }
+    }
+
+    private sealed class CurrentRequestAuthorizationHandler(IHttpContextAccessor contextAccessor) : DelegatingHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            var authorization = contextAccessor.HttpContext?.Request.Headers.Authorization;
+            if (authorization is { Count: > 0 } && !request.Headers.Contains("Authorization"))
+            {
+                request.Headers.TryAddWithoutValidation("Authorization", authorization.ToString());
+                }
+
+            return base.SendAsync(request, cancellationToken);
         }
     }
 }

@@ -1,5 +1,7 @@
 @page "/students/{UserId:int}"
 @using System.Net.Http.Json
+@inject CampusAccountService Account
+@inject NavigationManager Navigation
 
 <PageTitle>Student | Academic Records</PageTitle>
 
@@ -25,10 +27,6 @@ else if (student is not null)
             <small>@student.Email</small>
         </div>
     </header>
-
-    <div class="button-row" style="margin-bottom: 1rem;">
-        <a class="button button-secondary" href="/">← Back to select user</a>
-    </div>
 
     <CampusSectionTabs Items="tabs" @bind-ActiveKey="activeTab" AriaLabel="Student sections" />
 
@@ -66,7 +64,35 @@ else if (student is not null)
 
     protected override async Task OnParametersSetAsync()
     {
+        student = null;
         loadError = null;
+
+        await Account.InitializeAsync();
+        var signedInUser = Account.CurrentUser;
+        if (signedInUser is null)
+        {
+            loadError = Account.ErrorMessage ?? "Sign in with a student account to view Academic Records.";
+            return;
+        }
+
+        if (CampusAccountService.IsStaff(signedInUser))
+        {
+            Navigation.NavigateTo($"staff/{signedInUser.UserId}", replace: true);
+            return;
+        }
+
+        if (!CampusAccountService.IsStudent(signedInUser))
+        {
+            loadError = "This account does not have access to the student view.";
+            return;
+        }
+
+        if (UserId != signedInUser.UserId)
+        {
+            Navigation.NavigateTo($"students/{signedInUser.UserId}", replace: true);
+            return;
+        }
+
         try
         {
             student = await Http.GetFromJsonAsync<StudentHeader>($"api/students/by-user/{UserId}");

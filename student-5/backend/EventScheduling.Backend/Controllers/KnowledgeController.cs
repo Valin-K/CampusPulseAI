@@ -26,7 +26,7 @@ public sealed class KnowledgeController(
         {
             logger.LogWarning(exception, "The knowledge assistant could not reach the RAG server.");
             return Problem(
-                "The shared RAG server is unavailable. Start it on the host at http://localhost:5267 before using this feature.",
+                "The shared RAG server is unavailable. Check that it is running and reachable at the configured Services:RagServer address.",
                 statusCode: StatusCodes.Status503ServiceUnavailable);
         }
         catch (TaskCanceledException exception) when (!cancellationToken.IsCancellationRequested)

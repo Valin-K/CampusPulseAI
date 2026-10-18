@@ -15,8 +15,11 @@ portal — to Azure, with **AI-Mode, MCP, RAG and the Multi-Agent Server disable
 brief's cloud baseline. A reusable set of scripts does the deployment, and a GitHub Actions workflow
 (`cloud-deployment.yml`) runs those scripts automatically after CI passes on a merge to `master`.
 
-The AI services themselves are **not deployed** in the required baseline — they stay as non-containerised
-local services, exactly as they run today. Enabling them in the cloud is bonus-only (B1–B4).
+The AI services are containerised and included in local Compose. The required cloud baseline
+still does **not deploy** them. The cloud workflow builds and publishes their images alongside
+the other images; its `enable_ai` input (or `Deploy-Apps.ps1 -EnableAi`) deploys the bonus AI profile.
+Set the `GEMINI_API_KEY` GitHub Actions secret, or the environment variable for a local deploy.
+It is stored as a Container Apps secret on the gateway only, never in the images.
 
 ---
 
@@ -24,11 +27,11 @@ local services, exactly as they run today. Enabling them in the cloud is bonus-o
 
 Each of the 5 student projects is really 3 separate pieces (frontend, backend, database), which is already
 how `docker-compose.yml` models them. Azure Container Apps mirrors that 1:1 — **one Container App per
-compose service**, 16 apps total, all inside a single Container Apps environment.
+compose service**, 16 baseline apps or 20 with AI enabled, inside one Container Apps environment.
 
 ```
                          GitHub (Valin-K/CampusPulseAI)
-  PR merged to master ─► student-1..5 CI + integration CI ─► build & push 16 images to GHCR
+  CI validation ─► student-1..5 CI + integration CI ─► build & push 20 images to GHCR
                                                                       │
                                          az containerapp update --image …:<git-sha> (OIDC login)
                                                                       ▼
@@ -71,6 +74,10 @@ These are the cloud equivalents, used everywhere — Bicep, env vars, nginx `BAC
 | `eventscheduling.backend` | `eventscheduling-api` | internal |
 | `eventscheduling.frontend` | `eventscheduling-web` | external |
 | `shared-ui` | `campuspulse-portal` | external |
+| `ai.gateway` | `ai-gateway` | internal, AI profile only |
+| `mcp.server` | `mcp-server` | internal, AI profile only |
+| `rag.server` | `rag-server` | internal, AI profile only |
+| `multiagent.server` | `multi-agent-server` | internal, AI profile only |
 
 Apps reach each other inside the environment at `http://<app-name>` — Azure's equivalent of Compose's
 service-name DNS, confirmed working by hand-testing an internal-ingress app against a public one before
@@ -131,7 +138,13 @@ these flags already, others don't yet.
 
 ### 3.4 Scale-to-zero by design
 
-Every Container App, including the databases, runs with `minReplicas: 0`. SQLite data lives on an Azure
+The optional AI profile keeps RAG and Multi-Agent at exactly one replica: RAG has an
+in-memory index and Multi-Agent has an in-process queue. RAG still requires re-ingestion
+after restarts or new revisions. Multi-Agent persists workflow history on its own
+`multiagent-data` Azure Files share. This profile has ongoing compute cost while enabled.
+The gateway and MCP follow the normal scale-to-zero / warm-up setting.
+
+Every baseline Container App, including the databases, runs with `minReplicas: 0`. SQLite data lives on an Azure
 Files share mounted into each database app, so nothing is lost when a container scales down — only the
 running compute stops. Databases are additionally capped at `maxReplicas: 1`, since SQLite only tolerates
 one writer; this is a correctness requirement, not just a cost one.

@@ -1,21 +1,29 @@
 using CourseManagement.Frontend;
 using CourseManagement.Frontend.Services;
+using CampusPulse.Shared.Components.Services;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
+using Microsoft.JSInterop;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 builder.RootComponents.Add<App>("#app");
 builder.RootComponents.Add<HeadOutlet>("head::after");
 
-// Empty/missing BaseAddress (e.g. the cloud Production build) falls back to this app's own
-// origin, where nginx proxies /api/ to the real backend.
+var academicRecordsBackendUrl = builder.Configuration["AcademicRecordsBackendUrl"] ?? "http://localhost:5020";
+builder.Services.AddCampusDemoAuthentication(academicRecordsBackendUrl);
 var configuredApiBaseAddress = builder.Configuration["CourseManagementApi:BaseAddress"];
 var apiBaseAddress = string.IsNullOrWhiteSpace(configuredApiBaseAddress)
     ? builder.HostEnvironment.BaseAddress
     : configuredApiBaseAddress;
-builder.Services.AddScoped(_ => new HttpClient
+builder.Services.AddCampusAccountServices(academicRecordsBackendUrl);
+builder.Services.AddScoped(serviceProvider =>
 {
-    BaseAddress = new Uri(apiBaseAddress, UriKind.Absolute)
+    var handler = new CampusUserIdHeaderHandler(serviceProvider.GetRequiredService<IJSRuntime>())
+    {
+        InnerHandler = CampusDemoAuthenticationServiceCollectionExtensions
+            .CreateCampusDemoTokenHandler(serviceProvider)
+    };
+    return new HttpClient(handler) { BaseAddress = new Uri(apiBaseAddress, UriKind.Absolute) };
 });
 builder.Services.AddScoped<CourseApiClient>();
 builder.Services.AddScoped<CourseUserContext>();

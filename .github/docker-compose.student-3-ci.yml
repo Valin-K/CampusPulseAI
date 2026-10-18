@@ -1,0 +1,6 @@
+services:
+  campushousing.backend:
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      Mcp__Enabled: "false"
+      Rag__Enabled: "false"

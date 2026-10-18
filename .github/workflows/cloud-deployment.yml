@@ -76,6 +76,14 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - app: ai-gateway
+            dockerfile: shared/backend/CampusPulse.Shared.Ai.Gateway/Dockerfile
+          - app: mcp-server
+            dockerfile: ai-services/mcp-server/McpServer/Dockerfile
+          - app: rag-server
+            dockerfile: ai-services/rag-server/RagServer/Dockerfile
+          - app: multi-agent-server
+            dockerfile: ai-services/multi-agent-server/MultiAgentServer/Dockerfile
           - app: academicrecords-db
             dockerfile: student-1/database/AcademicRecords.Database/Dockerfile
           - app: academicrecords-api
@@ -159,6 +167,8 @@ jobs:
 
       - name: Deploy apps
         shell: pwsh
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           $params = @{
             GitHubOwner = '${{ needs.prepare.outputs.owner }}'
@@ -170,7 +180,7 @@ jobs:
 
       - name: Smoke test
         shell: pwsh
-        run: ./scripts/deploy/Test-CloudDeployment.ps1
+        run: ./scripts/deploy/Test-CloudDeployment.ps1 -EnableAi:('${{ github.event.inputs.enable_ai }}' -eq 'true')
 
       - name: Upload evidence
         if: always()

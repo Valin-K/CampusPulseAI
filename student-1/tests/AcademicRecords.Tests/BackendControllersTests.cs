@@ -1,4 +1,5 @@
 using System.Net;
+using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
 using AcademicRecords.Backend.Contracts;
@@ -7,6 +8,7 @@ using AcademicRecords.Backend.Models;
 using AcademicRecords.Backend.Services;
 using CampusPulse.Shared.Mcp.Client;
 using CampusPulse.Shared.Rag.Assistant;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
@@ -58,6 +60,18 @@ public sealed class BackendControllersTests
             Assert.That(clients.Requests[5].Body, Is.EqualTo("grade update"));
             Assert.That(clients.Requests[5].ContentType, Is.EqualTo("application/json"));
         });
+    }
+
+    [TestCase(typeof(StudentsController), "Enroll", true)]
+    [TestCase(typeof(StaffController), "Enroll", true)]
+    [TestCase(typeof(StudentsController), "Update", false)]
+    [TestCase(typeof(StaffController), "Update", false)]
+    public void OnlyAccountCreationActionsAllowAnonymous(Type controllerType, string actionName, bool expected)
+    {
+        var action = controllerType.GetMethod(actionName);
+
+        Assert.That(action, Is.Not.Null);
+        Assert.That(action!.IsDefined(typeof(AllowAnonymousAttribute), inherit: true), Is.EqualTo(expected));
     }
 
     [Test]
@@ -199,6 +213,79 @@ public sealed class BackendControllersTests
         {
             Assert.That(emptyQuestion.Value, Is.Not.Null);
             Assert.That(invalidUser.Value, Is.Not.Null);
+            Assert.That(knowledge.CallCount, Is.Zero);
+        });
+    }
+
+    [Test]
+    public async Task AskUsesAuthenticatedStudentIdWhenRequestOmitsIt()
+    {
+        using var clients = new RecordingHttpClientFactory((_, _, _) =>
+            throw new InvalidOperationException("No HTTP call expected."));
+        KnowledgeQuestionRequest? receivedRequest = null;
+        var knowledge = new StubAcademicKnowledgeService((request, _) =>
+        {
+            receivedRequest = request;
+            return Task.FromResult(new RagAssistantAnswer(
+                request.Question,
+                "answered",
+                "Your GPA is available.",
+                0.8,
+                RagConfidenceCategory.High,
+                [],
+                "test-model"));
+        });
+        var controller = new AiController(clients, null!, null!, knowledge);
+        controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext
+            {
+                User = new ClaimsPrincipal(new ClaimsIdentity(
+                [
+                    new Claim("user_id", "42"),
+                    new Claim(ClaimTypes.Role, "Student")
+                ], "test"))
+            }
+        };
+
+        var result = await controller.Ask(
+            new KnowledgeQuestionRequest { Question = "What is my GPA?" },
+            CancellationToken.None);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result, Is.TypeOf<OkObjectResult>());
+            Assert.That(receivedRequest!.UserId, Is.EqualTo(42));
+        });
+    }
+
+    [Test]
+    public async Task AskRejectsStudentIdThatDoesNotMatchAuthenticatedClaim()
+    {
+        using var clients = new RecordingHttpClientFactory((_, _, _) =>
+            throw new InvalidOperationException("No HTTP call expected."));
+        var knowledge = new StubAcademicKnowledgeService((_, _) =>
+            throw new InvalidOperationException("No service call expected."));
+        var controller = new AiController(clients, null!, null!, knowledge);
+        controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext
+            {
+                User = new ClaimsPrincipal(new ClaimsIdentity(
+                [
+                    new Claim("user_id", "42"),
+                    new Claim(ClaimTypes.Role, "Student")
+                ], "test"))
+            }
+        };
+
+        var result = await controller.Ask(
+            new KnowledgeQuestionRequest { Question = "What is my GPA?", UserId = 41 },
+            CancellationToken.None);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result, Is.TypeOf<ForbidResult>());
             Assert.That(knowledge.CallCount, Is.Zero);
         });
     }

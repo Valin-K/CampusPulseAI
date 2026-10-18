@@ -1,24 +1,19 @@
-using Microsoft.AspNetCore.Components;
+using CampusPulse.Shared.Components.Models;
+using CampusPulse.Shared.Components.Services;
 using Microsoft.JSInterop;
-using System.Net.Http.Json;
 
 namespace CampusHousing.Frontend.Services;
 
-public sealed record HousingUser(int UserId, string DisplayName, string StudentId, bool IsAdministrator);
-
-public sealed class HousingUserContext(IJSRuntime js, NavigationManager navigation, IConfiguration configuration)
+public sealed class HousingUserContext(CampusAccountService account)
 {
-    private const string StorageKey = "campuspulse.campus-housing.selected-user-id";
-
-    public IReadOnlyList<HousingUser> Users { get; private set; } = [];
-
-    public HousingUser? CurrentUser { get; private set; }
+    public CampusAccountUser? CurrentUser { get; private set; }
 
     public bool IsInitialized { get; private set; }
 
     public bool IsAvailable => CurrentUser is not null;
 
-    public bool IsAdministrator => CurrentUser?.IsAdministrator == true;
+    public bool IsAdministrator =>
+        CurrentUser is not null && CampusAccountService.IsStaff(CurrentUser);
 
     public string? ErrorMessage { get; private set; }
 
@@ -35,49 +30,34 @@ public sealed class HousingUserContext(IJSRuntime js, NavigationManager navigati
 
         try
         {
-            var configuredBackendUrl = configuration["BackendUrl"];
-            var backendUrl = string.IsNullOrWhiteSpace(configuredBackendUrl) ? navigation.BaseUri : configuredBackendUrl;
-            using var http = new HttpClient { BaseAddress = new Uri(backendUrl.TrimEnd('/') + "/") };
-            var directory = await http.GetFromJsonAsync<List<HousingDirectoryUser>>("api/housing/users");
-            Users = (directory ?? [])
-                .Where(user => string.Equals(user.Role, "Student", StringComparison.OrdinalIgnoreCase)
-                    && user.UserId > 0 && !string.IsNullOrWhiteSpace(user.StudentId))
-                .Select(user => new HousingUser(user.UserId, $"{user.FirstName} {user.LastName}", user.StudentId!, false))
-                .Append(new HousingUser(0, "Housing Administrator", "", true))
-                .ToList();
-
-            var savedUserId = await js.InvokeAsync<string?>("campusPulseHousingUser.getSelectedUserId", StorageKey);
-            var selectedUser = int.TryParse(savedUserId, out var userId)
-                ? Users.FirstOrDefault(user => user.UserId == userId)
-                : null;
-            CurrentUser = selectedUser ?? Users.FirstOrDefault(user => !user.IsAdministrator);
-
-            if (selectedUser is null && savedUserId is not null)
+            await account.InitializeAsync(forceRefresh);
+            var signedInUser = account.CurrentUser;
+            if (signedInUser is null)
             {
-                await js.InvokeVoidAsync("campusPulseHousingUser.removeSelectedUserId", StorageKey);
+                ErrorMessage = account.ErrorMessage
+                    ?? "Sign in with a student or staff account to access Campus Housing.";
+                return;
             }
 
+            if (!CampusAccountService.IsStudent(signedInUser)
+                && !CampusAccountService.IsStaff(signedInUser))
+            {
+                ErrorMessage = "This CampusPulse account does not have Campus Housing access.";
+                return;
+            }
+
+            CurrentUser = signedInUser;
         }
         catch (JSException)
         {
-            ErrorMessage = "The selected Housing user could not be read from this browser.";
+            ErrorMessage = "The CampusPulse sign-in session could not be read from this browser.";
         }
         finally
         {
             IsInitialized = true;
         }
     }
-
-    public async Task SelectUserAsync(int userId)
-    {
-        var user = Users.FirstOrDefault(candidate => candidate.UserId == userId)
-            ?? throw new InvalidOperationException("The selected housing user is not available.");
-        await js.InvokeVoidAsync("campusPulseHousingUser.setSelectedUserId", StorageKey, user.UserId);
-        navigation.NavigateTo(navigation.Uri, forceLoad: true);
-    }
 }
-
-file sealed record HousingDirectoryUser(int UserId, string FirstName, string LastName, string Email, string Role, string? StudentId, string? StaffId);
 
 public sealed class HousingRoleHandler(HousingUserContext userContext) : DelegatingHandler
 {

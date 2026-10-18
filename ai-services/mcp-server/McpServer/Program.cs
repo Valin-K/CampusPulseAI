@@ -1,8 +1,11 @@
 using McpServer.Contracts;
 using McpServer.Tools;
+using CampusPulse.Shared.Mcp.Client;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddOpenApi();
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddTransient<McpAuthorizationHeaderHandler>();
 builder.Services.AddCors(options => options.AddDefaultPolicy(policy => policy
     .AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod()));
 builder.Services.AddHttpClient("courseManagement", client =>
@@ -11,12 +14,12 @@ builder.Services.AddHttpClient("courseManagement", client =>
         builder.Configuration["Services:CourseManagementBackend"]
         ?? "http://localhost:5118");
     client.Timeout = TimeSpan.FromSeconds(10);
-});
+}).AddHttpMessageHandler<McpAuthorizationHeaderHandler>();
 builder.Services.AddHttpClient("academicRecords", client =>
 {
     client.BaseAddress = new Uri(builder.Configuration["Services:AcademicRecordsBackend"] ?? "http://localhost:5020");
     client.Timeout = TimeSpan.FromSeconds(30);
-});
+}).AddHttpMessageHandler<McpAuthorizationHeaderHandler>();
 builder.Services.AddHttpClient("campusHousing", client =>
 {
     client.BaseAddress = new Uri(builder.Configuration["Services:CampusHousingDatabase"] ?? "http://localhost:5093");
