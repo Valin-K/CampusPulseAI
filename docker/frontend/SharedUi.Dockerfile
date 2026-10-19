@@ -15,9 +15,8 @@ ENV CAMPUSHOUSING_WEB_URL=http://localhost:8083
 ENV FINAID_WEB_URL=http://localhost:8084
 ENV EVENTSCHEDULING_WEB_URL=http://localhost:8085
 
-ENV ACADEMICRECORDS_BACKEND_HOST=academicrecords-backend-upstream
-ENV ACADEMICRECORDS_BACKEND_PORT=8080
-ENV ACADEMICRECORDS_FRONTEND_HOST=academicrecords-frontend-upstream
+ENV ACADEMICRECORDS_BACKEND_BASE_URL=http://academicrecords-backend-upstream:8080
+ENV ACADEMICRECORDS_FRONTEND_BASE_URL=http://academicrecords-frontend-upstream
 
 COPY shared/frontend/docker-entrypoint.d/40-render-portal-links.sh /docker-entrypoint.d/40-render-portal-links.sh
 RUN chmod +x /docker-entrypoint.d/40-render-portal-links.sh

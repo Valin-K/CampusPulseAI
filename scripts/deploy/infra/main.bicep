@@ -32,6 +32,16 @@ var namePrefix = 'campuspulse'
 var registry = 'ghcr.io/${githubOwner}'
 var aiEnvValue = enableAi ? 'true' : 'false'
 
+// Internal-ingress apps (databases, backends, AI services) are NOT reachable by their plain
+// name from other apps: confirmed by hand - nginx's own resolver (unlike nslookup/wget, which
+// apply a search-domain suffix nginx's raw resolver does not) fails on the bare name with
+// "could not be resolved", and Azure's own ingress.fqdn for an internal app is actually
+// "<name>.internal.<environment-default-domain>". Internal ingress also requires HTTPS
+// (containerApp.bicep sets allowInsecure: false), not plain HTTP. External apps (the 5 web
+// frontends, the portal) use the same domain without ".internal." and are also HTTPS-only.
+func internalUrl(appName string, domain string) string => 'https://${appName}.internal.${domain}'
+func externalUrl(appName string, domain string) string => 'https://${appName}.${domain}'
+
 module environment 'environment.bicep' = {
   name: 'environment'
   params: {
@@ -99,9 +109,13 @@ module aiApps 'containerApp.bicep' = [
       image: '${registry}/campuspulse-${ai.name}:${imageTag}'
       targetPort: 8080
       external: false
-      env: ai.name == 'ai-gateway'
-        ? concat(ai.env, [{ name: 'GEMINI_API_KEY', secretRef: 'gemini-api-key' }])
-        : ai.env
+      env: [
+        for entry in (ai.name == 'ai-gateway'
+          ? concat(ai.env, [{ name: 'GEMINI_API_KEY', secretRef: 'gemini-api-key' }])
+          : ai.env): (contains(entry, 'value') && startsWith(entry.value, 'http://'))
+          ? { name: entry.name, value: internalUrl(substring(entry.value, 7, length(entry.value) - 7), environment.outputs.defaultDomain) }
+          : entry
+      ]
       geminiApiKey: ai.name == 'ai-gateway' ? geminiApiKey : ''
       minReplicas: ai.minReplicas
       maxReplicas: 1
@@ -168,7 +182,11 @@ module databaseApps 'containerApp.bicep' = [
       image: '${registry}/campuspulse-${db.name}:${imageTag}'
       targetPort: 8080
       external: false
-      env: db.env
+      env: [
+        for entry in db.env: (contains(entry, 'value') && startsWith(entry.value, 'http://'))
+          ? { name: entry.name, value: internalUrl(substring(entry.value, 7, length(entry.value) - 7), environment.outputs.defaultDomain) }
+          : entry
+      ]
       minReplicas: minReplicas
       maxReplicas: 1
       volumeMount: { mountPath: '/app/data' }
@@ -195,7 +213,6 @@ var sharedAiDisabled = [
 var backends = [
   {
     name: 'academicrecords-api'
-    needsCorsOrigin: false
     env: concat(sharedAiDisabled, [
       { name: 'Services__AcademicRecordsDatabase', value: 'http://academicrecords-db' }
       { name: 'Services__CourseManagementDatabase', value: 'http://coursemgmt-db' }
@@ -204,19 +221,17 @@ var backends = [
   {
     name: 'coursemgmt-api'
     // CORS is a browser-enforced check on cross-origin requests; with the nginx /api/ proxy
-    // every real request is same-origin, so this only matters for direct testing. The actual
-    // origin value (which needs environment.outputs.defaultDomain, only known once deployment
-    // starts) is appended below, outside this array - a for-loop's source array must be
-    // resolvable before deployment starts, so it can't contain that reference itself.
-    needsCorsOrigin: true
+    // every real request is same-origin, so this only matters for direct testing. The
+    // 'external://' prefix (vs. 'http://' for internal-ingress apps) tells the module-call-site
+    // transform below to use the public URL pattern instead of the internal one.
     env: concat(sharedAiDisabled, [
       { name: 'Services__AcademicRecordsDatabase', value: 'http://academicrecords-db' }
       { name: 'Services__CourseManagementDatabase', value: 'http://coursemgmt-db' }
+      { name: 'Cors__AllowedOrigins__0', value: 'external://coursemgmt-web' }
     ])
   }
   {
     name: 'campushousing-api'
-    needsCorsOrigin: false
     env: concat(sharedAiDisabled, [
       { name: 'Services__CampusHousingDatabase', value: 'http://campushousing-db' }
       { name: 'Services__AcademicRecordsDatabase', value: 'http://academicrecords-db' }
@@ -224,7 +239,6 @@ var backends = [
   }
   {
     name: 'finaid-api'
-    needsCorsOrigin: false
     env: concat(sharedAiDisabled, [
       { name: 'Services__InvoiceDatabase', value: 'http://finaid-db' }
       { name: 'Services__AcademicRecordsBackend', value: 'http://academicrecords-api' }
@@ -232,7 +246,6 @@ var backends = [
   }
   {
     name: 'eventscheduling-api'
-    needsCorsOrigin: false
     env: concat(sharedAiDisabled, [
       { name: 'Services__EventDatabase', value: 'http://eventscheduling-db' }
       { name: 'Services__AcademicRecordsDatabase', value: 'http://academicrecords-db' }
@@ -250,11 +263,13 @@ module backendApps 'containerApp.bicep' = [
       image: '${registry}/campuspulse-${api.name}:${imageTag}'
       targetPort: 8080
       external: false
-      env: api.needsCorsOrigin
-        ? concat(api.env, [
-            { name: 'Cors__AllowedOrigins__0', value: 'https://coursemgmt-web.${environment.outputs.defaultDomain}' }
-          ])
-        : api.env
+      env: [
+        for entry in api.env: (contains(entry, 'value') && startsWith(entry.value, 'http://'))
+          ? { name: entry.name, value: internalUrl(substring(entry.value, 7, length(entry.value) - 7), environment.outputs.defaultDomain) }
+          : (contains(entry, 'value') && startsWith(entry.value, 'external://'))
+            ? { name: entry.name, value: externalUrl(substring(entry.value, 11, length(entry.value) - 11), environment.outputs.defaultDomain) }
+            : entry
+      ]
       authSigningKey: authSigningKey
       minReplicas: minReplicas
       maxReplicas: 2
@@ -284,10 +299,8 @@ module frontendApps 'containerApp.bicep' = [
       external: true
       healthPath: '/'
       env: [
-        { name: 'BACKEND_HOST', value: web.backend }
-        // Azure Container Apps fronts internal calls on port 80 regardless of the target
-        // port the backend actually listens on - confirmed by hand before writing this.
-        { name: 'BACKEND_PORT', value: '80' }
+        { name: 'BACKEND_BASE_URL', value: internalUrl(web.backend, environment.outputs.defaultDomain) }
+        { name: 'ACADEMICRECORDS_API_BASE_URL', value: internalUrl('academicrecords-api', environment.outputs.defaultDomain) }
       ]
       minReplicas: minReplicas
       maxReplicas: 2
@@ -308,14 +321,13 @@ module portal 'containerApp.bicep' = {
     external: true
     healthPath: '/'
     env: [
-      { name: 'ACADEMICRECORDS_WEB_URL', value: 'https://academicrecords-web.${environment.outputs.defaultDomain}' }
-      { name: 'COURSEMANAGEMENT_WEB_URL', value: 'https://coursemgmt-web.${environment.outputs.defaultDomain}' }
-      { name: 'CAMPUSHOUSING_WEB_URL', value: 'https://campushousing-web.${environment.outputs.defaultDomain}' }
-      { name: 'FINAID_WEB_URL', value: 'https://finaid-web.${environment.outputs.defaultDomain}' }
-      { name: 'EVENTSCHEDULING_WEB_URL', value: 'https://eventscheduling-web.${environment.outputs.defaultDomain}' }
-      { name: 'ACADEMICRECORDS_BACKEND_HOST', value: 'academicrecords-api' }
-      { name: 'ACADEMICRECORDS_BACKEND_PORT', value: '80' }
-      { name: 'ACADEMICRECORDS_FRONTEND_HOST', value: 'academicrecords-web' }
+      { name: 'ACADEMICRECORDS_WEB_URL', value: externalUrl('academicrecords-web', environment.outputs.defaultDomain) }
+      { name: 'COURSEMANAGEMENT_WEB_URL', value: externalUrl('coursemgmt-web', environment.outputs.defaultDomain) }
+      { name: 'CAMPUSHOUSING_WEB_URL', value: externalUrl('campushousing-web', environment.outputs.defaultDomain) }
+      { name: 'FINAID_WEB_URL', value: externalUrl('finaid-web', environment.outputs.defaultDomain) }
+      { name: 'EVENTSCHEDULING_WEB_URL', value: externalUrl('eventscheduling-web', environment.outputs.defaultDomain) }
+      { name: 'ACADEMICRECORDS_BACKEND_BASE_URL', value: internalUrl('academicrecords-api', environment.outputs.defaultDomain) }
+      { name: 'ACADEMICRECORDS_FRONTEND_BASE_URL', value: externalUrl('academicrecords-web', environment.outputs.defaultDomain) }
     ]
     minReplicas: minReplicas
     maxReplicas: 2

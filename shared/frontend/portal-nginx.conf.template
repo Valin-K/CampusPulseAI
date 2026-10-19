@@ -5,15 +5,18 @@ server {
     root /usr/share/nginx/html;
     index index.html;
     resolver 127.0.0.11 valid=10s ipv6=off;
+    proxy_ssl_server_name on;
 
     location = / {
         try_files /index.html =404;
     }
 
     location /api/ {
-        set $academic_records_backend http://${ACADEMICRECORDS_BACKEND_HOST}:${ACADEMICRECORDS_BACKEND_PORT};
+        set $academic_records_backend ${ACADEMICRECORDS_BACKEND_BASE_URL};
         proxy_pass $academic_records_backend$request_uri;
-        proxy_set_header Host $host;
+        # Azure's internal ingress routes by Host header too, not just SNI; forwarding the
+        # client's original Host prevents Envoy from matching the backend app.
+        proxy_set_header Host $proxy_host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
@@ -24,9 +27,9 @@ server {
     }
 
     location @academic_records {
-        set $academic_records_frontend http://${ACADEMICRECORDS_FRONTEND_HOST};
+        set $academic_records_frontend ${ACADEMICRECORDS_FRONTEND_BASE_URL};
         proxy_pass $academic_records_frontend$request_uri;
-        proxy_set_header Host $host;
+        proxy_set_header Host $proxy_host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
