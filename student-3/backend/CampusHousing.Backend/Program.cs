@@ -28,7 +28,7 @@ builder.Services.AddHttpClient<CampusPulse.Shared.Rag.Client.IRagServerClient, C
 {
     client.BaseAddress = new Uri(builder.Configuration["Services:RagServer"] ?? "http://localhost:5267");
     client.Timeout = TimeSpan.FromSeconds(90);
-});
+}).ForwardCampusPulseAuthorization();
 builder.Services.AddSingleton<CampusPulse.Shared.Rag.Generation.RagCitationParser>();
 builder.Services.AddScoped<CampusPulse.Shared.Rag.Assistant.RagKnowledgeService>();
 builder.Services.AddScoped<CampusHousing.Backend.Services.IHousingRagService, CampusHousing.Backend.Services.HousingKnowledgeService>();

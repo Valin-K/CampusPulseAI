@@ -1,7 +1,10 @@
 using AcademicRecords.Database.Contracts;
 using AcademicRecords.Database.Controllers;
+using AcademicRecords.Database.Data;
 using AcademicRecords.Database.Models;
 using AcademicRecords.Database.Services;
+using System.Security.Claims;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -27,7 +30,8 @@ public sealed class StudentsControllerTests
         });
         await database.SaveChangesAsync();
 
-        var result = await new StudentsController(database).GetByUser(student.UserId, CancellationToken.None);
+        var controller = CreateStudentController(database, student.StudentId, student.UserId);
+        var result = await controller.GetByUser(student.UserId, CancellationToken.None);
 
         var response = result.Result as OkObjectResult;
         Assert.That(response, Is.Not.Null);
@@ -48,7 +52,7 @@ public sealed class StudentsControllerTests
             CreateStudent("STU002", "Zoe", "Young", "zoe@example.edu"),
             CreateStudent("STU001", "Alex", "Adams", "alex@example.edu"));
         await database.SaveChangesAsync();
-        var controller = new StudentsController(database);
+        var controller = CreateStaffController(database);
 
         var listResult = await controller.GetAll(CancellationToken.None);
         var listResponse = listResult.Result as OkObjectResult;
@@ -67,7 +71,7 @@ public sealed class StudentsControllerTests
     public async Task GetUnknownStudentByUserAndStudentIdReturnsNotFound()
     {
         await using var testDatabase = await ControllerTestDatabase.CreateAsync();
-        var controller = new StudentsController(testDatabase.Context);
+        var controller = CreateStudentController(testDatabase.Context, "STU404", 999);
 
         var userResult = await controller.GetByUser(999, CancellationToken.None);
         var studentIdResult = await controller.GetByStudentId("STU404", CancellationToken.None);
@@ -161,7 +165,7 @@ public sealed class StudentsControllerTests
         database.AddRange(student, term);
         await database.SaveChangesAsync();
 
-        var result = await new StudentsController(database).AddEnrollment(
+        var result = await CreateStudentController(database, student.StudentId, student.UserId).AddEnrollment(
             student.StudentId, new AddEnrollmentRequest(" CS101 ", term.TermId, 2026), CancellationToken.None);
 
         var created = result as CreatedResult;
@@ -181,7 +185,7 @@ public sealed class StudentsControllerTests
         var student = CreateStudent("STU001", "Avery", "Student", "avery@example.edu");
         database.Students.Add(student);
         await database.SaveChangesAsync();
-        var controller = new StudentsController(database);
+        var controller = CreateStudentController(database, student.StudentId, student.UserId);
         var request = new AddEnrollmentRequest("CS101", 99);
 
         var missingStudent = await controller.AddEnrollment("STU404", request, CancellationToken.None);
@@ -202,7 +206,7 @@ public sealed class StudentsControllerTests
         var request = new UpdateStudentRequest(" New ", " Name ", "new@example.edu", new DateOnly(2001, 2, 3),
             " New Address ", " Emergency Contact ", "0400000001", "0400000002", " BSc ", " CS ", " Math ");
 
-        var result = await new StudentsController(database).Update("STU001", request, CancellationToken.None);
+        var result = await CreateStudentController(database, "STU001", 1).Update("STU001", request, CancellationToken.None);
 
         Assert.That(result, Is.InstanceOf<NoContentResult>());
         var updated = await database.Students.AsNoTracking().SingleAsync(student => student.StudentId == "STU001");
@@ -228,7 +232,7 @@ public sealed class StudentsControllerTests
         var request = new UpdateStudentRequest("New", "Name", "new@example.edu", new DateOnly(2001, 2, 3),
             "New Address", "Contact", "bad-phone");
 
-        var result = await new StudentsController(database).Update("STU001", request, CancellationToken.None);
+        var result = await CreateStudentController(database, "STU001", 1).Update("STU001", request, CancellationToken.None);
 
         Assert.That(result, Is.InstanceOf<BadRequestObjectResult>());
         var unchanged = await database.Students.AsNoTracking().SingleAsync(student => student.StudentId == "STU001");
@@ -243,7 +247,7 @@ public sealed class StudentsControllerTests
         var request = new UpdateStudentRequest("New", "Name", "new@example.edu", new DateOnly(2001, 2, 3),
             "New Address", "Contact", "0400000001");
 
-        var result = await new StudentsController(testDatabase.Context).Update("STU404", request, CancellationToken.None);
+        var result = await CreateStudentController(testDatabase.Context, "STU404", 999).Update("STU404", request, CancellationToken.None);
 
         Assert.That(result, Is.InstanceOf<NotFoundObjectResult>());
     }
@@ -255,7 +259,7 @@ public sealed class StudentsControllerTests
         var database = testDatabase.Context;
         database.Students.Add(CreateStudent("STU001", "Avery", "Student", "avery@example.edu"));
         await database.SaveChangesAsync();
-        var controller = new StudentsController(database);
+        var controller = CreateStaffController(database);
         var futureDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(1);
 
         var futureResult = await controller.UpdateGraduation(
@@ -287,6 +291,25 @@ public sealed class StudentsControllerTests
         " Avery ", " Student ", "avery@example.edu", new DateOnly(2000, 1, 1),
         "1 Campus Way", "Emergency Contact", "0400000000",
         Password: "StrongPassword!2026", ConfirmPassword: "StrongPassword!2026");
+
+    private static StudentsController CreateStudentController(AcademicRecordsDbContext database, string studentId, int userId) =>
+        CreateController(database, new Claim(ClaimTypes.Role, "Student"), new Claim("student_id", studentId), new Claim("user_id", userId.ToString()));
+
+    private static StudentsController CreateStaffController(AcademicRecordsDbContext database) =>
+        CreateController(database, new Claim(ClaimTypes.Role, "Staff"));
+
+    private static StudentsController CreateController(AcademicRecordsDbContext database, params Claim[] claims)
+    {
+        var controller = new StudentsController(database);
+        controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext
+            {
+                User = new ClaimsPrincipal(new ClaimsIdentity(claims, "test"))
+            }
+        };
+        return controller;
+    }
 
     private static Student CreateStudent(string studentId, string firstName, string lastName, string email) => new()
     {

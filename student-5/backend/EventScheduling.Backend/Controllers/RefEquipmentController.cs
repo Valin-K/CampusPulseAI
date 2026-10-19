@@ -1,4 +1,6 @@
 using EventScheduling.Backend.Models;
+using CampusPulse.Shared.Security;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace EventScheduling.Backend.Controllers;
@@ -24,6 +26,7 @@ public sealed class RefEquipmentController(IHttpClientFactory httpClientFactory)
     }
 
     [HttpPost]
+    [Authorize(Policy = CampusPulseSecurityExtensions.StaffOnlyPolicy)]
     public async Task<IActionResult> Create(RefEquipmentRequest request, CancellationToken cancellationToken)
     {
         var response = await DatabaseClient.PostAsJsonAsync("/api/refequipment", request, cancellationToken);
@@ -31,6 +34,7 @@ public sealed class RefEquipmentController(IHttpClientFactory httpClientFactory)
     }
 
     [HttpPut("{id:int}")]
+    [Authorize(Policy = CampusPulseSecurityExtensions.StaffOnlyPolicy)]
     public async Task<IActionResult> Update(int id, RefEquipmentRequest request, CancellationToken cancellationToken)
     {
         var response = await DatabaseClient.PutAsJsonAsync($"/api/refequipment/{id}", request, cancellationToken);
@@ -38,6 +42,7 @@ public sealed class RefEquipmentController(IHttpClientFactory httpClientFactory)
     }
 
     [HttpDelete("{id:int}")]
+    [Authorize(Policy = CampusPulseSecurityExtensions.StaffOnlyPolicy)]
     public async Task<IActionResult> Delete(int id, CancellationToken cancellationToken)
     {
         var response = await DatabaseClient.DeleteAsync($"/api/refequipment/{id}", cancellationToken);

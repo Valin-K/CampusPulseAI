@@ -42,7 +42,7 @@ builder.Services.AddHttpClient<IRagServerClient, RagServerClient>(client =>
 {
     client.BaseAddress = new Uri(builder.Configuration["Services:RagServer"] ?? "http://localhost:5267");
     client.Timeout = TimeSpan.FromSeconds(90);
-});
+}).ForwardCampusPulseAuthorization();
 builder.Services.AddSingleton<RagCitationParser>();
 builder.Services.AddScoped<RagKnowledgeService>();
 builder.Services.AddScoped<IFinancialAidKnowledgeService, FinancialAidKnowledgeService>();
@@ -70,36 +70,45 @@ app.MapGet("/api/students", async (
 
     var response = await clients.CreateClient("academicRecords").SendAsync(request, cancellationToken);
     return await response.ToResultAsync(cancellationToken);
-});
+}).RequireAuthorization(CampusPulseSecurityExtensions.StaffOnlyPolicy);
 
 var invoices = app.MapGroup("/api/invoices");
 
-invoices.MapGet("/", async (IHttpClientFactory clients, CancellationToken cancellationToken) =>
-    await (await clients.CreateClient("billingDatabase").GetAsync("/api/invoices", cancellationToken)).ToResultAsync(cancellationToken));
+invoices.MapGet("/", async (HttpContext context, IHttpClientFactory clients, CancellationToken cancellationToken) =>
+    await ForwardAuthorizedBillingReadAsync(context, clients, HttpMethod.Get, "/api/invoices", cancellationToken));
 
-invoices.MapGet("/{id:int}", async (int id, IHttpClientFactory clients, CancellationToken cancellationToken) =>
-    await (await clients.CreateClient("billingDatabase").GetAsync($"/api/invoices/{id}", cancellationToken)).ToResultAsync(cancellationToken));
+invoices.MapGet("/{id:int}", async (int id, HttpContext context, IHttpClientFactory clients, CancellationToken cancellationToken) =>
+    await ForwardAuthorizedBillingReadAsync(context, clients, HttpMethod.Get, $"/api/invoices/{id}", cancellationToken));
 
 invoices.MapPost("/", async (InvoiceRequest request, IHttpClientFactory clients, CancellationToken cancellationToken) =>
-    await (await clients.CreateClient("billingDatabase").PostAsJsonAsync("/api/invoices", request, cancellationToken)).ToResultAsync(cancellationToken));
+    await (await clients.CreateClient("billingDatabase").PostAsJsonAsync("/api/invoices", request, cancellationToken)).ToResultAsync(cancellationToken))
+    .RequireAuthorization(CampusPulseSecurityExtensions.StaffOnlyPolicy);
 
 invoices.MapPut("/{id:int}", async (int id, InvoiceRequest request, IHttpClientFactory clients, CancellationToken cancellationToken) =>
-    await (await clients.CreateClient("billingDatabase").PutAsJsonAsync($"/api/invoices/{id}", request, cancellationToken)).ToResultAsync(cancellationToken));
+    await (await clients.CreateClient("billingDatabase").PutAsJsonAsync($"/api/invoices/{id}", request, cancellationToken)).ToResultAsync(cancellationToken))
+    .RequireAuthorization(CampusPulseSecurityExtensions.StaffOnlyPolicy);
 
 invoices.MapDelete("/{id:int}", async (int id, IHttpClientFactory clients, CancellationToken cancellationToken) =>
-    await (await clients.CreateClient("billingDatabase").DeleteAsync($"/api/invoices/{id}", cancellationToken)).ToResultAsync(cancellationToken));
+    await (await clients.CreateClient("billingDatabase").DeleteAsync($"/api/invoices/{id}", cancellationToken)).ToResultAsync(cancellationToken))
+    .RequireAuthorization(CampusPulseSecurityExtensions.StaffOnlyPolicy);
 
 var payments = app.MapGroup("/api/payments");
-payments.MapGet("/", async (IHttpClientFactory clients, CancellationToken cancellationToken) =>
-    await (await clients.CreateClient("billingDatabase").GetAsync("/api/payments", cancellationToken)).ToResultAsync(cancellationToken));
-payments.MapGet("/{id:int}", async (int id, IHttpClientFactory clients, CancellationToken cancellationToken) =>
-    await (await clients.CreateClient("billingDatabase").GetAsync($"/api/payments/{id}", cancellationToken)).ToResultAsync(cancellationToken));
+payments.MapGet("/", async (HttpContext context, IHttpClientFactory clients, CancellationToken cancellationToken) =>
+    await ForwardAuthorizedBillingReadAsync(context, clients, HttpMethod.Get, "/api/payments", cancellationToken))
+    .RequireAuthorization();
+payments.MapGet("/{id:int}", async (int id, HttpContext context, IHttpClientFactory clients, CancellationToken cancellationToken) =>
+    await ForwardAuthorizedBillingReadAsync(context, clients, HttpMethod.Get, $"/api/payments/{id}", cancellationToken))
+    .RequireAuthorization();
 payments.MapPost("/", async (PaymentRequest request, IHttpClientFactory clients, CancellationToken cancellationToken) =>
-    await (await clients.CreateClient("billingDatabase").PostAsJsonAsync("/api/payments", request, cancellationToken)).ToResultAsync(cancellationToken));
+    await (await clients.CreateClient("billingDatabase").PostAsJsonAsync("/api/payments", request, cancellationToken)).ToResultAsync(cancellationToken))
+    .RequireAuthorization(CampusPulseSecurityExtensions.StudentOnlyPolicy);
 payments.MapPut("/{id:int}", async (int id, PaymentRequest request, IHttpClientFactory clients, CancellationToken cancellationToken) =>
-    await (await clients.CreateClient("billingDatabase").PutAsJsonAsync($"/api/payments/{id}", request, cancellationToken)).ToResultAsync(cancellationToken));
+    await (await clients.CreateClient("billingDatabase").PutAsJsonAsync($"/api/payments/{id}", request, cancellationToken)).ToResultAsync(cancellationToken))
+    .RequireAuthorization(CampusPulseSecurityExtensions.StaffOnlyPolicy);
 payments.MapDelete("/{id:int}", async (int id, IHttpClientFactory clients, CancellationToken cancellationToken) =>
-    await (await clients.CreateClient("billingDatabase").DeleteAsync($"/api/payments/{id}", cancellationToken)).ToResultAsync(cancellationToken));
+    await (await clients.CreateClient("billingDatabase").DeleteAsync($"/api/payments/{id}", cancellationToken)).ToResultAsync(cancellationToken))
+    .RequireAuthorization(CampusPulseSecurityExtensions.StaffOnlyPolicy);
+
 
 var scholarships = app.MapGroup("/api/scholarships");
 scholarships.MapGet("/", async (IHttpClientFactory clients, CancellationToken cancellationToken) =>
@@ -107,15 +116,22 @@ scholarships.MapGet("/", async (IHttpClientFactory clients, CancellationToken ca
 scholarships.MapGet("/{id:int}", async (int id, IHttpClientFactory clients, CancellationToken cancellationToken) =>
     await (await clients.CreateClient("billingDatabase").GetAsync($"/api/scholarships/{id}", cancellationToken)).ToResultAsync(cancellationToken));
 scholarships.MapPost("/", async (ScholarshipRequest request, IHttpClientFactory clients, CancellationToken cancellationToken) =>
-    await (await clients.CreateClient("billingDatabase").PostAsJsonAsync("/api/scholarships", request, cancellationToken)).ToResultAsync(cancellationToken));
+    await (await clients.CreateClient("billingDatabase").PostAsJsonAsync("/api/scholarships", request, cancellationToken)).ToResultAsync(cancellationToken))
+    .RequireAuthorization(CampusPulseSecurityExtensions.StaffOnlyPolicy);
 scholarships.MapPut("/{id:int}", async (int id, ScholarshipRequest request, IHttpClientFactory clients, CancellationToken cancellationToken) =>
-    await (await clients.CreateClient("billingDatabase").PutAsJsonAsync($"/api/scholarships/{id}", request, cancellationToken)).ToResultAsync(cancellationToken));
+    await (await clients.CreateClient("billingDatabase").PutAsJsonAsync($"/api/scholarships/{id}", request, cancellationToken)).ToResultAsync(cancellationToken))
+    .RequireAuthorization(CampusPulseSecurityExtensions.StaffOnlyPolicy);
 scholarships.MapDelete("/{id:int}", async (int id, IHttpClientFactory clients, CancellationToken cancellationToken) =>
-    await (await clients.CreateClient("billingDatabase").DeleteAsync($"/api/scholarships/{id}", cancellationToken)).ToResultAsync(cancellationToken));
+    await (await clients.CreateClient("billingDatabase").DeleteAsync($"/api/scholarships/{id}", cancellationToken)).ToResultAsync(cancellationToken))
+    .RequireAuthorization(CampusPulseSecurityExtensions.StaffOnlyPolicy);
 
 scholarships.MapPost("/recommendations/student/{userId:int}", async (
-    int userId, IHttpClientFactory clients, GeminiScholarshipService service, IConfiguration configuration, CancellationToken cancellationToken) =>
+    int userId, HttpContext context, IHttpClientFactory clients, GeminiScholarshipService service, IConfiguration configuration, CancellationToken cancellationToken) =>
 {
+    if (!context.User.IsInRole("Student") || !context.User.CanAccessUser(userId))
+    {
+        return Results.Forbid();
+    }
     if (!configuration.GetValue("Mcp:Enabled", true))
     {
         return Results.Problem(statusCode: 403, title: "MCP is disabled in this deployment; scholarship recommendations are unavailable.");
@@ -165,7 +181,7 @@ scholarships.MapPost("/recommendations/student/{userId:int}", async (
         return Results.Problem("The scholarship recommendation service did not respond in time.",
             statusCode: StatusCodes.Status504GatewayTimeout);
     }
-});
+}).RequireAuthorization(CampusPulseSecurityExtensions.StudentOnlyPolicy);
 
 var assistant = app.MapGroup("/api/assistant");
 
@@ -285,3 +301,20 @@ app.MapPost("/api/ai/knowledge", async (
 app.MapGet("/health", () => Results.Ok(new { status = "healthy" })).AllowAnonymous();
 
 app.Run();
+
+static async Task<IResult> ForwardAuthorizedBillingReadAsync(
+    HttpContext context,
+    IHttpClientFactory clients,
+    HttpMethod method,
+    string path,
+    CancellationToken cancellationToken)
+{
+    using var request = new HttpRequestMessage(method, path);
+    if (context.Request.Headers.Authorization.Count > 0)
+    {
+        request.Headers.TryAddWithoutValidation("Authorization", context.Request.Headers.Authorization.ToArray());
+    }
+
+    using var response = await clients.CreateClient("billingDatabase").SendAsync(request, cancellationToken);
+    return await response.ToResultAsync(cancellationToken);
+}

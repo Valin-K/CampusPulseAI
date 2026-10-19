@@ -1,6 +1,7 @@
 using AcademicRecords.Backend.Calculators;
 using AcademicRecords.Backend.Contracts;
 using AcademicRecords.Backend.Services;
+using CampusPulse.Shared.Security;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AcademicRecords.Backend.Controllers;
@@ -28,6 +29,7 @@ public sealed class StudentAcademicController(
         {
             return error;
         }
+        if (!CanAccessStudent(profile!.StudentId)) return Forbid();
 
         var courses = await courseMetadata.GetCourseMetadataAsync(cancellationToken);
         profile = StudentCourseMetadataService.ApplyCourseMetadata(profile!, courses);
@@ -42,6 +44,7 @@ public sealed class StudentAcademicController(
         {
             return error;
         }
+        if (!CanAccessStudent(profile!.StudentId)) return Forbid();
 
         var courses = await courseMetadata.GetCourseMetadataAsync(cancellationToken);
         profile = StudentCourseMetadataService.ApplyCourseMetadata(profile!, courses);
@@ -56,6 +59,7 @@ public sealed class StudentAcademicController(
         {
             return error;
         }
+        if (!CanAccessStudent(profile!.StudentId)) return Forbid();
 
         var courses = await courseMetadata.GetCourseMetadataAsync(cancellationToken);
         profile = StudentCourseMetadataService.ApplyCourseMetadata(profile!, courses);
@@ -73,6 +77,7 @@ public sealed class StudentAcademicController(
         {
             return error;
         }
+        if (!CanAccessStudent(profile!.StudentId)) return Forbid();
 
         var courses = await courseMetadata.GetCourseMetadataAsync(cancellationToken);
         profile = StudentCourseMetadataService.ApplyCourseMetadata(profile!, courses);
@@ -85,5 +90,8 @@ public sealed class StudentAcademicController(
         return Ok(new StudentStatisticResponse(profile.StudentId, gpa ? "GPA" : "WAM",
             statistic.Value, statistic.GradedEnrollmentCount, statistic.TotalCredits));
     }
+
+    private bool CanAccessStudent(string studentId) =>
+        User.CanAccessStudent(studentId);
 
 }

@@ -3,6 +3,8 @@ using System.Text;
 using EventScheduling.Backend.Clients;
 using EventScheduling.Backend.Controllers;
 using EventScheduling.Backend.Models;
+using System.Security.Claims;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
 namespace EventScheduling.Tests;
@@ -31,7 +33,7 @@ public sealed class BookingsControllerTests
 
         Assert.Multiple(() =>
         {
-            Assert.That((result as ObjectResult)?.StatusCode, Is.EqualTo(400));
+            Assert.That(result, Is.TypeOf<ForbidResult>());
             Assert.That(database.CallCount, Is.Zero, "an unverified booking should never reach the database tier");
         });
     }
@@ -67,8 +69,16 @@ public sealed class BookingsControllerTests
         });
     }
 
-    private static BookingsController Controller(HttpMessageHandler databaseHandler, IAcademicRecordsClient academicRecords) =>
-        new(new NamedHttpClientFactory(databaseHandler), academicRecords);
+    private static BookingsController Controller(HttpMessageHandler databaseHandler, IAcademicRecordsClient academicRecords)
+    {
+        var controller = new BookingsController(new NamedHttpClientFactory(databaseHandler), academicRecords);
+        var context = new DefaultHttpContext();
+        context.User = new ClaimsPrincipal(new ClaimsIdentity(
+            [new Claim(ClaimTypes.Role, "Student"), new Claim("user_id", "4")],
+            "test"));
+        controller.ControllerContext = new ControllerContext { HttpContext = context };
+        return controller;
+    }
 
     private static HttpResponseMessage Created() => new(HttpStatusCode.Created)
     {

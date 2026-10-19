@@ -1,3 +1,5 @@
+using CampusPulse.Shared.Security;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AcademicRecords.Backend.Controllers;
@@ -7,6 +9,7 @@ namespace AcademicRecords.Backend.Controllers;
 public sealed class EnrollmentsController(IHttpClientFactory clients) : AcademicRecordsControllerBase(clients)
 {
     [HttpPut("{enrollmentId:int}/grade")]
+    [Authorize(Policy = CampusPulseSecurityExtensions.StaffOnlyPolicy)]
     public Task<IActionResult> UpdateGrade(int enrollmentId, CancellationToken cancellationToken) =>
         ForwardJsonRequestAsync(
             AcademicRecordsDatabase,

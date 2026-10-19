@@ -85,6 +85,25 @@ public static class CampusPulseSecurityExtensions
         builder.AddHttpMessageHandler<ForwardCurrentAuthorizationHeaderHandler>();
 }
 
+public static class CampusPulseClaimsPrincipalExtensions
+{
+    public static bool TryGetUserId(this ClaimsPrincipal user, out int userId) =>
+        int.TryParse(user.FindFirst("user_id")?.Value, out userId);
+
+    public static bool CanAccessStudent(this ClaimsPrincipal user, string studentId) =>
+        user.IsInRole("Staff")
+        || user.IsInRole("Student")
+            && !string.IsNullOrWhiteSpace(studentId)
+            && string.Equals(user.FindFirst("student_id")?.Value, studentId, StringComparison.OrdinalIgnoreCase);
+
+    public static bool CanAccessUser(this ClaimsPrincipal user, int userId) =>
+        user.IsInRole("Staff")
+        || user.IsInRole("Student")
+            && userId > 0
+            && user.TryGetUserId(out var authenticatedUserId)
+            && userId == authenticatedUserId;
+}
+
 public sealed class AuthorizationRequestContext
 {
     private readonly AsyncLocal<string?> currentAuthorization = new();

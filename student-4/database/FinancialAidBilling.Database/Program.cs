@@ -3,6 +3,7 @@ using FinancialAidBilling.Database.Models;
 using CampusPulse.Shared.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 
 var builder = WebApplication.CreateBuilder(args);
 var connectionString = builder.Configuration.GetConnectionString("FinancialAidBilling")
@@ -27,17 +28,44 @@ using (var scope = app.Services.CreateScope())
 
 var invoices = app.MapGroup("/api/invoices");
 
-invoices.MapGet("/", async (FinancialAidBillingDbContext database, CancellationToken cancellationToken) =>
-    await database.Invoices
-        .AsNoTracking()
+invoices.MapGet("/", async (FinancialAidBillingDbContext database, ClaimsPrincipal user, CancellationToken cancellationToken) =>
+{
+    var query = database.Invoices.AsNoTracking();
+    if (!user.IsInRole("Staff"))
+    {
+        if (!user.TryGetUserId(out var userId))
+        {
+            return Results.Forbid();
+        }
+
+        query = query.Where(invoice => invoice.StudentId == userId);
+    }
+
+    return Results.Ok(await query
         .OrderByDescending(invoice => invoice.IssueDate)
         .Select(invoice => invoice.ToResponse())
         .ToListAsync(cancellationToken));
+});
 
-invoices.MapGet("/{id:int}", async (int id, FinancialAidBillingDbContext database, CancellationToken cancellationToken) =>
+invoices.MapGet("/{id:int}", async (int id, FinancialAidBillingDbContext database, ClaimsPrincipal user, CancellationToken cancellationToken) =>
 {
     var invoice = await database.Invoices.AsNoTracking().SingleOrDefaultAsync(item => item.Id == id, cancellationToken);
-    return invoice is null ? Results.NotFound() : Results.Ok(invoice.ToResponse());
+    if (invoice is null)
+    {
+        return Results.NotFound();
+    }
+
+    if (user.IsInRole("Staff"))
+    {
+        return Results.Ok(invoice.ToResponse());
+    }
+
+    if (!user.CanAccessUser(invoice.StudentId))
+    {
+        return Results.Forbid();
+    }
+
+    return Results.Ok(invoice.ToResponse());
 });
 
 invoices.MapPost("/", async (InvoiceRequest request, FinancialAidBillingDbContext database, CancellationToken cancellationToken) =>
@@ -53,7 +81,7 @@ invoices.MapPost("/", async (InvoiceRequest request, FinancialAidBillingDbContex
     await database.SaveChangesAsync(cancellationToken);
 
     return Results.Created($"/api/invoices/{invoice.Id}", invoice.ToResponse());
-});
+}).RequireAuthorization(CampusPulseSecurityExtensions.StaffOnlyPolicy);
 
 invoices.MapPut("/{id:int}", async (int id, InvoiceRequest request, FinancialAidBillingDbContext database, CancellationToken cancellationToken) =>
 {
@@ -73,7 +101,7 @@ invoices.MapPut("/{id:int}", async (int id, InvoiceRequest request, FinancialAid
     await database.SaveChangesAsync(cancellationToken);
 
     return Results.Ok(invoice.ToResponse());
-});
+}).RequireAuthorization(CampusPulseSecurityExtensions.StaffOnlyPolicy);
 
 invoices.MapDelete("/{id:int}", async (int id, FinancialAidBillingDbContext database, CancellationToken cancellationToken) =>
 {
@@ -89,25 +117,57 @@ invoices.MapDelete("/{id:int}", async (int id, FinancialAidBillingDbContext data
     await database.SaveChangesAsync(cancellationToken);
 
     return Results.NoContent();
-});
+}).RequireAuthorization(CampusPulseSecurityExtensions.StaffOnlyPolicy);
 
 var payments = app.MapGroup("/api/payments");
 
-payments.MapGet("/", async (FinancialAidBillingDbContext database, CancellationToken cancellationToken) =>
-    await database.Payments
-        .AsNoTracking()
+payments.MapGet("/", async (FinancialAidBillingDbContext database, ClaimsPrincipal user, CancellationToken cancellationToken) =>
+{
+    var query = database.Payments.AsNoTracking();
+    if (!user.IsInRole("Staff"))
+    {
+        if (!user.TryGetUserId(out var userId))
+        {
+            return Results.Forbid();
+        }
+
+        query = query.Where(payment => payment.StudentId == userId);
+    }
+
+    return Results.Ok(await query
         .OrderByDescending(payment => payment.PaidAtUtc)
         .Select(payment => payment.ToResponse())
         .ToListAsync(cancellationToken));
-
-payments.MapGet("/{id:int}", async (int id, FinancialAidBillingDbContext database, CancellationToken cancellationToken) =>
-{
-    var payment = await database.Payments.AsNoTracking().SingleOrDefaultAsync(item => item.Id == id, cancellationToken);
-    return payment is null ? Results.NotFound() : Results.Ok(payment.ToResponse());
 });
 
-payments.MapPost("/", async (PaymentRequest request, FinancialAidBillingDbContext database, CancellationToken cancellationToken) =>
+payments.MapGet("/{id:int}", async (int id, FinancialAidBillingDbContext database, ClaimsPrincipal user, CancellationToken cancellationToken) =>
 {
+    var payment = await database.Payments.AsNoTracking().SingleOrDefaultAsync(item => item.Id == id, cancellationToken);
+    if (payment is null)
+    {
+        return Results.NotFound();
+    }
+
+    if (user.IsInRole("Staff"))
+    {
+        return Results.Ok(payment.ToResponse());
+    }
+
+    if (!user.CanAccessUser(payment.StudentId))
+    {
+        return Results.Forbid();
+    }
+
+    return Results.Ok(payment.ToResponse());
+});
+
+payments.MapPost("/", async (PaymentRequest request, FinancialAidBillingDbContext database, ClaimsPrincipal user, CancellationToken cancellationToken) =>
+{
+    if (!user.IsInRole("Student") || !user.CanAccessUser(request.StudentId))
+    {
+        return Results.Forbid();
+    }
+
     var error = request.Validate();
     if (error is not null)
     {
@@ -137,7 +197,7 @@ payments.MapPost("/", async (PaymentRequest request, FinancialAidBillingDbContex
 
     await database.SaveChangesAsync(cancellationToken);
     return Results.Created($"/api/payments/{payment.Id}", payment.ToResponse());
-});
+}).RequireAuthorization(CampusPulseSecurityExtensions.StudentOnlyPolicy);
 
 payments.MapPut("/{id:int}", async (int id, PaymentRequest request, FinancialAidBillingDbContext database, CancellationToken cancellationToken) =>
 {
@@ -171,7 +231,7 @@ payments.MapPut("/{id:int}", async (int id, PaymentRequest request, FinancialAid
     invoice.Status = otherPayments + request.Amount == invoice.Amount ? InvoiceStatus.Paid : InvoiceStatus.Outstanding;
     await database.SaveChangesAsync(cancellationToken);
     return Results.Ok(payment.ToResponse());
-});
+}).RequireAuthorization(CampusPulseSecurityExtensions.StaffOnlyPolicy);
 
 payments.MapDelete("/{id:int}", async (int id, FinancialAidBillingDbContext database, CancellationToken cancellationToken) =>
 {
@@ -190,7 +250,7 @@ payments.MapDelete("/{id:int}", async (int id, FinancialAidBillingDbContext data
 
     await database.SaveChangesAsync(cancellationToken);
     return Results.NoContent();
-});
+}).RequireAuthorization(CampusPulseSecurityExtensions.StaffOnlyPolicy);
 
 var scholarships = app.MapGroup("/api/scholarships");
 
@@ -219,7 +279,7 @@ scholarships.MapPost("/", async (ScholarshipRequest request, FinancialAidBilling
     database.Scholarships.Add(scholarship);
     await database.SaveChangesAsync(cancellationToken);
     return Results.Created($"/api/scholarships/{scholarship.Id}", scholarship.ToResponse());
-});
+}).RequireAuthorization(CampusPulseSecurityExtensions.StaffOnlyPolicy);
 
 scholarships.MapPut("/{id:int}", async (int id, ScholarshipRequest request, FinancialAidBillingDbContext database, CancellationToken cancellationToken) =>
 {
@@ -238,7 +298,7 @@ scholarships.MapPut("/{id:int}", async (int id, ScholarshipRequest request, Fina
     scholarship.UpdateFrom(request);
     await database.SaveChangesAsync(cancellationToken);
     return Results.Ok(scholarship.ToResponse());
-});
+}).RequireAuthorization(CampusPulseSecurityExtensions.StaffOnlyPolicy);
 
 scholarships.MapDelete("/{id:int}", async (int id, FinancialAidBillingDbContext database, CancellationToken cancellationToken) =>
 {
@@ -251,7 +311,7 @@ scholarships.MapDelete("/{id:int}", async (int id, FinancialAidBillingDbContext 
     database.Scholarships.Remove(scholarship);
     await database.SaveChangesAsync(cancellationToken);
     return Results.NoContent();
-});
+}).RequireAuthorization(CampusPulseSecurityExtensions.StaffOnlyPolicy);
 
 app.MapGet("/health", () => Results.Ok(new { status = "healthy" })).AllowAnonymous();
 

@@ -59,14 +59,3 @@ public sealed class HousingUserContext(AccountService account)
     }
 }
 
-public sealed class HousingRoleHandler(HousingUserContext userContext) : DelegatingHandler
-{
-    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
-    {
-        request.Headers.Remove("X-Housing-Role");
-        request.Headers.Remove("X-Housing-User");
-        request.Headers.TryAddWithoutValidation("X-Housing-Role", userContext.IsAdministrator ? "Administrator" : "Student");
-        request.Headers.TryAddWithoutValidation("X-Housing-User", userContext.CurrentUser?.StudentId ?? "");
-        return base.SendAsync(request, cancellationToken);
-    }
-}

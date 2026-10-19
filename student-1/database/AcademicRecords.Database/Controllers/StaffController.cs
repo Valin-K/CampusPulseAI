@@ -2,6 +2,7 @@ using AcademicRecords.Database.Contracts;
 using AcademicRecords.Database.Data;
 using AcademicRecords.Database.Models;
 using AcademicRecords.Database.Services;
+using CampusPulse.Shared.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -13,6 +14,7 @@ namespace AcademicRecords.Database.Controllers;
 public sealed class StaffController(AcademicRecordsDbContext database) : ControllerBase
 {
     [HttpGet("by-user/{userId:int}")]
+    [Authorize(Policy = CampusPulseSecurityExtensions.StaffOnlyPolicy)]
     public async Task<ActionResult<StaffProfileResponse>> GetByUser(
         int userId,
         CancellationToken cancellationToken)
@@ -27,6 +29,7 @@ public sealed class StaffController(AcademicRecordsDbContext database) : Control
     }
 
     [HttpGet]
+    [Authorize(Policy = CampusPulseSecurityExtensions.StaffOnlyPolicy)]
     public async Task<ActionResult<IReadOnlyList<StaffProfileResponse>>> GetAll(
         CancellationToken cancellationToken)
     {
@@ -85,6 +88,7 @@ public sealed class StaffController(AcademicRecordsDbContext database) : Control
     }
 
     [HttpPut("{staffId}")]
+    [Authorize(Policy = CampusPulseSecurityExtensions.StaffOnlyPolicy)]
     public async Task<IActionResult> Update(
         string staffId,
         UpdateStaffRequest request,

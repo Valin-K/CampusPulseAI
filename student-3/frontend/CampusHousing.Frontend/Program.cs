@@ -3,7 +3,6 @@ using CampusHousing.Frontend.Services;
 using CampusPulse.Shared.Components.Services;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
-using Microsoft.JSInterop;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 builder.RootComponents.Add<App>("#app");
@@ -16,16 +15,9 @@ var academicRecordsBackendUrl = builder.Configuration["AcademicRecordsBackendUrl
 builder.Services.AddAuthentication(academicRecordsBackendUrl);
 builder.Services.AddCampusAccountServices(academicRecordsBackendUrl);
 builder.Services.AddScoped<HousingUserContext>();
-builder.Services.AddScoped<HousingRoleHandler>();
 builder.Services.AddScoped(sp =>
 {
-    var housingHandler = sp.GetRequiredService<HousingRoleHandler>();
-    housingHandler.InnerHandler = AuthenticationServiceCollectionExtensions
-        .CreateTokenHandler(sp);
-    var userIdHandler = new UserIdHeaderHandler(sp.GetRequiredService<IJSRuntime>())
-    {
-        InnerHandler = housingHandler
-    };
-    return new HttpClient(userIdHandler) { BaseAddress = new Uri(backendUrl) };
+    var tokenHandler = AuthenticationServiceCollectionExtensions.CreateTokenHandler(sp);
+    return new HttpClient(tokenHandler) { BaseAddress = new Uri(backendUrl) };
 });
 await builder.Build().RunAsync();

@@ -6,6 +6,7 @@ using AcademicRecords.Backend.Contracts;
 using AcademicRecords.Backend.Controllers;
 using AcademicRecords.Backend.Models;
 using AcademicRecords.Backend.Services;
+using CampusPulse.Shared.Ai;
 using CampusPulse.Shared.Mcp.Client;
 using CampusPulse.Shared.Rag.Assistant;
 using Microsoft.AspNetCore.Authorization;
@@ -133,6 +134,7 @@ public sealed class BackendControllersTests
             _ => throw new InvalidOperationException($"Unexpected client: {name}")
         }));
         var controller = new StudentsController(clients, new StudentCourseMetadataService(clients));
+        SetUser(controller, new Claim(ClaimTypes.Role, "Student"), new Claim("student_id", "STU 001"));
 
         var result = await controller.GetByStudentId("STU 001", CancellationToken.None);
 
@@ -185,6 +187,7 @@ public sealed class BackendControllersTests
             clients,
             new StudentCourseMetadataService(clients),
             new StubTranscriptPdfGenerator());
+        SetUser(controller, new Claim(ClaimTypes.Role, "Student"), new Claim("student_id", "STU001"));
 
         var result = (OkObjectResult)await controller.GetWam("STU001", CancellationToken.None);
         var statistic = (StudentStatisticResponse)result.Value!;
@@ -208,6 +211,7 @@ public sealed class BackendControllersTests
             clients,
             new StudentCourseMetadataService(clients),
             new StubTranscriptPdfGenerator());
+        SetUser(controller, new Claim(ClaimTypes.Role, "Student"), new Claim("student_id", "STU404"));
 
         var result = (ContentResult)await controller.GetStatistics("STU404", CancellationToken.None);
 
@@ -231,6 +235,7 @@ public sealed class BackendControllersTests
         }));
         var pdf = new StubTranscriptPdfGenerator();
         var controller = new StudentAcademicController(clients, new StudentCourseMetadataService(clients), pdf);
+        SetUser(controller, new Claim(ClaimTypes.Role, "Student"), new Claim("student_id", "STU001"));
 
         var result = (FileContentResult)await controller.GetTranscript("STU001", CancellationToken.None);
 
@@ -244,6 +249,69 @@ public sealed class BackendControllersTests
     }
 
     [Test]
+    public async Task AnalyzeProgressAllowsStudentToAnalyzeOnlyTheirOwnStudentId()
+    {
+        const string profile = """
+            {"studentId":"STU001","firstName":"Ada","lastName":"Lovelace","enrollments":[]}
+            """;
+        using var clients = new RecordingHttpClientFactory((name, _, _) => Task.FromResult(name switch
+        {
+            "academicRecordsDatabase" => JsonResponse(profile),
+            "courseManagementDatabase" => JsonResponse("[]"),
+            _ => throw new InvalidOperationException($"Unexpected client: {name}")
+        }));
+        var controller = new AiController(
+            clients,
+            new StudentCourseMetadataService(clients),
+            new GeminiAcademicProgressService(new TestAiGateway(), Microsoft.Extensions.Logging.Abstractions.NullLogger<GeminiAcademicProgressService>.Instance),
+            new StubAcademicKnowledgeService((_, _) => throw new InvalidOperationException()));
+
+        SetUser(controller, new Claim(ClaimTypes.Role, "Student"), new Claim("student_id", "STU001"));
+        var ownResult = await controller.AnalyzeProgress("STU001", CancellationToken.None);
+        SetUser(controller, new Claim(ClaimTypes.Role, "Student"), new Claim("student_id", "STU002"));
+        var otherResult = await controller.AnalyzeProgress("STU001", CancellationToken.None);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(ownResult, Is.TypeOf<OkObjectResult>());
+            Assert.That(otherResult, Is.TypeOf<ForbidResult>());
+            Assert.That(clients.Requests, Has.Count.EqualTo(2));
+        });
+    }
+
+    [Test]
+    public async Task AnalyzeProgressAllowsStaffToAnalyzeAnyStudent()
+    {
+        using var clients = new RecordingHttpClientFactory((name, _, _) => Task.FromResult(name switch
+        {
+            "academicRecordsDatabase" => JsonResponse("""{"studentId":"STU001","enrollments":[]}"""),
+            "courseManagementDatabase" => JsonResponse("[]"),
+            _ => throw new InvalidOperationException($"Unexpected client: {name}")
+        }));
+        var controller = new AiController(
+            clients,
+            new StudentCourseMetadataService(clients),
+            new GeminiAcademicProgressService(new TestAiGateway(), Microsoft.Extensions.Logging.Abstractions.NullLogger<GeminiAcademicProgressService>.Instance),
+            new StubAcademicKnowledgeService((_, _) => throw new InvalidOperationException()));
+        SetUser(controller, new Claim(ClaimTypes.Role, "Staff"));
+
+        var result = await controller.AnalyzeProgress("STU001", CancellationToken.None);
+
+        Assert.That(result, Is.TypeOf<OkObjectResult>());
+    }
+
+    private static void SetUser(ControllerBase controller, params Claim[] claims)
+    {
+        controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext
+            {
+                User = new ClaimsPrincipal(new ClaimsIdentity(claims, "test"))
+            }
+        };
+    }
+
+    [Test]
     public async Task AskRejectsInvalidRequestsWithoutCallingKnowledgeService()
     {
         using var clients = new RecordingHttpClientFactory((_, _, _) => throw new InvalidOperationException("No HTTP call expected."));
@@ -252,6 +320,7 @@ public sealed class BackendControllersTests
 
         var emptyQuestion = (BadRequestObjectResult)await controller.Ask(
             new KnowledgeQuestionRequest { Question = "  " }, CancellationToken.None);
+        SetUser(controller, new Claim(ClaimTypes.Role, "Student"), new Claim("user_id", "42"));
         var invalidUser = (BadRequestObjectResult)await controller.Ask(
             new KnowledgeQuestionRequest { Question = "When does term start?", UserId = 0 }, CancellationToken.None);
 
@@ -282,17 +351,7 @@ public sealed class BackendControllersTests
                 "test-model"));
         });
         var controller = new AiController(clients, null!, null!, knowledge);
-        controller.ControllerContext = new ControllerContext
-        {
-            HttpContext = new DefaultHttpContext
-            {
-                User = new ClaimsPrincipal(new ClaimsIdentity(
-                [
-                    new Claim("user_id", "42"),
-                    new Claim(ClaimTypes.Role, "Student")
-                ], "test"))
-            }
-        };
+        SetUser(controller, new Claim("user_id", "42"), new Claim(ClaimTypes.Role, "Student"));
 
         var result = await controller.Ask(
             new KnowledgeQuestionRequest { Question = "What is my GPA?" },
@@ -313,17 +372,7 @@ public sealed class BackendControllersTests
         var knowledge = new StubAcademicKnowledgeService((_, _) =>
             throw new InvalidOperationException("No service call expected."));
         var controller = new AiController(clients, null!, null!, knowledge);
-        controller.ControllerContext = new ControllerContext
-        {
-            HttpContext = new DefaultHttpContext
-            {
-                User = new ClaimsPrincipal(new ClaimsIdentity(
-                [
-                    new Claim("user_id", "42"),
-                    new Claim(ClaimTypes.Role, "Student")
-                ], "test"))
-            }
-        };
+        SetUser(controller, new Claim("user_id", "42"), new Claim(ClaimTypes.Role, "Student"));
 
         var result = await controller.Ask(
             new KnowledgeQuestionRequest { Question = "What is my GPA?", UserId = 41 },
@@ -392,6 +441,20 @@ public sealed class BackendControllersTests
         public void Dispose()
         {
         }
+
+    private sealed class TestAiGateway : IAiGatewayClient
+    {
+        public Task<AiEmbeddingResponse> EmbedAsync(IReadOnlyList<string> texts, bool isQuery, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<AiGatewayStatus> GetStatusAsync(CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<AiGenerationResponse> GenerateAsync(string prompt, string context, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new AiGenerationResponse(
+                """{"expectedGraduationTerm":"T2 2028","expectedGraduationDate":"2028-11-01","explanation":"Based on pace","riskFlags":[]}""",
+                "test"));
+    }
     }
 
     private sealed class RecordingHandler(
@@ -447,5 +510,19 @@ public sealed class BackendControllersTests
             CallCount++;
             return ask(request, cancellationToken);
         }
+    }
+
+    private sealed class TestAiGateway : IAiGatewayClient
+    {
+        public Task<AiEmbeddingResponse> EmbedAsync(IReadOnlyList<string> texts, bool isQuery, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<AiGatewayStatus> GetStatusAsync(CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<AiGenerationResponse> GenerateAsync(string prompt, string context, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new AiGenerationResponse(
+                """{"expectedGraduationTerm":"T2 2028","expectedGraduationDate":"2028-11-01","explanation":"Based on pace","riskFlags":[]}""",
+                "test"));
     }
 }

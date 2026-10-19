@@ -50,7 +50,7 @@ builder.Services.AddHttpClient<IAcademicRecordsClient, AcademicRecordsClient>(cl
         academicRecordsDatabaseAddress,
         UriKind.Absolute);
     client.Timeout = TimeSpan.FromSeconds(5);
-});
+}).ForwardCampusPulseAuthorization();
 var courseManagementDatabaseAddress =
     builder.Configuration["Services:CourseManagementDatabase"]
     ?? throw new InvalidOperationException(
@@ -90,7 +90,7 @@ builder.Services.AddHttpClient<CampusPulse.Shared.Rag.Client.IRagServerClient, C
 {
     client.BaseAddress = new Uri(builder.Configuration["Services:RagServer"] ?? "http://localhost:5267");
     client.Timeout = TimeSpan.FromSeconds(90);
-});
+}).ForwardCampusPulseAuthorization();
 builder.Services.AddSingleton<CampusPulse.Shared.Rag.Generation.RagCitationParser>();
 builder.Services.AddScoped<CampusPulse.Shared.Rag.Assistant.RagKnowledgeService>();
 builder.Services.AddScoped<ICourseRagService, CourseKnowledgeService>();
