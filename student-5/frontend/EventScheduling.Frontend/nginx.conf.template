@@ -7,6 +7,10 @@ server {
     index  index.html;
 
     resolver 127.0.0.11 valid=10s;
+    # Azure Container Apps' internal ingress routes by SNI (many internal apps share one
+    # load-balancer IP); nginx doesn't send SNI to a variable-based HTTPS upstream unless
+    # told to, which silently resets the TLS handshake. Local HTTP upstreams ignore this.
+    proxy_ssl_server_name on;
 
     location /api/ {
         set $backend_upstream ${BACKEND_BASE_URL};
