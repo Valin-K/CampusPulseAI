@@ -12,7 +12,9 @@ server {
     location /api/ {
         set $backend_upstream ${BACKEND_BASE_URL};
         proxy_pass $backend_upstream$request_uri;
-        proxy_set_header Host $host;
+        # Azure's internal ingress routes by Host header too, not just SNI; forwarding the
+        # client's original Host prevents Envoy from matching the backend app.
+        proxy_set_header Host $proxy_host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
@@ -23,7 +25,7 @@ server {
         set $academic_records_api ${ACADEMICRECORDS_API_BASE_URL};
         rewrite ^/academic-api/(.*)$ /$1 break;
         proxy_pass $academic_records_api$uri$is_args$args;
-        proxy_set_header Host $host;
+        proxy_set_header Host $proxy_host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;

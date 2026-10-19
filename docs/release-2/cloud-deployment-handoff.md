@@ -80,8 +80,27 @@ into the repo, so this isn't guesswork — but the nginx-side fix (`proxy_ssl_se
 real image rebuild + redeploy to verify end-to-end, since it couldn't be hot-patched into the running
 nginx containers cleanly via `exec`.
 
-**Still needed**: push PR #93 with these two additional fixes, re-trigger `cloud-deployment.yml`, and
-confirm `Test-CloudDeployment.ps1` reports 8/8 against the real Azure deployment.
+PR #93 was re-pushed with both fixes and `cloud-deployment.yml` re-ran end-to-end for real. 502s are gone
+— progress — but the smoke test still only passed 1/8, now against a different symptom: every `/api/`
+proxy returns `404`, and the response body is Azure's own **"Container App - Unavailable"** platform error
+page, not nginx's 404 and not the backend app's. That's Envoy failing to match the request to a container
+app at all.
+
+### Round 3: wrong Host header breaking Azure's own routing
+
+Root cause: Azure Container Apps' internal ingress routes by **Host header**, not only SNI. Our nginx
+config explicitly forwards the original client's Host (`proxy_set_header Host $host;` — e.g. the
+*frontend's* own hostname, `academicrecords-web...`) to the backend proxy target. Envoy then can't match
+that Host to the backend app (`academicrecords-api...`) it's actually being asked to route to, and falls
+back to its platform error page. `curl` worked in every manual test because it auto-sets Host to match
+the URL it's connecting to; nginx does not do this by default when proxying to a variable-based upstream.
+
+**Fix**: changed every `proxy_set_header Host $host;` forwarding to a backend/upstream app (11 occurrences
+across all 6 nginx templates) to `proxy_set_header Host $proxy_host;` — nginx's built-in variable holding
+the host:port from the resolved `proxy_pass` target, which correctly matches the backend being called.
+
+**Still needed**: push this third fix, re-trigger `cloud-deployment.yml`, and confirm
+`Test-CloudDeployment.ps1` reports 8/8 against the real Azure deployment — not yet re-confirmed.
 
 ---
 
