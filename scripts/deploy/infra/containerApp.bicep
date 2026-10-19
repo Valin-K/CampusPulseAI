@@ -27,6 +27,10 @@ param env array = []
 @description('Optional Gemini credential for the AI gateway, referenced via secretRef.')
 param geminiApiKey string = ''
 
+@secure()
+@description('Optional JWT signing key for universal sign-in, referenced via secretRef. Every backend needs the same value to validate tokens Academic Records issues.')
+param authSigningKey string = ''
+
 @description('0 normally (scale-to-zero); 1 during the showcase/marking window (Deploy-Apps.ps1 -WarmUp).')
 param minReplicas int = 0
 
@@ -50,7 +54,10 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
   properties: {
     environmentId: environmentId
     configuration: {
-      secrets: empty(geminiApiKey) ? [] : [{ name: 'gemini-api-key', value: geminiApiKey }]
+      secrets: concat(
+        empty(geminiApiKey) ? [] : [{ name: 'gemini-api-key', value: geminiApiKey }],
+        empty(authSigningKey) ? [] : [{ name: 'auth-signing-key', value: authSigningKey }]
+      )
       ingress: {
         external: external
         targetPort: targetPort

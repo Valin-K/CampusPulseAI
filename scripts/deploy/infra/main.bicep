@@ -21,6 +21,10 @@ param enableAi bool = false
 @description('Gemini credential, stored as a Container Apps secret only on the AI gateway.')
 param geminiApiKey string = ''
 
+@secure()
+@description('JWT signing key for universal sign-in, shared by all 5 backends so each can validate tokens Academic Records issues. Required even in the AI-disabled baseline - every backend throws on startup without it. Deploy-Apps.ps1 generates a fresh one on every run; this is demo-only auth (CampusDemoAuthenticationStateProvider), so tokens resetting on redeploy is expected.')
+param authSigningKey string
+
 @description('0 normally (scale-to-zero). 1 during the showcase/marking window.')
 param minReplicas int = 0
 
@@ -185,6 +189,7 @@ var sharedAiDisabled = [
   { name: 'Services__McpServer', value: 'http://mcp-server' }
   { name: 'Services__RagServer', value: 'http://rag-server' }
   { name: 'Services__MultiAgentServer', value: 'http://multi-agent-server' }
+  { name: 'Authentication__SigningKey', secretRef: 'auth-signing-key' }
 ]
 
 var backends = [
@@ -250,6 +255,7 @@ module backendApps 'containerApp.bicep' = [
             { name: 'Cors__AllowedOrigins__0', value: 'https://coursemgmt-web.${environment.outputs.defaultDomain}' }
           ])
         : api.env
+      authSigningKey: authSigningKey
       minReplicas: minReplicas
       maxReplicas: 2
     }
@@ -307,6 +313,9 @@ module portal 'containerApp.bicep' = {
       { name: 'CAMPUSHOUSING_WEB_URL', value: 'https://campushousing-web.${environment.outputs.defaultDomain}' }
       { name: 'FINAID_WEB_URL', value: 'https://finaid-web.${environment.outputs.defaultDomain}' }
       { name: 'EVENTSCHEDULING_WEB_URL', value: 'https://eventscheduling-web.${environment.outputs.defaultDomain}' }
+      { name: 'ACADEMICRECORDS_BACKEND_HOST', value: 'academicrecords-api' }
+      { name: 'ACADEMICRECORDS_BACKEND_PORT', value: '80' }
+      { name: 'ACADEMICRECORDS_FRONTEND_HOST', value: 'academicrecords-web' }
     ]
     minReplicas: minReplicas
     maxReplicas: 2
