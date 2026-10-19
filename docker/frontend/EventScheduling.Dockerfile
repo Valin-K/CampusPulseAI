@@ -12,9 +12,7 @@ RUN dotnet publish "./EventScheduling.Frontend.csproj" -c $BUILD_CONFIGURATION -
 FROM nginx:alpine AS final
 WORKDIR /usr/share/nginx/html
 COPY --from=build /app/publish/wwwroot .
-ENV BACKEND_HOST=eventscheduling.backend
-ENV BACKEND_PORT=8080
-ENV ACADEMICRECORDS_API_HOST=academicrecords.backend
-ENV ACADEMICRECORDS_API_PORT=8080
+ENV BACKEND_BASE_URL=http://eventscheduling.backend:8080
+ENV ACADEMICRECORDS_API_BASE_URL=http://academicrecords.backend:8080
 COPY student-5/frontend/EventScheduling.Frontend/nginx.conf.template /etc/nginx/templates/default.conf.template
 EXPOSE 80
