@@ -250,8 +250,12 @@ human-review commands, evidence exports, and validation are documented in
 
 The cloud workflow builds and publishes all four AI images. Its `enable_ai` option
 (or `Deploy-Apps.ps1 -EnableAi`) deploys them as internal Azure Container Apps;
-the default cloud baseline still leaves AI disabled. Configure the `GEMINI_API_KEY`
-GitHub Actions secret (or environment variable when deploying locally). See the
+the default cloud baseline still leaves AI disabled. Cloud deployment reads
+`CAMPUSPULSE-SIGNING-KEY` and, when AI is enabled, `GEMINI-API-KEY` from Key Vault
+`kv-campuspulse`, using the workflow variable `CAMPUSPULSE_KEY_VAULT_NAME`. The Azure OIDC
+identity must have permission to read those secrets. `Deploy-Apps.ps1` accepts `-KeyVaultName`
+to use a different vault. Local Compose continues to use `GEMINI_API_KEY` and
+`CAMPUSPULSE_SIGNING_KEY` from `.env`. See the
 [cloud deployment guide](docs/release-2/cloud-deployment-plan.md).
 
 ## Run and test .NET projects locally

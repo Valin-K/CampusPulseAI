@@ -12,11 +12,11 @@
 
 .PARAMETER EnableAi
     Switch. Omit for the required baseline (AI disabled). Pass it only for the bonus AI profile.
-    Reads GEMINI_API_KEY from the environment and stores it as an AI gateway secret.
+    Reads GEMINI-API-KEY from Key Vault and stores it as an AI gateway secret.
 
-.PARAMETER CampusPulseSigningKey
-    Required JWT signing key. Set CAMPUSPULSE_SIGNING_KEY in the environment; Azure stores it
-    as a Container Apps secret for secured services.
+.PARAMETER KeyVaultName
+    Key Vault holding CAMPUSPULSE-SIGNING-KEY and, with -EnableAi, GEMINI-API-KEY.
+    The deploying identity needs the Key Vault Secrets User role on this vault.
 
 .PARAMETER WarmUp
     Switch. Sets minReplicas to 1 on every app instead of 0, so there's no cold-start delay.
@@ -35,28 +35,37 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$Tag,
     [switch]$EnableAi,
-    [switch]$WarmUp
+    [switch]$WarmUp,
+    [string]$KeyVaultName = 'kv-campuspulse'
 )
 
 $ErrorActionPreference = 'Stop'
-$campusPulseSigningKey = $env:CAMPUSPULSE_SIGNING_KEY
-if ([string]::IsNullOrWhiteSpace($campusPulseSigningKey) -or [Text.Encoding]::UTF8.GetByteCount($campusPulseSigningKey) -lt 32) {
-    throw 'Set CAMPUSPULSE_SIGNING_KEY to a secret of at least 32 bytes before deployment.'
-}
 $bicepFile = Join-Path $PSScriptRoot 'infra/main.bicep'
 $minReplicas = 0
 if ($WarmUp) { $minReplicas = 1 }
-$geminiApiKey = ''
-if ($EnableAi) {
-    $geminiApiKey = $env:GEMINI_API_KEY
-    if ([string]::IsNullOrWhiteSpace($geminiApiKey)) {
-        throw 'Set GEMINI_API_KEY before deploying with -EnableAi.'
+
+function Get-KeyVaultSecret([string]$SecretName) {
+    $value = az keyvault secret show --vault-name $KeyVaultName --name $SecretName --query value --output tsv
+    $exitCode = $LASTEXITCODE
+    if ($exitCode -ne 0 -or [string]::IsNullOrWhiteSpace($value)) {
+        throw "Could not read secret '$SecretName' from Key Vault '$KeyVaultName'. Confirm it exists and the deploying identity has the Key Vault Secrets User role."
     }
+    $value = ($value -join "`n").Trim()
+    if ($env:GITHUB_ACTIONS -eq 'true') {
+        Write-Host "::add-mask::$value"
+    }
+    return $value
 }
 
-$signingKeyBytes = New-Object byte[] 48
-[System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($signingKeyBytes)
-$authSigningKey = [Convert]::ToBase64String($signingKeyBytes)
+$geminiApiKey = ''
+if ($EnableAi) {
+    $geminiApiKey = Get-KeyVaultSecret 'GEMINI-API-KEY'
+}
+
+$campusPulseSigningKey = Get-KeyVaultSecret 'CAMPUSPULSE-SIGNING-KEY'
+if ([Text.Encoding]::UTF8.GetByteCount($campusPulseSigningKey) -lt 32) {
+    throw 'Key Vault secret CAMPUSPULSE-SIGNING-KEY must contain at least 32 bytes.'
+}
 
 Write-Host "Deploying image tag '$Tag' to resource group '$ResourceGroupName' (AI enabled: $($EnableAi.IsPresent), minReplicas: $minReplicas)..." -ForegroundColor Cyan
 
