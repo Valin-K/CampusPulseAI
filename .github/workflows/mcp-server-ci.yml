@@ -62,6 +62,13 @@ jobs:
         if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.mcp == 'true'
         shell: bash
         run: |
+          export Authentication__SigningKey="$CAMPUSPULSE_SIGNING_KEY"
+          jwt_part() { openssl base64 -A | tr '/+' '_-' | tr -d '='; }
+          now="$(date +%s)"
+          header="$(printf '{"alg":"HS256","typ":"JWT"}' | jwt_part)"
+          payload="$(printf '{"iss":"CampusPulse","aud":"CampusPulse.Api","sub":"4","user_id":"4","role":"Student","scope":"CampusPulse.Access","nbf":%s,"exp":%s}' "$((now - 1))" "$((now + 600))" | jwt_part)"
+          signature="$(printf '%s.%s' "$header" "$payload" | openssl dgst -sha256 -hmac "$CAMPUSPULSE_SIGNING_KEY" -binary | jwt_part)"
+          authorization_header="Authorization: Bearer $header.$payload.$signature"
           dotnet run --project ai-services/mcp-server/McpServer/McpServer.csproj --configuration Release --no-build --urls http://localhost:5268 > mcp-server.log 2>&1 &
           server_pid=$!
           trap 'kill "$server_pid" 2>/dev/null || true; wait "$server_pid" 2>/dev/null || true' EXIT
@@ -72,10 +79,11 @@ jobs:
             sleep 1
           done
           curl --silent --fail http://localhost:5268/health
-          tools=$(curl --silent --fail http://localhost:5268/api/mcp/tools)
+          tools=$(curl --silent --show-error --fail --header "$authorization_header" http://localhost:5268/api/mcp/tools)
           printf '%s' "$tools"
           printf '%s' "$tools" | grep --quiet 'calculate_student_academic_statistics'
           capabilities=$(curl --silent --fail \
+            -H "$authorization_header" \
             -H "Content-Type: application/json" \
             -d '{"tool":"get_feature_capabilities","arguments":{"feature":"student-1"}}' \
             http://localhost:5268/api/mcp/tools/call)
@@ -83,6 +91,7 @@ jobs:
           printf '%s' "$capabilities" | grep --quiet 'get_feature_capabilities'
           for feature in student-1 student-2 student-3 student-4 student-5; do
             integration=$(curl --silent --fail \
+              -H "$authorization_header" \
               -H "Content-Type: application/json" \
               -d "{\"tool\":\"validate_integration\",\"arguments\":{\"feature\":\"$feature\"}}" \
               http://localhost:5268/api/mcp/tools/call)
@@ -96,18 +105,25 @@ jobs:
             ' > /dev/null
           done
           unsafe_path=$(curl --silent --fail \
+            -H "$authorization_header" \
             -H "Content-Type: application/json" \
             -d '{"tool":"project_files","arguments":{"directory_path":".."}}' \
             http://localhost:5268/api/mcp/tools/call)
           printf '%s' "$unsafe_path"
           printf '%s' "$unsafe_path" | grep --quiet '"isError":true'
           invalid_statistics_call=$(curl --silent --fail \
+            -H "$authorization_header" \
             -H "Content-Type: application/json" \
             -d '{"tool":"calculate_student_academic_statistics","arguments":{}}' \
             http://localhost:5268/api/mcp/tools/call)
           printf '%s' "$invalid_statistics_call"
           printf '%s' "$invalid_statistics_call" | grep --quiet '"isError":true'
           curl --silent --fail \
+            -H "$authorization_header" \
             -H "Content-Type: application/json" \
             -d '{"tool":"project_files","arguments":{"directory_path":"docs"}}' \
             http://localhost:5268/api/mcp/tools/call
+
+      - name: Show MCP server log on failure
+        if: failure() && (github.event_name == 'workflow_dispatch' || steps.filter.outputs.mcp == 'true')
+        run: cat mcp-server.log
