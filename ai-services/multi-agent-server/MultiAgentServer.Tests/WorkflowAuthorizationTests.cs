@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using CampusPulse.Shared.Mcp.Contracts;
 using CampusPulse.Shared.MultiAgent;
+using CampusPulse.Shared.Security;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Hosting.Server;
@@ -17,16 +18,20 @@ public sealed class WorkflowAuthorizationTests
 {
     private readonly ConcurrentQueue<(string Path, string? Authorization)> requests = new();
     private readonly ConcurrentQueue<string> modelInputs = new();
+    private readonly ConcurrentQueue<string?> agentAuthorizations = new();
     private string directory = null!;
     private WebApplication app = null!;
     private HttpClient http = null!;
+    private AuthorizationRequestContext authorizationContext = null!;
 
     [SetUp]
     public async Task Setup()
     {
         requests.Clear();
         modelInputs.Clear();
+        agentAuthorizations.Clear();
         directory = Path.Combine(Path.GetTempPath(), $"campus-workflow-auth-{Guid.NewGuid():N}");
+        authorizationContext = new AuthorizationRequestContext();
         var builder = WebApplication.CreateBuilder();
         builder.WebHost.UseUrls("http://127.0.0.1:0");
         builder.Logging.ClearProviders();
@@ -34,9 +39,10 @@ public sealed class WorkflowAuthorizationTests
         foreach (var name in new[] { "workflowMcp", "workflowRag" })
             builder.Services.AddHttpClient(name, client => client.BaseAddress = new Uri("http://dependency.test/"))
                 .ConfigurePrimaryHttpMessageHandler(() => new DependencyHandler(requests));
+        builder.Services.AddSingleton(authorizationContext);
         builder.Services.AddSingleton(new WorkflowStore(Path.Combine(directory, "workflow.db")));
         builder.Services.AddSingleton<IWorkflowEvidenceCollector, WorkflowEvidenceCollector>();
-        builder.Services.AddSingleton<IWorkflowAgents>(new RecordingAgents(modelInputs));
+        builder.Services.AddSingleton<IWorkflowAgents>(new RecordingAgents(modelInputs, agentAuthorizations, authorizationContext));
         builder.Services.AddSingleton<WorkflowCoordinator>();
         builder.Services.AddHostedService(provider => provider.GetRequiredService<WorkflowCoordinator>());
         app = builder.Build();
@@ -94,6 +100,11 @@ public sealed class WorkflowAuthorizationTests
                 Is.EqualTo(new string?[] { firstToken, secondToken, null, correctionToken }));
             Assert.That(requests.Where(item => item.Path.EndsWith("/retrieve", StringComparison.Ordinal))
                 .Select(item => item.Authorization), Is.EqualTo(new string?[] { firstToken, secondToken, correctionToken }));
+            Assert.That(agentAuthorizations, Is.EqualTo(new[]
+            {
+                firstToken, firstToken, firstToken, secondToken, secondToken, secondToken,
+                correctionToken, correctionToken, correctionToken
+            }));
             Assert.That(modelInputs, Has.Count.EqualTo(9));
             foreach (var token in new[] { "first-caller-token", "second-caller-token", "refreshed-reviewer-token" })
             {
@@ -171,11 +182,15 @@ public sealed class WorkflowAuthorizationTests
         }
     }
 
-    private sealed class RecordingAgents(ConcurrentQueue<string> inputs) : IWorkflowAgents
+    private sealed class RecordingAgents(
+        ConcurrentQueue<string> inputs,
+        ConcurrentQueue<string?> authorizations,
+        AuthorizationRequestContext authorizationContext) : IWorkflowAgents
     {
         public Task<AgentExecution> ExecuteAsync(string role, Workflow workflow, CancellationToken ct)
         {
             inputs.Enqueue(JsonSerializer.Serialize(workflow));
+            authorizations.Enqueue(authorizationContext.CurrentAuthorization);
             var now = DateTimeOffset.UtcNow;
             return Task.FromResult(new AgentExecution(role, workflow.Round, "test-model", now, now,
                 Plan: role == "planner" ? new("Summarise", ["Read catalogue"], ["catalogue"]) : null,

@@ -74,7 +74,7 @@ if (@($workflow.evidence | Where-Object { $_.source -like "RAG $documentId chunk
 	throw 'Multi-Agent did not retrieve the exact smoke-test RAG document.'
 }
 if ($workflow.status -ne 'failed' -or $workflow.error -ne 'The AI gateway returned HTTP 503.') {
-	throw 'The keyless gateway must produce an explicit workflow failure, not a fabricated success.'
+	throw "The keyless gateway must produce an explicit workflow failure, not a fabricated success. Actual status: '$($workflow.status)'; error: '$($workflow.error)'."
 }
 
 docker compose -p $ComposeProjectName up --detach --no-deps --force-recreate multiagent.server

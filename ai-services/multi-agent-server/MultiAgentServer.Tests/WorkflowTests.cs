@@ -5,6 +5,7 @@ using CampusPulse.Shared.Ai;
 using CampusPulse.Shared.Mcp.Client;
 using CampusPulse.Shared.Mcp.Contracts;
 using CampusPulse.Shared.MultiAgent;
+using CampusPulse.Shared.Security;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Hosting.Server;
@@ -23,6 +24,7 @@ public sealed class WorkflowTests
     private RecordingAgents agents = null!;
     private PassthroughCollector collector = null!;
     private WorkflowCoordinator coordinator = null!;
+    private AuthorizationRequestContext authorizationContext = null!;
 
     [SetUp]
     public void Setup()
@@ -31,7 +33,9 @@ public sealed class WorkflowTests
         store = new WorkflowStore(Path.Combine(directory, "workflow.db"));
         agents = new RecordingAgents();
         collector = new PassthroughCollector();
-        coordinator = new WorkflowCoordinator(store, agents, collector, NullLogger<WorkflowCoordinator>.Instance);
+        authorizationContext = new AuthorizationRequestContext();
+        coordinator = new WorkflowCoordinator(
+            store, agents, collector, NullLogger<WorkflowCoordinator>.Instance, authorizationContext);
     }
 
     [Test]
