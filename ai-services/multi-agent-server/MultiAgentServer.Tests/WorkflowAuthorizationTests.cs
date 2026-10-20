@@ -58,7 +58,7 @@ public sealed class WorkflowAuthorizationTests
     }
 
     [Test]
-    public async Task QueuedJobsAndCorrectionsUseOnlyTheirOwnTokenWithoutPersistingOrSendingItToModelsOrRag()
+    public async Task QueuedJobsAndCorrectionsForwardTheirOwnTokenToProtectedDependenciesButNeverPersistOrSendItToModels()
     {
         const string firstToken = "Bearer first-caller-token";
         const string secondToken = "Bearer second-caller-token";
@@ -93,7 +93,7 @@ public sealed class WorkflowAuthorizationTests
             Assert.That(requests.Where(item => item.Path == "/api/mcp/tools/call").Select(item => item.Authorization),
                 Is.EqualTo(new string?[] { firstToken, secondToken, null, correctionToken }));
             Assert.That(requests.Where(item => item.Path.EndsWith("/retrieve", StringComparison.Ordinal))
-                .Select(item => item.Authorization), Is.EqualTo(new string?[] { null, null, null }));
+                .Select(item => item.Authorization), Is.EqualTo(new string?[] { firstToken, secondToken, correctionToken }));
             Assert.That(modelInputs, Has.Count.EqualTo(9));
             foreach (var token in new[] { "first-caller-token", "second-caller-token", "refreshed-reviewer-token" })
             {
