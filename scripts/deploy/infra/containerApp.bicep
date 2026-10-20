@@ -60,7 +60,11 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
       ingress: {
         external: external
         targetPort: targetPort
-        transport: 'auto'
+        // 'auto' lets Envoy negotiate HTTP/2 end-to-end, but Kestrel's h2c (cleartext
+        // HTTP/2) handshake with the internal ingress sidecar silently hangs on every
+        // request (confirmed live: identical calls succeed instantly forced to HTTP/1.1,
+        // and never return under 'auto'/h2). Pin to HTTP/1.1, which every app here needs.
+        transport: 'http'
         allowInsecure: false
       }
     }

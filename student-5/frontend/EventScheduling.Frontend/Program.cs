@@ -13,7 +13,10 @@ var configuredBackendUrl = builder.Configuration["BackendUrl"];
 var backendUrl = string.IsNullOrWhiteSpace(configuredBackendUrl)
     ? builder.HostEnvironment.BaseAddress
     : configuredBackendUrl;
-var academicRecordsBackendUrl = builder.Configuration["AcademicRecordsBackendUrl"] ?? "http://localhost:5020";
+var configuredAcademicRecordsBackendUrl = builder.Configuration["AcademicRecordsBackendUrl"];
+var academicRecordsBackendUrl = string.IsNullOrWhiteSpace(configuredAcademicRecordsBackendUrl)
+    ? builder.HostEnvironment.BaseAddress.TrimEnd('/') + "/academic-api/"
+    : configuredAcademicRecordsBackendUrl;
 builder.Services.AddAuthentication(academicRecordsBackendUrl);
 builder.Services.AddCampusAccountServices(academicRecordsBackendUrl);
 builder.Services.AddScoped(serviceProvider =>

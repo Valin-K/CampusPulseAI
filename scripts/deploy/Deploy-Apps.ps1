@@ -54,6 +54,10 @@ if ($EnableAi) {
     }
 }
 
+$signingKeyBytes = New-Object byte[] 48
+[System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($signingKeyBytes)
+$authSigningKey = [Convert]::ToBase64String($signingKeyBytes)
+
 Write-Host "Deploying image tag '$Tag' to resource group '$ResourceGroupName' (AI enabled: $($EnableAi.IsPresent), minReplicas: $minReplicas)..." -ForegroundColor Cyan
 
 $deployment = az deployment group create `
