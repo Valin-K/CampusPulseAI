@@ -2,7 +2,10 @@ function ConvertTo-Base64Url([byte[]]$Bytes) {
 	return [Convert]::ToBase64String($Bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_')
 }
 
-function New-CampusPulseTestHeaders([bool]$IncludeScope = $true) {
+function New-CampusPulseTestHeaders(
+	[bool]$IncludeScope = $true,
+	[ValidateSet('Student', 'Staff')][string]$Role = 'Student'
+) {
 	$signingKey = $env:CAMPUSPULSE_SIGNING_KEY
 	if ([string]::IsNullOrWhiteSpace($signingKey) -or [Text.Encoding]::UTF8.GetByteCount($signingKey) -lt 32) {
 		throw 'Set CAMPUSPULSE_SIGNING_KEY to match the isolated Compose stack; it must contain at least 32 bytes.'
@@ -10,8 +13,13 @@ function New-CampusPulseTestHeaders([bool]$IncludeScope = $true) {
 
 	$now = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
 	$claims = @{
-		iss = 'CampusPulse'; aud = 'CampusPulse.Api'; sub = '4'; user_id = '4'
-		role = 'Student'; nbf = $now; exp = $now + 600
+		iss = 'CampusPulse'; aud = 'CampusPulse.Api'; role = $Role; nbf = $now; exp = $now + 600
+	}
+	if ($Role -eq 'Student') {
+		$claims.sub = '4'; $claims.user_id = '4'; $claims.student_id = 'STU004'
+	}
+	else {
+		$claims.sub = '14'; $claims.user_id = '14'; $claims.staff_id = 'STF004'
 	}
 	if ($IncludeScope) { $claims.scope = 'CampusPulse.Access' }
 	$header = ConvertTo-Base64Url ([Text.Encoding]::UTF8.GetBytes('{"alg":"HS256","typ":"JWT"}'))
