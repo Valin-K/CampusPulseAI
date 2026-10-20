@@ -88,6 +88,7 @@ jobs:
         run: |
           set -euo pipefail
           authorization_header="Authorization: Bearer $(python3 .github/scripts/create-ci-auth-token.py --account-id STU001 --role Student)"
+          staff_authorization_header="Authorization: Bearer $(python3 .github/scripts/create-ci-auth-token.py --account-id STF001 --role Staff)"
           endpoints=("http://localhost:5269/health" "http://localhost:5020/health" "http://localhost:5021/health" "http://localhost:18080/health" "http://localhost:18080/api/invoices" "http://localhost:18084/")
           for endpoint in "${endpoints[@]}"; do
             reachable=false
@@ -105,9 +106,9 @@ jobs:
               exit 1
             fi
           done
-          curl -s -f -X POST http://localhost:18080/api/invoices -H "$authorization_header" -H 'Content-Type: application/json' -d '{"studentId":4,"description":"CI tuition fee","amount":1250.00,"issueDate":"2026-07-01","dueDate":"2026-08-01","status":0}' > /dev/null
-          curl -s -f -X PUT http://localhost:18080/api/invoices/1 -H "$authorization_header" -H 'Content-Type: application/json' -d '{"studentId":4,"description":"Updated CI tuition fee","amount":4500.00,"issueDate":"2026-07-01","dueDate":"2026-08-15","status":1}' > /dev/null
-          curl -s -f -X DELETE http://localhost:18080/api/invoices/2 -H "$authorization_header" > /dev/null
+          curl -s -f -X POST http://localhost:18080/api/invoices -H "$staff_authorization_header" -H 'Content-Type: application/json' -d '{"studentId":4,"description":"CI tuition fee","amount":1250.00,"issueDate":"2026-07-01","dueDate":"2026-08-01","status":0}' > /dev/null
+          curl -s -f -X PUT http://localhost:18080/api/invoices/1 -H "$staff_authorization_header" -H 'Content-Type: application/json' -d '{"studentId":4,"description":"Updated CI tuition fee","amount":4500.00,"issueDate":"2026-07-01","dueDate":"2026-08-15","status":1}' > /dev/null
+          curl -s -f -X DELETE http://localhost:18080/api/invoices/2 -H "$staff_authorization_header" > /dev/null
 
       - name: Remove Student 4 containers
         if: always() && (github.event_name == 'workflow_dispatch' || steps.filter.outputs.student4 == 'true')

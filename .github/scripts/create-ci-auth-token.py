@@ -41,7 +41,7 @@ for attempt in range(30):
         if error.code < 500:
             raise SystemExit(f"Authentication failed with HTTP {error.code}.") from error
         last_error = error
-    except (URLError, TimeoutError, json.JSONDecodeError) as error:
+    except (URLError, TimeoutError, ConnectionError, json.JSONDecodeError) as error:
         last_error = error
 
     if attempt < 29:

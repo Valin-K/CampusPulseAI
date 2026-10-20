@@ -99,7 +99,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          authorization_header="Authorization: Bearer $(python3 .github/scripts/create-ci-auth-token.py --account-id STU001 --role Student)"
+          authorization_header="Authorization: Bearer $(python3 .github/scripts/create-ci-auth-token.py --account-id STU004 --role Student)"
           staff_authorization_header="Authorization: Bearer $(python3 .github/scripts/create-ci-auth-token.py --account-id STF004 --role Staff)"
           endpoints=("http://localhost:5269/health" "http://localhost:5020/health" "http://localhost:15521/health" "http://localhost:18085/health" "http://localhost:18085/api/rooms" "http://localhost:18085/api/refequipment" "http://localhost:18085/api/equipment" "http://localhost:18085/api/bookings" "http://localhost:18085/api/users" "http://localhost:18085/api/users/4" "http://localhost:18086/")
           for endpoint in "${endpoints[@]}"; do
