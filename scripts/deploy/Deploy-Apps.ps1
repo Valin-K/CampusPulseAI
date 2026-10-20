@@ -12,11 +12,15 @@
 
 .PARAMETER EnableAi
     Switch. Omit for the required baseline (AI disabled). Pass it only for the bonus AI profile.
-    Reads GEMINI_API_KEY from the environment and stores it as an AI gateway secret.
+    Reads the GEMINI-API-KEY secret from Key Vault and stores it as an AI gateway secret.
 
 .PARAMETER WarmUp
     Switch. Sets minReplicas to 1 on every app instead of 0, so there's no cold-start delay.
     Use before the showcase/marking window; redeploy without it afterwards.
+
+.PARAMETER KeyVaultName
+    Key Vault holding CAMPUSPULSE-SIGNING-KEY (always) and GEMINI-API-KEY (with -EnableAi).
+    The deploying identity needs the Key Vault Secrets User role on this vault.
 
 .EXAMPLE
     ./Deploy-Apps.ps1 -ResourceGroupName rg-campuspulse -GitHubOwner valin-k -Tag abc1234
@@ -31,24 +35,29 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$Tag,
     [switch]$EnableAi,
-    [switch]$WarmUp
+    [switch]$WarmUp,
+    [string]$KeyVaultName = 'kv-campuspulse'
 )
 
 $ErrorActionPreference = 'Stop'
 $bicepFile = Join-Path $PSScriptRoot 'infra/main.bicep'
 $minReplicas = 0
 if ($WarmUp) { $minReplicas = 1 }
-$geminiApiKey = ''
-if ($EnableAi) {
-    $geminiApiKey = $env:GEMINI_API_KEY
-    if ([string]::IsNullOrWhiteSpace($geminiApiKey)) {
-        throw 'Set GEMINI_API_KEY before deploying with -EnableAi.'
+
+function Get-KeyVaultSecret([string]$SecretName) {
+    $value = az keyvault secret show --vault-name $KeyVaultName --name $SecretName --query value -o tsv
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($value)) {
+        throw "Could not read secret '$SecretName' from Key Vault '$KeyVaultName'. Confirm it exists and the deploying identity has the Key Vault Secrets User role."
     }
+    return $value
 }
 
-$signingKeyBytes = New-Object byte[] 48
-[System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($signingKeyBytes)
-$authSigningKey = [Convert]::ToBase64String($signingKeyBytes)
+$geminiApiKey = ''
+if ($EnableAi) {
+    $geminiApiKey = Get-KeyVaultSecret 'GEMINI-API-KEY'
+}
+
+$authSigningKey = Get-KeyVaultSecret 'CAMPUSPULSE-SIGNING-KEY'
 
 Write-Host "Deploying image tag '$Tag' to resource group '$ResourceGroupName' (AI enabled: $($EnableAi.IsPresent), minReplicas: $minReplicas)..." -ForegroundColor Cyan
 
