@@ -57,7 +57,7 @@ jobs:
 
   prepare:
     needs: [student-1, student-2, student-3, student-4, student-5, integration-ci]
-    runs-on: ubuntu-latest
+    runs-on: campuspulse-runners
     outputs:
       owner: ${{ steps.vars.outputs.owner }}
       tag: ${{ steps.vars.outputs.tag }}
@@ -70,7 +70,7 @@ jobs:
 
   build-and-push:
     needs: prepare
-    runs-on: ubuntu-latest
+    runs-on: campuspulse-runners
     permissions:
       contents: read
       packages: write
@@ -149,7 +149,7 @@ jobs:
 
   deploy:
     needs: [build-and-push, prepare]
-    runs-on: ubuntu-latest
+    runs-on: campuspulse-runners
     environment: production
     permissions:
       id-token: write

@@ -20,7 +20,7 @@ concurrency:
 jobs:
   build-and-test:
     name: Shared backend library validation
-    runs-on: ubuntu-latest
+    runs-on: campuspulse-runners
     timeout-minutes: 10
 
     steps:
