@@ -201,7 +201,6 @@ var sharedAiDisabled = [
   { name: 'Services__McpServer', value: 'http://mcp-server' }
   { name: 'Services__RagServer', value: 'http://rag-server' }
   { name: 'Services__MultiAgentServer', value: 'http://multi-agent-server' }
-  { name: 'Authentication__SigningKey', secretRef: 'auth-signing-key' }
 ]
 
 var backends = [
