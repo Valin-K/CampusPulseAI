@@ -216,12 +216,10 @@ var backends = [
     name: 'coursemgmt-api'
     // CORS is a browser-enforced check on cross-origin requests; with the nginx /api/ proxy
     // every real request is same-origin, so this only matters for direct testing. The
-    // 'external://' prefix (vs. 'http://' for internal-ingress apps) tells the module-call-site
-    // transform below to use the public URL pattern instead of the internal one.
+    // allowed origin is set to the public frontend URL at the module call site.
     env: concat(sharedAiDisabled, [
       { name: 'Services__AcademicRecordsDatabase', value: 'http://academicrecords-db' }
       { name: 'Services__CourseManagementDatabase', value: 'http://coursemgmt-db' }
-      { name: 'Cors__AllowedOrigins__0', value: 'external://coursemgmt-web' }
     ])
   }
   {
@@ -257,7 +255,7 @@ module backendApps 'containerApp.bicep' = [
       image: '${registry}/campuspulse-${api.name}:${imageTag}'
       targetPort: 8080
       external: false
-      env: api.needsCorsOrigin
+      env: api.name == 'coursemgmt-api'
         ? concat(api.env, [
             { name: 'Cors__AllowedOrigins__0', value: 'https://coursemgmt-web.${environment.outputs.defaultDomain}' }
             { name: 'Authentication__SigningKey', secretRef: 'campuspulse-signing-key' }
