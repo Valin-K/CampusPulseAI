@@ -1,6 +1,7 @@
 @implements IDisposable
 @inject AccountService Account
 @inject NavigationManager Navigation
+@inject CampusEndpoints Endpoints
 @inject AuthenticationStateProvider Authentication
 @inject IJSRuntime JavaScript
 
@@ -27,9 +28,9 @@
 </div>
 
 @code {
-    private string ProfileUrl => $"http://localhost:8081/profile?returnUrl={Uri.EscapeDataString(Navigation.Uri)}";
+    private string ProfileUrl => Endpoints.AccountUrl("profile", Navigation.Uri);
 
-    private string SignInUrl => $"http://localhost:8081/login?returnUrl={Uri.EscapeDataString(Navigation.Uri)}";
+    private string SignInUrl => Endpoints.AccountUrl("login", Navigation.Uri);
 
     protected override async Task OnInitializedAsync()
     {

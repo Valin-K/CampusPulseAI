@@ -12,6 +12,8 @@ RUN dotnet publish "./EventScheduling.Frontend.csproj" -c $BUILD_CONFIGURATION -
 FROM nginx:alpine AS final
 WORKDIR /usr/share/nginx/html
 COPY --from=build /app/publish/wwwroot .
+COPY shared/frontend/campus-config.json.template ./campus-config.json.template
+COPY --chmod=755 shared/frontend/docker-entrypoint.d/40-render-portal-links.sh /docker-entrypoint.d/40-render-portal-links.sh
 ENV BACKEND_BASE_URL=http://eventscheduling.backend:8080
 ENV ACADEMICRECORDS_API_BASE_URL=http://academicrecords.backend:8080
 COPY student-5/frontend/EventScheduling.Frontend/nginx.conf.template /etc/nginx/templates/default.conf.template
