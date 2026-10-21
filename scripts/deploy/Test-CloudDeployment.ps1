@@ -44,7 +44,7 @@ $ErrorActionPreference = 'Stop'
 # the api/db pair behind it, so a failure can pull diagnostics for the actual apps involved.
 $services = @(
     @{ App = 'academicrecords-web'; Path = '/api/users'; Api = 'academicrecords-api'; Db = 'academicrecords-db' }
-    @{ App = 'coursemgmt-web'; Path = '/api/course-access/users'; Api = 'coursemgmt-api'; Db = 'coursemgmt-db' }
+    @{ App = 'coursemgmt-web'; Path = '/api/courses'; Api = 'coursemgmt-api'; Db = 'coursemgmt-db' }
     @{ App = 'campushousing-web'; Path = '/api/housing/rooms'; Api = 'campushousing-api'; Db = 'campushousing-db' }
     @{ App = 'finaid-web'; Path = '/api/invoices'; Api = 'finaid-api'; Db = 'finaid-db' }
     @{ App = 'eventscheduling-web'; Path = '/api/rooms'; Api = 'eventscheduling-api'; Db = 'eventscheduling-db' }
