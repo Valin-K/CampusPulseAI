@@ -1,4 +1,6 @@
-﻿<div class="top-row ps-3 navbar navbar-dark">
+﻿@inject CampusEndpoints Endpoints
+
+<div class="top-row ps-3 navbar navbar-dark">
     <div class="container-fluid">
         <a class="navbar-brand" href="">The Residence</a>
         <button type="button"
@@ -35,18 +37,18 @@
             </NavLink>
         </div>
         <div class="nav-item px-3">
-            <a class="nav-link" href="http://localhost:8080" @onclick="CloseNavMenu">
+            <a class="nav-link" href="@Endpoints.Portal" @onclick="CloseNavMenu">
                 <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> CampusPulse home
             </a>
         </div>
         <div class="nav-item px-3">
-            <a class="nav-link" href="http://localhost:8082" @onclick="CloseNavMenu">Courses</a>
+            <a class="nav-link" href="@Endpoints.CourseManagement" @onclick="CloseNavMenu">Courses</a>
         </div>
         <div class="nav-item px-3">
-            <a class="nav-link" href="http://localhost:8084" @onclick="CloseNavMenu">Financial aid</a>
+            <a class="nav-link" href="@Endpoints.FinancialAidBilling" @onclick="CloseNavMenu">Financial aid</a>
         </div>
         <div class="nav-item px-3">
-            <a class="nav-link" href="http://localhost:8085" @onclick="CloseNavMenu">Events</a>
+            <a class="nav-link" href="@Endpoints.EventScheduling" @onclick="CloseNavMenu">Events</a>
         </div>
     </nav>
 </div>

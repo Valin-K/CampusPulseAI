@@ -1,0 +1,12 @@
+{
+  "UseSameOriginApi": true,
+  "Urls": {
+	"Portal": "${PORTAL_WEB_URL}",
+	"AcademicRecords": "${ACADEMICRECORDS_WEB_URL}",
+	"CourseManagement": "${COURSEMANAGEMENT_WEB_URL}",
+	"CampusHousing": "${CAMPUSHOUSING_WEB_URL}",
+	"FinancialAidBilling": "${FINAID_WEB_URL}",
+	"EventScheduling": "${EVENTSCHEDULING_WEB_URL}"
+  },
+  "AdditionalOrigins": []
+}

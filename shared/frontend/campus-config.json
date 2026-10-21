@@ -1,0 +1,15 @@
+{
+  "UseSameOriginApi": false,
+  "Urls": {
+    "Portal": "http://localhost:8080/",
+    "AcademicRecords": "http://localhost:8081/",
+    "CourseManagement": "http://localhost:8082/",
+    "CampusHousing": "http://localhost:8083/",
+    "FinancialAidBilling": "http://localhost:8084/",
+    "EventScheduling": "http://localhost:8085/"
+  },
+  "AdditionalOrigins": [
+    "http://localhost:5062", "http://localhost:5186", "http://localhost:5254",
+    "http://localhost:5128", "http://localhost:5236"
+  ]
+}

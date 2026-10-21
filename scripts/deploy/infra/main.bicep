@@ -41,6 +41,19 @@ var aiEnvValue = enableAi ? 'true' : 'false'
 // frontends, the portal) use the same domain without ".internal." and are also HTTPS-only.
 func internalUrl(appName string, domain string) string => 'https://${appName}.internal.${domain}'
 func externalUrl(appName string, domain string) string => 'https://${appName}.${domain}'
+func internalServiceEnv(settings array, domain string) array => map(settings, setting => {
+  name: setting.name
+  value: startsWith(setting.value, 'http://') ? internalUrl(substring(setting.value, 7), domain) : setting.value
+})
+
+var publicNavigationEnv = [
+  { name: 'PORTAL_WEB_URL', value: externalUrl('campuspulse-portal', environment.outputs.defaultDomain) }
+  { name: 'ACADEMICRECORDS_WEB_URL', value: externalUrl('academicrecords-web', environment.outputs.defaultDomain) }
+  { name: 'COURSEMANAGEMENT_WEB_URL', value: externalUrl('coursemgmt-web', environment.outputs.defaultDomain) }
+  { name: 'CAMPUSHOUSING_WEB_URL', value: externalUrl('campushousing-web', environment.outputs.defaultDomain) }
+  { name: 'FINAID_WEB_URL', value: externalUrl('finaid-web', environment.outputs.defaultDomain) }
+  { name: 'EVENTSCHEDULING_WEB_URL', value: externalUrl('eventscheduling-web', environment.outputs.defaultDomain) }
+]
 
 module environment 'environment.bicep' = {
   name: 'environment'
@@ -109,7 +122,7 @@ module aiApps 'containerApp.bicep' = [
       image: '${registry}/campuspulse-${ai.name}:${imageTag}'
       targetPort: 8080
       external: false
-      env: concat(ai.env,
+      env: concat(internalServiceEnv(ai.env, environment.outputs.defaultDomain),
         ai.name == 'ai-gateway' ? [{ name: 'GEMINI_API_KEY', secretRef: 'gemini-api-key' }] : [],
         [{ name: 'Authentication__SigningKey', secretRef: 'campuspulse-signing-key' }])
       geminiApiKey: ai.name == 'ai-gateway' ? geminiApiKey : ''
@@ -179,7 +192,7 @@ module databaseApps 'containerApp.bicep' = [
       image: '${registry}/campuspulse-${db.name}:${imageTag}'
       targetPort: 8080
       external: false
-      env: concat(db.env, [{ name: 'Authentication__SigningKey', secretRef: 'campuspulse-signing-key' }])
+      env: concat(internalServiceEnv(db.env, environment.outputs.defaultDomain), [{ name: 'Authentication__SigningKey', secretRef: 'campuspulse-signing-key' }])
       campusPulseSigningKey: campusPulseSigningKey
       minReplicas: minReplicas
       maxReplicas: 1
@@ -256,11 +269,11 @@ module backendApps 'containerApp.bicep' = [
       targetPort: 8080
       external: false
       env: api.name == 'coursemgmt-api'
-        ? concat(api.env, [
+        ? concat(internalServiceEnv(api.env, environment.outputs.defaultDomain), [
             { name: 'Cors__AllowedOrigins__0', value: 'https://coursemgmt-web.${environment.outputs.defaultDomain}' }
             { name: 'Authentication__SigningKey', secretRef: 'campuspulse-signing-key' }
           ])
-        : concat(api.env, [{ name: 'Authentication__SigningKey', secretRef: 'campuspulse-signing-key' }])
+        : concat(internalServiceEnv(api.env, environment.outputs.defaultDomain), [{ name: 'Authentication__SigningKey', secretRef: 'campuspulse-signing-key' }])
       campusPulseSigningKey: campusPulseSigningKey
       minReplicas: minReplicas
       maxReplicas: 2
@@ -289,10 +302,10 @@ module frontendApps 'containerApp.bicep' = [
       targetPort: 80
       external: true
       healthPath: '/'
-      env: [
+      env: concat(publicNavigationEnv, [
         { name: 'BACKEND_BASE_URL', value: internalUrl(web.backend, environment.outputs.defaultDomain) }
         { name: 'ACADEMICRECORDS_API_BASE_URL', value: internalUrl('academicrecords-api', environment.outputs.defaultDomain) }
-      ]
+      ])
       minReplicas: minReplicas
       maxReplicas: 2
     }
@@ -311,15 +324,10 @@ module portal 'containerApp.bicep' = {
     targetPort: 80
     external: true
     healthPath: '/'
-    env: [
-      { name: 'ACADEMICRECORDS_WEB_URL', value: externalUrl('academicrecords-web', environment.outputs.defaultDomain) }
-      { name: 'COURSEMANAGEMENT_WEB_URL', value: externalUrl('coursemgmt-web', environment.outputs.defaultDomain) }
-      { name: 'CAMPUSHOUSING_WEB_URL', value: externalUrl('campushousing-web', environment.outputs.defaultDomain) }
-      { name: 'FINAID_WEB_URL', value: externalUrl('finaid-web', environment.outputs.defaultDomain) }
-      { name: 'EVENTSCHEDULING_WEB_URL', value: externalUrl('eventscheduling-web', environment.outputs.defaultDomain) }
+    env: concat(publicNavigationEnv, [
       { name: 'ACADEMICRECORDS_BACKEND_BASE_URL', value: internalUrl('academicrecords-api', environment.outputs.defaultDomain) }
       { name: 'ACADEMICRECORDS_FRONTEND_BASE_URL', value: externalUrl('academicrecords-web', environment.outputs.defaultDomain) }
-    ]
+    ])
     minReplicas: minReplicas
     maxReplicas: 2
   }

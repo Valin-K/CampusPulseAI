@@ -1,10 +1,12 @@
+@inject CampusEndpoints Endpoints
+
 <campus-nav-bar page-name="@PageName"
                 section-label="@SectionLabel"
                 user-name="@(ShowAccountActions ? string.Empty : UserName)"
                 user-details="@(ShowAccountActions ? string.Empty : UserDetails)"
                 user-initials="@UserInitials"
-                home-href="@HomeHref"
-                portal-href="@PortalHref"
+                home-href="@(HomeHref ?? Endpoints.Portal)"
+                portal-href="@(PortalHref ?? Endpoints.Portal)"
                 context-label="@ContextLabel">
     @if (ShowAccountActions)
     {
@@ -26,8 +28,8 @@
     [Parameter] public string UserName { get; set; } = "Student";
     [Parameter] public string UserDetails { get; set; } = string.Empty;
     [Parameter] public string UserInitials { get; set; } = "ST";
-    [Parameter] public string HomeHref { get; set; } = "http://localhost:8080/";
-    [Parameter] public string PortalHref { get; set; } = "http://localhost:8080";
+    [Parameter] public string? HomeHref { get; set; }
+    [Parameter] public string? PortalHref { get; set; }
     [Parameter] public string ContextLabel { get; set; } = "Student portal";
     [Parameter] public bool ShowAccountActions { get; set; } = true;
     [Parameter] public RenderFragment? UserSelector { get; set; }

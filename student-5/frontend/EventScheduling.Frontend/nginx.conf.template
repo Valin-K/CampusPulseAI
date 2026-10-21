@@ -12,6 +12,11 @@ server {
     # told to, which silently resets the TLS handshake. Local HTTP upstreams ignore this.
     proxy_ssl_server_name on;
 
+    location = /campus-config.json {
+        add_header Cache-Control "no-store";
+        try_files $uri =404;
+    }
+
     location /api/ {
         set $backend_upstream ${BACKEND_BASE_URL};
         proxy_pass $backend_upstream$request_uri;
