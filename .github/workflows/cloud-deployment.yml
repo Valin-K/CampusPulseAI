@@ -1,23 +1,9 @@
 name: Cloud Deployment
 
-# Deploys the integrated application to Azure. Each student's CI and the integration CI already
-# gate every PR before it can merge (branch protection), so this workflow doesn't re-run them -
-# whatever ref it's dispatched against has already passed that validation to get into the repo.
-# See docs/release-2/cloud-deployment-plan.md.
-#
-# Prerequisites this workflow assumes are already set up (Phase 0, not done by this file):
-#   - AZURE_CLIENT_ID / AZURE_TENANT_ID / AZURE_SUBSCRIPTION_ID repo secrets, from an OIDC
-#     federated credential - no stored Azure password/secret exists anywhere.
-#   - A 'production' GitHub Environment (used below so the Azure login step is reviewable).
-#   - Key Vault 'kv-campuspulse' with secret 'CAMPUSPULSE-SIGNING-KEY' and (when AI is
-#     enabled) 'GEMINI-API-KEY'; the OIDC identity must be allowed to read those secrets.
-# GHCR push needs no extra secret - just the built-in GITHUB_TOKEN with packages: write.
 
 on:
-  # Manual trigger only for now, while the deployment is being proven out - every merge to
-  # master would otherwise redeploy on every PR, including unrelated ones. Switch this to
-  # `push: branches: [master]` (see git history for the exact block) once the team is
-  # confident a merge should always redeploy automatically.
+  push:
+    branches: [master]
   workflow_dispatch:
     inputs:
       enable_ai:
