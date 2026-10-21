@@ -2,6 +2,7 @@ using FinancialAidBilling.Database.Data;
 using FinancialAidBilling.Database.Models;
 using CampusPulse.Shared.Security;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 
@@ -22,8 +23,19 @@ app.MapOpenApi();
 using (var scope = app.Services.CreateScope())
 {
     var database = scope.ServiceProvider.GetRequiredService<FinancialAidBillingDbContext>();
-    await database.Database.EnsureCreatedAsync();
-    await InvoiceSeedData.InitializeAsync(database);
+    for (var attempt = 1; ; attempt++)
+    {
+        try
+        {
+            await database.Database.EnsureCreatedAsync();
+            await InvoiceSeedData.InitializeAsync(database);
+            break;
+        }
+        catch (SqliteException ex) when (ex.SqliteErrorCode == 5 && attempt < 10)
+        {
+            await Task.Delay(TimeSpan.FromMilliseconds(500));
+        }
+    }
 }
 
 var invoices = app.MapGroup("/api/invoices");
