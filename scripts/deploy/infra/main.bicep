@@ -208,6 +208,7 @@ var backends = [
     name: 'academicrecords-api'
     env: concat(sharedAiDisabled, [
       { name: 'Services__AcademicRecordsDatabase', value: 'http://academicrecords-db' }
+      { name: 'Services__AcademicRecordsCredentials', value: 'http://academicrecords-db' }
       { name: 'Services__CourseManagementDatabase', value: 'http://coursemgmt-db' }
     ])
   }
