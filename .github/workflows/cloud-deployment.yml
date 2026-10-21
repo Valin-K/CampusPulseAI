@@ -1,8 +1,9 @@
 name: Cloud Deployment
 
-# Deploys the integrated application to Azure, only after every student's CI and the
-# integration CI have passed (via `needs:` on reusable workflows - not `workflow_run`, which
-# only waits for one of them, not all). See docs/release-2/cloud-deployment-plan.md.
+# Deploys the integrated application to Azure. Each student's CI and the integration CI already
+# gate every PR before it can merge (branch protection), so this workflow doesn't re-run them -
+# whatever ref it's dispatched against has already passed that validation to get into the repo.
+# See docs/release-2/cloud-deployment-plan.md.
 #
 # Prerequisites this workflow assumes are already set up (Phase 0, not done by this file):
 #   - AZURE_CLIENT_ID / AZURE_TENANT_ID / AZURE_SUBSCRIPTION_ID repo secrets, from an OIDC
@@ -33,30 +34,9 @@ concurrency:
 
 permissions:
   contents: read
-  pull-requests: read
 
 jobs:
-  student-1:
-    uses: ./.github/workflows/student-1-ci.yml
-    secrets: inherit
-  student-2:
-    uses: ./.github/workflows/student-2-ci.yml
-    secrets: inherit
-  student-3:
-    uses: ./.github/workflows/student-3.yml
-    secrets: inherit
-  student-4:
-    uses: ./.github/workflows/student-4-ci.yml
-    secrets: inherit
-  student-5:
-    uses: ./.github/workflows/student-5-ci.yml
-    secrets: inherit
-  integration-ci:
-    uses: ./.github/workflows/integration-ci.yml
-    secrets: inherit
-
   prepare:
-    needs: [student-1, student-2, student-3, student-4, student-5, integration-ci]
     runs-on: ubuntu-latest
     outputs:
       owner: ${{ steps.vars.outputs.owner }}
