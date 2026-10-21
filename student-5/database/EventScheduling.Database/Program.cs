@@ -1,6 +1,7 @@
 using EventScheduling.Database.Data;
 using EventScheduling.Database.Models;
 using CampusPulse.Shared.Security;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 
@@ -21,8 +22,19 @@ app.MapOpenApi();
 using (var scope = app.Services.CreateScope())
 {
     var database = scope.ServiceProvider.GetRequiredService<EventSchedulingDbContext>();
-    await database.Database.EnsureCreatedAsync();
-    await EventSeedData.InitializeAsync(database);
+    for (var attempt = 1; ; attempt++)
+    {
+        try
+        {
+            await database.Database.EnsureCreatedAsync();
+            await EventSeedData.InitializeAsync(database);
+            break;
+        }
+        catch (SqliteException ex) when (ex.SqliteErrorCode == 5 && attempt < 10)
+        {
+            await Task.Delay(TimeSpan.FromMilliseconds(500));
+        }
+    }
 }
 
 var rooms = app.MapGroup("/api/rooms");

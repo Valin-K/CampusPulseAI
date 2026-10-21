@@ -2,6 +2,7 @@ using CampusHousing.Database.Data;
 using CampusHousing.Database.Models;
 using CampusPulse.Shared.Security;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 using System.Net.Http.Json;
@@ -23,7 +24,18 @@ if (!string.IsNullOrWhiteSpace(databaseDirectory)) Directory.CreateDirectory(dat
 await using (var scope = app.Services.CreateAsyncScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<CampusHousingDbContext>();
-    await db.Database.EnsureCreatedAsync();
+    for (var attempt = 1; ; attempt++)
+    {
+        try
+        {
+            await db.Database.EnsureCreatedAsync();
+            break;
+        }
+        catch (SqliteException ex) when (ex.SqliteErrorCode == 5 && attempt < 10)
+        {
+            await Task.Delay(TimeSpan.FromMilliseconds(500));
+        }
+    }
     var users = await GetAcademicRecordsUsersAsync(
         scope.ServiceProvider.GetRequiredService<IHttpClientFactory>().CreateClient("AcademicRecords"));
     await CampusHousingSeedData.EnsureSeededAsync(db, users);
