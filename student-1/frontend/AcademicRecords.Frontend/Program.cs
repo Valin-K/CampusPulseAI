@@ -2,16 +2,20 @@ using AcademicRecords.Frontend;
 using CampusPulse.Shared.Components.Services;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
+using Microsoft.JSInterop;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 builder.RootComponents.Add<App>("#app");
 builder.RootComponents.Add<HeadOutlet>("head::after");
 
+var endpoints = await CampusEndpoints.LoadAsync(builder.HostEnvironment.BaseAddress);
+builder.Services.AddSingleton(endpoints);
 var configuredBackendUrl = builder.Configuration["BackendUrl"];
-var backendUrl = string.IsNullOrWhiteSpace(configuredBackendUrl)
+var backendUrl = endpoints.UseSameOriginApi || string.IsNullOrWhiteSpace(configuredBackendUrl)
     ? builder.HostEnvironment.BaseAddress
     : configuredBackendUrl;
-var academicRecordsBackendUrl = builder.Configuration["AcademicRecordsBackendUrl"] ?? backendUrl;
+var academicRecordsBackendUrl = endpoints.UseSameOriginApi ? backendUrl
+    : builder.Configuration["AcademicRecordsBackendUrl"] ?? backendUrl;
 builder.Services.AddAuthentication(academicRecordsBackendUrl);
 builder.Services.AddCampusAccountServices(academicRecordsBackendUrl);
 builder.Services.AddScoped(serviceProvider =>
@@ -24,4 +28,6 @@ builder.Services.AddScoped(serviceProvider =>
     return new HttpClient(userIdHandler) { BaseAddress = new Uri(backendUrl) };
 });
 
-await builder.Build().RunAsync();
+var host = builder.Build();
+await host.Services.GetRequiredService<Microsoft.JSInterop.IJSRuntime>().InvokeVoidAsync("campusPulseWaitForNavigation");
+await host.RunAsync();

@@ -1,13 +1,13 @@
 ﻿@inherits LayoutComponentBase
 @inject FinancialAidUserContext UserContext
 @inject AccountService Account
+@inject CampusEndpoints Endpoints
 
 <CampusShell PageName="Financial Aid &amp; Billing"
              SectionLabel="Student finance"
              UserName="@(Account.CurrentUser?.FullName ?? "Financial Aid & Billing")"
              UserDetails="@(Account.CurrentUser is null ? "Finance workspace" : $"{Account.CurrentUser.Role} · {Account.CurrentUser.ExternalId}")"
              UserInitials="@(Account.CurrentUser?.Initials ?? "FA")"
-             HomeHref="http://localhost:8080"
              RequireSignedInUser="true">
     <ChildContent>
         @if (!UserContext.IsInitialized)
@@ -92,9 +92,8 @@
             await Authentication.SignOutAsync();
         }
 
-        var returnUrl = Uri.EscapeDataString(Navigation.BaseUri);
         Navigation.NavigateTo(
-            $"http://localhost:8081/login/student?returnUrl={returnUrl}",
+            Endpoints.AccountUrl("login/student", Navigation.BaseUri),
             forceLoad: true);
     }
 

@@ -9,13 +9,15 @@ var builder = WebAssemblyHostBuilder.CreateDefault(args);
 builder.RootComponents.Add<App>("#app");
 builder.RootComponents.Add<HeadOutlet>("head::after");
 
+var endpoints = await CampusEndpoints.LoadAsync(builder.HostEnvironment.BaseAddress);
+builder.Services.AddSingleton(endpoints);
 var configuredAcademicRecordsBackendUrl = builder.Configuration["AcademicRecordsBackendUrl"];
-var academicRecordsBackendUrl = string.IsNullOrWhiteSpace(configuredAcademicRecordsBackendUrl)
+var academicRecordsBackendUrl = endpoints.UseSameOriginApi || string.IsNullOrWhiteSpace(configuredAcademicRecordsBackendUrl)
     ? builder.HostEnvironment.BaseAddress.TrimEnd('/') + "/academic-api/"
     : configuredAcademicRecordsBackendUrl;
 builder.Services.AddAuthentication(academicRecordsBackendUrl);
 var configuredApiBaseAddress = builder.Configuration["CourseManagementApi:BaseAddress"];
-var apiBaseAddress = string.IsNullOrWhiteSpace(configuredApiBaseAddress)
+var apiBaseAddress = endpoints.UseSameOriginApi || string.IsNullOrWhiteSpace(configuredApiBaseAddress)
     ? builder.HostEnvironment.BaseAddress
     : configuredApiBaseAddress;
 builder.Services.AddCampusAccountServices(academicRecordsBackendUrl);
@@ -31,4 +33,6 @@ builder.Services.AddScoped(serviceProvider =>
 builder.Services.AddScoped<CourseApiClient>();
 builder.Services.AddScoped<CourseUserContext>();
 
-await builder.Build().RunAsync();
+var host = builder.Build();
+await host.Services.GetRequiredService<IJSRuntime>().InvokeVoidAsync("campusPulseWaitForNavigation");
+await host.RunAsync();

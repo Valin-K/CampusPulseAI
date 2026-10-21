@@ -6,6 +6,7 @@
 @using System.Text.Json
 @inject AccountService Account
 @inject NavigationManager Navigation
+@inject CampusEndpoints Endpoints
 
 <PageTitle>Sign in | CampusPulse</PageTitle>
 
@@ -188,7 +189,7 @@
     private string SignInDescription => string.IsNullOrWhiteSpace(Role)
         ? "Use your student or staff account to access CampusPulse services."
         : $"Sign in to access CampusPulse {NormalizedRole.ToLowerInvariant()} services.";
-    private string SafeReturnUrl => IsAllowedReturnUrl(ReturnUrl) ? ReturnUrl! : "/";
+    private string SafeReturnUrl => Endpoints.IsAllowedReturnUrl(ReturnUrl) ? ReturnUrl! : "/";
     private string SignInUrl => RoleSignInUrl(null);
     private bool IsStudentRole => string.Equals(NormalizedRole, "Student", StringComparison.Ordinal);
 
@@ -244,30 +245,11 @@
         }
     }
 
-    private static bool IsAllowedReturnUrl(string? returnUrl)
-    {
-        if (string.IsNullOrWhiteSpace(returnUrl))
-        {
-            return false;
-        }
-
-        if (returnUrl.StartsWith("/", StringComparison.Ordinal))
-        {
-            return !returnUrl.StartsWith("//", StringComparison.Ordinal)
-                && !returnUrl.StartsWith("/\\", StringComparison.Ordinal);
-        }
-
-        return Uri.TryCreate(returnUrl, UriKind.Absolute, out var destination)
-            && destination.Scheme == Uri.UriSchemeHttp
-            && string.Equals(destination.Host, "localhost", StringComparison.OrdinalIgnoreCase)
-            && destination.Port is >= 8080 and <= 8085;
-    }
-
     private string BuildReturnUrl()
     {
         if (!Uri.TryCreate(SafeReturnUrl, UriKind.Absolute, out var destination)
             || !Uri.TryCreate(Navigation.BaseUri, UriKind.Absolute, out var current)
-            || destination.Authority.Equals(current.Authority, StringComparison.OrdinalIgnoreCase))
+            || destination.GetLeftPart(UriPartial.Authority).Equals(current.GetLeftPart(UriPartial.Authority), StringComparison.OrdinalIgnoreCase))
         {
             return SafeReturnUrl;
         }
@@ -284,10 +266,7 @@
     private string RoleSignInUrl(string? role)
     {
         var path = string.IsNullOrWhiteSpace(role) ? "/login" : $"/login/{role}";
-        var query = IsAllowedReturnUrl(ReturnUrl)
-            ? $"?returnUrl={Uri.EscapeDataString(ReturnUrl!)}"
-            : string.Empty;
-        return $"http://localhost:8081{path}{query}";
+        return Endpoints.AccountUrl(path, Endpoints.IsAllowedReturnUrl(ReturnUrl) ? ReturnUrl : null);
     }
 
     private async Task CreateStudentAsync()

@@ -7,7 +7,6 @@
              UserName="@(Account.CurrentUser?.FullName ?? "Event Scheduling")"
              UserDetails="@(Account.CurrentUser is null ? "Scheduling workspace" : $"{Account.CurrentUser.Role} · {Account.CurrentUser.ExternalId}")"
              UserInitials="@(Account.CurrentUser?.Initials ?? "ES")"
-             HomeHref="http://localhost:8080"
              RequireSignedInUser="true">
     <ChildContent>
         @Body

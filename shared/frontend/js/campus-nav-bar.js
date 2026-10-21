@@ -1,3 +1,23 @@
+window.campusPulseWaitForNavigation = () => window.campusPulseReady;
+window.campusPulseReady = (async () => {
+const configResponse = await fetch('/campus-config.json', { cache: 'no-store' });
+if (!configResponse.ok) throw new Error('Unable to load CampusPulse endpoint configuration.');
+const config = await configResponse.json();
+const campusUrls = config.Urls;
+const campusServices = ['Portal', 'AcademicRecords', 'CourseManagement', 'CampusHousing', 'FinancialAidBilling', 'EventScheduling'];
+for (const service of campusServices) {
+    const address = new URL(campusUrls[service]);
+    if (!['http:', 'https:'].includes(address.protocol) || address.username || address.password) {
+        throw new Error(`Invalid CampusPulse endpoint: ${service}.`);
+    }
+}
+const campusOrigins = new Set([
+    ...campusServices.map(service => new URL(campusUrls[service]).origin),
+    ...(config.AdditionalOrigins ?? []).map(address => new URL(address).origin),
+    window.location.origin
+]);
+const accountUrl = path => new URL(path, `${campusUrls.AcademicRecords.replace(/\/$/, '')}/`).toString();
+
 window.campusPulseAccountSession = {
     key: 'campuspulse.account.user-id',
     getUserId() {
@@ -15,11 +35,6 @@ window.campusPulseAccountSession = {
 
 const campusAuthSessionKey = 'campuspulse.auth.session';
 const legacyCampusAuthSessionKey = 'campuspulse.demo-auth.session';
-const campusLogoutPorts = ['8080', '8081', '8082', '8083', '8084', '8085'];
-const campusSpaPorts = new Set([
-    '8080', '8081', '8082', '8083', '8084', '8085',
-    '5062', '5186', '5254', '5128', '5236'
-]);
 const clearCampusSession = () => {
     sessionStorage.removeItem(campusAuthSessionKey);
     sessionStorage.removeItem(legacyCampusAuthSessionKey);
@@ -40,42 +55,43 @@ window.campusPulseNavigation = {
     },
     signOutEverywhere() {
         clearCampusSession();
-        const remainingPorts = campusLogoutPorts
-            .filter(port => port !== window.location.port && port !== '8080')
-            .concat('8080');
-        navigateToNextLogoutOrigin(remainingPorts);
+        const remainingServices = campusServices
+            .filter(service => service !== 'Portal' && new URL(campusUrls[service]).origin !== window.location.origin)
+            .concat('Portal');
+        navigateToNextLogoutOrigin(remainingServices);
     }
 };
-function navigateToNextLogoutOrigin(remainingPorts) {
-    const [nextPort, ...portsAfterNext] = remainingPorts;
-    if (!nextPort) {
-        window.location.replace('http://localhost:8080/');
+function navigateToNextLogoutOrigin(remainingServices) {
+    const [nextService, ...servicesAfterNext] = remainingServices;
+    if (!nextService) {
+        window.location.replace(campusUrls.Portal);
         return;
     }
 
-    const destination = new URL(`http://localhost:${nextPort}/`);
+    const destination = new URL(campusUrls[nextService]);
     destination.searchParams.set('campuspulse_logout', '1');
-    destination.searchParams.set('campuspulse_logout_remaining', portsAfterNext.join(','));
+    destination.searchParams.set('campuspulse_logout_remaining', servicesAfterNext.join(','));
     window.location.assign(destination.toString());
 }
 
 const navigationQuery = new URLSearchParams(window.location.search);
 if (navigationQuery.get('campuspulse_logout') === '1') {
     clearCampusSession();
-    const currentPort = window.location.port || '80';
-    const remainingPorts = [...new Set(
+    const remainingServices = [...new Set(
         (navigationQuery.get('campuspulse_logout_remaining') ?? '')
             .split(',')
-            .filter(port => campusLogoutPorts.includes(port) && port !== currentPort))];
-    if (!remainingPorts.includes('8080') && currentPort !== '8080') {
-        remainingPorts.push('8080');
+            .filter(service => campusServices.includes(service)
+                && new URL(campusUrls[service]).origin !== window.location.origin))];
+    if (!remainingServices.includes('Portal') && new URL(campusUrls.Portal).origin !== window.location.origin) {
+        remainingServices.push('Portal');
     }
 
-    if (remainingPorts.length > 0) {
-        navigateToNextLogoutOrigin(remainingPorts);
+    if (remainingServices.length > 0) {
+        navigateToNextLogoutOrigin(remainingServices);
     } else {
-        window.location.replace('http://localhost:8080/');
+        window.location.replace(campusUrls.Portal);
     }
+    return;
 }
 const incomingSession = new URLSearchParams(window.location.hash.slice(1)).get('campuspulse_session');
 if (incomingSession) {
@@ -102,19 +118,18 @@ document.addEventListener('click', event => {
     }
 
     const anchor = event.composedPath().find(element => element instanceof HTMLAnchorElement);
-    if (!anchor || anchor.target && anchor.target !== '_self') {
+    if (!anchor || anchor.hasAttribute('download') || anchor.target && anchor.target !== '_self') {
         return;
     }
 
     const destination = new URL(anchor.href, window.location.href);
-    if (destination.pathname.endsWith('/index.html')) {
+    if (destination.origin === window.location.origin && destination.pathname.endsWith('/index.html')) {
         event.preventDefault();
         window.location.assign(destination.toString());
         return;
     }
 
-    if (destination.hostname !== 'localhost'
-        || !campusSpaPorts.has(destination.port)
+    if (!campusOrigins.has(destination.origin)
         || destination.origin === window.location.origin) {
         return;
     }
@@ -208,9 +223,9 @@ class CampusNavBar extends HTMLElement {
 
         const pageName = escape(value('page-name', 'CampusPulse'));
         const sectionLabel = escape(value('section-label', 'Student services'));
-        const homeHref = escape(value('home-href', '/'));
-        const profileHref = `/profile?returnUrl=${encodeURIComponent(`${window.location.origin}/index.html`)}`;
-        const signInHref = `/login?returnUrl=${encodeURIComponent(`${window.location.origin}/`)}`;
+        const homeHref = escape(value('home-href', campusUrls.Portal));
+        const profileHref = `${accountUrl('profile')}?returnUrl=${encodeURIComponent(`${window.location.origin}/index.html`)}`;
+        const signInHref = `${accountUrl('login')}?returnUrl=${encodeURIComponent(`${window.location.origin}/`)}`;
         const portalHref = value('portal-href');
         const userName = value('user-name');
         const userDetails = escape(value('user-details'));
@@ -315,3 +330,11 @@ class CampusNavBar extends HTMLElement {
 if (!customElements.get('campus-nav-bar')) {
     customElements.define('campus-nav-bar', CampusNavBar);
 }
+})();
+window.campusPulseReady.catch(error => {
+    console.error('CampusPulse navigation could not start.', error);
+    const message = document.createElement('p');
+    message.setAttribute('role', 'alert');
+    message.textContent = 'CampusPulse navigation is unavailable. Please reload the page or contact support.';
+    document.body.prepend(message);
+});

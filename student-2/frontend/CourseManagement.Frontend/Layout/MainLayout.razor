@@ -7,8 +7,6 @@
              UserName="@(Account.CurrentUser?.FullName ?? "Course Management")"
              UserDetails="@(Account.CurrentUser is null ? "Course workspace" : $"{Account.CurrentUser.Role} · {Account.CurrentUser.ExternalId}")"
              UserInitials="@(Account.CurrentUser?.Initials ?? "CM")"
-             HomeHref="http://localhost:8080"
-             PortalHref="http://localhost:8080"
              RequireSignedInUser="true"
              ContextLabel="@ContextLabel">
     <ChildContent>
