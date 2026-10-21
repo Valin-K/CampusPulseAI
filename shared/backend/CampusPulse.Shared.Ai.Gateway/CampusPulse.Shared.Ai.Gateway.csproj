@@ -13,5 +13,6 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\CampusPulse.Shared.Ai\CampusPulse.Shared.Ai.csproj" />
+    <ProjectReference Include="..\CampusPulse.Shared.Security\CampusPulse.Shared.Security.csproj" />
   </ItemGroup>
 </Project>

@@ -4,7 +4,7 @@ using Microsoft.JSInterop;
 
 namespace CampusPulse.Shared.Components.Services;
 
-public sealed class CampusDemoTokenHandler(IJSRuntime javaScript) : DelegatingHandler
+public sealed class TokenHandler(IJSRuntime javaScript) : DelegatingHandler
 {
     public const string SessionStorageKey = "campuspulse.auth.session";
 

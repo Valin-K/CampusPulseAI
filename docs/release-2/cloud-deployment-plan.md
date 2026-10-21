@@ -18,8 +18,11 @@ brief's cloud baseline. A reusable set of scripts does the deployment, and a Git
 The AI services are containerised and included in local Compose. The required cloud baseline
 still does **not deploy** them. The cloud workflow builds and publishes their images alongside
 the other images; its `enable_ai` input (or `Deploy-Apps.ps1 -EnableAi`) deploys the bonus AI profile.
-Set the `GEMINI_API_KEY` GitHub Actions secret, or the environment variable for a local deploy.
-It is stored as a Container Apps secret on the gateway only, never in the images.
+`Deploy-Apps.ps1` reads `CAMPUSPULSE-SIGNING-KEY` and, when AI is enabled, `GEMINI-API-KEY`
+from Key Vault `kv-campuspulse`. The Azure OIDC identity needs the Key Vault Secrets User role
+on that vault. The Gemini key is stored as a Container Apps secret on the gateway only, never
+in the images. Local Compose continues to use `CAMPUSPULSE_SIGNING_KEY` and `GEMINI_API_KEY`
+from the repository-root `.env` file.
 
 ---
 

@@ -3,7 +3,7 @@ using Microsoft.JSInterop;
 
 namespace CampusPulse.Shared.Components.Services;
 
-public sealed class CampusUserIdHeaderHandler(IJSRuntime javaScript) : DelegatingHandler
+public sealed class UserIdHeaderHandler(IJSRuntime javaScript) : DelegatingHandler
 {
     protected override async Task<HttpResponseMessage> SendAsync(
         HttpRequestMessage request,

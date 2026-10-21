@@ -47,6 +47,8 @@ public sealed record CampusStudentRegistration(
     string LastName,
     string Email,
     DateOnly? DateOfBirth,
+    string Password,
+    string ConfirmPassword,
     string MailingAddress,
     string EmergencyContactName,
     string EmergencyContactPhone,
@@ -59,6 +61,8 @@ public sealed record CampusStaffRegistration(
     string LastName,
     string Email,
     DateOnly? DateOfBirth,
+    string Password,
+    string ConfirmPassword,
     string? PhoneNumber = null);
 
 public sealed record CampusCreatedUser(string StudentId, int UserId);

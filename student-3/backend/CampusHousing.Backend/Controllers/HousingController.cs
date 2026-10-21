@@ -1,6 +1,8 @@
 using System.Net.Http.Json;
 using CampusHousing.Backend.Models;
 using CampusHousing.Backend.Services;
+using CampusPulse.Shared.Security;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace CampusHousing.Backend.Controllers;
@@ -13,6 +15,7 @@ public sealed class HousingController(IHttpClientFactory httpClientFactory, Main
     private HttpClient AcademicRecords => httpClientFactory.CreateClient("AcademicRecordsDatabase");
 
     [HttpGet("users")]
+    [Authorize(Policy = CampusPulseSecurityExtensions.StaffOnlyPolicy)]
     public async Task<IActionResult> Users(CancellationToken cancellationToken)
     {
         using var response = await AcademicRecords.GetAsync("api/users", cancellationToken);
@@ -42,7 +45,7 @@ public sealed class HousingController(IHttpClientFactory httpClientFactory, Main
     [HttpPost("allocations")]
     public async Task<IActionResult> Allocate(CreateAllocationRequest request, CancellationToken cancellationToken)
     {
-        if (!IsAdministrator && !IsCurrentStudent(request.StudentId)) return Forbid();
+        if (!User.CanAccessStudent(request.StudentId)) return Forbid();
         var response = await Database.PostAsJsonAsync("api/allocations", request, cancellationToken);
         return await ToActionResult(response);
     }
@@ -51,21 +54,22 @@ public sealed class HousingController(IHttpClientFactory httpClientFactory, Main
     public async Task<IActionResult> Allocations(CancellationToken cancellationToken)
     {
         var response = await Database.GetAsync("api/allocations", cancellationToken);
-        if (IsAdministrator || string.IsNullOrWhiteSpace(CurrentStudentId)) return await ToActionResult(response);
+        if (IsAdministrator) return await ToActionResult(response);
+        if (string.IsNullOrWhiteSpace(CurrentStudentId)) return Forbid();
         var allocations = await response.Content.ReadFromJsonAsync<List<HousingAllocation>>(cancellationToken: cancellationToken) ?? [];
-        return Ok(allocations.Where(allocation => IsCurrentStudent(allocation.StudentId)));
+        return Ok(allocations.Where(allocation => User.CanAccessStudent(allocation.StudentId)));
     }
 
     [HttpPut("allocations/{id:int}")]
     public async Task<IActionResult> UpdateAllocation(int id, UpdateAllocationRequest request, CancellationToken cancellationToken)
     {
-        if (!IsAdministrator && !IsCurrentStudent(request.StudentId)) return Forbid();
+        if (!User.CanAccessStudent(request.StudentId)) return Forbid();
         if (!IsAdministrator)
         {
             var existing = await Database.GetAsync($"api/allocations/{id}", cancellationToken);
             if (!existing.IsSuccessStatusCode) return await ToActionResult(existing);
             var allocation = await existing.Content.ReadFromJsonAsync<HousingAllocation>(cancellationToken: cancellationToken);
-            if (allocation is null || !IsCurrentStudent(allocation.StudentId)) return Forbid();
+            if (allocation is null || !User.CanAccessStudent(allocation.StudentId)) return Forbid();
         }
         return await ForwardJsonAsync(HttpMethod.Put, $"api/allocations/{id}", request, cancellationToken);
     }
@@ -77,15 +81,16 @@ public sealed class HousingController(IHttpClientFactory httpClientFactory, Main
     public async Task<IActionResult> Tickets(CancellationToken cancellationToken)
     {
         var response = await Database.GetAsync("api/tickets", cancellationToken);
-        if (IsAdministrator || string.IsNullOrWhiteSpace(CurrentStudentId)) return await ToActionResult(response);
+        if (IsAdministrator) return await ToActionResult(response);
+        if (string.IsNullOrWhiteSpace(CurrentStudentId)) return Forbid();
         var tickets = await response.Content.ReadFromJsonAsync<List<MaintenanceTicket>>(cancellationToken: cancellationToken) ?? [];
-        return Ok(tickets.Where(ticket => IsCurrentStudent(ticket.StudentId)));
+        return Ok(tickets.Where(ticket => User.CanAccessStudent(ticket.StudentId)));
     }
 
     [HttpPost("tickets")]
     public async Task<IActionResult> CreateTicket(CreateMaintenanceRequest request, CancellationToken cancellationToken)
     {
-        if (!IsAdministrator && !IsCurrentStudent(request.StudentId)) return Forbid();
+        if (!User.CanAccessStudent(request.StudentId)) return Forbid();
         if (string.IsNullOrWhiteSpace(request.Description)) return BadRequest(new { message = "Description is required." });
         var classification = await classifier.ClassifyAsync(request.Description, cancellationToken);
         var ticket = new MaintenanceTicket(0, request.StudentId, request.DormRoomId, request.Description, classification.Severity, classification.RepairQueue, "Open", DateTime.UtcNow, null);
@@ -105,12 +110,9 @@ public sealed class HousingController(IHttpClientFactory httpClientFactory, Main
     [HttpDelete("tickets/{id:int}")]
     public async Task<IActionResult> DeleteTicket(int id, CancellationToken cancellationToken) => !IsAdministrator ? Forbid() : await ForwardDeleteAsync($"api/tickets/{id}", cancellationToken);
 
-    private bool IsAdministrator => string.Equals(Request.Headers["X-Housing-Role"], "Administrator", StringComparison.OrdinalIgnoreCase);
+    private bool IsAdministrator => User?.IsInRole("Staff") == true;
 
-    private string? CurrentStudentId => Request.Headers["X-Housing-User"].FirstOrDefault();
-
-    private bool IsCurrentStudent(string studentId) =>
-        !string.IsNullOrWhiteSpace(CurrentStudentId) && string.Equals(CurrentStudentId, studentId, StringComparison.OrdinalIgnoreCase);
+    private string? CurrentStudentId => User?.FindFirst("student_id")?.Value;
 
     private async Task<IActionResult> ForwardGetAsync(string path, CancellationToken cancellationToken)
     {

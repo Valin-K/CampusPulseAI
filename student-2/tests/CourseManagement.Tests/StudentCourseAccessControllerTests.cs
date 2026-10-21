@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using System.Security.Claims;
 
 namespace CourseManagement.Tests;
 
@@ -217,7 +218,18 @@ public sealed class StudentCourseAccessControllerTests
                 DemoEnrollmentTermId = 15,
                 DemoAcademicYear = 2026
             }),
-            NullLogger<StudentCourseAccessController>.Instance);
+            NullLogger<StudentCourseAccessController>.Instance)
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext
+                {
+                    User = new ClaimsPrincipal(new ClaimsIdentity(
+                        [new Claim(ClaimTypes.Role, "Student"), new Claim("student_id", "STU003")],
+                        "test"))
+                }
+            }
+        };
 
     static AcademicRecordsStudentResponse Student(
         List<AcademicRecordsEnrollmentResponse> enrollments) =>

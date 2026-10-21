@@ -3,13 +3,13 @@ using CampusPulse.Shared.Components.Services;
 
 namespace CourseManagement.Frontend.Services;
 
-public sealed class CourseUserContext(CampusAccountService account)
+public sealed class CourseUserContext(AccountService account)
 {
     public CampusAccountUser? CurrentUser { get; private set; }
     public bool IsInitialized { get; private set; }
     public bool IsAvailable => CurrentUser is not null;
     public bool IsCourseAdministrator =>
-        CurrentUser is not null && CampusAccountService.IsStaff(CurrentUser);
+        CurrentUser is not null && AccountService.IsStaff(CurrentUser);
     public string? ErrorMessage { get; private set; }
 
     public async Task InitializeAsync(bool forceRefresh = false)
@@ -34,8 +34,8 @@ public sealed class CourseUserContext(CampusAccountService account)
                 return;
             }
 
-            if (!CampusAccountService.IsStudent(signedInUser)
-                && !CampusAccountService.IsStaff(signedInUser))
+            if (!AccountService.IsStudent(signedInUser)
+                && !AccountService.IsStaff(signedInUser))
             {
                 ErrorMessage = "This CampusPulse account does not have Course Management access.";
                 return;

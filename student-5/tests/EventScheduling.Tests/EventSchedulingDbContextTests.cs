@@ -7,6 +7,24 @@ namespace EventScheduling.Tests;
 
 public sealed class EventSchedulingDbContextTests
 {
+    [Test]
+    public void ReferenceEquipmentReadsAreSharedAndMutationsAreStaffOnly()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            TestContext.CurrentContext.TestDirectory,
+            "..", "..", "..", "..", "..", "database", "EventScheduling.Database", "Program.cs"));
+        var start = source.IndexOf("var refEquipment = app.MapGroup(\"/api/refequipment\")", StringComparison.Ordinal);
+        var end = source.IndexOf("refEquipment.MapPost(\"/\"", start, StringComparison.Ordinal);
+        var readRoutes = source[start..end];
+
+        var mutationRoutes = source[end..source.IndexOf("var bookings", end, StringComparison.Ordinal)];
+        Assert.Multiple(() =>
+        {
+            Assert.That(readRoutes, Does.Not.Contain("RequireAuthorization(CampusPulseSecurityExtensions.StaffOnlyPolicy)"));
+            Assert.That(mutationRoutes, Does.Contain("RequireAuthorization(CampusPulseSecurityExtensions.StaffOnlyPolicy)"));
+        });
+    }
+
     private static RefEquipment RefEquipmentType(string name = "HDMI Adapter") =>
         new() { Name = name, Category = "Cables & Adapters", Description = "Test type." };
 

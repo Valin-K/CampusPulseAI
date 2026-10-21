@@ -51,7 +51,10 @@ public sealed class WorkflowEvidenceCollector(
         {
             await CollectDependencyAsync("rag", async () =>
             {
-                using var response = await clients.CreateClient("workflowRag").PostAsJsonAsync(
+                using var client = clients.CreateClient("workflowRag");
+                if (!string.IsNullOrWhiteSpace(authorization))
+                    client.DefaultRequestHeaders.Authorization = System.Net.Http.Headers.AuthenticationHeaderValue.Parse(authorization);
+                using var response = await client.PostAsJsonAsync(
                     $"api/rag/{workflow.Feature}/retrieve", new { question = workflow.Task, topK = 4 }, ct);
                 response.EnsureSuccessStatusCode();
                 var retrieval = await response.Content.ReadFromJsonAsync<RetrievedEvidence>(ct)

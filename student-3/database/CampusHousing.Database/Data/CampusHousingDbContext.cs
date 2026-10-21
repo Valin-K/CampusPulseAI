@@ -25,6 +25,6 @@ public sealed class CampusHousingDbContext(DbContextOptions<CampusHousingDbConte
             new DormRoom { Id = 9, Building = "Birch Hall", RoomNumber = "501", Capacity = 4, IsAvailable = true },
             new DormRoom { Id = 10, Building = "Birch Hall", RoomNumber = "502", Capacity = 4, IsAvailable = true });
         modelBuilder.Entity<HousingAllocation>().HasData(
-            new HousingAllocation { Id = 1, DormRoomId = 1, StudentId = "STU-000003", StudentName = "Seed placeholder", RoommatePreference = "Quiet", AllocatedAt = new DateTime(2025, 1, 10, 0, 0, 0, DateTimeKind.Utc) });
+            new HousingAllocation { Id = 1, DormRoomId = 1, StudentId = "STU001", StudentName = "Seed placeholder", RoommatePreference = "Quiet", AllocatedAt = new DateTime(2025, 1, 10, 0, 0, 0, DateTimeKind.Utc) });
     }
 }

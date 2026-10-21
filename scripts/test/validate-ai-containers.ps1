@@ -9,6 +9,8 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+. "$PSScriptRoot/ai-authorization-helpers.ps1"
+$headers = New-CampusPulseTestHeaders
 $task = 'Container connectivity verification evidence'
 $documentId = "container-smoke-$([guid]::NewGuid())"
 
@@ -27,13 +29,13 @@ foreach ($port in @(5267, 5268, 5270)) {
 	if (-not $healthy) { throw "AI service on port $port did not become healthy." }
 }
 
-$gateway = Invoke-RestMethod 'http://localhost:5269/api/ai/status' -TimeoutSec 10
+$gateway = Invoke-RestMethod 'http://localhost:5269/api/ai/status' -Headers $headers -TimeoutSec 10
 if ($gateway.generationAvailable -ne $false) {
 	throw 'This deterministic smoke test requires a keyless gateway; unset GEMINI_API_KEY in the validation stack.'
 }
 
 $ingest = Invoke-RestMethod 'http://localhost:5267/api/rag/eventscheduling/documents' `
-	-Method Post -ContentType 'application/json' -TimeoutSec 30 `
+	-Headers $headers -Method Post -ContentType 'application/json' -TimeoutSec 30 `
 	-Body (@{ documents = @(@{ id = $documentId; text = $task }) } | ConvertTo-Json -Depth 5)
 if ($ingest.documents -ne 1 -or $ingest.chunks -ne 1) {
 	throw 'RAG did not ingest the smoke-test document through the containerised gateway.'
@@ -53,11 +55,11 @@ $request = @{
 	allowFallback = $false
 } | ConvertTo-Json -Depth 5
 $workflow = Invoke-RestMethod 'http://localhost:5270/api/workflows/' `
-	-Method Post -ContentType 'application/json' -Body $request -TimeoutSec 30
+	-Headers $headers -Method Post -ContentType 'application/json' -Body $request -TimeoutSec 30
 $uri = "http://localhost:5270/api/workflows/$($workflow.id)?feature=eventscheduling"
 
 for ($attempt = 0; $attempt -lt 30; $attempt++) {
-	$workflow = Invoke-RestMethod $uri -TimeoutSec 10
+	$workflow = Invoke-RestMethod $uri -Headers $headers -TimeoutSec 10
 	if ($workflow.status -ne 'running') { break }
 	Start-Sleep -Seconds 2
 }
@@ -72,7 +74,7 @@ if (@($workflow.evidence | Where-Object { $_.source -like "RAG $documentId chunk
 	throw 'Multi-Agent did not retrieve the exact smoke-test RAG document.'
 }
 if ($workflow.status -ne 'failed' -or $workflow.error -ne 'The AI gateway returned HTTP 503.') {
-	throw 'The keyless gateway must produce an explicit workflow failure, not a fabricated success.'
+	throw "The keyless gateway must produce an explicit workflow failure, not a fabricated success. Actual status: '$($workflow.status)'; error: '$($workflow.error)'."
 }
 
 docker compose -p $ComposeProjectName up --detach --no-deps --force-recreate multiagent.server
@@ -81,7 +83,7 @@ if ($LASTEXITCODE -ne 0) { throw 'Failed to recreate the Multi-Agent container.'
 $restored = $null
 for ($attempt = 0; $attempt -lt 30; $attempt++) {
 	try {
-		$restored = Invoke-RestMethod $uri -TimeoutSec 5
+		$restored = Invoke-RestMethod $uri -Headers $headers -TimeoutSec 5
 		break
 	}
 	catch {

@@ -10,11 +10,11 @@ public static class CampusHousingSeedData
         var students = users is null
             ? new[]
             {
-                new AcademicRecordsUser(1, "Jack", "Wang", "STU-000003"), new AcademicRecordsUser(2, "Maya", "Patel", "STU-000004"),
-                new AcademicRecordsUser(3, "Liam", "Chen", "STU-000005"), new AcademicRecordsUser(4, "Sofia", "Garcia", "STU-000006"),
-                new AcademicRecordsUser(5, "Noah", "Brown", "STU-000007"), new AcademicRecordsUser(6, "Ava", "Wilson", "STU-000008"),
-                new AcademicRecordsUser(7, "Ethan", "Davis", "STU-000009"), new AcademicRecordsUser(8, "Emma", "Miller", "STU-000010"),
-                new AcademicRecordsUser(9, "Oliver", "Moore", "STU-000011"), new AcademicRecordsUser(10, "Isabella", "Taylor", "STU-000012")
+                new AcademicRecordsUser(1, "Alec", "Steele", "STU001"), new AcademicRecordsUser(2, "Joyce", "Yap", "STU002"),
+                new AcademicRecordsUser(3, "Jack", "Wang", "STU003"), new AcademicRecordsUser(4, "Valin", "Kennedy", "STU004"),
+                new AcademicRecordsUser(5, "Ryan", "Takayasu", "STU005"), new AcademicRecordsUser(6, "Mia", "Chen", "STU006"),
+                new AcademicRecordsUser(7, "Noah", "Patel", "STU007"), new AcademicRecordsUser(8, "Ava", "Thompson", "STU008"),
+                new AcademicRecordsUser(9, "Liam", "Nguyen", "STU009"), new AcademicRecordsUser(10, "Sophie", "Martinez", "STU010")
             }
 
             : users.Where(user => user.UserId > 0 && !string.IsNullOrWhiteSpace(user.StudentId)).Take(10).ToArray();

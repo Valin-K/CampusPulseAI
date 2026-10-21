@@ -1,6 +1,6 @@
 ﻿@inherits LayoutComponentBase
 @inject FinancialAidUserContext UserContext
-@inject CampusAccountService Account
+@inject AccountService Account
 
 <CampusShell PageName="Financial Aid &amp; Billing"
              SectionLabel="Student finance"
@@ -46,7 +46,7 @@
 
 @code {
     [Inject]
-    private CampusDemoAuthenticationStateProvider DemoAuthentication { get; set; } = default!;
+    private AuthenticationStateProvider Authentication { get; set; } = default!;
 
     [Inject]
     private NavigationManager Navigation { get; set; } = default!;
@@ -54,7 +54,7 @@
     private bool redirectingToStudentLogin;
     private bool staffRedirectStarted;
     private bool IsStaffAccount => Account.CurrentUser is { } user
-        && CampusAccountService.IsStaff(user);
+        && AccountService.IsStaff(user);
 
     protected override async Task OnInitializedAsync()
     {
@@ -89,7 +89,7 @@
         redirectingToStudentLogin = true;
         if (IsStaffAccount)
         {
-            await DemoAuthentication.SignOutAsync();
+            await Authentication.SignOutAsync();
         }
 
         var returnUrl = Uri.EscapeDataString(Navigation.BaseUri);

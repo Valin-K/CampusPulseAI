@@ -9,6 +9,7 @@
 
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <ProjectReference Include="..\CampusPulse.Shared.Security\CampusPulse.Shared.Security.csproj" />
   </ItemGroup>
 
 </Project>

@@ -64,8 +64,6 @@
                                         {
                                             <button class="button button-small button-primary" @onclick="() => OpenPayment(invoice)">Pay</button>
                                         }
-                                        <button class="button button-small button-secondary" @onclick="() => BeginInvoiceEdit(invoice)">Edit</button>
-                                        <button class="button button-small button-danger" @onclick="() => DeleteInvoiceAsync(invoice)">Delete</button>
                                     </div></td>
                                 </tr>
                             }
@@ -75,16 +73,6 @@
             }
         </section>
 
-        <section class="surface-card">
-            <div class="section-heading"><div><span class="eyebrow">Staff demo</span><h2>@(editingInvoiceId is null ? "Create invoice" : $"Edit invoice #{editingInvoiceId}")</h2></div></div>
-            <form class="form-stack" @onsubmit="SaveInvoiceAsync" @onsubmit:preventDefault="true">
-                <label class="field"><span>Description</span><input @bind="invoiceDraft.Description" required maxlength="200" /></label>
-                <label class="field"><span>Amount</span><input type="number" min="0.01" step="0.01" @bind="invoiceDraft.Amount" required /></label>
-                <div class="form-grid"><label class="field"><span>Issue date</span><input type="date" @bind="invoiceDraft.IssueDate" /></label><label class="field"><span>Due date</span><input type="date" @bind="invoiceDraft.DueDate" /></label></div>
-                <label class="field"><span>Status</span><select @bind="invoiceDraft.Status">@foreach (var status in Enum.GetValues<InvoiceStatus>()) { <option value="@status">@status</option> }</select></label>
-                <div class="button-row"><button class="button button-primary" type="submit" disabled="@isSaving">@(isSaving ? "Saving…" : "Save invoice")</button>@if (editingInvoiceId is not null) { <button class="button button-secondary" type="button" @onclick="CancelInvoiceEdit">Cancel</button> }</div>
-            </form>
-        </section>
     </div>
 }
 else if (activeTab == "scholarships")
@@ -166,34 +154,21 @@ else if (activeTab == "scholarships")
                         <div class="card-topline"><span class="status-badge @(scholarship.IsActive ? "paid" : "overdue")">@(scholarship.IsActive ? "Active" : "Closed")</span><strong>@scholarship.AwardAmount.ToString("C0")</strong></div>
                         <h3>@scholarship.Name</h3><p>@scholarship.Description</p>
                         <ul class="detail-list"><li>GPA @scholarship.MinimumGpa.ToString("F2")+</li><li>@scholarship.EligibleMajor</li><li>Due @scholarship.ApplicationDeadline.ToString("MMM d, yyyy")</li></ul>
-                        <div class="button-row"><button class="button button-small button-secondary" @onclick="() => BeginScholarshipEdit(scholarship)">Edit</button><button class="button button-small button-danger" @onclick="() => DeleteScholarshipAsync(scholarship)">Delete</button></div>
                     </article>
                 }
             </div>
         </section>
 
-        <section class="surface-card">
-            <div class="section-heading"><div><span class="eyebrow">Aid office demo</span><h2>@(editingScholarshipId is null ? "Add scholarship" : "Edit scholarship")</h2></div></div>
-            <form class="form-stack" @onsubmit="SaveScholarshipAsync" @onsubmit:preventDefault="true">
-                <label class="field"><span>Name</span><input @bind="scholarshipDraft.Name" required maxlength="120" /></label>
-                <label class="field"><span>Description</span><textarea @bind="scholarshipDraft.Description" required maxlength="500"></textarea></label>
-                <div class="form-grid"><label class="field"><span>Award</span><input type="number" min="1" step="0.01" @bind="scholarshipDraft.AwardAmount" /></label><label class="field"><span>Minimum GPA</span><input type="number" min="0" max="4" step="0.01" @bind="scholarshipDraft.MinimumGpa" /></label></div>
-                <div class="form-grid"><label class="field"><span>Eligible major</span><input @bind="scholarshipDraft.EligibleMajor" /></label><label class="field"><span>Minimum year</span><input type="number" min="1" max="8" @bind="scholarshipDraft.MinimumYearLevel" /></label></div>
-                <label class="field"><span>Application deadline</span><input type="date" @bind="scholarshipDraft.ApplicationDeadline" /></label>
-                <label class="check-field"><input type="checkbox" @bind="scholarshipDraft.IsActive" /><span>Accepting applications</span></label>
-                <div class="button-row"><button class="button button-primary" type="submit">Save scholarship</button>@if (editingScholarshipId is not null) { <button class="button button-secondary" type="button" @onclick="CancelScholarshipEdit">Cancel</button> }</div>
-            </form>
-        </section>
     </div>
 }
 else
 {
     <section class="surface-card">
         <div class="section-heading"><div><span class="eyebrow">Receipts</span><h2>Payment history</h2></div></div>
-        <div class="responsive-table"><table><thead><tr><th>Reference</th><th>Invoice</th><th>Date</th><th>Method</th><th>Amount</th><th></th></tr></thead><tbody>
+        <div class="responsive-table"><table><thead><tr><th>Reference</th><th>Invoice</th><th>Date</th><th>Method</th><th>Amount</th></tr></thead><tbody>
             @foreach (var payment in payments.Where(item => item.StudentId == StudentId))
             {
-                <tr><td><strong>@payment.Reference</strong></td><td>#@payment.InvoiceId</td><td>@payment.PaidAtUtc.ToLocalTime().ToString("MMM d, yyyy")</td><td>@payment.Method</td><td>@payment.Amount.ToString("C")</td><td><button class="button button-small button-danger" @onclick="() => DeletePaymentAsync(payment)">Delete</button></td></tr>
+                <tr><td><strong>@payment.Reference</strong></td><td>#@payment.InvoiceId</td><td>@payment.PaidAtUtc.ToLocalTime().ToString("MMM d, yyyy")</td><td>@payment.Method</td><td>@payment.Amount.ToString("C")</td></tr>
             }
         </tbody></table></div>
     </section>
@@ -224,12 +199,8 @@ else
     private readonly List<InvoiceResponse> invoices = [];
     private readonly List<PaymentResponse> payments = [];
     private readonly List<ScholarshipResponse> scholarships = [];
-    private InvoiceInput invoiceDraft = new();
-    private ScholarshipInput scholarshipDraft = new();
     private PaymentInput paymentDraft = new();
     private InvoiceResponse? paymentInvoice;
-    private int? editingInvoiceId;
-    private int? editingScholarshipId;
     private string activeTab = "billing";
     private string? errorMessage;
     private string? successMessage;
@@ -240,7 +211,6 @@ else
     private McpIntegrationResponse? mcpIntegration;
     private RagAnswerResponse? ragAnswer;
     private bool isLoading;
-    private bool isSaving;
     private bool isRecommending;
     private bool isCheckingMcp;
     private bool isAskingRag;
@@ -277,22 +247,6 @@ else
         finally { isLoading = false; }
     }
 
-    private async Task SaveInvoiceAsync()
-    {
-        isSaving = true;
-        invoiceDraft.StudentId = StudentId;
-        await SaveAsync(editingInvoiceId is null
-            ? Http.PostAsJsonAsync("/api/invoices", invoiceDraft.ToRequest())
-            : Http.PutAsJsonAsync($"/api/invoices/{editingInvoiceId}", invoiceDraft.ToRequest()), "Invoice saved.");
-        if (errorMessage is null) CancelInvoiceEdit();
-        isSaving = false;
-    }
-
-    private void BeginInvoiceEdit(InvoiceResponse invoice) { editingInvoiceId = invoice.Id; invoiceDraft = InvoiceInput.From(invoice); }
-    private void CancelInvoiceEdit() { editingInvoiceId = null; invoiceDraft = new(); }
-
-    private async Task DeleteInvoiceAsync(InvoiceResponse invoice) => await DeleteAsync($"/api/invoices/{invoice.Id}", $"Invoice #{invoice.Id} deleted.");
-
     private void OpenPayment(InvoiceResponse invoice)
     {
         paymentInvoice = invoice;
@@ -307,20 +261,6 @@ else
         await SaveAsync(Http.PostAsJsonAsync("/api/payments", paymentDraft.ToRequest()), "Dummy payment recorded.");
         if (errorMessage is null) ClosePayment();
     }
-
-    private async Task DeletePaymentAsync(PaymentResponse payment) => await DeleteAsync($"/api/payments/{payment.Id}", $"Payment {payment.Reference} deleted.");
-
-    private async Task SaveScholarshipAsync()
-    {
-        await SaveAsync(editingScholarshipId is null
-            ? Http.PostAsJsonAsync("/api/scholarships", scholarshipDraft.ToRequest())
-            : Http.PutAsJsonAsync($"/api/scholarships/{editingScholarshipId}", scholarshipDraft.ToRequest()), "Scholarship saved.");
-        if (errorMessage is null) CancelScholarshipEdit();
-    }
-
-    private void BeginScholarshipEdit(ScholarshipResponse scholarship) { editingScholarshipId = scholarship.Id; scholarshipDraft = ScholarshipInput.From(scholarship); }
-    private void CancelScholarshipEdit() { editingScholarshipId = null; scholarshipDraft = new(); }
-    private async Task DeleteScholarshipAsync(ScholarshipResponse scholarship) => await DeleteAsync($"/api/scholarships/{scholarship.Id}", $"{scholarship.Name} deleted.");
 
     private async Task GetRecommendationsAsync()
     {

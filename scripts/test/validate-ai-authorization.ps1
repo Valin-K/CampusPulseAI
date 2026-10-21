@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-	Checks authenticated AI data paths in an isolated, running, keyless Compose stack.
+	Checks authenticated AI data paths in an isolated, running, AI-provider-keyless Compose stack.
 	Adds test RAG documents and workflows; temporarily disables and restores scholarships.
 #>
 param(
@@ -10,29 +10,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 if (-not $IsolatedTestStack) { throw 'Run this only against an isolated test stack.' }
-
-function ConvertTo-Base64Url([byte[]]$Bytes) {
-	return [Convert]::ToBase64String($Bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_')
-}
-
-function New-TestHeaders([bool]$IncludeScope) {
-	$now = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
-	$claims = @{
-		iss = 'CampusPulse.Dev'; aud = 'CampusPulse.Api'; sub = '4'; user_id = '4'
-		role = 'Student'; nbf = $now; exp = $now + 600
-	}
-	if ($IncludeScope) { $claims.scope = 'CampusPulse.Access' }
-	$header = ConvertTo-Base64Url ([Text.Encoding]::UTF8.GetBytes('{"alg":"HS256","typ":"JWT"}'))
-	$payload = ConvertTo-Base64Url ([Text.Encoding]::UTF8.GetBytes(($claims | ConvertTo-Json -Compress)))
-	$unsigned = "$header.$payload"
-	$hmac = New-Object Security.Cryptography.HMACSHA256
-	try {
-		$hmac.Key = [Text.Encoding]::UTF8.GetBytes('campuspulse-demo-only-signing-key-change-before-any-use')
-		$signature = ConvertTo-Base64Url ($hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($unsigned)))
-	}
-	finally { $hmac.Dispose() }
-	return @{ Authorization = "Bearer $unsigned.$signature" }
-}
+. "$PSScriptRoot/ai-authorization-helpers.ps1"
 
 function Assert-Rejected([string]$Uri, [hashtable]$Headers, [int]$ExpectedStatus,
 	[string]$Body = '{"question":"Test","task":"Test"}') {
@@ -47,10 +25,11 @@ function Assert-Rejected([string]$Uri, [hashtable]$Headers, [int]$ExpectedStatus
 	throw "Expected HTTP $ExpectedStatus from $Uri."
 }
 
-$gateway = Invoke-RestMethod 'http://localhost:5269/api/ai/status' -TimeoutSec 10
+$headers = New-CampusPulseTestHeaders $true
+$unscopedHeaders = New-CampusPulseTestHeaders $false
+$staffHeaders = New-CampusPulseTestHeaders -Role 'Staff'
+$gateway = Invoke-RestMethod 'http://localhost:5269/api/ai/status' -Headers $headers -TimeoutSec 10
 if ($gateway.generationAvailable -ne $false) { throw 'This test requires a keyless gateway.' }
-$headers = New-TestHeaders $true
-$unscopedHeaders = New-TestHeaders $false
 $features = @(
 	@{ Name = 'academicrecords'; Url = 'http://localhost:5020'; Tool = 'calculate_student_academic_statistics'; Arguments = @{ student_id = 'STU004' } }
 	@{ Name = 'coursemanagement'; Url = 'http://localhost:5118'; Tool = 'course.list_courses'; Arguments = @{} }
@@ -79,14 +58,14 @@ foreach ($feature in $features) {
 	$tool = Invoke-RestMethod 'http://localhost:5268/api/mcp/tools/call' -Headers $headers `
 		-Method Post -ContentType 'application/json' -TimeoutSec 30 `
 		-Body (@{ tool = $feature.Tool; arguments = $feature.Arguments } | ConvertTo-Json -Depth 5)
-	if ($tool.isError -ne $false -or $tool.tool -ne $feature.Tool) {
-		throw "$($feature.Name) MCP call failed."
+	if ($tool.isError -ne $false -or $tool.tool -ne $feature.Tool -or $null -eq $tool.result) {
+		throw "$($feature.Name) MCP call failed (tool='$($tool.tool)', isError='$($tool.isError)', resultPresent=$($null -ne $tool.result))."
 	}
 
 	$documentId = "authorization-test-$([guid]::NewGuid())"
 	$task = "Authorization connectivity evidence for $($feature.Name) $documentId"
 	$ingest = Invoke-RestMethod "http://localhost:5267/api/rag/$($feature.Name)/documents" `
-		-Method Post -ContentType 'application/json' -TimeoutSec 30 `
+		-Headers $headers -Method Post -ContentType 'application/json' -TimeoutSec 30 `
 		-Body (@{ documents = @(@{ id = $documentId; text = $task }) } | ConvertTo-Json -Depth 5)
 	if ($ingest.documents -ne 1) { throw "$($feature.Name) RAG ingestion failed." }
 
@@ -144,7 +123,7 @@ try {
 	foreach ($award in $scholarships) {
 		$disabled = $award | Select-Object *
 		$disabled.isActive = $false
-		Invoke-RestMethod "$billingUrl/api/scholarships/$($award.id)" -Headers $headers `
+		Invoke-RestMethod "$billingUrl/api/scholarships/$($award.id)" -Headers $staffHeaders `
 			-Method Put -ContentType 'application/json' -Body ($disabled | ConvertTo-Json) -TimeoutSec 10 | Out-Null
 	}
 	$recommendation = Invoke-RestMethod "$billingUrl/api/scholarships/recommendations/student/4" `
@@ -158,7 +137,7 @@ try {
 }
 finally {
 	foreach ($award in $scholarships) {
-		Invoke-RestMethod "$billingUrl/api/scholarships/$($award.id)" -Headers $headers `
+		Invoke-RestMethod "$billingUrl/api/scholarships/$($award.id)" -Headers $staffHeaders `
 			-Method Put -ContentType 'application/json' -Body ($award | ConvertTo-Json) -TimeoutSec 10 | Out-Null
 	}
 }

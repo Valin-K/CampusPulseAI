@@ -5,6 +5,8 @@ using CourseManagement.Backend.Contracts.Prerequisites;
 using CourseManagement.Backend.Services;
 using CourseManagement.Database.Data;
 using CourseManagement.Database.Models;
+using CampusPulse.Shared.Security;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -53,6 +55,7 @@ public sealed class CoursesController(
     }
 
     [HttpPost]
+    [Authorize(Policy = CampusPulseSecurityExtensions.StaffOnlyPolicy)]
     public async Task<ActionResult<CourseResponse>> Create(
         CourseRequest request,
         CancellationToken cancellationToken)
@@ -81,6 +84,7 @@ public sealed class CoursesController(
     }
 
     [HttpPut("{id:int}")]
+    [Authorize(Policy = CampusPulseSecurityExtensions.StaffOnlyPolicy)]
     public async Task<ActionResult<CourseResponse>> Update(
         int id,
         CourseRequest request,
@@ -112,6 +116,7 @@ public sealed class CoursesController(
     }
 
     [HttpPut("{id:int}/status")]
+    [Authorize(Policy = CampusPulseSecurityExtensions.StaffOnlyPolicy)]
     public async Task<ActionResult<CourseResponse>> SetStatus(
         int id,
         CourseStatusRequest request,
@@ -140,6 +145,7 @@ public sealed class CoursesController(
     }
 
     [HttpPut("{id:int}/grade-type")]
+    [Authorize(Policy = CampusPulseSecurityExtensions.StaffOnlyPolicy)]
     public async Task<ActionResult<CourseResponse>> SetGradeType(
         int id,
         CourseGradeTypeRequest request,
@@ -169,6 +175,7 @@ public sealed class CoursesController(
     }
 
     [HttpDelete("{id:int}")]
+    [Authorize(Policy = CampusPulseSecurityExtensions.StaffOnlyPolicy)]
     public async Task<IActionResult> Delete(int id, CancellationToken cancellationToken)
     {
         var course = await database.Courses.FindAsync([id], cancellationToken);

@@ -8,6 +8,8 @@ name: Cloud Deployment
 #   - AZURE_CLIENT_ID / AZURE_TENANT_ID / AZURE_SUBSCRIPTION_ID repo secrets, from an OIDC
 #     federated credential - no stored Azure password/secret exists anywhere.
 #   - A 'production' GitHub Environment (used below so the Azure login step is reviewable).
+#   - Key Vault 'kv-campuspulse' with secret 'CAMPUSPULSE-SIGNING-KEY' and (when AI is
+#     enabled) 'GEMINI-API-KEY'; the OIDC identity must be allowed to read those secrets.
 # GHCR push needs no extra secret - just the built-in GITHUB_TOKEN with packages: write.
 
 on:
@@ -168,11 +170,12 @@ jobs:
       - name: Deploy apps
         shell: pwsh
         env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          CAMPUSPULSE_KEY_VAULT_NAME: kv-campuspulse
         run: |
           $params = @{
             GitHubOwner = '${{ needs.prepare.outputs.owner }}'
             Tag         = '${{ needs.prepare.outputs.tag }}'
+            KeyVaultName = $env:CAMPUSPULSE_KEY_VAULT_NAME
           }
           if ('${{ github.event.inputs.warm_up }}' -eq 'true') { $params.WarmUp = $true }
           if ('${{ github.event.inputs.enable_ai }}' -eq 'true') { $params.EnableAi = $true }

@@ -1,6 +1,7 @@
 using System.Net;
 using CampusPulse.Shared.Ai;
 using CampusPulse.Shared.Ai.Gateway;
+using CampusPulse.Shared.Security;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = 2 * 1024 * 1024);
@@ -18,6 +19,7 @@ if (string.IsNullOrWhiteSpace(options.GenerationModel) || string.IsNullOrWhiteSp
 }
 
 builder.Services.AddSingleton(options);
+builder.Services.AddCampusPulseSecurity(builder.Configuration);
 builder.Services.AddHttpClient<GeminiService>(client =>
 {
     client.BaseAddress = new Uri("https://generativelanguage.googleapis.com/");
@@ -29,8 +31,10 @@ builder.Services.AddHttpClient<GeminiService>(client =>
 });
 
 var app = builder.Build();
-app.MapGet("/health", () => Results.Ok(new { status = "healthy", service = "ai-gateway" }));
-app.MapGet("/api/ai/status", (GeminiService gemini) => Results.Ok(gemini.Status));
+app.UseAuthentication();
+app.UseAuthorization();
+app.MapGet("/health", () => Results.Ok(new { status = "healthy", service = "ai-gateway" })).AllowAnonymous();
+app.MapGet("/api/ai/status", (GeminiService gemini) => Results.Ok(gemini.Status)).RequireAuthorization();
 app.MapPost("/api/ai/generate", async (
     AiGenerationRequest request, GeminiService gemini, ILogger<GeminiService> logger, CancellationToken cancellationToken) =>
 {
@@ -41,7 +45,7 @@ app.MapPost("/api/ai/generate", async (
     }
 
     return await ExecuteAsync(() => gemini.GenerateAsync(request.Prompt, request.Context, cancellationToken), logger, cancellationToken);
-});
+}).RequireAuthorization();
 app.MapPost("/api/ai/embeddings", async (
     AiEmbeddingRequest request, GeminiService gemini, ILogger<GeminiService> logger, CancellationToken cancellationToken) =>
 {
@@ -53,7 +57,7 @@ app.MapPost("/api/ai/embeddings", async (
     }
 
     return await ExecuteAsync(() => gemini.EmbedAsync(request.Texts, request.IsQuery, cancellationToken), logger, cancellationToken);
-});
+}).RequireAuthorization();
 app.Run();
 
 static async Task<IResult> ExecuteAsync<T>(
@@ -77,3 +81,5 @@ static async Task<IResult> ExecuteAsync<T>(
         return Results.Problem(statusCode: StatusCodes.Status504GatewayTimeout, title: "The AI provider request timed out.");
     }
 }
+
+public partial class Program { }

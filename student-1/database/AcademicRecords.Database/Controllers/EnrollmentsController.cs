@@ -1,6 +1,8 @@
 using AcademicRecords.Database.Contracts;
 using AcademicRecords.Database.Data;
 using AcademicRecords.Database.Models;
+using CampusPulse.Shared.Security;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -11,6 +13,7 @@ namespace AcademicRecords.Database.Controllers;
 public sealed class EnrollmentsController(AcademicRecordsDbContext database) : ControllerBase
 {
     [HttpPut("{enrollmentId:int}/grade")]
+    [Authorize(Policy = CampusPulseSecurityExtensions.StaffOnlyPolicy)]
     public async Task<IActionResult> UpdateGrade(
         int enrollmentId,
         GradeEntryRequest request,

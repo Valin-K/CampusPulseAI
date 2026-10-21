@@ -22,8 +22,8 @@ param enableAi bool = false
 param geminiApiKey string = ''
 
 @secure()
-@description('JWT signing key for universal sign-in, shared by all 5 backends so each can validate tokens Academic Records issues. Required even in the AI-disabled baseline - every backend throws on startup without it. Deploy-Apps.ps1 generates a fresh one on every run; this is demo-only auth (CampusDemoAuthenticationStateProvider), so tokens resetting on redeploy is expected.')
-param authSigningKey string
+@description('JWT signing key shared by secured services, stored as a Container Apps secret.')
+param campusPulseSigningKey string
 
 @description('0 normally (scale-to-zero). 1 during the showcase/marking window.')
 param minReplicas int = 0
@@ -109,14 +109,11 @@ module aiApps 'containerApp.bicep' = [
       image: '${registry}/campuspulse-${ai.name}:${imageTag}'
       targetPort: 8080
       external: false
-      env: [
-        for entry in (ai.name == 'ai-gateway'
-          ? concat(ai.env, [{ name: 'GEMINI_API_KEY', secretRef: 'gemini-api-key' }])
-          : ai.env): (contains(entry, 'value') && startsWith(entry.value, 'http://'))
-          ? { name: entry.name, value: internalUrl(substring(entry.value, 7, length(entry.value) - 7), environment.outputs.defaultDomain) }
-          : entry
-      ]
+      env: concat(ai.env,
+        ai.name == 'ai-gateway' ? [{ name: 'GEMINI_API_KEY', secretRef: 'gemini-api-key' }] : [],
+        [{ name: 'Authentication__SigningKey', secretRef: 'campuspulse-signing-key' }])
       geminiApiKey: ai.name == 'ai-gateway' ? geminiApiKey : ''
+      campusPulseSigningKey: campusPulseSigningKey
       minReplicas: ai.minReplicas
       maxReplicas: 1
       volumeMount: ai.name == 'multi-agent-server' ? { mountPath: '/app/data' } : {}
@@ -182,11 +179,8 @@ module databaseApps 'containerApp.bicep' = [
       image: '${registry}/campuspulse-${db.name}:${imageTag}'
       targetPort: 8080
       external: false
-      env: [
-        for entry in db.env: (contains(entry, 'value') && startsWith(entry.value, 'http://'))
-          ? { name: entry.name, value: internalUrl(substring(entry.value, 7, length(entry.value) - 7), environment.outputs.defaultDomain) }
-          : entry
-      ]
+      env: concat(db.env, [{ name: 'Authentication__SigningKey', secretRef: 'campuspulse-signing-key' }])
+      campusPulseSigningKey: campusPulseSigningKey
       minReplicas: minReplicas
       maxReplicas: 1
       volumeMount: { mountPath: '/app/data' }
@@ -207,7 +201,6 @@ var sharedAiDisabled = [
   { name: 'Services__McpServer', value: 'http://mcp-server' }
   { name: 'Services__RagServer', value: 'http://rag-server' }
   { name: 'Services__MultiAgentServer', value: 'http://multi-agent-server' }
-  { name: 'Authentication__SigningKey', secretRef: 'auth-signing-key' }
 ]
 
 var backends = [
@@ -222,12 +215,10 @@ var backends = [
     name: 'coursemgmt-api'
     // CORS is a browser-enforced check on cross-origin requests; with the nginx /api/ proxy
     // every real request is same-origin, so this only matters for direct testing. The
-    // 'external://' prefix (vs. 'http://' for internal-ingress apps) tells the module-call-site
-    // transform below to use the public URL pattern instead of the internal one.
+    // allowed origin is set to the public frontend URL at the module call site.
     env: concat(sharedAiDisabled, [
       { name: 'Services__AcademicRecordsDatabase', value: 'http://academicrecords-db' }
       { name: 'Services__CourseManagementDatabase', value: 'http://coursemgmt-db' }
-      { name: 'Cors__AllowedOrigins__0', value: 'external://coursemgmt-web' }
     ])
   }
   {
@@ -263,14 +254,13 @@ module backendApps 'containerApp.bicep' = [
       image: '${registry}/campuspulse-${api.name}:${imageTag}'
       targetPort: 8080
       external: false
-      env: [
-        for entry in api.env: (contains(entry, 'value') && startsWith(entry.value, 'http://'))
-          ? { name: entry.name, value: internalUrl(substring(entry.value, 7, length(entry.value) - 7), environment.outputs.defaultDomain) }
-          : (contains(entry, 'value') && startsWith(entry.value, 'external://'))
-            ? { name: entry.name, value: externalUrl(substring(entry.value, 11, length(entry.value) - 11), environment.outputs.defaultDomain) }
-            : entry
-      ]
-      authSigningKey: authSigningKey
+      env: api.name == 'coursemgmt-api'
+        ? concat(api.env, [
+            { name: 'Cors__AllowedOrigins__0', value: 'https://coursemgmt-web.${environment.outputs.defaultDomain}' }
+            { name: 'Authentication__SigningKey', secretRef: 'campuspulse-signing-key' }
+          ])
+        : concat(api.env, [{ name: 'Authentication__SigningKey', secretRef: 'campuspulse-signing-key' }])
+      campusPulseSigningKey: campusPulseSigningKey
       minReplicas: minReplicas
       maxReplicas: 2
     }

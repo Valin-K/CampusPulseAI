@@ -1,5 +1,6 @@
 using System.Net;
 using CampusPulse.Shared.Ai;
+using CampusPulse.Shared.Security;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -31,6 +32,28 @@ public sealed class MultiAgentAuthorizationForwardingTests
         {
             Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
             Assert.That(handler.Authorization, Is.EqualTo("Bearer workflow-token"));
+        });
+    }
+
+    [Test]
+    public async Task ForwardsAmbientAuthorizationDuringBackgroundWork()
+    {
+        var handler = new CapturingHandler();
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddMultiAgentCaller(new ConfigurationBuilder().Build());
+        services.Configure<HttpClientFactoryOptions>("multiAgent", options =>
+            options.HttpMessageHandlerBuilderActions.Add(
+                builder => builder.PrimaryHandler = handler));
+        using var provider = services.BuildServiceProvider();
+        using var authorization = provider.GetRequiredService<AuthorizationRequestContext>().Push("Bearer background-token");
+        using var client = provider.GetRequiredService<IHttpClientFactory>().CreateClient("multiAgent");
+        using var response = await client.GetAsync("api/workflows");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+            Assert.That(handler.Authorization, Is.EqualTo("Bearer background-token"));
         });
     }
 

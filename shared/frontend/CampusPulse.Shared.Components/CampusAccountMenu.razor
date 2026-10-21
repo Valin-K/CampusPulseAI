@@ -1,7 +1,7 @@
 @implements IDisposable
-@inject CampusAccountService Account
+@inject AccountService Account
 @inject NavigationManager Navigation
-@inject CampusDemoAuthenticationStateProvider DemoAuthentication
+@inject AuthenticationStateProvider Authentication
 @inject IJSRuntime JavaScript
 
 <div class="campus-account-menu" aria-label="Account">
@@ -41,7 +41,7 @@
 
     private async Task SignOutAsync()
     {
-        await DemoAuthentication.SignOutAsync();
+        await Authentication.SignOutAsync();
         await Account.InitializeAsync(forceRefresh: true);
         await JavaScript.InvokeVoidAsync("campusPulseNavigation.signOutEverywhere");
     }

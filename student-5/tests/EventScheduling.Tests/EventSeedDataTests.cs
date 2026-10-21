@@ -46,7 +46,7 @@ public sealed class EventSeedDataTests
         Assert.Multiple(() =>
         {
             Assert.That(bookings, Has.Count.EqualTo(51));
-            Assert.That(bookings.Count(booking => booking.StudentId == 4), Is.EqualTo(19));
+            Assert.That(bookings.Count(booking => booking.StudentId == 5), Is.EqualTo(19));
             Assert.That(bookings.Count(booking => booking.StudentId == 14), Is.EqualTo(32));
         });
     }

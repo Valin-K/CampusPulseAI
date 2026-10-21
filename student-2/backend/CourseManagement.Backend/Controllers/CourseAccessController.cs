@@ -1,6 +1,8 @@
 using CourseManagement.Backend.Clients;
 using CourseManagement.Backend.Configuration;
 using CourseManagement.Backend.Contracts.CourseAccess;
+using CampusPulse.Shared.Security;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 
@@ -8,6 +10,7 @@ namespace CourseManagement.Backend.Controllers;
 
 [ApiController]
 [Route("api/course-access")]
+[Authorize(Policy = CampusPulseSecurityExtensions.StaffOnlyPolicy)]
 public sealed class CourseAccessController(
     IAcademicRecordsClient academicRecords,
     IOptions<CourseAccessOptions> options,
