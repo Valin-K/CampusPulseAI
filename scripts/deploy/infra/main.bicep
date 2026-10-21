@@ -60,13 +60,14 @@ module environment 'environment.bicep' = {
   params: {
     location: location
     namePrefix: namePrefix
-    databaseShareNames: concat([
-      'academicrecords-data'
-      'coursemgmt-data'
-      'campushousing-data'
-      'finaid-data'
-      'eventscheduling-data'
-    ], enableAi ? ['multiagent-data'] : [])
+    // The 5 SQLite databases used to each get their own Azure Files share here, but Azure
+    // Files (SMB) does not reliably support the file locking SQLite needs - every deploy had a
+    // real chance of a new revision crash-looping forever on "database is locked" fighting the
+    // old revision (or even itself) for the same locked file. They now use each container's own
+    // local disk instead: data does not survive a restart/scale-to-zero, which is an accepted
+    // tradeoff for this assessment deployment (run with Deploy-Apps.ps1 -WarmUp during grading
+    // so nothing restarts mid-session). Multi-Agent's job queue still needs real persistence.
+    databaseShareNames: enableAi ? ['multiagent-data'] : []
   }
 }
 
@@ -135,12 +136,12 @@ module aiApps 'containerApp.bicep' = [
   }
 ]
 
-// ---- Databases (SQLite on Azure Files; maxReplicas must stay 1) ----
+// ---- Databases (SQLite on each container's own local disk; maxReplicas must stay 1 - see the
+// databaseShareNames comment above on environment.bicep for why this isn't Azure Files) ----
 
 var databases = [
   {
     name: 'academicrecords-db'
-    shareName: 'academicrecords-data'
     env: [
       { name: 'ASPNETCORE_HTTP_PORTS', value: '8080' }
       { name: 'ConnectionStrings__AcademicRecords', value: 'Data Source=/app/data/academic-records.db' }
@@ -148,7 +149,6 @@ var databases = [
   }
   {
     name: 'coursemgmt-db'
-    shareName: 'coursemgmt-data'
     env: [
       { name: 'ASPNETCORE_HTTP_PORTS', value: '8080' }
       { name: 'ConnectionStrings__CourseManagementDatabase', value: 'Data Source=/app/data/course-management.db;Foreign Keys=True' }
@@ -157,7 +157,6 @@ var databases = [
   }
   {
     name: 'campushousing-db'
-    shareName: 'campushousing-data'
     env: [
       { name: 'ASPNETCORE_HTTP_PORTS', value: '8080' }
       { name: 'ConnectionStrings__CampusHousing', value: 'Data Source=/app/data/campus-housing.db' }
@@ -166,7 +165,6 @@ var databases = [
   }
   {
     name: 'finaid-db'
-    shareName: 'finaid-data'
     env: [
       { name: 'ASPNETCORE_HTTP_PORTS', value: '8080' }
       { name: 'ConnectionStrings__FinancialAidBilling', value: 'Data Source=/app/data/financial-aid-billing.db' }
@@ -174,7 +172,6 @@ var databases = [
   }
   {
     name: 'eventscheduling-db'
-    shareName: 'eventscheduling-data'
     env: [
       { name: 'ASPNETCORE_HTTP_PORTS', value: '8080' }
       { name: 'ConnectionStrings__EventScheduling', value: 'Data Source=/app/data/event-scheduling.db' }
@@ -196,8 +193,6 @@ module databaseApps 'containerApp.bicep' = [
       campusPulseSigningKey: campusPulseSigningKey
       minReplicas: minReplicas
       maxReplicas: 1
-      volumeMount: { mountPath: '/app/data' }
-      storageName: db.shareName
     }
   }
 ]
