@@ -27,11 +27,6 @@
     4 services' chat orchestrators degrade by silently not offering the RAG/MCP route rather than
     returning an error code - that's correct, graceful behaviour, but not something a single
     automated assertion can observe. Confirm those via the UI screenshots in the report instead.
-
-    On any failed check, it prints that check's own apps' Container App revision health and any
-    recent error-looking console log lines directly into the CI log (via Write-AppDiagnostics) -
-    the same evidence that otherwise takes a manual `az containerapp revision list` /
-    `az monitor log-analytics query` round trip to find.
 #>
 param(
     [string]$ResourceGroupName = 'rg-campuspulse',
@@ -40,14 +35,15 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-# One known, real GET endpoint per frontend - the exact ones manually verified in Phase 1 - plus
-# the api/db pair behind it, so a failure can pull diagnostics for the actual apps involved.
+# One known, real GET endpoint per frontend - the exact ones manually verified in Phase 1.
 $services = @(
-    @{ App = 'academicrecords-web'; Path = '/api/users'; Api = 'academicrecords-api'; Db = 'academicrecords-db' }
-    @{ App = 'coursemgmt-web'; Path = '/api/courses'; Api = 'coursemgmt-api'; Db = 'coursemgmt-db' }
-    @{ App = 'campushousing-web'; Path = '/api/housing/rooms'; Api = 'campushousing-api'; Db = 'campushousing-db' }
-    @{ App = 'finaid-web'; Path = '/api/invoices'; Api = 'finaid-api'; Db = 'finaid-db' }
-    @{ App = 'eventscheduling-web'; Path = '/api/rooms'; Api = 'eventscheduling-api'; Db = 'eventscheduling-db' }
+    @{ App = 'academicrecords-web'; Path = '/api/users' }
+    # Not /api/course-access/users - that route is [Authorize(Policy = StaffOnlyPolicy)], and
+    # this script signs in as a seeded Student, so it would always get a correct 403 there.
+    @{ App = 'coursemgmt-web'; Path = '/api/courses' }
+    @{ App = 'campushousing-web'; Path = '/api/housing/rooms' }
+    @{ App = 'finaid-web'; Path = '/api/invoices' }
+    @{ App = 'eventscheduling-web'; Path = '/api/rooms' }
 )
 
 function Get-AppFqdn([string]$AppName) {
@@ -56,50 +52,6 @@ function Get-AppFqdn([string]$AppName) {
         throw "Could not resolve the FQDN for '$AppName' - is it deployed?"
     }
     return $fqdn
-}
-
-# Lazily resolved once, only if a check actually fails - avoids the extra az call on a clean run.
-$script:logAnalyticsWorkspaceId = $null
-function Get-LogAnalyticsWorkspaceId {
-    if (-not $script:logAnalyticsWorkspaceId) {
-        $script:logAnalyticsWorkspaceId = az monitor log-analytics workspace list --resource-group $ResourceGroupName --query '[0].customerId' --output tsv
-    }
-    return $script:logAnalyticsWorkspaceId
-}
-
-# Prints, directly into the CI log, exactly the diagnostics that otherwise take a manual
-# `az containerapp revision list` + `az monitor log-analytics query` round trip to find: each
-# app's revision health, and any recent error-looking lines from its own console output - the
-# same evidence that traced the SQLite "database is locked" failures back to their real cause.
-function Write-AppDiagnostics([string[]]$AppNames) {
-    Write-Host "`n--- Diagnostics ---" -ForegroundColor Yellow
-    foreach ($appName in $AppNames) {
-        Write-Host "`n[$appName] revisions:" -ForegroundColor Yellow
-        az containerapp revision list --resource-group $ResourceGroupName --name $appName `
-            --query '[].{name:name, active:properties.active, health:properties.healthState, running:properties.runningState, replicas:properties.replicas}' `
-            --output table
-    }
-
-    $workspaceId = Get-LogAnalyticsWorkspaceId
-    if ([string]::IsNullOrWhiteSpace($workspaceId)) {
-        Write-Host "`nNo Log Analytics workspace found for $ResourceGroupName - skipping log query." -ForegroundColor Yellow
-        return
-    }
-
-    foreach ($appName in $AppNames) {
-        Write-Host "`n[$appName] recent error-looking log lines (last 10 minutes):" -ForegroundColor Yellow
-        # A multi-line here-string query broke silently when passed through `az` as a single CLI
-        # argument on Windows (the where-clauses were dropped, dumping every log line unfiltered)
-        # - keep this on one line to avoid that.
-        $query = "ContainerAppConsoleLogs_CL | where ContainerAppName_s == '$appName' | where TimeGenerated > ago(10m) | where Log_s contains 'error' or Log_s contains 'exception' or Log_s contains 'fail:' or Log_s contains 'locked' or Log_s contains 'unhandled' | project TimeGenerated, Log_s | order by TimeGenerated asc | take 30"
-        $lines = az monitor log-analytics query --workspace $workspaceId --analytics-query $query --output tsv 2>&1
-        if ([string]::IsNullOrWhiteSpace($lines)) {
-            Write-Host "  (none found)"
-        } else {
-            $lines | ForEach-Object { Write-Host "  $_" }
-        }
-    }
-    Write-Host "--- End diagnostics ---`n" -ForegroundColor Yellow
 }
 
 $results = @()
@@ -120,10 +72,7 @@ $tokenBody = @{ AccountId = 'STU001'; Role = 'Student'; Password = 'test' } | Co
 $authHeaders = $null
 $authUrl = "https://$academicRecordsFqdn/api/auth/token"
 try {
-    $sw = [System.Diagnostics.Stopwatch]::StartNew()
     $tokenResponse = Invoke-WebRequest -Uri $authUrl -Method Post -Body $tokenBody -ContentType 'application/json' -UseBasicParsing -TimeoutSec 60
-    $sw.Stop()
-    Write-Host "  Sign-in responded in $($sw.Elapsed.TotalSeconds)s with status $($tokenResponse.StatusCode)."
     $accessToken = ($tokenResponse.Content | ConvertFrom-Json).accessToken
     if ([string]::IsNullOrWhiteSpace($accessToken)) {
         throw 'Sign-in returned 200 but no accessToken in the response body.'
@@ -134,12 +83,7 @@ try {
 catch {
     $statusCode = 'error'
     if ($_.Exception.Response) { $statusCode = [int]$_.Exception.Response.StatusCode }
-    Write-Host "  Sign-in failed: $($_.Exception.GetType().Name): $($_.Exception.Message)" -ForegroundColor Red
-    if ($_.Exception.InnerException) {
-        Write-Host "  Inner: $($_.Exception.InnerException.GetType().Name): $($_.Exception.InnerException.Message)" -ForegroundColor Red
-    }
     $results += [pscustomobject]@{ Check = 'authentication (STU001 sign-in)'; Url = $authUrl; Status = $statusCode; Passed = $false }
-    Write-AppDiagnostics -AppNames @('academicrecords-web', 'academicrecords-api', 'academicrecords-db')
 }
 
 if ($authHeaders) {
@@ -148,18 +92,13 @@ if ($authHeaders) {
         $url = "https://$fqdn$($service.Path)"
         Write-Host "Checking $($service.App)$($service.Path)..." -ForegroundColor Cyan
         try {
-            $sw = [System.Diagnostics.Stopwatch]::StartNew()
             $response = Invoke-WebRequest -Uri $url -Headers $authHeaders -UseBasicParsing -TimeoutSec 60
-            $sw.Stop()
-            Write-Host "  Responded in $($sw.Elapsed.TotalSeconds)s with status $($response.StatusCode)."
             $results += [pscustomobject]@{ Check = "$($service.App) CRUD read (web -> api -> db)"; Url = $url; Status = $response.StatusCode; Passed = ($response.StatusCode -eq 200) }
         }
         catch {
             $statusCode = 'error'
             if ($_.Exception.Response) { $statusCode = [int]$_.Exception.Response.StatusCode }
-            Write-Host "  Failed: $($_.Exception.GetType().Name): $($_.Exception.Message)" -ForegroundColor Red
             $results += [pscustomobject]@{ Check = "$($service.App) CRUD read (web -> api -> db)"; Url = $url; Status = $statusCode; Passed = $false }
-            Write-AppDiagnostics -AppNames @($service.App, $service.Api, $service.Db)
         }
     }
 } else {
@@ -185,10 +124,7 @@ if ($authHeaders) {
         # is read from the exception, not a successful return - this also works on Windows
         # PowerShell 5.1, which has no -SkipHttpErrorCheck parameter (added in PS 7.4+).
         try {
-            $sw = [System.Diagnostics.Stopwatch]::StartNew()
             $response = Invoke-WebRequest -Uri $url -Method Post -Headers $authHeaders -Body '{}' -ContentType 'application/json' -UseBasicParsing -TimeoutSec 60
-            $sw.Stop()
-            Write-Host "  Responded in $($sw.Elapsed.TotalSeconds)s with status $($response.StatusCode)."
             $passed = $response.StatusCode -eq $check.ExpectedStatus
             if ($EnableAi) { $passed = $passed -and (($response.Content | ConvertFrom-Json).isError -eq $false) }
             $results += [pscustomobject]@{ Check = "AI profile: $($check.Path) returns $($check.ExpectedStatus)"; Url = $url; Status = $response.StatusCode; Passed = $passed }
@@ -196,12 +132,7 @@ if ($authHeaders) {
         catch {
             $statusCode = 'error'
             if ($_.Exception.Response) { $statusCode = [int]$_.Exception.Response.StatusCode }
-            $passed = ($statusCode -eq $check.ExpectedStatus)
-            if (-not $passed) {
-                Write-Host "  Failed: $($_.Exception.GetType().Name): $($_.Exception.Message)" -ForegroundColor Red
-                Write-AppDiagnostics -AppNames @('finaid-web', 'finaid-api', 'finaid-db')
-            }
-            $results += [pscustomobject]@{ Check = "AI profile: $($check.Path) returns $($check.ExpectedStatus)"; Url = $url; Status = $statusCode; Passed = $passed }
+            $results += [pscustomobject]@{ Check = "AI profile: $($check.Path) returns $($check.ExpectedStatus)"; Url = $url; Status = $statusCode; Passed = ($statusCode -eq $check.ExpectedStatus) }
         }
     }
 } else {

@@ -60,14 +60,7 @@ module environment 'environment.bicep' = {
   params: {
     location: location
     namePrefix: namePrefix
-    // The 5 SQLite databases used to each get their own Azure Files share here, but Azure
-    // Files (SMB) does not reliably support the file locking SQLite needs - every deploy had a
-    // real chance of a new revision crash-looping forever on "database is locked" fighting the
-    // old revision (or even itself) for the same locked file. They now use each container's own
-    // local disk instead: data does not survive a restart/scale-to-zero, which is an accepted
-    // tradeoff for this assessment deployment (run with Deploy-Apps.ps1 -WarmUp during grading
-    // so nothing restarts mid-session). Multi-Agent's job queue still needs real persistence.
-    databaseShareNames: enableAi ? ['multiagent-data'] : []
+    databaseShareNames: []
   }
 }
 
@@ -130,8 +123,6 @@ module aiApps 'containerApp.bicep' = [
       campusPulseSigningKey: campusPulseSigningKey
       minReplicas: ai.minReplicas
       maxReplicas: 1
-      volumeMount: ai.name == 'multi-agent-server' ? { mountPath: '/app/data' } : {}
-      storageName: ai.name == 'multi-agent-server' ? 'multiagent-data' : ''
     }
   }
 ]
