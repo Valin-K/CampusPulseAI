@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   build-rag-server:
-    runs-on: campuspulse-runners
+    runs-on: ubuntu-latest
     timeout-minutes: 10
 
     steps:

@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   build-mcp-server:
-    runs-on: campuspulse-runners
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
       MCP_ENABLED: "true"

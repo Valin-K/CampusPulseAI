@@ -16,7 +16,7 @@ concurrency:
 jobs:
   build-and-validate-containers:
     name: Build solution and validate containers
-    runs-on: campuspulse-runners
+    runs-on: ubuntu-latest
 
     steps:
       - name: Check out source

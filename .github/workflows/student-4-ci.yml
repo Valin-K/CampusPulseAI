@@ -24,7 +24,7 @@ concurrency:
 jobs:
   build-test-and-smoke-test:
     name: Student 4 validation
-    runs-on: campuspulse-runners
+    runs-on: ubuntu-latest
 
     steps:
       - name: Check out source
