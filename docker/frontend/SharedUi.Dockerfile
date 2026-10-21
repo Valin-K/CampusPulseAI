@@ -4,6 +4,7 @@ COPY shared/frontend/index.html.template ./index.html.template
 COPY shared/frontend/assets ./assets
 COPY shared/frontend/css ./css
 COPY shared/frontend/js ./js
+COPY shared/frontend/campus-config.json.template ./campus-config.json.template
 COPY shared/frontend/portal-nginx.conf.template /etc/nginx/templates/default.conf.template
 
 # Default values match the local docker-compose port mapping, so no

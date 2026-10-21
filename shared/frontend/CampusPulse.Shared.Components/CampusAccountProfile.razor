@@ -3,6 +3,7 @@
 @using System.Text.Json
 @inject AccountService Account
 @inject NavigationManager Navigation
+@inject CampusEndpoints Endpoints
 
 <PageTitle>My profile | CampusPulse</PageTitle>
 
@@ -92,7 +93,7 @@ else if (profile is not null)
         if (Account.CurrentUser is null)
         {
             var returnUrl = Navigation.Uri;
-            Navigation.NavigateTo($"http://localhost:8081/login?returnUrl={Uri.EscapeDataString(returnUrl)}");
+            Navigation.NavigateTo(Endpoints.AccountUrl("login", returnUrl));
             return;
         }
 
