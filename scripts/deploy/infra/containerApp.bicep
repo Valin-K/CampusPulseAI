@@ -95,7 +95,7 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
               }
               initialDelaySeconds: 5
               periodSeconds: 5
-              failureThreshold: 20
+              failureThreshold: 60
             }
           ]
         }
