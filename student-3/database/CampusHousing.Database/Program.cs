@@ -2,6 +2,7 @@ using CampusHousing.Database.Data;
 using CampusHousing.Database.Models;
 using CampusPulse.Shared.Security;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 using System.Net.Http.Json;
@@ -10,7 +11,19 @@ using System.Security.Claims;
 var builder = Microsoft.AspNetCore.Builder.WebApplication.CreateBuilder(args);
 var connectionString = builder.Configuration.GetConnectionString("CampusHousing")
     ?? "Data Source=/app/data/campus-housing.db";
-builder.Services.AddDbContext<CampusHousingDbContext>(options => options.UseSqlite(connectionString));
+// Azure Files (SMB) does not reliably support the byte-range locking SQLite needs to acquire
+// and release a write lock per transaction - every repeated lock negotiation is a chance to see
+// "database is locked". Instead, acquire the lock ONCE via a single connection kept open and
+// exclusive for this container's entire lifetime, and have every DbContext reuse it.
+var sharedConnection = new SqliteConnection(connectionString);
+sharedConnection.Open();
+using (var pragma = sharedConnection.CreateCommand())
+{
+    pragma.CommandText = "PRAGMA journal_mode=MEMORY; PRAGMA locking_mode=EXCLUSIVE;";
+    pragma.ExecuteNonQuery();
+}
+builder.Services.AddSingleton(sharedConnection);
+builder.Services.AddDbContext<CampusHousingDbContext>(options => options.UseSqlite(sharedConnection));
 builder.Services.AddCampusPulseSecurity(builder.Configuration);
 var academicRecordsUrl = builder.Configuration["Services:AcademicRecordsDatabase"] ?? "http://localhost:5021";
 builder.Services.AddHttpClient("AcademicRecords", client => client.BaseAddress = new Uri(academicRecordsUrl.TrimEnd('/') + "/"));
@@ -23,7 +36,18 @@ if (!string.IsNullOrWhiteSpace(databaseDirectory)) Directory.CreateDirectory(dat
 await using (var scope = app.Services.CreateAsyncScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<CampusHousingDbContext>();
-    await db.Database.EnsureCreatedAsync();
+    for (var attempt = 1; ; attempt++)
+    {
+        try
+        {
+            await db.Database.EnsureCreatedAsync();
+            break;
+        }
+        catch (SqliteException ex) when (ex.SqliteErrorCode == 5 && attempt < 10)
+        {
+            await Task.Delay(TimeSpan.FromMilliseconds(500));
+        }
+    }
     var users = await GetAcademicRecordsUsersAsync(
         scope.ServiceProvider.GetRequiredService<IHttpClientFactory>().CreateClient("AcademicRecords"));
     await CampusHousingSeedData.EnsureSeededAsync(db, users);
