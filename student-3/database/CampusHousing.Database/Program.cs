@@ -11,7 +11,19 @@ using System.Security.Claims;
 var builder = Microsoft.AspNetCore.Builder.WebApplication.CreateBuilder(args);
 var connectionString = builder.Configuration.GetConnectionString("CampusHousing")
     ?? "Data Source=/app/data/campus-housing.db";
-builder.Services.AddDbContext<CampusHousingDbContext>(options => options.UseSqlite(connectionString));
+// Azure Files (SMB) does not reliably support the byte-range locking SQLite needs to acquire
+// and release a write lock per transaction - every repeated lock negotiation is a chance to see
+// "database is locked". Instead, acquire the lock ONCE via a single connection kept open and
+// exclusive for this container's entire lifetime, and have every DbContext reuse it.
+var sharedConnection = new SqliteConnection(connectionString);
+sharedConnection.Open();
+using (var pragma = sharedConnection.CreateCommand())
+{
+    pragma.CommandText = "PRAGMA journal_mode=MEMORY; PRAGMA locking_mode=EXCLUSIVE;";
+    pragma.ExecuteNonQuery();
+}
+builder.Services.AddSingleton(sharedConnection);
+builder.Services.AddDbContext<CampusHousingDbContext>(options => options.UseSqlite(sharedConnection));
 builder.Services.AddCampusPulseSecurity(builder.Configuration);
 var academicRecordsUrl = builder.Configuration["Services:AcademicRecordsDatabase"] ?? "http://localhost:5021";
 builder.Services.AddHttpClient("AcademicRecords", client => client.BaseAddress = new Uri(academicRecordsUrl.TrimEnd('/') + "/"));
