@@ -69,6 +69,35 @@ if ([Text.Encoding]::UTF8.GetByteCount($campusPulseSigningKey) -lt 32) {
 
 Write-Host "Deploying image tag '$Tag' to resource group '$ResourceGroupName' (AI enabled: $($EnableAi.IsPresent), minReplicas: $minReplicas)..." -ForegroundColor Cyan
 
+$databaseAppNames = @('academicrecords-db', 'coursemgmt-db', 'campushousing-db', 'finaid-db', 'eventscheduling-db')
+if ($EnableAi) { $databaseAppNames += 'multi-agent-server' }
+$existingApps = az containerapp list --resource-group $ResourceGroupName --query '[].name' --output json
+if ($LASTEXITCODE -ne 0) { throw 'Could not list existing apps; no database revisions have been stopped.' }
+$existingAppNames = @($existingApps | ConvertFrom-Json)
+$stoppedRevisions = @()
+foreach ($appName in $databaseAppNames) {
+    if ($appName -notin $existingAppNames) { continue }
+    $revisions = az containerapp revision list --resource-group $ResourceGroupName --name $appName --query '[?properties.active].name' --output json
+    if ($LASTEXITCODE -ne 0) { throw "Could not list revisions for '$appName'." }
+    foreach ($revision in @($revisions | ConvertFrom-Json)) {
+        Write-Host "Stopping SQLite revision '$revision' before replacement (brief database downtime)..."
+        az containerapp revision deactivate --resource-group $ResourceGroupName --name $appName --revision $revision --output none
+        if ($LASTEXITCODE -ne 0) { throw "Could not deactivate '$revision'; deployment stopped to avoid competing SQLite writers." }
+        $stoppedRevisions += @{ App = $appName; Revision = $revision }
+    }
+}
+
+$stopDeadline = (Get-Date).AddMinutes(5)
+foreach ($stopped in $stoppedRevisions) {
+    do {
+        $replicas = az containerapp replica list --resource-group $ResourceGroupName --name $stopped.App --revision $stopped.Revision --query '[].name' --output json
+        if ($LASTEXITCODE -ne 0) { throw "Could not confirm '$($stopped.Revision)' stopped; deployment aborted." }
+        if (@($replicas | ConvertFrom-Json).Count -eq 0) { break }
+        if ((Get-Date) -ge $stopDeadline) { throw "Timed out waiting for '$($stopped.Revision)' to stop; deployment aborted to protect SQLite." }
+        Start-Sleep -Seconds 5
+    } while ($true)
+}
+
 $deployment = az deployment group create `
     --resource-group $ResourceGroupName `
     --template-file $bicepFile `
@@ -76,7 +105,16 @@ $deployment = az deployment group create `
     --output json | ConvertFrom-Json
 
 if ($LASTEXITCODE -ne 0) {
-    throw "Deployment failed. Check the Azure CLI output above."
+    throw "Deployment failed. Database revisions were stopped and may need reactivation. Check the Azure CLI output above and the recovery steps in cloud-deployment-plan.md."
+}
+
+foreach ($appName in $databaseAppNames) {
+    $latestRevision = az containerapp show --resource-group $ResourceGroupName --name $appName --query 'properties.latestRevisionName' --output tsv
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($latestRevision)) {
+        throw "Could not find the latest revision for '$appName'."
+    }
+    az containerapp revision activate --resource-group $ResourceGroupName --name $appName --revision $latestRevision --output none
+    if ($LASTEXITCODE -ne 0) { throw "Could not activate '$latestRevision'." }
 }
 
 $portalUrl = $deployment.properties.outputs.portalUrl.value

@@ -171,6 +171,35 @@ Files share mounted into each database app, so nothing is lost when a container 
 running compute stops. Databases are additionally capped at `maxReplicas: 1`, since SQLite only tolerates
 one writer; this is a correctness requirement, not just a cost one.
 
+The replica cap applies **per revision**, not across a rolling update. The database services
+hold an exclusive SQLite connection for their lifetime, so an old revision can block its
+replacement from seeding and becoming healthy. Even Single revision mode keeps the old
+revision alive until the replacement is ready. `Deploy-Apps.ps1` therefore deactivates the
+database revisions and waits for their replicas to disappear before deploying, then activates
+the latest revision (including when reusing the same image tag). This deliberately introduces
+brief database downtime; it preserves the existing Azure Files data. Do not deploy these
+database apps directly with a rolling update. The optional Multi-Agent SQLite app is stopped
+the same way when deploying with AI enabled.
+
+#### Emergency recovery: sign-in hangs and SQLite reports "database is locked"
+
+Use the Azure subscription containing `rg-campuspulse`. In Container Apps, open each database
+app's **Revisions and replicas** page (`academicrecords-db` first, then `coursemgmt-db`,
+`campushousing-db`, `finaid-db`, and `eventscheduling-db`):
+
+1. Record the newest revision name/image. Deactivate **all** active revisions, including any
+   failed or activating revisions, and wait until their replicas have stopped.
+2. Activate **only the newest** revision and wait for it to become Healthy. Do not reactivate
+   the older revision alongside it. If startup still fails, inspect its full console logs;
+   lock errors alone do not establish database corruption.
+3. Sign in with the seeded assessment account and run `scripts\deploy\Test-CloudDeployment.ps1`
+   to verify the full web/API/database chain. For the marking window, use the normal deployment
+   script with `-WarmUp` to avoid scale-to-zero cold starts (this incurs compute cost).
+
+Do not delete the `.db`, journal files, or Azure Files shares to clear this error. If a deployment
+fails after stopping the databases, use the same stop-all/activate-one procedure to restore
+one known-good revision per app, never two revisions sharing the same SQLite file.
+
 The trade-off is a cold-start delay (worst case: web → api → db waking up in sequence) on the first
 request after idle. nginx's proxy timeout is set generously (120s) and backends retry their database
 connection on startup to absorb this.

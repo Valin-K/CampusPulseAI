@@ -54,6 +54,7 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
   properties: {
     environmentId: environmentId
     configuration: {
+      activeRevisionsMode: 'Single'
       secrets: concat(
         empty(geminiApiKey) ? [] : [{ name: 'gemini-api-key', value: geminiApiKey }],
         empty(campusPulseSigningKey) ? [] : [{ name: 'campuspulse-signing-key', value: campusPulseSigningKey }])
