@@ -4,7 +4,7 @@ using FinancialAidBilling.Frontend.Models;
 
 namespace FinancialAidBilling.Frontend.Services;
 
-public sealed class FinancialAidUserContext(CampusAccountService account)
+public sealed class FinancialAidUserContext(AccountService account)
 {
     public StudentProfile? CurrentUser { get; private set; }
     public bool IsInitialized { get; private set; }
@@ -33,7 +33,7 @@ public sealed class FinancialAidUserContext(CampusAccountService account)
                 return;
             }
 
-            if (!CampusAccountService.IsStudent(signedInUser))
+            if (!AccountService.IsStudent(signedInUser))
             {
                 ErrorMessage = "Financial Aid & Billing is available to student accounts.";
                 return;

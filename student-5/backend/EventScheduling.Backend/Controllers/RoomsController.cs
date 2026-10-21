@@ -1,4 +1,6 @@
 using EventScheduling.Backend.Models;
+using CampusPulse.Shared.Security;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace EventScheduling.Backend.Controllers;
@@ -24,6 +26,7 @@ public sealed class RoomsController(IHttpClientFactory httpClientFactory) : Cont
     }
 
     [HttpPost]
+    [Authorize(Policy = CampusPulseSecurityExtensions.StaffOnlyPolicy)]
     public async Task<IActionResult> Create(RoomRequest request, CancellationToken cancellationToken)
     {
         var response = await DatabaseClient.PostAsJsonAsync("/api/rooms", request, cancellationToken);
@@ -31,6 +34,7 @@ public sealed class RoomsController(IHttpClientFactory httpClientFactory) : Cont
     }
 
     [HttpPut("{id:int}")]
+    [Authorize(Policy = CampusPulseSecurityExtensions.StaffOnlyPolicy)]
     public async Task<IActionResult> Update(int id, RoomRequest request, CancellationToken cancellationToken)
     {
         var response = await DatabaseClient.PutAsJsonAsync($"/api/rooms/{id}", request, cancellationToken);
@@ -38,6 +42,7 @@ public sealed class RoomsController(IHttpClientFactory httpClientFactory) : Cont
     }
 
     [HttpDelete("{id:int}")]
+    [Authorize(Policy = CampusPulseSecurityExtensions.StaffOnlyPolicy)]
     public async Task<IActionResult> Delete(int id, CancellationToken cancellationToken)
     {
         var response = await DatabaseClient.DeleteAsync($"/api/rooms/{id}", cancellationToken);

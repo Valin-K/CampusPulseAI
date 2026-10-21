@@ -7,11 +7,28 @@ server {
     index  index.html;
 
     resolver 127.0.0.11 valid=10s;
+    # Azure Container Apps' internal ingress routes by SNI (many internal apps share one
+    # load-balancer IP); nginx doesn't send SNI to a variable-based HTTPS upstream unless
+    # told to, which silently resets the TLS handshake. Local HTTP upstreams ignore this.
+    proxy_ssl_server_name on;
 
     location /api/ {
-        set $backend_upstream http://${BACKEND_HOST}:${BACKEND_PORT};
+        set $backend_upstream ${BACKEND_BASE_URL};
         proxy_pass $backend_upstream$request_uri;
-        proxy_set_header Host $host;
+        # Azure's internal ingress routes by Host header too, not just SNI; forwarding the
+        # client's original Host prevents Envoy from matching the backend app.
+        proxy_set_header Host $proxy_host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 120s;
+    }
+
+    location /academic-api/ {
+        set $academic_records_api ${ACADEMICRECORDS_API_BASE_URL};
+        rewrite ^/academic-api/(.*)$ /$1 break;
+        proxy_pass $academic_records_api$uri$is_args$args;
+        proxy_set_header Host $proxy_host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;

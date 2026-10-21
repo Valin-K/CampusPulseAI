@@ -1,6 +1,7 @@
 using System.Net.Http.Json;
 using System.Text.Json;
 using CampusPulse.Shared.MultiAgent;
+using CampusPulse.Shared.Security;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -15,13 +16,12 @@ public static class MultiAgentEndpoints
 {
     public static IServiceCollection AddMultiAgentCaller(this IServiceCollection services, IConfiguration configuration)
     {
-        services.AddHttpContextAccessor();
-        services.AddTransient<CurrentRequestAuthorizationHandler>();
+        services.AddCampusPulseAuthorizationForwarding();
         services.AddHttpClient("multiAgent", client =>
         {
             client.BaseAddress = new Uri((configuration["Services:MultiAgentServer"] ?? "http://localhost:5270").TrimEnd('/') + "/");
             client.Timeout = TimeSpan.FromMinutes(6);
-        }).AddHttpMessageHandler<CurrentRequestAuthorizationHandler>();
+        }).ForwardCampusPulseAuthorization();
         return services;
     }
 
@@ -109,19 +109,4 @@ public static class MultiAgentEndpoints
         }
     }
 
-    private sealed class CurrentRequestAuthorizationHandler(IHttpContextAccessor contextAccessor) : DelegatingHandler
-    {
-        protected override Task<HttpResponseMessage> SendAsync(
-            HttpRequestMessage request,
-            CancellationToken cancellationToken)
-        {
-            var authorization = contextAccessor.HttpContext?.Request.Headers.Authorization;
-            if (authorization is { Count: > 0 } && !request.Headers.Contains("Authorization"))
-            {
-                request.Headers.TryAddWithoutValidation("Authorization", authorization.ToString());
-                }
-
-            return base.SendAsync(request, cancellationToken);
-        }
-    }
 }

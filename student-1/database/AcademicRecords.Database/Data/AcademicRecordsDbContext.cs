@@ -26,6 +26,7 @@ public sealed class AcademicRecordsDbContext(DbContextOptions<AcademicRecordsDbC
             entity.Property(user => user.FirstName).HasColumnName("first_name").HasMaxLength(100).IsRequired();
             entity.Property(user => user.LastName).HasColumnName("last_name").HasMaxLength(100).IsRequired();
             entity.Property(user => user.Email).HasColumnName("email").HasMaxLength(255).IsRequired();
+            entity.Property(user => user.PasswordHash).HasColumnName("password_hash").HasMaxLength(512).IsRequired();
             entity.Property(user => user.DateOfBirth).HasColumnName("date_of_birth").HasColumnType("DATE");
             entity.Property(user => user.Status).HasColumnName("status").HasMaxLength(3).IsRequired();
             entity.Property(user => user.PhoneNumber).HasColumnName("phone_number").HasMaxLength(10);

@@ -4,45 +4,13 @@ using CourseManagement.Backend.Clients;
 using CourseManagement.Backend.Configuration;
 using CourseManagement.Backend.Infrastructure;
 using CourseManagement.Backend.Services;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
+using CampusPulse.Shared.Security;
 using Microsoft.AspNetCore.Authorization;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
-var issuer = builder.Configuration["Authentication:Issuer"] ?? "CampusPulse.Dev";
-var audience = builder.Configuration["Authentication:Audience"] ?? "CampusPulse.Api";
-var signingKey = builder.Configuration["Authentication:SigningKey"]
-    ?? (builder.Environment.IsDevelopment()
-        ? "campuspulse-demo-only-signing-key-change-before-any-use"
-        : throw new InvalidOperationException("The token signing key is not configured."));
-var keyBytes = System.Text.Encoding.UTF8.GetBytes(signingKey);
-if (keyBytes.Length < 32)
-{
-    throw new InvalidOperationException("The token signing key must contain at least 32 bytes.");
-}
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options =>
-    {
-        options.TokenValidationParameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters
-        {
-            ValidateIssuer = true,
-            ValidIssuer = issuer,
-            ValidateAudience = true,
-            ValidAudience = audience,
-            ValidateIssuerSigningKey = true,
-            IssuerSigningKey = new Microsoft.IdentityModel.Tokens.SymmetricSecurityKey(keyBytes),
-            ValidateLifetime = true,
-            ClockSkew = TimeSpan.FromSeconds(30)
-        };
-    });
-builder.Services.AddAuthorization(options =>
-{
-    options.FallbackPolicy = new AuthorizationPolicyBuilder(JwtBearerDefaults.AuthenticationScheme)
-        .RequireAuthenticatedUser()
-        .RequireClaim("scope", "CampusPulse.Access")
-        .Build();
-});
+builder.Services.AddCampusPulseSecurity(builder.Configuration);
 const string courseManagementFrontendCorsPolicy = "CourseManagementFrontend";
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
     ?? throw new InvalidOperationException("Course Management CORS origins are not configured.");
@@ -82,7 +50,7 @@ builder.Services.AddHttpClient<IAcademicRecordsClient, AcademicRecordsClient>(cl
         academicRecordsDatabaseAddress,
         UriKind.Absolute);
     client.Timeout = TimeSpan.FromSeconds(5);
-});
+}).ForwardCampusPulseAuthorization();
 var courseManagementDatabaseAddress =
     builder.Configuration["Services:CourseManagementDatabase"]
     ?? throw new InvalidOperationException(
@@ -95,7 +63,7 @@ builder.Services.AddHttpClient(
             courseManagementDatabaseAddress,
             UriKind.Absolute);
         client.Timeout = TimeSpan.FromSeconds(30);
-    });
+    }).ForwardCampusPulseAuthorization();
 builder.Services.AddHttpClient<ICourseCatalogueClient, CourseCatalogueClient>(
     client =>
     {
@@ -103,13 +71,13 @@ builder.Services.AddHttpClient<ICourseCatalogueClient, CourseCatalogueClient>(
             courseManagementDatabaseAddress,
             UriKind.Absolute);
         client.Timeout = TimeSpan.FromSeconds(5);
-    });
+    }).ForwardCampusPulseAuthorization();
 builder.Services.AddScoped<DatabaseApiProxy>();
 builder.Services.AddHttpClient(CourseKnowledgeService.CatalogueClientName, client =>
 {
     client.BaseAddress = new Uri(courseManagementDatabaseAddress, UriKind.Absolute);
     client.Timeout = TimeSpan.FromSeconds(30);
-});
+}).ForwardCampusPulseAuthorization();
 builder.Services.AddMcpClient(client =>
 {
     client.BaseAddress = new Uri(
@@ -117,12 +85,12 @@ builder.Services.AddMcpClient(client =>
         ?? "http://localhost:5268",
         UriKind.Absolute);
     client.Timeout = TimeSpan.FromSeconds(30);
-});
+}).ForwardCampusPulseAuthorization();
 builder.Services.AddHttpClient<CampusPulse.Shared.Rag.Client.IRagServerClient, CampusPulse.Shared.Rag.Client.RagServerClient>(client =>
 {
     client.BaseAddress = new Uri(builder.Configuration["Services:RagServer"] ?? "http://localhost:5267");
     client.Timeout = TimeSpan.FromSeconds(90);
-});
+}).ForwardCampusPulseAuthorization();
 builder.Services.AddSingleton<CampusPulse.Shared.Rag.Generation.RagCitationParser>();
 builder.Services.AddScoped<CampusPulse.Shared.Rag.Assistant.RagKnowledgeService>();
 builder.Services.AddScoped<ICourseRagService, CourseKnowledgeService>();

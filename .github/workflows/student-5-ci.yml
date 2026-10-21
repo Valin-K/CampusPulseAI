@@ -18,7 +18,7 @@ env:
   RAG_ENABLED: "false"
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
+  group: student-5-ci-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
@@ -31,6 +31,9 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Create ephemeral JWT signing key
+        run: echo "CAMPUSPULSE_SIGNING_KEY=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
 
       - name: Detect changed paths
         id: filter
@@ -88,15 +91,17 @@ jobs:
         if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.student5 == 'true'
         shell: bash
         run: |
-          docker compose -p student-5-ci -f docker-compose.yml -f .github/docker-compose.student-5.ci.yml build ai.gateway academicrecords.database eventscheduling.database eventscheduling.backend eventscheduling.frontend
-          docker compose -p student-5-ci -f docker-compose.yml -f .github/docker-compose.student-5.ci.yml up --detach --no-build --no-deps ai.gateway academicrecords.database eventscheduling.database eventscheduling.backend eventscheduling.frontend
+          docker compose -p student-5-ci -f docker-compose.yml -f .github/docker-compose.student-5.ci.yml build --with-dependencies ai.gateway academicrecords.database academicrecords.backend eventscheduling.database eventscheduling.backend eventscheduling.frontend
+          docker compose -p student-5-ci -f docker-compose.yml -f .github/docker-compose.student-5.ci.yml up --detach --no-build ai.gateway academicrecords.database academicrecords.backend eventscheduling.database eventscheduling.backend eventscheduling.frontend
 
       - name: Smoke test Student 5 containers
         if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.student5 == 'true'
         shell: bash
         run: |
-          authorization_header="Authorization: Bearer $(python3 .github/scripts/create-ci-auth-token.py)"
-          endpoints=("http://localhost:5269/health" "http://localhost:18085/health" "http://localhost:18085/api/rooms" "http://localhost:18085/api/refequipment" "http://localhost:18085/api/equipment" "http://localhost:18085/api/bookings" "http://localhost:18085/api/users" "http://localhost:18085/api/users/4" "http://localhost:18086/")
+          set -euo pipefail
+          authorization_header="Authorization: Bearer $(python3 .github/scripts/create-ci-auth-token.py --account-id STU005 --role Student)"
+          staff_authorization_header="Authorization: Bearer $(python3 .github/scripts/create-ci-auth-token.py --account-id STF004 --role Staff)"
+          endpoints=("http://localhost:5269/health" "http://localhost:5020/health" "http://localhost:15521/health" "http://localhost:18085/health" "http://localhost:18085/api/rooms" "http://localhost:18085/api/refequipment" "http://localhost:18085/api/equipment" "http://localhost:18085/api/bookings" "http://localhost:18085/api/users" "http://localhost:18085/api/users/5" "http://localhost:18086/")
           for endpoint in "${endpoints[@]}"; do
             reachable=false
             for attempt in {1..30}; do
@@ -108,14 +113,14 @@ jobs:
             done
             if [ "$reachable" = false ]; then
               docker compose -p student-5-ci -f docker-compose.yml -f .github/docker-compose.student-5.ci.yml ps
-              docker compose -p student-5-ci -f docker-compose.yml -f .github/docker-compose.student-5.ci.yml logs --no-color ai.gateway academicrecords.database eventscheduling.database eventscheduling.backend eventscheduling.frontend
+              docker compose -p student-5-ci -f docker-compose.yml -f .github/docker-compose.student-5.ci.yml logs --no-color ai.gateway academicrecords.database academicrecords.backend eventscheduling.database eventscheduling.backend eventscheduling.frontend
               echo "Container did not respond successfully: $endpoint"
               exit 1
             fi
           done
-          curl -s -f -X POST http://localhost:18085/api/bookings -H "$authorization_header" -H 'Content-Type: application/json' -d '{"studentId":4,"roomId":2,"refEquipmentId":null,"resourceName":"CI smoke booking","startUtc":"2027-06-15T10:00:00Z","endUtc":"2027-06-15T11:00:00Z","status":1}' > /dev/null
-          curl -s -f -X POST http://localhost:18085/api/bookings -H "$authorization_header" -H 'Content-Type: application/json' -d '{"studentId":14,"roomId":9,"refEquipmentId":null,"resourceName":"CI smoke staff booking","startUtc":"2027-06-16T13:00:00Z","endUtc":"2027-06-16T15:00:00Z","status":1,"isStaff":true}' > /dev/null
-          curl -s -f -X PUT http://localhost:18085/api/bookings/1 -H "$authorization_header" -H 'Content-Type: application/json' -d '{"studentId":4,"roomId":1,"refEquipmentId":null,"resourceName":"CI smoke booking (updated)","startUtc":"2027-07-01T09:00:00Z","endUtc":"2027-07-01T10:00:00Z","status":1}' > /dev/null
+          curl -s -f -X POST http://localhost:18085/api/bookings -H "$authorization_header" -H 'Content-Type: application/json' -d '{"studentId":5,"roomId":2,"refEquipmentId":null,"resourceName":"CI smoke booking","startUtc":"2027-06-15T10:00:00Z","endUtc":"2027-06-15T11:00:00Z","status":1}' > /dev/null
+          curl -s -f -X POST http://localhost:18085/api/bookings -H "$staff_authorization_header" -H 'Content-Type: application/json' -d '{"studentId":14,"roomId":9,"refEquipmentId":null,"resourceName":"CI smoke staff booking","startUtc":"2027-06-16T13:00:00Z","endUtc":"2027-06-16T15:00:00Z","status":1,"isStaff":true}' > /dev/null
+          curl -s -f -X PUT http://localhost:18085/api/bookings/1 -H "$authorization_header" -H 'Content-Type: application/json' -d '{"studentId":5,"roomId":1,"refEquipmentId":null,"resourceName":"CI smoke booking (updated)","startUtc":"2027-07-01T09:00:00Z","endUtc":"2027-07-01T10:00:00Z","status":1}' > /dev/null
           curl -s -f -X POST http://localhost:18085/api/bookings/1/end -H "$authorization_header" > /dev/null
           curl -s -f -X POST http://localhost:18085/api/bookings/10/return -H "$authorization_header" > /dev/null
           curl -s -f -X DELETE http://localhost:18085/api/bookings/2 -H "$authorization_header" > /dev/null

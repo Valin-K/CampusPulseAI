@@ -8,6 +8,9 @@
 .PARAMETER ResourceGroupName
     Defaults to 'rg-campuspulse'.
 
+.PARAMETER EnableAi
+    Checks MCP connectivity instead of the baseline AI-disabled gates.
+
 .NOTES
     This checks the externally-reachable apps (frontends + portal) and, through their /api/
     proxy, the full web -> api -> database chain. It does not separately probe the internal-only
@@ -21,7 +24,8 @@
     automated assertion can observe. Confirm those via the UI screenshots in the report instead.
 #>
 param(
-    [string]$ResourceGroupName = 'rg-campuspulse'
+    [string]$ResourceGroupName = 'rg-campuspulse',
+    [switch]$EnableAi
 )
 
 $ErrorActionPreference = 'Stop'
@@ -70,21 +74,30 @@ foreach ($service in $services) {
     }
 }
 
-Write-Host "Checking Financial Aid's explicit AI-disabled gates..." -ForegroundColor Cyan
+Write-Host "Checking Financial Aid's AI profile gates..." -ForegroundColor Cyan
 $finaidFqdn = Get-AppFqdn -AppName 'finaid-web'
-foreach ($path in @('/api/assistant/mcp/integration', '/api/ai/knowledge')) {
-    $url = "https://$finaidFqdn$path"
+$aiChecks = @(
+    @{ Path = '/api/assistant/mcp/integration'; ExpectedStatus = 403 }
+    @{ Path = '/api/ai/knowledge'; ExpectedStatus = 403 }
+)
+if ($EnableAi) {
+    $aiChecks = @(@{ Path = '/api/assistant/mcp/integration'; ExpectedStatus = 200 })
+}
+foreach ($check in $aiChecks) {
+    $url = "https://$finaidFqdn$($check.Path)"
     # A 403 makes Invoke-WebRequest throw (it's not a 2xx), so the expected "disabled" response
     # is read from the exception, not a successful return - this also works on Windows
     # PowerShell 5.1, which has no -SkipHttpErrorCheck parameter (added in PS 7.4+).
     try {
         $response = Invoke-WebRequest -Uri $url -Method Post -Body '{}' -ContentType 'application/json' -UseBasicParsing -TimeoutSec 60
-        $results += [pscustomobject]@{ Check = "AI disabled: $path returns 403"; Url = $url; Status = $response.StatusCode; Passed = $false }
+        $passed = $response.StatusCode -eq $check.ExpectedStatus
+        if ($EnableAi) { $passed = $passed -and (($response.Content | ConvertFrom-Json).isError -eq $false) }
+        $results += [pscustomobject]@{ Check = "AI profile: $($check.Path) returns $($check.ExpectedStatus)"; Url = $url; Status = $response.StatusCode; Passed = $passed }
     }
     catch {
         $statusCode = 'error'
         if ($_.Exception.Response) { $statusCode = [int]$_.Exception.Response.StatusCode }
-        $results += [pscustomobject]@{ Check = "AI disabled: $path returns 403"; Url = $url; Status = $statusCode; Passed = ($statusCode -eq 403) }
+        $results += [pscustomobject]@{ Check = "AI profile: $($check.Path) returns $($check.ExpectedStatus)"; Url = $url; Status = $statusCode; Passed = ($statusCode -eq $check.ExpectedStatus) }
     }
 }
 

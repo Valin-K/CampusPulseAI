@@ -9,56 +9,47 @@ using Microsoft.IdentityModel.Tokens;
 namespace AcademicRecords.Backend.Controllers;
 
 [ApiController]
-[Route("api/auth/demo")]
-public sealed class DemoAuthenticationController(
+[Route("api/auth")]
+public sealed class AuthenticationController(
     IHttpClientFactory clients,
-    IConfiguration configuration,
-    IWebHostEnvironment environment) : ControllerBase
+    IConfiguration configuration) : ControllerBase
 {
     [AllowAnonymous]
-    [HttpGet("users")]
-    public async Task<ActionResult<IReadOnlyList<DemoUser>>> GetUsers(string? role, CancellationToken cancellationToken)
-    {
-        if (!environment.IsDevelopment())
-        {
-            return NotFound();
-        }
-
-        var users = await GetDirectoryUsersAsync(cancellationToken);
-        if (!string.IsNullOrWhiteSpace(role))
-        {
-            users = users.Where(user => string.Equals(user.Role, role, StringComparison.OrdinalIgnoreCase)).ToList();
-        }
-
-        return Ok(users);
-    }
-
-    [AllowAnonymous]
     [HttpPost("token")]
-    public async Task<ActionResult<DemoTokenResponse>> CreateToken(
-        DemoTokenRequest request,
+    public async Task<ActionResult<TokenResponse>> CreateToken(
+        TokenRequest request,
         CancellationToken cancellationToken)
     {
-        if (!environment.IsDevelopment())
-        {
-            return NotFound();
-        }
-
-        var users = await GetDirectoryUsersAsync(cancellationToken);
-        var user = users.SingleOrDefault(candidate => candidate.UserId == request.UserId
-            && string.Equals(candidate.Role, request.Role, StringComparison.OrdinalIgnoreCase));
-        if (user is null)
+        using var response = await clients.CreateClient("academicRecordsCredentials")
+            .PostAsJsonAsync("/api/users/authenticate", new
+            {
+                request.AccountId,
+                request.Role,
+                request.Password
+            }, cancellationToken);
+        if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
         {
             return Unauthorized();
         }
+
+        response.EnsureSuccessStatusCode();
+        var user = await response.Content.ReadFromJsonAsync<AuthenticatedUser>(cancellationToken: cancellationToken)
+            ?? throw new InvalidOperationException("The Academic Records database returned no authenticated user.");
+        var role = user.Role.ToUpperInvariant() switch
+        {
+            "STUDENT" => "Student",
+            "STAFF" => "Staff",
+            _ => throw new InvalidOperationException("The Academic Records database returned an unsupported user role.")
+        };
+        user = user with { Role = role };
 
         var issuer = configuration["Authentication:Issuer"]
             ?? throw new InvalidOperationException("The token issuer is not configured.");
         var audience = configuration["Authentication:Audience"]
             ?? throw new InvalidOperationException("The token audience is not configured.");
         var signingKey = configuration["Authentication:SigningKey"]
-            ?? "campuspulse-demo-only-signing-key-change-before-any-use";
-        if (Encoding.UTF8.GetByteCount(signingKey) < 32)
+            ?? throw new InvalidOperationException("The token signing key is not configured.");
+        if (string.IsNullOrWhiteSpace(signingKey) || Encoding.UTF8.GetByteCount(signingKey) < 32)
         {
             throw new InvalidOperationException("The token signing key must contain at least 32 bytes.");
         }
@@ -71,6 +62,7 @@ public sealed class DemoAuthenticationController(
         var subject = new ClaimsIdentity(
         [
             new Claim(JwtRegisteredClaimNames.Sub, user.UserId.ToString(System.Globalization.CultureInfo.InvariantCulture)),
+            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString("N")),
             new Claim("user_id", user.UserId.ToString(System.Globalization.CultureInfo.InvariantCulture)),
             new Claim(ClaimTypes.NameIdentifier, user.UserId.ToString(System.Globalization.CultureInfo.InvariantCulture)),
             new Claim(ClaimTypes.Name, user.FirstName + " " + user.LastName),
@@ -78,6 +70,14 @@ public sealed class DemoAuthenticationController(
             new Claim(ClaimTypes.Role, user.Role),
             new Claim("scope", "CampusPulse.Access")
         ]);
+        if (!string.IsNullOrWhiteSpace(user.StudentId))
+        {
+            subject.AddClaim(new Claim("student_id", user.StudentId));
+        }
+        if (!string.IsNullOrWhiteSpace(user.StaffId))
+        {
+            subject.AddClaim(new Claim("staff_id", user.StaffId));
+        }
         var descriptor = new SecurityTokenDescriptor
         {
             Issuer = issuer,
@@ -89,22 +89,14 @@ public sealed class DemoAuthenticationController(
         };
         var token = new JwtSecurityTokenHandler().CreateEncodedJwt(descriptor);
 
-        return Ok(new DemoTokenResponse(token, "Bearer", expires, user));
+        return Ok(new TokenResponse(token, "Bearer", expires, user));
     }
 
-    private async Task<List<DemoUser>> GetDirectoryUsersAsync(CancellationToken cancellationToken)
-    {
-        using var response = await clients.CreateClient("academicRecordsDatabase")
-            .GetAsync("/api/users", cancellationToken);
-        response.EnsureSuccessStatusCode();
-        return await response.Content.ReadFromJsonAsync<List<DemoUser>>(cancellationToken: cancellationToken) ?? [];
-    }
+    public sealed record TokenRequest(string AccountId, string Role, string Password);
 
-    public sealed record DemoTokenRequest(int UserId, string Role);
+    public sealed record TokenResponse(string AccessToken, string TokenType, DateTime ExpiresAt, AuthenticatedUser User);
 
-    public sealed record DemoTokenResponse(string AccessToken, string TokenType, DateTime ExpiresAt, DemoUser User);
-
-    public sealed record DemoUser(
+    public sealed record AuthenticatedUser(
         int UserId,
         string FirstName,
         string LastName,

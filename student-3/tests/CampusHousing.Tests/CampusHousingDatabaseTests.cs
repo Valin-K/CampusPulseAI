@@ -27,7 +27,7 @@ public sealed class CampusHousingDatabaseTests
         {
             Assert.That(db.DormRooms.Count(), Is.EqualTo(10));
             Assert.That(db.HousingAllocations.Count(), Is.EqualTo(10));
-            Assert.That(db.HousingAllocations.Single(allocation => allocation.Id == 1).StudentName, Is.EqualTo("Jack Wang"));
+            Assert.That(db.HousingAllocations.Single(allocation => allocation.Id == 1).StudentName, Is.EqualTo("Alec Steele"));
             Assert.That(db.MaintenanceTickets.Count(), Is.EqualTo(10));
             Assert.That(db.DormRooms.Single(room => room.Id == 1).Building, Is.EqualTo("Maple Hall"));
             Assert.That(db.DormRooms.Single(room => room.Id == 2).IsAvailable, Is.True);
@@ -63,7 +63,7 @@ public sealed class CampusHousingDatabaseTests
         db.HousingAllocations.Add(new()
         {
             DormRoomId = 1,
-            StudentId = "STU-000003",
+            StudentId = "STU001",
             StudentName = "Another Name"
         });
 

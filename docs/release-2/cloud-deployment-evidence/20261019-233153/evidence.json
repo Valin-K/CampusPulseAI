@@ -1,0 +1,50 @@
+﻿[
+    {
+        "Check":  "portal root",
+        "Url":  "https://campuspulse-portal.bluesea-ede2f3bb.australiaeast.azurecontainerapps.io/",
+        "Status":  200,
+        "Passed":  true
+    },
+    {
+        "Check":  "academicrecords-web CRUD read (web -\u003e api -\u003e db)",
+        "Url":  "https://academicrecords-web.bluesea-ede2f3bb.australiaeast.azurecontainerapps.io/api/users",
+        "Status":  401,
+        "Passed":  false
+    },
+    {
+        "Check":  "coursemgmt-web CRUD read (web -\u003e api -\u003e db)",
+        "Url":  "https://coursemgmt-web.bluesea-ede2f3bb.australiaeast.azurecontainerapps.io/api/course-access/users",
+        "Status":  401,
+        "Passed":  false
+    },
+    {
+        "Check":  "campushousing-web CRUD read (web -\u003e api -\u003e db)",
+        "Url":  "https://campushousing-web.bluesea-ede2f3bb.australiaeast.azurecontainerapps.io/api/housing/rooms",
+        "Status":  401,
+        "Passed":  false
+    },
+    {
+        "Check":  "finaid-web CRUD read (web -\u003e api -\u003e db)",
+        "Url":  "https://finaid-web.bluesea-ede2f3bb.australiaeast.azurecontainerapps.io/api/invoices",
+        "Status":  401,
+        "Passed":  false
+    },
+    {
+        "Check":  "eventscheduling-web CRUD read (web -\u003e api -\u003e db)",
+        "Url":  "https://eventscheduling-web.bluesea-ede2f3bb.australiaeast.azurecontainerapps.io/api/rooms",
+        "Status":  401,
+        "Passed":  false
+    },
+    {
+        "Check":  "AI profile: /api/assistant/mcp/integration returns 403",
+        "Url":  "https://finaid-web.bluesea-ede2f3bb.australiaeast.azurecontainerapps.io/api/assistant/mcp/integration",
+        "Status":  401,
+        "Passed":  false
+    },
+    {
+        "Check":  "AI profile: /api/ai/knowledge returns 403",
+        "Url":  "https://finaid-web.bluesea-ede2f3bb.australiaeast.azurecontainerapps.io/api/ai/knowledge",
+        "Status":  401,
+        "Passed":  false
+    }
+]

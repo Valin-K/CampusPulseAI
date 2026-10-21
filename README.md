@@ -67,6 +67,11 @@ Open `CampusPulseAI.slnx` in Visual Studio 2026. The solution includes the `dock
 
 When the solution is first opened, allow Visual Studio to restore NuGet packages. Package versions are managed centrally in `Directory.Packages.props`.
 
+The repository's `NuGet.Config` restores packages from nuget.org only, overriding
+inherited machine/user package sources for this solution. This avoids `NU1507`
+errors with central package management when unrelated private feeds are configured
+on your machine; those feeds remain unchanged for other repositories.
+
 ## Run the complete environment in Visual Studio
 
 1. Start Docker Desktop and confirm it is running.
@@ -74,9 +79,10 @@ When the solution is first opened, allow Visual Studio to restore NuGet packages
 3. In **Solution Explorer**, right-click the solution and choose **Set Startup Projects**.
 4. Select **Multiple startup projects** if necessary and set `docker-compose` to **Start**. Alternatively, select the `docker-compose` project directly and choose **Set as Startup Project**.
 5. In the Visual Studio debug target selector, choose **Docker Compose**.
-6. Press **F5** to build the images, start the services, attach the debugger, and launch the configured browser target. Use **Ctrl+F5** to run without the debugger.
+6. Set `CAMPUSPULSE_SIGNING_KEY` in the environment used by Visual Studio to a private random value of at least 32 bytes. Generate one in PowerShell with `[Convert]::ToHexString([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))`, then save it in a local, untracked `.env` file in the repository root. Never commit the value.
+7. Press **F5** to build the images, start the services, attach the debugger, and launch the configured browser target. Use **Ctrl+F5** to run without the debugger.
 
-The Compose configuration starts the databases, backend APIs, shared AI gateway, and frontend containers. Visual Studio starts MCP, RAG, and the separate Multi-Agent Server on the host through `scripts\launch-local-ai-services.ps1`. Multi-agent coordination is not part of the Gemini transport gateway. The frontend URLs are:
+The Compose configuration starts the databases, backend APIs, shared AI gateway, MCP, RAG, Multi-Agent Server, and frontend containers. No host-side AI launcher is needed. Multi-agent coordination is not part of the Gemini transport gateway. The frontend URLs are:
 
 | Application | URL |
 | --- | --- |
@@ -88,6 +94,10 @@ The Compose configuration starts the databases, backend APIs, shared AI gateway,
 | Shared UI | `http://localhost:8080` |
 
 Backend containers expose port `8080` inside the Compose network. Visual Studio may assign host ports dynamically for services that do not have an explicit host-port mapping. Use the **Containers** window to see the actual host ports and service status.
+
+Student and staff sign-in remain separate. Enter the Student ID or Staff ID and password
+on the appropriate role-specific sign-in page; the page does not request or display a
+directory of user accounts before authentication.
 
 ## Student 4: MCP and RAG features
 
@@ -111,12 +121,14 @@ In **Financial Aid and Billing** (`http://localhost:8084`), open **Scholarships*
   `/api/ai/knowledge` uses the same corpus for the shared assistant.
 - **Check MCP registration** remains a diagnostic; it is not the substantive MCP feature.
 
-Run Academic Records, the billing database/backend, the AI gateway, and the host
-MCP/RAG services (`.\scripts\launch-local-ai-services.ps1`). Student 4 uses
+Run the complete environment with `docker compose up --build -d`. Student 4 uses
 `Services:McpServer` (default `http://localhost:5268`) and `Services:RagServer`
-(default `http://localhost:5267`); Compose supplies `host.docker.internal` URLs.
+(default `http://localhost:5267`); Compose supplies `http://mcp.server:8080` and
+`http://rag.server:8080` URLs.
 Authenticated MCP and multi-agent workflow requests forward their bearer token
-through the host services to protected Academic Records or Course Management APIs.
+through the AI containers to protected Academic Records or Course Management APIs.
+Scholarship recommendations also forward that token on the direct Academic Records
+profile lookup; the downstream APIs still require authentication and the access scope.
 MCP must also be able to reach those APIs. Dependency failures and timeouts are
 surfaced, not replaced with fabricated statistics or an incomplete catalogue.
 
@@ -138,6 +150,14 @@ Visual Studio provides a graphical view of the Docker resources used by the solu
 Do not remove running containers while Visual Studio is debugging unless you intend to stop the current Compose session. Stop debugging first, then restart the Compose profile to recreate the environment.
 
 ## Run with Docker Compose from a terminal
+
+Set a private signing key in the repository-root `.env` file before starting the stack:
+
+```powershell
+CAMPUSPULSE_SIGNING_KEY=<a private random value of at least 32 bytes>
+```
+
+Generate a value in PowerShell with `[Convert]::ToHexString([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))`. Keep it local and untracked; do not commit it.
 
 The same environment can be started without Visual Studio:
 
@@ -186,9 +206,8 @@ Set `GEMINI_API_KEY` in the repository-root `.env` (never commit it). Compose in
 - RAG uses the same gateway for generation and embeddings. Retrieval and citations remain in RAG.
 - This is a Gemini transport gateway, **not** a multi-agent server, router, or tool executor.
 
-Start the gateway with `docker compose up --build -d ai.gateway`. For terminal-based
-development, also run `.\scripts\launch-local-ai-services.ps1` for MCP, RAG, and Multi-Agent.
-Host services connect to `http://localhost:5269`; Compose backends use `http://ai.gateway:8080`.
+Start the AI containers with `docker compose up --build -d ai.gateway mcp.server rag.server multiagent.server`.
+Host tools connect to `http://localhost:5269`; Compose services use `http://ai.gateway:8080`.
 Override `Services__AiGateway` when using another address. Only the gateway configures
 `Gemini__GenerationModel`, `Gemini__EmbeddingModel`, and `Gemini__EmbeddingDimensions`.
 
@@ -205,11 +224,11 @@ and its host port is bound to loopback only. Do not expose it publicly without
 service authentication and rate limiting. The separate Python developer agentic-loop
 tool below is not part of the application gateway migration.
 
-## Shared local Multi-Agent Server
+## Shared Multi-Agent Server
 
 All five applications expose the same reviewed workflow through **Ask AI > Planner /
 Worker / Reviewer workflow**. Each backend collects its live catalogue before calling
-the host server at `http://localhost:5270`. The agents run sequentially using the
+the `multiagent.server` container (host tools use `http://localhost:5270`). The agents run sequentially using the
 existing Gemini gateway. No additional model-provider key is required; the gateway
 also accepts `GEMINI_API_KEY` inherited from the Windows user environment.
 
@@ -219,15 +238,25 @@ can be turned off or can explicitly fall back to application evidence when
 unavailable; gateway/model failures do **not** generate fake successful outputs.
 Workflow state and coordination events survive server restarts.
 
-Start the host services with `.\scripts\launch-local-ai-services.ps1`, or run
-`dotnet run --project .\ai-services\multi-agent-server\MultiAgentServer\MultiAgentServer.csproj`.
+Start it with `docker compose up --build -d multiagent.server`. Workflow history is
+stored in the `multiagent-data` named volume and survives container recreation.
+RAG collections remain in memory and must be re-ingested after a RAG restart.
+MCP, RAG, and Multi-Agent expose loopback-only host ports 5268, 5267, and 5270.
+For host-only development, the optional `.\scripts\launch-local-ai-services.ps1`
+launcher remains available; do not run it alongside Compose on those same ports.
 Terminal callers use `.\scripts\invoke-multi-agent.ps1`; full setup, API contracts,
 human-review commands, evidence exports, and validation are documented in
 [the Multi-Agent guide](ai-services/multi-agent-server/README.md).
 
-This implementation covers the server and application callers only. Pre-commit
-scans, student CI endpoint workflows, Azure deployment, and developer agentic-loop
-review-mode changes are separate Release 2 tasks.
+The cloud workflow builds and publishes all four AI images. Its `enable_ai` option
+(or `Deploy-Apps.ps1 -EnableAi`) deploys them as internal Azure Container Apps;
+the default cloud baseline still leaves AI disabled. Cloud deployment reads
+`CAMPUSPULSE-SIGNING-KEY` and, when AI is enabled, `GEMINI-API-KEY` from Key Vault
+`kv-campuspulse`, using the workflow variable `CAMPUSPULSE_KEY_VAULT_NAME`. The Azure OIDC
+identity must have permission to read those secrets. `Deploy-Apps.ps1` accepts `-KeyVaultName`
+to use a different vault. Local Compose continues to use `GEMINI_API_KEY` and
+`CAMPUSPULSE_SIGNING_KEY` from `.env`. See the
+[cloud deployment guide](docs/release-2/cloud-deployment-plan.md).
 
 ## Run and test .NET projects locally
 
@@ -246,6 +275,18 @@ dotnet run --project .\student-5\backend\EventScheduling.Backend\EventScheduling
 ```
 
 The local Event Scheduling backend uses `http://localhost:5021` when started with its `http` launch profile. Frontend projects are Blazor WebAssembly applications and are normally easiest to run through Visual Studio or their project launch profile.
+
+Integration CI also runs `scripts\test\validate-ai-containers.ps1` against its
+isolated keyless Compose stack. It checks AI health, container-to-container MCP/RAG
+evidence collection, explicit generation failure without a key, and workflow
+persistence after recreating the Multi-Agent container.
+
+`scripts\test\validate-ai-authorization.ps1 -IsolatedTestStack` also checks all
+five applications' protected AI endpoints, live workflow evidence, authenticated
+MCP calls, per-feature RAG retrieval, scholarship profile forwarding, and keyless
+knowledge, academic-progress, and booking-assistant responses. Run it
+only against an isolated keyless stack; it adds test documents/workflows and
+temporarily disables and restores scholarships to exercise a real no-match result.
 
 ## Run the shared agentic loop
 

@@ -1,5 +1,6 @@
 using EventScheduling.Backend.Clients;
 using EventScheduling.Backend.Models;
+using CampusPulse.Shared.Security;
 using Microsoft.AspNetCore.Mvc;
 
 namespace EventScheduling.Backend.Controllers;
@@ -29,10 +30,12 @@ public sealed class BookingsController(
     [HttpPost]
     public async Task<IActionResult> Create(BookingRequest request, CancellationToken cancellationToken)
     {
+        if (!User.TryGetUserId(out _) || User.IsInRole("Student") && !User.CanAccessUser(request.StudentId)) return Forbid();
         try
         {
             var users = await academicRecords.GetUsersAsync(cancellationToken);
-            if (!users.Any(user => user.UserId == request.StudentId))
+            if (!users.Any(user => user.UserId == request.StudentId
+                    && string.Equals(user.Role, User.IsInRole("Staff") ? "Staff" : "Student", StringComparison.OrdinalIgnoreCase)))
             {
                 return BookingProblem(
                     "The booking could not be verified against a current student or staff record.", "RuleBreach");
@@ -43,12 +46,17 @@ public sealed class BookingsController(
             // Academic Records is down - let the database tier's own validation decide.
         }
 
+        request = request with { IsStaff = User.IsInRole("Staff") };
         return await ForwardAsync(() => DatabaseClient.PostAsJsonAsync("/api/bookings", request, cancellationToken), cancellationToken);
     }
 
     [HttpPut("{id:int}")]
-    public async Task<IActionResult> Update(int id, BookingRequest request, CancellationToken cancellationToken) =>
-        await ForwardAsync(() => DatabaseClient.PutAsJsonAsync($"/api/bookings/{id}", request, cancellationToken), cancellationToken);
+    public async Task<IActionResult> Update(int id, BookingRequest request, CancellationToken cancellationToken)
+    {
+        if (User.IsInRole("Student")
+            && !User.CanAccessUser(request.StudentId)) return Forbid();
+        return await ForwardAsync(() => DatabaseClient.PutAsJsonAsync($"/api/bookings/{id}", request, cancellationToken), cancellationToken);
+    }
 
     [HttpPost("{id:int}/return")]
     public async Task<IActionResult> Return(int id, [FromBody] ReturnRequest? request, CancellationToken cancellationToken) =>

@@ -1,6 +1,10 @@
 using AcademicRecords.Database.Contracts;
 using AcademicRecords.Database.Data;
 using AcademicRecords.Database.Models;
+using AcademicRecords.Database.Services;
+using CampusPulse.Shared.Security;
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -15,6 +19,7 @@ public sealed class StudentsController(AcademicRecordsDbContext database) : Cont
         int userId,
         CancellationToken cancellationToken)
     {
+        if (!User.CanAccessUser(userId)) return Forbid();
         var value = await database.Students.AsNoTracking()
             .Include(student => student.Enrollments).ThenInclude(enrollment => enrollment.AcademicTerm)
             .SingleOrDefaultAsync(student => student.UserId == userId, cancellationToken);
@@ -24,6 +29,7 @@ public sealed class StudentsController(AcademicRecordsDbContext database) : Cont
     }
 
     [HttpGet]
+    [Authorize(Policy = CampusPulseSecurityExtensions.StaffOnlyPolicy)]
     public async Task<ActionResult<IReadOnlyList<StudentProfileResponse>>> GetAll(
         CancellationToken cancellationToken)
     {
@@ -37,10 +43,16 @@ public sealed class StudentsController(AcademicRecordsDbContext database) : Cont
     }
 
     [HttpPost("enroll")]
+    [AllowAnonymous]
     public async Task<IActionResult> Enroll(
         EnrollStudentRequest request,
         CancellationToken cancellationToken)
     {
+        if (!UserPasswordSecurity.IsValidNewPassword(request.Password, request.ConfirmPassword))
+        {
+            return BadRequest("Password must be 12 to 128 characters and match the confirmation.");
+        }
+
         if (string.IsNullOrWhiteSpace(request.FirstName) || string.IsNullOrWhiteSpace(request.LastName) ||
             string.IsNullOrWhiteSpace(request.Email) || request.DateOfBirth is null ||
             string.IsNullOrWhiteSpace(request.MailingAddress) || string.IsNullOrWhiteSpace(request.EmergencyContactName) ||
@@ -79,6 +91,7 @@ public sealed class StudentsController(AcademicRecordsDbContext database) : Cont
             Major = request.Major?.Trim(),
             SubMajor = request.SubMajor?.Trim()
         };
+        student.PasswordHash = UserPasswordSecurity.HashPassword(student, request.Password);
         database.Add(student);
 
         if (request.AcademicTermId is not null)
@@ -108,6 +121,7 @@ public sealed class StudentsController(AcademicRecordsDbContext database) : Cont
         {
             return NotFound("Student was not found.");
         }
+        if (!CanAccessStudent(student.StudentId)) return Forbid();
 
         if (string.IsNullOrWhiteSpace(request.CourseCode) || request.AcademicTermId <= 0)
         {
@@ -143,6 +157,8 @@ public sealed class StudentsController(AcademicRecordsDbContext database) : Cont
             .SingleOrDefaultAsync(student => student.StudentId == studentId, cancellationToken);
         var student = value is null ? null : CreateStudentProfileResponse(value);
 
+        if (student is not null && !CanAccessStudent(student.StudentId)) return Forbid();
+
         return student is null ? NotFound() : Ok(student);
     }
 
@@ -158,7 +174,7 @@ public sealed class StudentsController(AcademicRecordsDbContext database) : Cont
         {
             return NotFound("Student was not found.");
         }
-
+        if (!CanAccessStudent(student.StudentId)) return Forbid();
         if (string.IsNullOrWhiteSpace(request.FirstName) || string.IsNullOrWhiteSpace(request.LastName) ||
             string.IsNullOrWhiteSpace(request.Email) || request.DateOfBirth is null ||
             string.IsNullOrWhiteSpace(request.MailingAddress) || string.IsNullOrWhiteSpace(request.EmergencyContactName) ||
@@ -199,6 +215,7 @@ public sealed class StudentsController(AcademicRecordsDbContext database) : Cont
     }
 
     [HttpPut("{studentId}/graduation")]
+    [Authorize(Policy = CampusPulseSecurityExtensions.StaffOnlyPolicy)]
     public async Task<IActionResult> UpdateGraduation(
         string studentId,
         GraduationUpdateRequest request,
@@ -272,4 +289,7 @@ public sealed class StudentsController(AcademicRecordsDbContext database) : Cont
                 enrollment.AcademicYear, enrollment.Status, null,
                 enrollment.GradeValue, enrollment.IsFinalized)).ToList(),
             value.GraduationDate);
+
+    private bool CanAccessStudent(string studentId) =>
+        User.CanAccessStudent(studentId);
 }

@@ -5,7 +5,7 @@ namespace EventScheduling.Database.Data;
 
 public static class EventSeedData
 {
-    private const int StudentId = 4;
+    private const int StudentId = 5;
     private const int TeacherId = 14;
 
     public static async Task InitializeAsync(EventSchedulingDbContext database)

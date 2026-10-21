@@ -1,7 +1,7 @@
 # Shared Multi-Agent Server
 
 Release 2 server/caller implementation, following ASD Lab 10's roles and evidence
-flow. It is a non-containerised .NET service, separate from the transport-only
+flow. It is a containerised .NET service, separate from the transport-only
 Gemini gateway and the Python developer agentic loop.
 
 ## Integrated flow
@@ -10,7 +10,7 @@ Gemini gateway and the Python developer agentic loop.
 Five Blazor UIs / PowerShell terminal
   -> assigned backend /api/multi-agent/workflows
   -> live read-only application catalogue + optional user evidence
-  -> shared host Multi-Agent Server :5270
+  -> shared Multi-Agent Server (multiagent.server:8080; host port 5270)
   -> optional MCP tool + relevant RAG source retrieval
   -> Planner (objective, ordered steps, evidence requirements)
   -> Worker (draft, exact evidence IDs, limitations; receives planner output)
@@ -42,19 +42,27 @@ be inferred from these catalogues.
 
 ## Local configuration
 
-Run the integrated application's databases, backends, frontends, and Gemini gateway
-as usual, then:
+Run the complete environment:
 
 ```powershell
-.\scripts\launch-local-ai-services.ps1
+docker compose up --build -d
 ```
 
-The launcher builds each service before starting it, avoiding simultaneous builds
-of shared dependencies. It starts MCP on 5268, RAG on 5267, and Multi-Agent on 5270.
-No Multi-Agent Compose service is added. Local Compose backends explicitly enable
-the caller and use `http://host.docker.internal:5270`.
+Compose starts MCP on loopback port 5268, RAG on 5267, and Multi-Agent on 5270.
+Backends explicitly enable the caller and use `http://multiagent.server:8080`.
+The server uses container DNS for MCP, RAG, and the gateway, and stores SQLite
+workflow history in `/app/data/multi-agent.db` on the `multiagent-data` named volume.
+Do not use `docker compose down --volumes` unless you intend to delete that history.
 
-Alternatively run just the server:
+Backend callers forward the current bearer token when starting or correcting a
+workflow. The server retains it only in the in-memory queue for that execution and
+uses a separate MCP HTTP client per job. Tokens are never persisted with workflows,
+sent to models or RAG, or included in evidence exports. Correction rounds use the
+review request's current token. Protected downstream APIs still enforce token
+expiry and scope; expired credentials produce an explicit dependency failure (or
+the caller's selected optional-dependency fallback), not an authentication bypass.
+
+Alternatively run just the server on the host (stop its container first):
 
 ```powershell
 dotnet run --project .\ai-services\multi-agent-server\MultiAgentServer\MultiAgentServer.csproj
@@ -81,10 +89,10 @@ Worker, and Reviewer have distinct prompts and structured output contracts while
 using the gateway's configured generation model. Dependency URLs and Gemini model
 configuration remain independently configurable.
 
-Production/cloud is disabled by default. The repository's local Compose file
-explicitly enables callers; a future cloud deployment must override
-`MultiAgent__Enabled=false` and not launch this host service. Cloud deployment is
-outside this change's scope.
+Production/cloud is disabled by default. `Deploy-Apps.ps1 -EnableAi` or the cloud
+workflow's `enable_ai` input deploys the four AI containers internally and enables
+callers. Set `GEMINI_API_KEY` for the gateway. Multi-Agent uses one always-running
+replica while enabled (its queue is in-process) and an Azure Files share for history.
 
 ## Frontend demonstration
 
@@ -229,7 +237,7 @@ correction, stale decisions; persistence/restart; invalid inputs and agent outpu
 explicit dependency fallback and strict failure; exact RAG threshold; direct
 HTTP APIs; all five feature callers collecting live evidence and exporting audit.
 
-Assessment mapping: this component supplies the shared non-containerised server,
+Assessment mapping: this component supplies the shared containerised server,
 Planner -> Worker -> Reviewer -> Human Review through UI and terminal, and workflow
 history/coordination evidence. Security scan hooks, CI workflows, Azure deployment,
 developer agentic-loop extensions, and the group report/video are separate tasks.

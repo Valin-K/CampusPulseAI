@@ -58,7 +58,7 @@ public static class InvoiceSeedData
     private static Invoice Invoice(int id, string description, decimal amount, DateOnly issued, DateOnly due, InvoiceStatus status) => new()
     {
         Id = id,
-        StudentId = 4,
+        StudentId = 5,
         Description = description,
         Amount = amount,
         IssueDate = issued,
@@ -70,7 +70,7 @@ public static class InvoiceSeedData
     {
         Id = id,
         InvoiceId = invoiceId,
-        StudentId = 4,
+        StudentId = 5,
         Amount = amount,
         PaidAtUtc = paidAtUtc,
         Method = method,

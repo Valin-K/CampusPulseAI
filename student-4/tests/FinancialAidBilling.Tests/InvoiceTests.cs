@@ -27,29 +27,29 @@ public sealed class InvoiceTests
     }
 
     [Test]
-    public async Task GetInvoicesAsync_ReturnsTenSeededRecordsForStudentFour()
+    public async Task GetInvoicesAsync_ReturnsTenSeededRecordsForStudentFive()
     {
         await using var database = CreateDatabase();
         await database.Database.EnsureCreatedAsync();
         await InvoiceSeedData.InitializeAsync(database);
 
-        var invoices = await database.Invoices.AsNoTracking().Where(invoice => invoice.StudentId == 4).ToListAsync();
+        var invoices = await database.Invoices.AsNoTracking().Where(invoice => invoice.StudentId == 5).ToListAsync();
 
         Assert.That(invoices, Has.Count.EqualTo(10));
-        Assert.That(invoices, Has.All.Property(nameof(Invoice.StudentId)).EqualTo(4));
+        Assert.That(invoices, Has.All.Property(nameof(Invoice.StudentId)).EqualTo(5));
     }
 
     [Test]
-    public async Task GetPaymentsAsync_ReturnsTenSeededRecordsForStudentFour()
+    public async Task GetPaymentsAsync_ReturnsTenSeededRecordsForStudentFive()
     {
         await using var database = CreateDatabase();
         await database.Database.EnsureCreatedAsync();
         await InvoiceSeedData.InitializeAsync(database);
 
-        var payments = await database.Payments.AsNoTracking().Where(payment => payment.StudentId == 4).ToListAsync();
+        var payments = await database.Payments.AsNoTracking().Where(payment => payment.StudentId == 5).ToListAsync();
 
         Assert.That(payments, Has.Count.EqualTo(10));
-        Assert.That(payments, Has.All.Property(nameof(Payment.StudentId)).EqualTo(4));
+        Assert.That(payments, Has.All.Property(nameof(Payment.StudentId)).EqualTo(5));
     }
 
     [Test]

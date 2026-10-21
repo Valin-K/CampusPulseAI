@@ -17,6 +17,11 @@
     </None>
     <None Include="docker-compose.yml" />
     <None Include=".dockerignore" />
+    <None Include="NuGet.Config" />
+    <None Include="scripts\test\validate-ai-authorization.ps1" />
+    <None Include="scripts\test\validate-ai-containers.ps1" />
+    <None Include="shared\backend\CampusPulse.Shared.Security\CampusPulse.Shared.Security.csproj" />
+    <None Include="shared\backend\CampusPulse.Shared.Security\CampusPulseSecurityExtensions.cs" />
     <None Include="shared\frontend\assets\campus-pulse-logo.svg" />
     <None Include="shared\frontend\CampusPulse.Shared.Components\CampusMetricCard.razor" />
     <None Include="shared\frontend\CampusPulse.Shared.Components\CampusMetricCard.razor.css" />
@@ -45,9 +50,6 @@
     <None Include="student-5\database\EventScheduling.Database\Dockerfile" />
     <None Include="student-5\database\EventScheduling.Database\EventScheduling.Database.csproj" />
   </ItemGroup>
-  <Target Name="StartLocalAiServices" BeforeTargets="DockerPrepareForLaunch" Condition="'$(BuildingInsideVisualStudio)' == 'true'">
-    <Exec Command="&quot;$(SystemRoot)\System32\WindowsPowerShell\v1.0\powershell.exe&quot; -NoProfile -NonInteractive -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\scripts\launch-local-ai-services.ps1&quot;" />
-  </Target>
   <Target Name="OpenAcademicRecordsFrontend" AfterTargets="DockerPrepareForLaunch" Condition="'$(BuildingInsideVisualStudio)' == 'true'">
     <Exec Command="&quot;$(SystemRoot)\System32\WindowsPowerShell\v1.0\powershell.exe&quot; -NoProfile -NonInteractive -Command &quot;Start-Process -WindowStyle Hidden -FilePath '$(SystemRoot)\System32\WindowsPowerShell\v1.0\powershell.exe' -ArgumentList '-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File','$(MSBuildProjectDirectory)\scripts\launch-compose-browser.ps1'&quot;" />
   </Target>

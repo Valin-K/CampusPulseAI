@@ -1,5 +1,7 @@
 using CourseManagement.Backend.Services;
 using CourseManagement.Database.Data;
+using CampusPulse.Shared.Security;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -10,6 +12,7 @@ var connectionString = builder.Configuration.GetConnectionString(
 builder.Services.AddDbContext<CourseManagementDbContext>(options =>
     options.UseSqlite(connectionString));
 builder.Services.AddControllers();
+builder.Services.AddCampusPulseSecurity(builder.Configuration);
 builder.Services
     .AddOptions<SyllabusStorageOptions>()
     .Bind(builder.Configuration.GetSection(SyllabusStorageOptions.SectionName))
@@ -38,6 +41,8 @@ builder.WebHost.ConfigureKestrel(options =>
 builder.Services.AddSingleton<ISyllabusStorage, FileSystemSyllabusStorage>();
 
 var app = builder.Build();
+app.UseAuthentication();
+app.UseAuthorization();
 
 using (var scope = app.Services.CreateScope())
 {
@@ -48,7 +53,7 @@ using (var scope = app.Services.CreateScope())
 }
 
 app.MapControllers();
-app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
+app.MapGet("/health", () => Results.Ok(new { status = "healthy" })).AllowAnonymous();
 
 await app.RunAsync();
 

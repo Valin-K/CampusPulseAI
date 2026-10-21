@@ -14,7 +14,7 @@ permissions:
   pull-requests: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
+  group: student-1-ci-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
@@ -28,6 +28,9 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Create ephemeral JWT signing key
+        run: echo "CAMPUSPULSE_SIGNING_KEY=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
 
       - name: Detect changed paths
         id: filter
@@ -101,7 +104,7 @@ jobs:
         shell: bash
         run: |
           docker compose -f docker-compose.yml -f .github/docker-compose.student-1-ci.yml -p student-1-ci config --quiet
-          docker compose -f docker-compose.yml -f .github/docker-compose.student-1-ci.yml -p student-1-ci build ai.gateway academicrecords.database academicrecords.backend academicrecords.frontend
+          docker compose -f docker-compose.yml -f .github/docker-compose.student-1-ci.yml -p student-1-ci build --with-dependencies ai.gateway academicrecords.database academicrecords.backend academicrecords.frontend
           docker compose -f docker-compose.yml -f .github/docker-compose.student-1-ci.yml -p student-1-ci up --detach --wait --no-build ai.gateway academicrecords.database academicrecords.backend academicrecords.frontend
 
       - name: Smoke test Student 1 endpoints
@@ -109,14 +112,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          authorization_header="Authorization: Bearer $(python3 .github/scripts/create-ci-auth-token.py)"
+          student_authorization_header="Authorization: Bearer $(python3 .github/scripts/create-ci-auth-token.py --account-id STU001 --role Student)"
+          staff_authorization_header="Authorization: Bearer $(python3 .github/scripts/create-ci-auth-token.py --account-id STF001 --role Staff)"
 
           endpoints=(
             "http://localhost:5269/health"
             "http://localhost:5020/health"
+            "http://localhost:5021/health"
             "http://localhost:5020/api/users"
-            "http://localhost:5020/api/students"
-            "http://localhost:5020/api/staff"
             "http://localhost:5020/api/students/by-user/1"
             "http://localhost:8081/"
           )
@@ -125,7 +128,29 @@ jobs:
             reachable=0
             for attempt in {1..30}; do
               if curl --silent --show-error --fail --max-time 5 \
-                --header "$authorization_header" "$endpoint" > /dev/null; then
+                --header "$student_authorization_header" "$endpoint" > /dev/null; then
+                reachable=1
+                break
+              fi
+              sleep 2
+            done
+
+            if [ "$reachable" -eq 0 ]; then
+              echo "Container endpoint did not respond successfully: $endpoint"
+              exit 1
+            fi
+          done
+
+          staff_endpoints=(
+            "http://localhost:5020/api/students"
+            "http://localhost:5020/api/staff"
+          )
+
+          for endpoint in "${staff_endpoints[@]}"; do
+            reachable=0
+            for attempt in {1..30}; do
+              if curl --silent --show-error --fail --max-time 5 \
+                --header "$staff_authorization_header" "$endpoint" > /dev/null; then
                 reachable=1
                 break
               fi
@@ -140,9 +165,9 @@ jobs:
 
           student_response=$(curl --silent --show-error --fail --max-time 5 \
             -X POST http://localhost:5020/api/students/enroll \
-            --header "$authorization_header" \
+            --header "$student_authorization_header" \
             -H 'Content-Type: application/json' \
-            -d '{"firstName":"CI","lastName":"Student","email":"ci.student@example.edu","dateOfBirth":"2000-01-01","mailingAddress":"1 CI Way","emergencyContactName":"CI Contact","emergencyContactPhone":"0400000000","phoneNumber":"0400000001","degree":"Bachelor of Testing","major":"Software Engineering","academicTermId":15,"courseCode":"CI999","academicYear":2026}')
+            -d '{"firstName":"CI","lastName":"Student","email":"ci.student@example.edu","dateOfBirth":"2000-01-01","mailingAddress":"1 CI Way","emergencyContactName":"CI Contact","emergencyContactPhone":"0400000000","phoneNumber":"0400000001","degree":"Bachelor of Testing","major":"Software Engineering","academicTermId":15,"courseCode":"CI999","academicYear":2026,"password":"StrongPassword!2026","confirmPassword":"StrongPassword!2026"}')
           student_id=$(printf '%s' "$student_response" | jq --raw-output '.studentId')
           if [ -z "$student_id" ] || [ "$student_id" = "null" ]; then
             echo "Student enrollment response did not contain a studentId: $student_response"
@@ -150,12 +175,12 @@ jobs:
           fi
 
           curl --silent --show-error --fail --max-time 5 \
-            --header "$authorization_header" \
+            --header "$staff_authorization_header" \
             "http://localhost:5020/api/students/$student_id" > /dev/null
 
           curl --silent --show-error --fail --max-time 5 \
             -X PUT "http://localhost:5020/api/students/$student_id" \
-            --header "$authorization_header" \
+            --header "$staff_authorization_header" \
             -H 'Content-Type: application/json' \
             -d '{"firstName":"Updated CI","lastName":"Student","email":"updated.ci.student@example.edu","dateOfBirth":"2000-01-01","mailingAddress":"2 CI Way","emergencyContactName":"Updated CI Contact","emergencyContactPhone":"0400000000","phoneNumber":"0400000002","degree":"Bachelor of Testing","major":"Quality Engineering"}' > /dev/null
 

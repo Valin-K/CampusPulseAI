@@ -18,7 +18,7 @@ env:
   RAG_ENABLED: "false"
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
+  group: student-2-ci-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
@@ -31,6 +31,9 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Create ephemeral JWT signing key
+        run: echo "CAMPUSPULSE_SIGNING_KEY=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
 
       - name: Detect changed paths
         id: filter
@@ -77,16 +80,20 @@ jobs:
         shell: bash
         run: |
           cp .github/student-2-ci-appsettings.json student-2/frontend/CourseManagement.Frontend/wwwroot/appsettings.json
-          docker compose -p student-2-ci -f docker-compose.yml -f .github/docker-compose.student-2.ci.yml build ai.gateway academicrecords.database coursemanagement.database coursemanagement.backend coursemanagement.frontend
-          docker compose -p student-2-ci -f docker-compose.yml -f .github/docker-compose.student-2.ci.yml up --detach --no-build ai.gateway academicrecords.database coursemanagement.database coursemanagement.backend coursemanagement.frontend
+          docker compose -p student-2-ci -f docker-compose.yml -f .github/docker-compose.student-2.ci.yml build --with-dependencies ai.gateway academicrecords.database academicrecords.backend coursemanagement.database coursemanagement.backend coursemanagement.frontend
+          docker compose -p student-2-ci -f docker-compose.yml -f .github/docker-compose.student-2.ci.yml up --detach --no-build ai.gateway academicrecords.database academicrecords.backend coursemanagement.database coursemanagement.backend coursemanagement.frontend
 
       - name: Smoke test Student 2 containers
         if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.student2 == 'true'
         shell: bash
         run: |
-          authorization_header="Authorization: Bearer $(python3 .github/scripts/create-ci-auth-token.py)"
+          set -euo pipefail
+          authorization_header="Authorization: Bearer $(python3 .github/scripts/create-ci-auth-token.py --account-id STU001 --role Student)"
+          staff_authorization_header="Authorization: Bearer $(python3 .github/scripts/create-ci-auth-token.py --account-id STF001 --role Staff)"
           endpoints=(
             "http://localhost:5269/health"
+            "http://localhost:5020/health"
+            "http://localhost:15021/health"
             "http://localhost:15118/health"
             "http://localhost:15118/api/courses"
             "http://localhost:15118/api/course-access/student"
@@ -111,7 +118,7 @@ jobs:
           done
 
           created_course=$(curl -s -f -X POST http://localhost:15118/api/courses \
-            -H "$authorization_header" \
+            -H "$staff_authorization_header" \
             -H 'Content-Type: application/json' \
             -d '{"code":"CICI9001","name":"CI Course","description":"Created by Student 2 CI.","creditPoints":6,"level":1,"isActive":true}')
           course_id=$(printf '%s' "$created_course" | sed -n 's/.*"id":\([0-9][0-9]*\).*/\1/p')
@@ -122,7 +129,7 @@ jobs:
           fi
 
           curl -s -f -X PUT "http://localhost:15118/api/courses/$course_id" \
-            -H "$authorization_header" \
+            -H "$staff_authorization_header" \
             -H 'Content-Type: application/json' \
             -d '{"code":"CICI9001","name":"Updated CI Course","description":"Updated by Student 2 CI.","creditPoints":6,"level":1,"isActive":true}' > /dev/null
 
@@ -137,14 +144,14 @@ jobs:
             -d '{"courseCode":"CICI9001","completedCourses":[]}' > /dev/null
 
           curl -s -f -X DELETE "http://localhost:15118/api/courses/$course_id" \
-            -H "$authorization_header" > /dev/null
+            -H "$staff_authorization_header" > /dev/null
 
       - name: Display Student 2 container diagnostics
         if: failure() && (github.event_name == 'workflow_dispatch' || steps.filter.outputs.student2 == 'true')
         shell: bash
         run: |
           docker compose -p student-2-ci -f docker-compose.yml -f .github/docker-compose.student-2.ci.yml ps
-          docker compose -p student-2-ci -f docker-compose.yml -f .github/docker-compose.student-2.ci.yml logs --no-color ai.gateway academicrecords.database coursemanagement.database coursemanagement.backend coursemanagement.frontend
+          docker compose -p student-2-ci -f docker-compose.yml -f .github/docker-compose.student-2.ci.yml logs --no-color ai.gateway academicrecords.database academicrecords.backend coursemanagement.database coursemanagement.backend coursemanagement.frontend
 
       - name: Remove Student 2 containers
         if: always() && (github.event_name == 'workflow_dispatch' || steps.filter.outputs.student2 == 'true')

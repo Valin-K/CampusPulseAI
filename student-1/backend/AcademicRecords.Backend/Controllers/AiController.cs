@@ -2,6 +2,7 @@ using System.Net;
 using AcademicRecords.Backend.Models;
 using AcademicRecords.Backend.Services;
 using CampusPulse.Shared.Mcp.Client;
+using CampusPulse.Shared.Security;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AcademicRecords.Backend.Controllers;
@@ -16,10 +17,19 @@ public sealed class AiController(
     [HttpPost("students/{studentId}/ai-analysis")]
     public async Task<IActionResult> AnalyzeProgress(string studentId, CancellationToken cancellationToken)
     {
+        if (!User.CanAccessStudent(studentId))
+        {
+            return Forbid();
+        }
+
         var (profile, error) = await this.GetStudentProfileAsync(AcademicRecordsDatabase, studentId, cancellationToken);
         if (error is not null)
         {
             return error;
+        }
+        if (!User.CanAccessStudent(profile!.StudentId))
+        {
+            return Forbid();
         }
 
         var courses = await courseMetadata.GetCourseMetadataAsync(cancellationToken);
@@ -47,9 +57,8 @@ public sealed class AiController(
         var authenticatedUser = ControllerContext.HttpContext?.User;
         if (authenticatedUser?.IsInRole("Student") == true)
         {
-            var userIdClaim = authenticatedUser.FindFirst("user_id")?.Value;
-            if (!int.TryParse(userIdClaim, out var authenticatedUserId) || authenticatedUserId <= 0
-                || request.UserId is not null && request.UserId != authenticatedUserId)
+            if (!authenticatedUser.TryGetUserId(out var authenticatedUserId) || authenticatedUserId <= 0
+                || request.UserId is not null && !authenticatedUser.CanAccessUser(request.UserId.Value))
             {
                 return Forbid();
             }

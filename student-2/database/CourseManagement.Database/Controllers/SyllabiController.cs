@@ -1,6 +1,8 @@
 using CourseManagement.Backend.Contracts.Syllabi;
 using CourseManagement.Backend.Services;
 using CourseManagement.Database.Data;
+using CampusPulse.Shared.Security;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Net.Http.Headers;
@@ -17,6 +19,7 @@ public sealed class SyllabiController(
     const int MaxFileNameLength = 260;
 
     [HttpPut]
+    [Authorize(Policy = CampusPulseSecurityExtensions.StaffOnlyPolicy)]
     [Consumes("multipart/form-data")]
     public async Task<ActionResult<SyllabusResponse>> UploadOrReplace(
         int courseId,
@@ -173,6 +176,7 @@ public sealed class SyllabiController(
     }
 
     [HttpDelete]
+    [Authorize(Policy = CampusPulseSecurityExtensions.StaffOnlyPolicy)]
     public async Task<IActionResult> Delete(
         int courseId,
         CancellationToken cancellationToken)

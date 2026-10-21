@@ -22,6 +22,7 @@
     <ProjectReference Include="..\..\..\shared\backend\CampusPulse.Shared.Rag\CampusPulse.Shared.Rag.csproj" />
     <ProjectReference Include="..\..\..\shared\backend\CampusPulse.Shared.Mcp\CampusPulse.Shared.Mcp.csproj" />
     <ProjectReference Include="..\..\..\shared\backend\CampusPulse.Shared.Ai\CampusPulse.Shared.Ai.csproj" />
+    <ProjectReference Include="..\..\..\shared\backend\CampusPulse.Shared.Security\CampusPulse.Shared.Security.csproj" />
   </ItemGroup>
 
   <ItemGroup>

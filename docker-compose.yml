@@ -1,4 +1,54 @@
 services:
+  mcp.server:
+    image: ${DOCKER_REGISTRY-}campuspulse-mcp-server
+    build:
+      context: .
+      dockerfile: ai-services/mcp-server/McpServer/Dockerfile
+    environment:
+      ASPNETCORE_HTTP_PORTS: 8080
+      Authentication__SigningKey: ${CAMPUSPULSE_SIGNING_KEY:?Set CAMPUSPULSE_SIGNING_KEY to a secret of at least 32 bytes}
+      Services__AcademicRecordsBackend: http://academicrecords.backend:8080
+      Services__CourseManagementBackend: http://coursemanagement.backend:8080
+      Services__CampusHousingDatabase: http://campushousing.database:8080
+    ports:
+      - "127.0.0.1:5268:8080"
+
+  rag.server:
+    image: ${DOCKER_REGISTRY-}campuspulse-rag-server
+    build:
+      context: .
+      dockerfile: ai-services/rag-server/RagServer/Dockerfile
+    environment:
+      ASPNETCORE_HTTP_PORTS: 8080
+      Authentication__SigningKey: ${CAMPUSPULSE_SIGNING_KEY:?Set CAMPUSPULSE_SIGNING_KEY to a secret of at least 32 bytes}
+      Services__AiGateway: http://ai.gateway:8080
+    ports:
+      - "127.0.0.1:5267:8080"
+    depends_on:
+      - ai.gateway
+
+  multiagent.server:
+    image: ${DOCKER_REGISTRY-}campuspulse-multi-agent-server
+    build:
+      context: .
+      dockerfile: ai-services/multi-agent-server/MultiAgentServer/Dockerfile
+    environment:
+      ASPNETCORE_HTTP_PORTS: 8080
+      Authentication__SigningKey: ${CAMPUSPULSE_SIGNING_KEY:?Set CAMPUSPULSE_SIGNING_KEY to a secret of at least 32 bytes}
+      Services__AiGateway: http://ai.gateway:8080
+      Services__McpServer: http://mcp.server:8080
+      Services__RagServer: http://rag.server:8080
+      MultiAgent__Enabled: "true"
+      MultiAgent__DatabasePath: /app/data/multi-agent.db
+    ports:
+      - "127.0.0.1:5270:8080"
+    volumes:
+      - multiagent-data:/app/data
+    depends_on:
+      - ai.gateway
+      - mcp.server
+      - rag.server
+
   ai.gateway:
     image: ${DOCKER_REGISTRY-}campuspulse-ai-gateway
     build:
@@ -6,6 +56,7 @@ services:
       dockerfile: shared/backend/CampusPulse.Shared.Ai.Gateway/Dockerfile
     environment:
       ASPNETCORE_HTTP_PORTS: 8080
+      Authentication__SigningKey: ${CAMPUSPULSE_SIGNING_KEY:?Set CAMPUSPULSE_SIGNING_KEY to a secret of at least 32 bytes}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
     ports:
       - "127.0.0.1:5269:8080"
@@ -17,6 +68,7 @@ services:
       dockerfile: student-1/database/AcademicRecords.Database/Dockerfile
     environment:
       ASPNETCORE_HTTP_PORTS: 8080
+      Authentication__SigningKey: ${CAMPUSPULSE_SIGNING_KEY:?Set CAMPUSPULSE_SIGNING_KEY to a secret of at least 32 bytes}
       ConnectionStrings__AcademicRecords: Data Source=/app/data/academic-records.db
     ports:
       - "5021:8080"
@@ -34,19 +86,20 @@ services:
       dockerfile: student-1/backend/AcademicRecords.Backend/Dockerfile
     environment:
       ASPNETCORE_HTTP_PORTS: 8080
+      Authentication__SigningKey: ${CAMPUSPULSE_SIGNING_KEY:?Set CAMPUSPULSE_SIGNING_KEY to a secret of at least 32 bytes}
       Services__AcademicRecordsDatabase: http://academicrecords.database:8080
+      Services__AcademicRecordsCredentials: http://academicrecords.database:8080
       Services__CourseManagementDatabase: http://coursemanagement.database:8080
-      Services__McpServer: http://host.docker.internal:5268
-      Services__RagServer: http://host.docker.internal:5267
+      Services__McpServer: http://mcp.server:8080
+      Services__RagServer: http://rag.server:8080
       Services__AiGateway: http://ai.gateway:8080
-      Services__MultiAgentServer: http://host.docker.internal:5270
+      Services__MultiAgentServer: http://multiagent.server:8080
       MultiAgent__Enabled: "true"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     ports:
       - "5020:8080"
     depends_on:
       - ai.gateway
+      - multiagent.server
       - academicrecords.database
     networks:
       default:
@@ -60,16 +113,16 @@ services:
       dockerfile: student-2/backend/CourseManagement.Backend/Dockerfile
     environment:
       - Services__AcademicRecordsDatabase=http://academicrecords.database:8080
+      - Authentication__SigningKey=${CAMPUSPULSE_SIGNING_KEY:?Set CAMPUSPULSE_SIGNING_KEY to a secret of at least 32 bytes}
       - Services__CourseManagementDatabase=http://coursemanagement.database:8080
-      - Services__McpServer=http://host.docker.internal:5268
-      - Services__RagServer=http://host.docker.internal:5267
+      - Services__McpServer=http://mcp.server:8080
+      - Services__RagServer=http://rag.server:8080
       - Services__AiGateway=http://ai.gateway:8080
-      - Services__MultiAgentServer=http://host.docker.internal:5270
+      - Services__MultiAgentServer=http://multiagent.server:8080
       - MultiAgent__Enabled=true
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     depends_on:
       - ai.gateway
+      - multiagent.server
       - academicrecords.database
       - coursemanagement.database
 
@@ -80,6 +133,7 @@ services:
       dockerfile: student-2/database/CourseManagement.Database/Dockerfile
     environment:
       - ASPNETCORE_HTTP_PORTS=8080
+      - Authentication__SigningKey=${CAMPUSPULSE_SIGNING_KEY:?Set CAMPUSPULSE_SIGNING_KEY to a secret of at least 32 bytes}
       - ConnectionStrings__CourseManagementDatabase=Data Source=/app/data/course-management.db;Foreign Keys=True
       - SyllabusStorage__RootPath=/app/data/syllabi
     ports:
@@ -94,19 +148,20 @@ services:
       dockerfile: student-3/backend/CampusHousing.Backend/Dockerfile
     environment:
       ASPNETCORE_HTTP_PORTS: 8080
+      Authentication__SigningKey: ${CAMPUSPULSE_SIGNING_KEY:?Set CAMPUSPULSE_SIGNING_KEY to a secret of at least 32 bytes}
       Services__CampusHousingDatabase: http://campushousing.database:8080
       Services__AcademicRecordsDatabase: http://academicrecords.database:8080
-      Services__McpServer: http://host.docker.internal:5268
-      Services__RagServer: http://host.docker.internal:5267
+      Services__McpServer: http://mcp.server:8080
+      Services__RagServer: http://rag.server:8080
       Services__AiGateway: http://ai.gateway:8080
-      Services__MultiAgentServer: http://host.docker.internal:5270
+      Services__MultiAgentServer: http://multiagent.server:8080
       MultiAgent__Enabled: "true"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     ports:
       - "5083:8080"
     depends_on:
       ai.gateway:
+        condition: service_started
+      multiagent.server:
         condition: service_started
       campushousing.database:
         condition: service_healthy
@@ -120,6 +175,7 @@ services:
       dockerfile: student-3/database/CampusHousing.Database/Dockerfile
     environment:
       ASPNETCORE_HTTP_PORTS: 8080
+      Authentication__SigningKey: ${CAMPUSPULSE_SIGNING_KEY:?Set CAMPUSPULSE_SIGNING_KEY to a secret of at least 32 bytes}
       ConnectionStrings__CampusHousing: Data Source=/app/data/campus-housing.db
       Services__AcademicRecordsDatabase: http://academicrecords.database:8080
     volumes:
@@ -141,19 +197,20 @@ services:
       dockerfile: student-4/backend/FinancialAidBilling.Backend/Dockerfile
     environment:
       ASPNETCORE_HTTP_PORTS: 8080
+      Authentication__SigningKey: ${CAMPUSPULSE_SIGNING_KEY:?Set CAMPUSPULSE_SIGNING_KEY to a secret of at least 32 bytes}
       Services__InvoiceDatabase: http://financialaidbilling.database:8080
       Services__AcademicRecordsBackend: http://academicrecords.backend:8080
-      Services__McpServer: http://host.docker.internal:5268
-      Services__RagServer: http://host.docker.internal:5267
+      Services__McpServer: http://mcp.server:8080
+      Services__RagServer: http://rag.server:8080
       Services__AiGateway: http://ai.gateway:8080
-      Services__MultiAgentServer: http://host.docker.internal:5270
+      Services__MultiAgentServer: http://multiagent.server:8080
       MultiAgent__Enabled: "true"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     ports:
       - "8089:8080"
     depends_on:
       ai.gateway:
+        condition: service_started
+      multiagent.server:
         condition: service_started
       financialaidbilling.database:
         condition: service_started
@@ -167,6 +224,7 @@ services:
       dockerfile: student-4/database/FinancialAidBilling.Database/Dockerfile
     environment:
       ASPNETCORE_HTTP_PORTS: 8080
+      Authentication__SigningKey: ${CAMPUSPULSE_SIGNING_KEY:?Set CAMPUSPULSE_SIGNING_KEY to a secret of at least 32 bytes}
       ConnectionStrings__FinancialAidBilling: Data Source=/app/data/financial-aid-billing.db
 
 
@@ -177,19 +235,20 @@ services:
       dockerfile: student-5/backend/EventScheduling.Backend/Dockerfile
     environment:
       ASPNETCORE_HTTP_PORTS: 8080
+      Authentication__SigningKey: ${CAMPUSPULSE_SIGNING_KEY:?Set CAMPUSPULSE_SIGNING_KEY to a secret of at least 32 bytes}
       Services__EventDatabase: http://eventscheduling.database:8080
       Services__AcademicRecordsDatabase: http://academicrecords.database:8080
-      Services__McpServer: http://host.docker.internal:5268
-      Services__RagServer: http://host.docker.internal:5267
+      Services__McpServer: http://mcp.server:8080
+      Services__RagServer: http://rag.server:8080
       Services__AiGateway: http://ai.gateway:8080
-      Services__MultiAgentServer: http://host.docker.internal:5270
+      Services__MultiAgentServer: http://multiagent.server:8080
       MultiAgent__Enabled: "true"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     ports:
       - "8090:8080"
     depends_on:
       ai.gateway:
+        condition: service_started
+      multiagent.server:
         condition: service_started
       eventscheduling.database:
         condition: service_started
@@ -203,6 +262,7 @@ services:
       dockerfile: student-5/database/EventScheduling.Database/Dockerfile
     environment:
       ASPNETCORE_HTTP_PORTS: 8080
+      Authentication__SigningKey: ${CAMPUSPULSE_SIGNING_KEY:?Set CAMPUSPULSE_SIGNING_KEY to a secret of at least 32 bytes}
       ConnectionStrings__EventScheduling: Data Source=/app/data/event-scheduling.db
 
 
@@ -275,5 +335,6 @@ services:
       - "8080:80"
 
 volumes:
+  multiagent-data:
   coursemanagement-data:
   campushousing-data:
