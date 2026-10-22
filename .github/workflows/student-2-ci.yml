@@ -46,6 +46,7 @@ jobs:
               - 'docker-compose.yml'
               - '.github/docker-compose.student-2.ci.yml'
               - '.github/workflows/student-2-ci.yml'
+              - '.github/scripts/**'
 
       - name: No Student 2 changes
         if: github.event_name != 'workflow_dispatch' && steps.filter.outputs.student2 != 'true'
@@ -73,7 +74,7 @@ jobs:
 
       - name: Run NUnit tests
         if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.student2 == 'true'
-        run: dotnet test student-2/tests/CourseManagement.Tests/CourseManagement.Tests.csproj --configuration Release --no-restore
+        run: dotnet test student-2/tests/CourseManagement.Tests/CourseManagement.Tests.csproj --configuration Release --no-restore --logger "trx;LogFileName=course-management-tests.trx" --results-directory TestResults
 
       - name: Build and start Student 2 containers
         if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.student2 == 'true'
@@ -83,20 +84,17 @@ jobs:
           docker compose -p student-2-ci -f docker-compose.yml -f .github/docker-compose.student-2.ci.yml build --with-dependencies ai.gateway academicrecords.database academicrecords.backend coursemanagement.database coursemanagement.backend coursemanagement.frontend
           docker compose -p student-2-ci -f docker-compose.yml -f .github/docker-compose.student-2.ci.yml up --detach --no-build ai.gateway academicrecords.database academicrecords.backend coursemanagement.database coursemanagement.backend coursemanagement.frontend
 
-      - name: Smoke test Student 2 containers
+      # Smoke tests confirm container readiness; business endpoint assertions are a separate CI/CD step below.
+      - name: Smoke test Student 2 container health
         if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.student2 == 'true'
         shell: bash
         run: |
           set -euo pipefail
-          authorization_header="Authorization: Bearer $(python3 .github/scripts/create-ci-auth-token.py --account-id STU001 --role Student)"
-          staff_authorization_header="Authorization: Bearer $(python3 .github/scripts/create-ci-auth-token.py --account-id STF001 --role Staff)"
           endpoints=(
             "http://localhost:5269/health"
             "http://localhost:5020/health"
             "http://localhost:15021/health"
             "http://localhost:15118/health"
-            "http://localhost:15118/api/courses"
-            "http://localhost:15118/api/course-access/student"
             "http://localhost:15120/health"
             "http://localhost:18082/"
           )
@@ -104,7 +102,7 @@ jobs:
           for endpoint in "${endpoints[@]}"; do
             reachable=false
             for attempt in {1..30}; do
-              if curl -s -f -m 5 --header "$authorization_header" "$endpoint" > /dev/null; then
+              if curl --silent --show-error --fail --max-time 5 "$endpoint" > /dev/null; then
                 reachable=true
                 break
               fi
@@ -117,34 +115,9 @@ jobs:
             fi
           done
 
-          created_course=$(curl -s -f -X POST http://localhost:15118/api/courses \
-            -H "$staff_authorization_header" \
-            -H 'Content-Type: application/json' \
-            -d '{"code":"CICI9001","name":"CI Course","description":"Created by Student 2 CI.","creditPoints":6,"level":1,"isActive":true}')
-          course_id=$(printf '%s' "$created_course" | sed -n 's/.*"id":\([0-9][0-9]*\).*/\1/p')
-
-          if [ -z "$course_id" ]; then
-            echo "The created Course response did not contain an ID."
-            exit 1
-          fi
-
-          curl -s -f -X PUT "http://localhost:15118/api/courses/$course_id" \
-            -H "$staff_authorization_header" \
-            -H 'Content-Type: application/json' \
-            -d '{"code":"CICI9001","name":"Updated CI Course","description":"Updated by Student 2 CI.","creditPoints":6,"level":1,"isActive":true}' > /dev/null
-
-          curl -s -f -X POST "http://localhost:15118/api/courses/$course_id/prerequisite-eligibility" \
-            -H "$authorization_header" \
-            -H 'Content-Type: application/json' \
-            -d '{"completedCourses":[]}' > /dev/null
-
-          curl -s -f -X POST http://localhost:15118/api/course-access/student/enrollments \
-            -H "$authorization_header" \
-            -H 'Content-Type: application/json' \
-            -d '{"courseCode":"CICI9001","completedCourses":[]}' > /dev/null
-
-          curl -s -f -X DELETE "http://localhost:15118/api/courses/$course_id" \
-            -H "$staff_authorization_header" > /dev/null
+      - name: Post-commit CI/CD tests (two endpoints) - Student 2
+        if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.student2 == 'true'
+        run: python3 .github/scripts/run-post-commit-endpoint-tests.py --student 2 --base-url http://localhost:15118
 
       - name: Display Student 2 container diagnostics
         if: failure() && (github.event_name == 'workflow_dispatch' || steps.filter.outputs.student2 == 'true')
@@ -157,3 +130,14 @@ jobs:
         if: always() && (github.event_name == 'workflow_dispatch' || steps.filter.outputs.student2 == 'true')
         shell: bash
         run: docker compose -p student-2-ci -f docker-compose.yml -f .github/docker-compose.student-2.ci.yml down --volumes --remove-orphans
+
+      - name: Upload Student 2 post-commit CI/CD evidence
+        if: always() && (github.event_name == 'workflow_dispatch' || steps.filter.outputs.student2 == 'true')
+        uses: actions/upload-artifact@v4
+        with:
+          name: student-2-post-commit-evidence
+          path: |
+            TestResults/*.trx
+            reports/post-commit/student-2-*
+          if-no-files-found: warn
+          retention-days: 14

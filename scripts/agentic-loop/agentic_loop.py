@@ -40,6 +40,7 @@ import argparse
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import time
@@ -158,6 +159,13 @@ HTTP inside the Docker Compose network.
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+def git_executable() -> str:
+    executable = shutil.which("git")
+    if executable is None:
+        raise FileNotFoundError("Git is required to run the agentic loop.")
+    return executable
+
+
 def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -172,7 +180,7 @@ def run_command(
     print(f"  {name}")
     started = time.perf_counter()
     try:
-        result = subprocess.run(
+        result = subprocess.run(  # noqa: S603 - command vectors are internal checks; shell is disabled
             command,
             cwd=cwd,
             capture_output=True,
@@ -487,7 +495,7 @@ def ensure_local_service(
         "--", "--urls", application_url,
     ]
     try:
-        process = subprocess.Popen(
+        process = subprocess.Popen(  # noqa: S603 - fixed dotnet invocation; URL is restricted to loopback
             command,
             cwd=REPO_ROOT,
             env={**os.environ, **(environment or {})},
@@ -1237,8 +1245,8 @@ def main() -> int:
     patch_targets: list[str] = []
 
     try:
-        commit_before = subprocess.run(
-            ["git", "rev-parse", "HEAD"],
+        commit_before = subprocess.run(  # noqa: S603 - resolved Git executable and fixed argv
+            [git_executable(), "rev-parse", "HEAD"],
             cwd=REPO_ROOT,
             capture_output=True,
             text=True,
@@ -1366,8 +1374,8 @@ def main() -> int:
         else:
             print("No patch applied. Human approval is still required.")
 
-        commit_after = subprocess.run(
-            ["git", "rev-parse", "HEAD"],
+        commit_after = subprocess.run(  # noqa: S603 - resolved Git executable and fixed argv
+            [git_executable(), "rev-parse", "HEAD"],
             cwd=REPO_ROOT,
             capture_output=True,
             text=True,
@@ -1447,8 +1455,8 @@ def main() -> int:
             "apiKeysRecorded": False,
         },
         "git": {
-            "branch": subprocess.run(
-                ["git", "branch", "--show-current"],
+            "branch": subprocess.run(  # noqa: S603 - resolved Git executable and fixed argv
+                [git_executable(), "branch", "--show-current"],
                 cwd=REPO_ROOT,
                 capture_output=True,
                 text=True,

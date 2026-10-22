@@ -7,7 +7,39 @@ cloud, per the brief's baseline. Full architecture: [`cloud-deployment-plan.md`]
 
 ---
 
-## Current stage: everything is merged into `master`. Nothing has actually been deployed yet.
+## Current status: a successful cloud deployment is now verified
+
+GitHub Actions Cloud Deployment run [#275](https://github.com/Valin-K/CampusPulseAI/actions/runs/39611514822)
+completed successfully on 2026-10-21. It was manually dispatched from branch
+`Ryan-cloud-smoke-test` at commit `cd8ebcf935464f63e552f06e030f47eeeb861974` (not from `master`).
+The `deploy` job completed Azure login, infrastructure deployment, app deployment, smoke testing,
+and evidence upload successfully. The uploaded evidence is also saved under
+[`cloud-deployment-evidence/20261021-135602/`](cloud-deployment-evidence/20261021-135602/):
+**8/8 checks passed**—portal, sign-in, authenticated CRUD reads for all five services, and the
+enabled Financial Aid MCP integration.
+
+The earlier `20261019-233153` report is a historical failed run (1/8), not the latest result.
+Run #275 is a real successful deployment, but its branch matters: repeat the deployment from
+`master` after the fixes are merged before claiming the master revision is verified.
+
+The newer [Cloud Deployment run #276](https://github.com/Valin-K/CampusPulseAI/actions/runs/39726378661)
+on `Alec-PostCommitCICD` completed deployment but its smoke report was 6/7: only
+`/api/course-access/users` returned 403. This is not a missing route. The route is defined by
+`CourseAccessController` and requires the Staff role, while the smoke test signs in as Student.
+The smoke test now reads `/api/courses` with the Student token and separately expects 403 from
+the staff-only route. These changes still need a GitHub redeploy to verify.
+
+The latest `master` dispatch before Run #275 was [run #265](https://github.com/Valin-K/CampusPulseAI/actions/runs/39386062433)
+on 2026-10-20 and it failed before smoke testing. Its logs show the AI-enabled deploy stopped
+because `GEMINI_API_KEY` was unavailable; provider-registration attempts also logged
+authorization failures. Do not describe #265 as a failed 1/8 smoke test—the smoke-test step
+never ran. Run #275 is newer and succeeded, but on the separate `Ryan-cloud-smoke-test` branch.
+
+The latest Shared MCP Server CI run available during this check (#130) succeeded but detected
+no MCP changes and skipped its build and smoke-test steps. Source inspection confirms MCP
+authorization is configured. The current working-tree change makes that requirement explicit
+on both MCP endpoints and adds anonymous-request checks to MCP CI; those new checks have not
+yet run on GitHub.
 
 All of the following are **on `master`**, confirmed via `git log origin/master`:
 
@@ -99,36 +131,46 @@ the URL it's connecting to; nginx does not do this by default when proxying to a
 across all 6 nginx templates) to `proxy_set_header Host $proxy_host;` — nginx's built-in variable holding
 the host:port from the resolved `proxy_pass` target, which correctly matches the backend being called.
 
-**Still needed**: push this third fix, re-trigger `cloud-deployment.yml`, and confirm
-`Test-CloudDeployment.ps1` reports 8/8 against the real Azure deployment — not yet re-confirmed.
+**Verified by Run #275**: the fix was deployed, and `Test-CloudDeployment.ps1` reported 8/8
+against the Azure deployment. The evidence artifact records successful sign-in, all five
+authenticated CRUD reads, and the enabled AI/MCP integration check.
 
 ---
 
 ## Azure OIDC setup
 
-Done, on the Azure side:
-- User-assigned managed identity `id-campuspulse-deploy` in `rg-campuspulse`
-- Granted **Contributor, scoped only to `rg-campuspulse`** (confirmed via `az role assignment list`)
-- Federated credential trusting `repo:Valin-K/CampusPulseAI:environment:production`
+**Operationally verified by Run #275**:
+- `azure/login@v2` succeeded in the production environment, so the workflow had a usable Azure federated-login configuration.
+- Infrastructure and app deployment succeeded.
+- The smoke artifact includes the enabled AI/MCP check; the deploy script reads both the signing key and Gemini key from Key Vault for that profile. Therefore the workflow identity could read the required Key Vault secrets during that run.
 
-Required for the current Key Vault deployment flow: grant this identity the **Key Vault Secrets User**
-role on Key Vault `kv-campuspulse`. Contributor on the resource group does not by itself grant
-Key Vault secret-read access; verify this data-plane role assignment before running the cloud workflow.
+This proves the deployment path worked, but it does **not** reveal the exact Azure role assignments or prove least-privilege scope. The Azure CLI is not installed in this workspace, so live role assignments, storage network rules, encryption configuration, and backup settings were not independently queried. A successful run also does not prove that GitHub production-environment reviewer or branch restrictions are configured. Verify those settings directly in Azure/GitHub and save redacted output.
 
-Still needed, on the GitHub side — **requires repo admin access** (this account gets a 404; confirmed
-blocked). Valin-K needs to run:
-```bash
-gh api -X PUT /repos/Valin-K/CampusPulseAI/environments/production
-gh secret set AZURE_CLIENT_ID --env production --repo Valin-K/CampusPulseAI --body "d97c9b6d-e15e-4921-9f02-d766cb0ff3f5"
-gh secret set AZURE_TENANT_ID --env production --repo Valin-K/CampusPulseAI --body "e8911c26-cf9f-4a9c-878e-527807be8791"
-gh secret set AZURE_SUBSCRIPTION_ID --env production --repo Valin-K/CampusPulseAI --body "cf883aba-8165-413a-b14b-b9c89f55654f"
-```
-**Status as of this writing: not yet confirmed done.** Check with:
-```bash
-gh api /repos/Valin-K/CampusPulseAI/environments --jq ".environments[].name"
-gh api /repos/Valin-K/CampusPulseAI/environments/production/secrets --jq ".secrets[].name"
-```
-(Both 404 for this account too — needs Valin, or someone with read access, to check.)
+---
+
+## Repository security-screening status
+
+The pre-commit security hooks now cover repository-wide secret scanning, Python Ruff security
+rules, plus .NET security analyzers and NuGet audits across all projects. Python dependency
+vulnerability auditing is omitted because Python is not a production application in this project.
+Validation of the expanded checks found:
+
+- .NET security analyzers: passed for all 34 projects.
+- NuGet vulnerability audit: passed for all 34 projects.
+- Python Ruff security rules: passed across repository Python files.
+- `detect-secrets`: **not clean**. The first all-files run reported 20 candidate detections in
+  source, tests, templates, README, and generated evidence. These have not been individually
+  classified or added to the baseline. Review them before treating secret scanning as passed;
+  do not baseline a real credential simply to make the hook green.
+
+The expanded Ruff scan also prompted HTTPS-or-loopback-only checks for authentication/service
+URLs and explicit safe-argv annotations for internal subprocess calls. The Git executable is
+resolved from PATH rather than invoked by a partial executable name.
+
+Expanding .NET analyzer coverage also found a CA2100 warning on a conditional SQL statement in
+`WorkflowStore.Save`. The query strings are fixed constants; the assignment was split into
+explicit branches, and the security analyzer then passed. The focused multi-agent workflow and
+authorization tests passed (21 tests).
 
 ---
 
@@ -142,23 +184,12 @@ PR, including unrelated ones. **Switch it to `push: branches: [master]` only aft
 
 ## Next steps, in order
 
-1. **Confirm Valin's `gh` commands have actually run** (see checks above).
-2. **Manually trigger `cloud-deployment.yml`** from the Actions tab on GitHub — this is genuinely the
-   first real end-to-end attempt; nothing like it has run before.
-3. **Expect the first run to fail at the image-pull step.** The 16 GHCR packages are created private by
-   default (confirmed repo is private). After the first push, go through each of the 16 new packages and
-   flip visibility to Public — same one-time process done manually for the single test image earlier in
-   this project's history.
-4. **Re-trigger and confirm `Test-CloudDeployment.ps1` actually passes** — that's the real proof, not just
-   "the workflow finished."
-5. **Fix whatever else breaks.** Every other stage this session surfaced at least one real bug only
-   visible once actually run (wrong port, an nginx `proxy_pass` gotcha, a hidden second `HttpClient` with
-   a latent bug, a `for`-loop Bicep error) — there is no reason to expect the first real cloud run to be
-   different. Budget for this.
-6. **Collect evidence for the technical report**: CRUD screenshots per student in the cloud, the
-   architecture diagram (Azure icons, not the ASCII sketch in this repo), the cloud deployment report, and
-   the agentic-loop Cloud Deployment Review run against it.
-7. **Only then**, switch the trigger to `push: branches: [master]`.
+1. Merge the verified deployment and current security changes to `master`, then dispatch the workflow from `master` and preserve its new evidence artifact.
+2. Verify GitHub production-environment required reviewers/branch restrictions and query live Azure RBAC assignments. Confirm the deploy identity is scoped only to required resources and Key Vault secret reads. Pre-register Azure resource providers administratively so the deploy identity does not need subscription-level provider-registration permission.
+3. Query the storage account's encryption, public-network/firewall/private-endpoint, and Azure Files backup settings. Add a restore drill and retain redacted configuration evidence.
+4. Keep GHCR public-image exposure documented or migrate to a private registry with scoped pull access; add image scanning/signing and immutable digest deployment.
+5. Ensure MCP CI actually runs for changes and fails if anonymous tool listing or tool execution is not rejected with 401. The latest run #130 skipped its smoke tests because it detected no MCP changes.
+6. Collect the architecture diagram and any remaining presentation evidence. Keep automatic deployment disabled until the successful `master` run and production protections are confirmed.
 
 ### Separately, unresolved
 - The Visual Studio `docker-compose.dcproj` build (Windows reserved-port issue with

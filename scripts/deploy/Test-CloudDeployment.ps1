@@ -109,6 +109,24 @@ if ($authHeaders) {
 }
 
 if ($authHeaders) {
+    Write-Host "Checking Course Management's staff-only users endpoint..." -ForegroundColor Cyan
+    $courseManagementFqdn = Get-AppFqdn -AppName 'coursemgmt-web'
+    $courseAccessUrl = "https://$courseManagementFqdn/api/course-access/users"
+    $courseAccessStatus = 'error'
+    try {
+        $response = Invoke-WebRequest -Uri $courseAccessUrl -Headers $authHeaders -UseBasicParsing -TimeoutSec 60
+        $courseAccessStatus = $response.StatusCode
+    }
+    catch {
+        if ($_.Exception.Response) { $courseAccessStatus = [int]$_.Exception.Response.StatusCode }
+    }
+    $results += [pscustomobject]@{
+        Check = 'Course Management staff-only users endpoint rejects Student'
+        Url = $courseAccessUrl
+        Status = $courseAccessStatus
+        Passed = ($courseAccessStatus -eq 403)
+    }
+
     Write-Host "Checking Financial Aid's AI profile gates..." -ForegroundColor Cyan
     $finaidFqdn = Get-AppFqdn -AppName 'finaid-web'
     $aiChecks = @(
@@ -136,7 +154,13 @@ if ($authHeaders) {
         }
     }
 } else {
-    Write-Host "Skipping AI profile gate checks - sign-in failed, there's no token to send." -ForegroundColor Yellow
+    Write-Host "Skipping authorization and AI profile checks - sign-in failed, there's no token to send." -ForegroundColor Yellow
+    $results += [pscustomobject]@{
+        Check = 'Course Management staff-only users endpoint rejects Student'
+        Url = ''
+        Status = 'skipped (auth failed)'
+        Passed = $false
+    }
     $results += [pscustomobject]@{ Check = 'AI profile gates'; Url = ''; Status = 'skipped (auth failed)'; Passed = $false }
 }
 

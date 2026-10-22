@@ -50,6 +50,7 @@ jobs:
               - 'docker-compose.yml'
               - '.github/docker-compose.student-3-ci.yml'
               - '.github/workflows/student-3.yml'
+              - '.github/scripts/**'
 
       - name: Setup .NET 10
         if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.student3 == 'true'
@@ -91,23 +92,16 @@ jobs:
         if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.student3 == 'true'
         run: dotnet test student-3/tests/CampusHousing.Tests/CampusHousing.Tests.csproj --configuration Release --no-build --no-restore --logger "trx;LogFileName=campus-housing-tests.trx" --results-directory TestResults
 
-      - name: Upload NUnit test results
-        if: always() && (github.event_name == 'workflow_dispatch' || steps.filter.outputs.student3 == 'true')
-        uses: actions/upload-artifact@v4
-        with:
-          name: student-3-test-results
-          path: TestResults/*.trx
-          if-no-files-found: ignore
-
       - name: Validate and start Student 3 containers
         if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.student3 == 'true'
         shell: bash
         run: |
           docker compose -f docker-compose.yml -f .github/docker-compose.student-3-ci.yml -p student-3-ci config --quiet
-          docker compose -f docker-compose.yml -f .github/docker-compose.student-3-ci.yml -p student-3-ci build --with-dependencies ai.gateway academicrecords.database campushousing.database campushousing.backend campushousing.frontend
-          docker compose -f docker-compose.yml -f .github/docker-compose.student-3-ci.yml -p student-3-ci up --detach --wait --no-build ai.gateway academicrecords.database campushousing.database campushousing.backend campushousing.frontend
+          docker compose -f docker-compose.yml -f .github/docker-compose.student-3-ci.yml -p student-3-ci build --with-dependencies ai.gateway academicrecords.database academicrecords.backend campushousing.database campushousing.backend campushousing.frontend
+          docker compose -f docker-compose.yml -f .github/docker-compose.student-3-ci.yml -p student-3-ci up --detach --wait --no-build ai.gateway academicrecords.database academicrecords.backend campushousing.database campushousing.backend campushousing.frontend
 
-      - name: Smoke test Student 3 containers
+      # Smoke tests confirm container readiness; business endpoint assertions are a separate CI/CD step below.
+      - name: Smoke test Student 3 container health
         if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.student3 == 'true'
         shell: bash
         run: |
@@ -115,6 +109,7 @@ jobs:
 
           endpoints=(
             "http://localhost:5269/health"
+            "http://localhost:5020/health"
             "http://localhost:5083/health"
             "http://localhost:8083/"
           )
@@ -135,14 +130,29 @@ jobs:
             fi
           done
 
+      - name: Post-commit CI/CD tests (two endpoints) - Student 3
+        if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.student3 == 'true'
+        run: python3 .github/scripts/run-post-commit-endpoint-tests.py --student 3 --base-url http://localhost:5083
+
       - name: Show container diagnostics on failure
         if: failure() && (github.event_name == 'workflow_dispatch' || steps.filter.outputs.student3 == 'true')
         shell: bash
         run: |
           docker compose -f docker-compose.yml -f .github/docker-compose.student-3-ci.yml -p student-3-ci ps
-          docker compose -f docker-compose.yml -f .github/docker-compose.student-3-ci.yml -p student-3-ci logs --no-color ai.gateway academicrecords.database campushousing.database campushousing.backend campushousing.frontend
+          docker compose -f docker-compose.yml -f .github/docker-compose.student-3-ci.yml -p student-3-ci logs --no-color ai.gateway academicrecords.database academicrecords.backend campushousing.database campushousing.backend campushousing.frontend
 
       - name: Remove Student 3 containers
         if: always() && (github.event_name == 'workflow_dispatch' || steps.filter.outputs.student3 == 'true')
         shell: bash
         run: docker compose -f docker-compose.yml -f .github/docker-compose.student-3-ci.yml -p student-3-ci down --volumes --remove-orphans
+
+      - name: Upload Student 3 post-commit CI/CD evidence
+        if: always() && (github.event_name == 'workflow_dispatch' || steps.filter.outputs.student3 == 'true')
+        uses: actions/upload-artifact@v4
+        with:
+          name: student-3-post-commit-evidence
+          path: |
+            TestResults/*.trx
+            reports/post-commit/student-3-*
+          if-no-files-found: warn
+          retention-days: 14

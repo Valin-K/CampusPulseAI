@@ -5,6 +5,7 @@ import sys
 import time
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
+from urllib.parse import urlsplit
 
 
 parser = argparse.ArgumentParser()
@@ -16,6 +17,20 @@ endpoint = os.environ.get(
     "CAMPUSPULSE_AUTH_URL",
     "http://localhost:5020/api/auth/token",
 )
+parsed_endpoint = urlsplit(endpoint)
+is_local_http = parsed_endpoint.scheme == "http" and parsed_endpoint.hostname in {
+    "localhost",
+    "127.0.0.1",
+    "::1",
+}
+if (
+    not parsed_endpoint.hostname
+    or parsed_endpoint.username
+    or parsed_endpoint.password
+    or (parsed_endpoint.scheme != "https" and not is_local_http)
+):
+    raise SystemExit("The authentication endpoint must use HTTPS or loopback HTTP.")
+
 password = os.environ.get("CAMPUSPULSE_CI_PASSWORD", "test")
 payload = json.dumps(
     {"accountId": arguments.account_id, "role": arguments.role, "password": password}
@@ -23,14 +38,14 @@ payload = json.dumps(
 last_error = None
 
 for attempt in range(30):
-    request = Request(
+    request = Request(  # noqa: S310 - endpoint scheme is restricted above
         endpoint,
         data=payload,
         headers={"Content-Type": "application/json"},
         method="POST",
     )
     try:
-        with urlopen(request, timeout=5) as response:
+        with urlopen(request, timeout=5) as response:  # noqa: S310 - endpoint scheme is restricted above
             token_response = json.load(response)
         access_token = token_response.get("accessToken")
         if not isinstance(access_token, str) or not access_token:
