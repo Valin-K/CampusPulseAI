@@ -20,9 +20,30 @@ concurrency:
 
 permissions:
   contents: read
+  pull-requests: read
 
 jobs:
+  student-1:
+    uses: ./.github/workflows/student-1-ci.yml
+    secrets: inherit
+  student-2:
+    uses: ./.github/workflows/student-2-ci.yml
+    secrets: inherit
+  student-3:
+    uses: ./.github/workflows/student-3.yml
+    secrets: inherit
+  student-4:
+    uses: ./.github/workflows/student-4-ci.yml
+    secrets: inherit
+  student-5:
+    uses: ./.github/workflows/student-5-ci.yml
+    secrets: inherit
+  integration-ci:
+    uses: ./.github/workflows/integration-ci.yml
+    secrets: inherit
+
   prepare:
+    needs: [student-1, student-2, student-3, student-4, student-5, integration-ci]
     runs-on: ubuntu-latest
     outputs:
       owner: ${{ steps.vars.outputs.owner }}
