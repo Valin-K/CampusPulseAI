@@ -1,0 +1,28 @@
+﻿{
+    "schemaVersion":  1,
+    "mode":  "pre-commit-security",
+    "status":  "PASS",
+    "startedAtUtc":  "2026-10-21T11:34:31.6466136Z",
+    "completedAtUtc":  "2026-10-21T11:37:52.6723834Z",
+    "commitSha":  "1ce619a6173ccbecca1b1c6749d046fe93d12595",
+    "hooks":  [
+                  {
+                      "id":  "detect-secrets",
+                      "status":  "PASS",
+                      "exitCode":  0,
+                      "sanitizedOutput":  "Raw secret-scanner output suppressed to prevent secret disclosure."
+                  },
+                  {
+                      "id":  "dotnet-security-analyzers",
+                      "status":  "PASS",
+                      "exitCode":  0,
+                      "sanitizedOutput":  ".NET security analyzers (all students)...................................Passed"
+                  },
+                  {
+                      "id":  "nuget-vulnerable-packages",
+                      "status":  "PASS",
+                      "exitCode":  0,
+                      "sanitizedOutput":  "NuGet vulnerable package audit (all students)............................Passed"
+                  }
+              ]
+}

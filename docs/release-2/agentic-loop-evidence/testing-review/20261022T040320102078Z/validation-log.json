@@ -1,0 +1,84 @@
+{
+  "schemaVersion": 1,
+  "runId": "20261022T040320102078Z",
+  "timestampUtc": "2026-10-22T04:03:20.102869+00:00",
+  "completedAtUtc": "2026-10-22T04:03:27.768935+00:00",
+  "mode": "testing-review",
+  "sourceEvidencePaths": [
+    "C:\\Users\\jackz\\source\\repos\\CampusPulseAI\\docs\\release-2\\testing-evidence\\pre-commit-security-report.json",
+    "C:\\Users\\jackz\\source\\repos\\CampusPulseAI\\docs\\release-2\\testing-evidence\\ci-test-report.json"
+  ],
+  "checks": [
+    {
+      "name": "pre-commit hook coverage",
+      "status": "PASS",
+      "details": "Missing hooks: none"
+    },
+    {
+      "name": "security hook detect-secrets",
+      "status": "PASS",
+      "details": "Reported status: PASS."
+    },
+    {
+      "name": "security hook dotnet-security-analyzers",
+      "status": "PASS",
+      "details": "Reported status: PASS."
+    },
+    {
+      "name": "security hook nuget-vulnerable-packages",
+      "status": "PASS",
+      "details": "Reported status: PASS."
+    },
+    {
+      "name": "CI test record 1",
+      "status": "PASS",
+      "details": "shared-backend-ci / shared-backend-test-results: 100 passed, 0 failed, 0 skipped."
+    },
+    {
+      "name": "CI test record 2",
+      "status": "PASS",
+      "details": "shared-backend-ci / shared-backend-test-results: 34 passed, 0 failed, 0 skipped."
+    },
+    {
+      "name": "CI test record 3",
+      "status": "PASS",
+      "details": "student-1-ci / student-1-test-results: 107 passed, 0 failed, 0 skipped."
+    },
+    {
+      "name": "CI test record 4",
+      "status": "PASS",
+      "details": "student-3 / student-3-test-results: 50 passed, 0 failed, 0 skipped."
+    },
+    {
+      "name": "CI test record 5",
+      "status": "PASS",
+      "details": "student-5-ci / student-5-test-results: 128 passed, 0 failed, 0 skipped."
+    },
+    {
+      "name": "CI aggregate totals",
+      "status": "PASS",
+      "details": "Aggregate: 419 passed, 0 failed, 0 skipped, 419 total."
+    }
+  ],
+  "modelCalls": [
+    {
+      "stage": "implementation-assessment",
+      "requestedModel": "qwen/qwen3.8-27b",
+      "usedModel": "qwen/qwen3.8-27b",
+      "error": "OPENROUTER_API_KEY is not set."
+    },
+    {
+      "stage": "independent-review",
+      "requestedModel": "qwen/qwen3.8-27b",
+      "usedModel": "qwen/qwen3.8-27b",
+      "error": "OPENROUTER_API_KEY is not set."
+    }
+  ],
+  "errors": [
+    "OPENROUTER_API_KEY is not set.",
+    "OPENROUTER_API_KEY is not set."
+  ],
+  "status": "INCOMPLETE",
+  "humanReleaseDecision": "pending",
+  "releaseApproval": false
+}

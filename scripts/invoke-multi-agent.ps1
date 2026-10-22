@@ -3,6 +3,10 @@ param(
     [ValidateSet('Start', 'List', 'Get', 'Review', 'Export')]
     [string]$Mode = 'Start',
     [string]$BackendUrl = 'http://localhost:8089',
+    [string]$SignInUrl = 'http://localhost:5020/api/auth/token',
+    [string]$AccountId,
+    [ValidateSet('Student', 'Staff')]
+    [string]$Role = 'Student',
     [string]$Task,
     [string]$AdditionalEvidence,
     [string]$EvidenceFile,
@@ -34,16 +38,72 @@ if ($DirectServer) {
     $query = "?feature=$Feature"
 }
 
+function Get-AccessToken {
+    if ([string]::IsNullOrWhiteSpace($AccountId)) {
+        $AccountId = Read-Host 'CampusPulse account ID'
+    }
+    if ([string]::IsNullOrWhiteSpace($AccountId)) { throw 'A CampusPulse account ID is required to sign in.' }
+
+    $password = Read-Host "Password for $AccountId ($Role)" -AsSecureString
+    $passwordPointer = [IntPtr]::Zero
+    try {
+        $passwordPointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($password)
+        $plainPassword = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($passwordPointer)
+        $signInBody = @{
+            accountId = $AccountId
+            role = $Role
+            password = $plainPassword
+        } | ConvertTo-Json -Compress
+        $signInResponse = Invoke-RestMethod -Uri $SignInUrl -Method Post -ContentType 'application/json; charset=utf-8' `
+            -Body ([Text.Encoding]::UTF8.GetBytes($signInBody)) -TimeoutSec 30
+        if ([string]::IsNullOrWhiteSpace($signInResponse.accessToken)) {
+            throw "Sign-in at $SignInUrl succeeded without returning an access token."
+        }
+        return [string]$signInResponse.accessToken
+    }
+    catch {
+        $status = $null
+        if ($_.Exception.Response -and $null -ne $_.Exception.Response.StatusCode) {
+            $status = [int]$_.Exception.Response.StatusCode
+        }
+        if ($status) { throw "CampusPulse sign-in failed at ${SignInUrl} (HTTP $status). Verify the sign-in service, account, role, and password." }
+        throw "CampusPulse sign-in failed at ${SignInUrl}: $($_.Exception.Message)"
+    }
+    finally {
+        if ($passwordPointer -ne [IntPtr]::Zero) {
+            [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($passwordPointer)
+        }
+        if ($null -ne $password) { $password.Dispose() }
+        $plainPassword = $null
+        $signInBody = $null
+        $signInResponse = $null
+    }
+}
+
 function Invoke-WorkflowRequest {
     param([string]$Uri, [string]$Method = 'Get', [object]$Body)
-    $arguments = @{ Uri = $Uri; Method = $Method; TimeoutSec = 45 }
+    $arguments = @{
+        Uri = $Uri
+        Method = $Method
+        TimeoutSec = 45
+        Headers = @{ Authorization = "Bearer $script:AccessToken" }
+    }
     if ($null -ne $Body) {
         $arguments.ContentType = 'application/json; charset=utf-8'
         $arguments.Body = [Text.Encoding]::UTF8.GetBytes(($Body | ConvertTo-Json -Depth 50 -Compress))
     }
     try { return Invoke-RestMethod @arguments }
-    catch { throw "Multi-agent $Method request failed at ${Uri}: $($_.Exception.Message) $($_.ErrorDetails.Message)" }
+    catch {
+        $status = $null
+        if ($_.Exception.Response -and $null -ne $_.Exception.Response.StatusCode) {
+            $status = [int]$_.Exception.Response.StatusCode
+        }
+        if ($status) { throw "Multi-agent $Method request failed at ${Uri} (HTTP $status): $($_.Exception.Message)" }
+        throw "Multi-agent $Method request failed at ${Uri}: $($_.Exception.Message)"
+    }
 }
+
+$script:AccessToken = Get-AccessToken
 
 if ($Mode -in @('Get', 'Review', 'Export') -and $WorkflowId -eq [Guid]::Empty) {
     throw "$Mode requires WorkflowId."

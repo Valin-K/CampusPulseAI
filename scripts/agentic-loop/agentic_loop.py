@@ -55,6 +55,10 @@ from mcp_workflow import run_mcp_workflow
 from mcp_workflow.collector import McpCollector
 from rag_workflow import run_rag_workflow
 from rag_workflow.collector import RagCollector
+from multi_agent_review_workflow import run_multi_agent_review_workflow
+from multi_agent_review_workflow.collector import missing_multi_agent_export_files
+from testing_review_workflow import run_testing_review_workflow
+from cloud_deployment_review_workflow import run_cloud_deployment_review_workflow
 
 # ---------------------------------------------------------------------------
 # Paths and environment
@@ -64,6 +68,7 @@ ENV_PATH = REPO_ROOT / ".env"
 load_dotenv(dotenv_path=ENV_PATH, override=True)
 
 EVIDENCE_DIR = REPO_ROOT / "docs" / "release-1" / "agentic-loop-evidence"
+RELEASE_2_REVIEW_EVIDENCE_DIR = REPO_ROOT / "docs" / "release-2" / "agentic-loop-evidence"
 MCP_SERVER_URL = os.getenv("MCP_SERVER_URL", "http://localhost:5268").rstrip("/")
 RAG_SERVER_URL = os.getenv("RAG_SERVER_URL", "http://localhost:5267").rstrip("/")
 AI_GATEWAY_URL = os.getenv("AI_GATEWAY_URL", "http://localhost:5269").rstrip("/")
@@ -1017,9 +1022,9 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--mode",
-        choices=["full", "mcp", "rag"],
+        choices=["full", "mcp", "rag", "multi-agent-review", "testing-review", "cloud-deployment-review"],
         default="full",
-        help="Run the full suite, the Lab 07 MCP workflow, or the Lab 08 RAG workflow.",
+        help="Run the full suite or one of the MCP, RAG, Multi-Agent, Testing, or Cloud Deployment review workflows.",
     )
     parser.add_argument(
         "--focus",
@@ -1062,6 +1067,34 @@ def parse_args() -> argparse.Namespace:
         help="Directory where evidence JSON files are written.",
     )
     parser.add_argument(
+        "--review-evidence-dir",
+        type=Path,
+        default=RELEASE_2_REVIEW_EVIDENCE_DIR,
+        help="Output root for Release 2 review evidence.",
+    )
+    parser.add_argument(
+        "--multi-agent-evidence-dir",
+        type=Path,
+        help="Directory containing workflow.json and the two Multi-Agent JSONL exports.",
+    )
+    parser.add_argument(
+        "--precommit-report",
+        type=Path,
+        default=REPO_ROOT / "docs" / "release-2" / "testing-evidence" / "pre-commit-security-report.json",
+        help="Pre-commit security report JSON for Testing Review.",
+    )
+    parser.add_argument(
+        "--ci-report",
+        type=Path,
+        default=REPO_ROOT / "docs" / "release-2" / "testing-evidence" / "ci-test-report.json",
+        help="Post-commit CI test report JSON for Testing Review.",
+    )
+    parser.add_argument(
+        "--deployment-evidence-dir",
+        type=Path,
+        help="Directory containing report.md and evidence.json from Test-CloudDeployment.ps1.",
+    )
+    parser.add_argument(
         "--mcp-human-decision",
         choices=["pending", "accepted", "rejected"],
         default="pending",
@@ -1077,6 +1110,64 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
+
+    if args.mode == "multi-agent-review":
+        if args.apply:
+            print("ERROR: --apply is not supported in review modes.", file=sys.stderr)
+            return 1
+        if not args.multi_agent_evidence_dir:
+            print("ERROR: --multi-agent-evidence-dir is required for multi-agent-review.", file=sys.stderr)
+            return 2
+        export_directory = args.multi_agent_evidence_dir.expanduser().resolve()
+        missing_files = missing_multi_agent_export_files(export_directory)
+        if missing_files:
+            print(
+                "ERROR: Multi-Agent review source export is incomplete.\n"
+                f"Directory: {export_directory}\n"
+                f"Missing required files: {', '.join(missing_files)}\n"
+                "Export the intended workflow first with .\\scripts\\invoke-multi-agent.ps1 "
+                "-Mode Export -WorkflowId $id, then rerun review with that export directory.",
+                file=sys.stderr,
+            )
+            return 2
+        return run_multi_agent_review_workflow(
+            export_directory=export_directory,
+            evidence_dir=args.review_evidence_dir,
+            ai_call=call_ai,
+            provider=AGENTIC_PROVIDER,
+            implementation_model=ACT_MODEL,
+            review_model=REVIEW_MODEL,
+        )
+
+    if args.mode == "testing-review":
+        if args.apply:
+            print("ERROR: --apply is not supported in review modes.", file=sys.stderr)
+            return 1
+        return run_testing_review_workflow(
+            precommit_report=args.precommit_report,
+            ci_report=args.ci_report,
+            evidence_dir=args.review_evidence_dir,
+            ai_call=call_ai,
+            provider=AGENTIC_PROVIDER,
+            implementation_model=ACT_MODEL,
+            review_model=REVIEW_MODEL,
+        )
+
+    if args.mode == "cloud-deployment-review":
+        if args.apply:
+            print("ERROR: --apply is not supported in review modes.", file=sys.stderr)
+            return 1
+        if not args.deployment_evidence_dir:
+            print("ERROR: --deployment-evidence-dir is required for cloud-deployment-review.", file=sys.stderr)
+            return 2
+        return run_cloud_deployment_review_workflow(
+            deployment_evidence_directory=args.deployment_evidence_dir,
+            evidence_dir=args.review_evidence_dir,
+            ai_call=call_ai,
+            provider=AGENTIC_PROVIDER,
+            implementation_model=ACT_MODEL,
+            review_model=REVIEW_MODEL,
+        )
 
     if args.mode == "mcp":
         if args.mcp_human_decision != "pending" and not args.mcp_human_notes.strip():
