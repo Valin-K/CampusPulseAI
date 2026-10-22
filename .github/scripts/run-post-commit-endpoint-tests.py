@@ -4,6 +4,7 @@ import os
 import re
 import subprocess
 import sys
+import time
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable
@@ -44,10 +45,20 @@ class EndpointTestRunner:
         if server_url and repository and self.run_id != "local":
             self.workflow_url = f"{server_url}/{repository}/actions/runs/{self.run_id}"
 
+    def log(self, message: str) -> None:
+        timestamp = datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+        print(f"{timestamp} [student-{self.student}] {message}", flush=True)
+
     def token(self, account_id: str, role: str) -> str | None:
         auth_script = Path(__file__).with_name("create-ci-auth-token.py")
         environment = os.environ.copy()
         environment.setdefault("CAMPUSPULSE_AUTH_URL", "http://localhost:5020/api/auth/token")
+        auth_url = urlsplit(environment["CAMPUSPULSE_AUTH_URL"])
+        auth_host = f"[{auth_url.hostname}]" if auth_url.hostname and ":" in auth_url.hostname else auth_url.hostname
+        auth_port = f":{auth_url.port}" if auth_url.port else ""
+        auth_target = f"{auth_url.scheme}://{auth_host}{auth_port}{auth_url.path}"
+        started = time.perf_counter()
+        self.log(f"AUTH START role={role} endpoint={auth_target}")
         try:
             result = subprocess.run(  # noqa: S603 - fixed in-repository helper, argv list, shell disabled
                 [
@@ -65,15 +76,46 @@ class EndpointTestRunner:
                 env=environment,
             )
         except (OSError, subprocess.TimeoutExpired) as error:
-            self.auth_errors.append(f"{role} token setup failed: {error}")
+            detail = f"{role} token setup failed: {type(error).__name__}: {error}"
+            self.auth_errors.append(detail)
+            elapsed_ms = (time.perf_counter() - started) * 1000
+            self.log(f"AUTH FAIL role={role} elapsed_ms={elapsed_ms:.1f} error={detail}")
             return None
 
         token = result.stdout.strip()
         if result.returncode != 0 or not token:
             message = result.stderr.strip() or f"token helper exited with {result.returncode}"
-            self.auth_errors.append(f"{role} token setup failed: {message}")
+            detail = f"{role} token setup failed: {message}"
+            self.auth_errors.append(detail)
+            elapsed_ms = (time.perf_counter() - started) * 1000
+            self.log(f"AUTH FAIL role={role} elapsed_ms={elapsed_ms:.1f} error={detail}")
             return None
+        elapsed_ms = (time.perf_counter() - started) * 1000
+        self.log(f"AUTH PASS role={role} token=issued elapsed_ms={elapsed_ms:.1f}")
         return token
+
+    @staticmethod
+    def request_payload_summary(payload: dict[str, Any] | None) -> tuple[str, str]:
+        if payload is None:
+            return "none", "none"
+        redacted_markers = ("password", "token", "secret", "authorization", "api_key", "apikey")
+        fields = sorted(key for key in payload if not any(marker in key.lower() for marker in redacted_markers))
+        redacted = sorted(key for key in payload if any(marker in key.lower() for marker in redacted_markers))
+        field_summary = ",".join(fields) if fields else "none"
+        redacted_summary = ",".join(redacted) if redacted else "none"
+        return field_summary, redacted_summary
+
+    @staticmethod
+    def response_shape(body: Any) -> str:
+        if body is None:
+            return "empty"
+        if isinstance(body, dict):
+            return "object fields=" + (",".join(sorted(body)) or "none")
+        if isinstance(body, list):
+            if body and isinstance(body[0], dict):
+                return f"array items={len(body)} first_item_fields=" + (",".join(sorted(body[0])) or "none")
+            return f"array items={len(body)}"
+        return f"type={type(body).__name__}"
 
     def request(
         self,
@@ -125,17 +167,42 @@ class EndpointTestRunner:
         validate: Callable[[Any], str] | None = None,
     ) -> Any:
         status = 0
+        body = None
+        response_shape = "not received"
+        request_fields, redacted_fields = self.request_payload_summary(payload)
+        started = time.perf_counter()
+        self.log(
+            f"TEST START name={name!r} method={method} path={path} "
+            f"expected_status={expected_status} auth={'yes' if token else 'no'} "
+            f"payload_fields={request_fields} redacted_fields={redacted_fields}"
+        )
         try:
             if requires_auth and not token:
                 raise RuntimeError("required authorization token is unavailable; see authentication diagnostics")
+            self.log(
+                f"HTTP SEND method={method} path={path} "
+                f"content_type={'application/json' if payload is not None else 'none'}"
+            )
             status, body = self.request(method, path, payload, token)
+            response_shape = self.response_shape(body)
+            elapsed_ms = (time.perf_counter() - started) * 1000
+            self.log(
+                f"HTTP RECEIVE status={status} elapsed_ms={elapsed_ms:.1f} "
+                f"response={response_shape}"
+            )
             if status != expected_status:
                 raise AssertionError(f"expected HTTP {expected_status}, received HTTP {status}")
             detail = validate(body) if validate else "response status matched"
             result = "PASS"
+            self.log(f"ASSERT PASS name={name!r} detail={detail}")
         except Exception as error:
             detail = " ".join(str(error).split()).replace("|", "\\|")
             result = "FAIL"
+            elapsed_ms = (time.perf_counter() - started) * 1000
+            self.log(
+                f"ASSERT FAIL name={name!r} elapsed_ms={elapsed_ms:.1f} "
+                f"error={type(error).__name__}: {detail}"
+            )
 
         self.results.append(
             {
@@ -145,6 +212,11 @@ class EndpointTestRunner:
                 "endpoint": path,
                 "expected_status": expected_status,
                 "actual_status": status,
+                "authenticated": bool(token),
+                "request_payload_fields": request_fields,
+                "redacted_request_fields": redacted_fields,
+                "response_shape": response_shape,
+                "duration_ms": round(elapsed_ms, 1),
                 "result": result,
                 "detail": detail,
                 "timestamp_utc": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
@@ -154,7 +226,7 @@ class EndpointTestRunner:
                 "run_attempt": self.run_attempt,
             }
         )
-        print(f"{result}: {method} {path} (HTTP {status}; {detail})")
+        self.log(f"TEST {result} name={name!r} method={method} path={path} HTTP={status} detail={detail}")
         return body if result == "PASS" else None
 
     @staticmethod
@@ -590,13 +662,16 @@ class EndpointTestRunner:
             f"- Workflow run: {run_link} (attempt {self.run_attempt})",
             f"- Generated (UTC): {datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')}",
             "",
-            "| Endpoint test | Method | Endpoint | Expected HTTP | Actual HTTP | Result | Details |",
-            "|---|---|---|---:|---:|---|---|",
+            "| Endpoint test | Method | Endpoint | Auth | Expected HTTP | Actual HTTP | Duration ms | Request fields | Response shape | Result | Details |",
+            "|---|---|---|---|---:|---:|---:|---|---|---|---|",
         ]
         for result in self.results:
             lines.append(
                 f"| {result['name']} | {result['method']} | `{result['endpoint']}` "
-                f"| {result['expected_status']} | {result['actual_status']} "
+                f"| {'yes' if result['authenticated'] else 'no'} "
+                f"| {result['expected_status']} | {result['actual_status']} | {result['duration_ms']:.1f} "
+                f"| {result['request_payload_fields']} (redacted: {result['redacted_request_fields']}) "
+                f"| {result['response_shape']} "
                 f"| **{result['result']}** | {result['detail']} |"
             )
         if self.auth_errors:
@@ -613,11 +688,18 @@ class EndpointTestRunner:
         if summary_path:
             with Path(summary_path).open("a", encoding="utf-8") as summary:
                 summary.write(report)
-        print(f"Endpoint test report: {report_path}")
-        print(f"Endpoint test audit: {audit_path}")
+        self.log(f"SUMMARY result={outcome} passed={passed} total={total}")
+        self.log(f"EVIDENCE report={report_path}")
+        self.log(f"EVIDENCE audit={audit_path}")
         return outcome == "PASS"
 
     def run(self) -> bool:
+        target = urlsplit(self.base_url)
+        port = target.port or (443 if target.scheme == "https" else 80)
+        self.log(
+            f"RUN START base_url={target.scheme}://{target.hostname}:{port} "
+            f"expected_cases={self.expected_cases_per_student} run_attempt={self.run_attempt}"
+        )
         test_by_student = {
             1: self.run_student_1,
             2: self.run_student_2,
