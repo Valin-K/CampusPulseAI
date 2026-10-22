@@ -202,7 +202,7 @@ Criterion 5 ("reusable deployment scripts") as distinct from Criterion 6 (the wo
 | Cloud-ready frontend proxies and portal links | ✅ Implemented across all five services and portal |
 | Bicep infrastructure and reusable deployment scripts | ✅ Implemented |
 | GitHub Actions cloud deployment | ✅ Implemented; successful run #275 on `Ryan-cloud-smoke-test` |
-| Cloud smoke tests | ✅ Run #275 artifact records 8/8 checks passed, including authenticated CRUD across five services and the enabled AI/MCP integration |
+| Cloud smoke tests | ⚠️ Run #275 recorded 8/8 on `Ryan-cloud-smoke-test`; newer Run #276 was 6/7 because the Student test token called a Staff-only route. The smoke test now uses `/api/courses` for CRUD and separately expects 403 from `/api/course-access/users`; redeploy to verify. |
 | MCP endpoint authorization | ✅ Shared JWT fallback policy, internal ingress, and explicit endpoint authorization; anonymous 401 checks added to MCP CI |
 | Cloud data/secret hardening | ⚠️ Baseline controls exist; see the hardening backlog below |
 

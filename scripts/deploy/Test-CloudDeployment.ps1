@@ -38,7 +38,7 @@ $ErrorActionPreference = 'Stop'
 # One known, real GET endpoint per frontend - the exact ones manually verified in Phase 1.
 $services = @(
     @{ App = 'academicrecords-web'; Path = '/api/users' }
-    @{ App = 'coursemgmt-web'; Path = '/api/course-access/users' }
+    @{ App = 'coursemgmt-web'; Path = '/api/courses' }
     @{ App = 'campushousing-web'; Path = '/api/housing/rooms' }
     @{ App = 'finaid-web'; Path = '/api/invoices' }
     @{ App = 'eventscheduling-web'; Path = '/api/rooms' }
@@ -87,6 +87,24 @@ foreach ($service in $services) {
         if ($_.Exception.Response) { $statusCode = [int]$_.Exception.Response.StatusCode }
         $results += [pscustomobject]@{ Check = "$($service.App) CRUD read (web -> api -> db)"; Url = $url; Status = $statusCode; Passed = $false }
     }
+}
+
+Write-Host "Checking Course Management's staff-only users endpoint..." -ForegroundColor Cyan
+$courseManagementFqdn = Get-AppFqdn -AppName 'coursemgmt-web'
+$courseAccessUrl = "https://$courseManagementFqdn/api/course-access/users"
+$courseAccessStatus = 'error'
+try {
+    $response = Invoke-WebRequest -Uri $courseAccessUrl -Headers $authHeaders -UseBasicParsing -TimeoutSec 60
+    $courseAccessStatus = $response.StatusCode
+}
+catch {
+    if ($_.Exception.Response) { $courseAccessStatus = [int]$_.Exception.Response.StatusCode }
+}
+$results += [pscustomobject]@{
+    Check = 'Course Management staff-only users endpoint rejects Student'
+    Url = $courseAccessUrl
+    Status = $courseAccessStatus
+    Passed = ($courseAccessStatus -eq 403)
 }
 
 Write-Host "Checking Financial Aid's AI profile gates..." -ForegroundColor Cyan

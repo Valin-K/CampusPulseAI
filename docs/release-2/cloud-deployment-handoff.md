@@ -22,6 +22,13 @@ The earlier `20261019-233153` report is a historical failed run (1/8), not the l
 Run #275 is a real successful deployment, but its branch matters: repeat the deployment from
 `master` after the fixes are merged before claiming the master revision is verified.
 
+The newer [Cloud Deployment run #276](https://github.com/Valin-K/CampusPulseAI/actions/runs/39726378661)
+on `Alec-PostCommitCICD` completed deployment but its smoke report was 6/7: only
+`/api/course-access/users` returned 403. This is not a missing route. The route is defined by
+`CourseAccessController` and requires the Staff role, while the smoke test signs in as Student.
+The smoke test now reads `/api/courses` with the Student token and separately expects 403 from
+the staff-only route. These changes still need a GitHub redeploy to verify.
+
 The latest `master` dispatch before Run #275 was [run #265](https://github.com/Valin-K/CampusPulseAI/actions/runs/39386062433)
 on 2026-10-20 and it failed before smoke testing. Its logs show the AI-enabled deploy stopped
 because `GEMINI_API_KEY` was unavailable; provider-registration attempts also logged
