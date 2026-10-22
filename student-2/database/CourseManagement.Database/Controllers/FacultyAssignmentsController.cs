@@ -1,6 +1,8 @@
 using CourseManagement.Backend.Contracts.FacultyAssignments;
 using CourseManagement.Database.Data;
 using CourseManagement.Database.Models;
+using CampusPulse.Shared.Security;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -48,6 +50,7 @@ public sealed class FacultyAssignmentsController(CourseManagementDbContext datab
     }
 
     [HttpPost]
+    [Authorize(Policy = CampusPulseSecurityExtensions.StaffOnlyPolicy)]
     public async Task<ActionResult<FacultyAssignmentResponse>> Create(
         FacultyAssignmentRequest request,
         CancellationToken cancellationToken)
@@ -85,6 +88,7 @@ public sealed class FacultyAssignmentsController(CourseManagementDbContext datab
     }
 
     [HttpPut("{id:int}")]
+    [Authorize(Policy = CampusPulseSecurityExtensions.StaffOnlyPolicy)]
     public async Task<ActionResult<FacultyAssignmentResponse>> Update(
         int id,
         FacultyAssignmentRequest request,
@@ -122,6 +126,7 @@ public sealed class FacultyAssignmentsController(CourseManagementDbContext datab
     }
 
     [HttpDelete("{id:int}")]
+    [Authorize(Policy = CampusPulseSecurityExtensions.StaffOnlyPolicy)]
     public async Task<IActionResult> Delete(int id, CancellationToken cancellationToken)
     {
         var assignment = await database.FacultyAssignments.FindAsync([id], cancellationToken);

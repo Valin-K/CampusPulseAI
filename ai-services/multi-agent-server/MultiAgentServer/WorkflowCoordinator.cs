@@ -1,11 +1,12 @@
 using System.Threading.Channels;
 using CampusPulse.Shared.MultiAgent;
+using CampusPulse.Shared.Security;
 
 namespace MultiAgentServer;
 
 public sealed class WorkflowCoordinator(
     WorkflowStore store, IWorkflowAgents agents, IWorkflowEvidenceCollector collector,
-    ILogger<WorkflowCoordinator> logger) : BackgroundService
+    ILogger<WorkflowCoordinator> logger, AuthorizationRequestContext authorizationContext) : BackgroundService
 {
     private readonly Channel<(Guid Id, string? Authorization)> queue = Channel.CreateBounded<(Guid, string?)>(100);
 
@@ -66,6 +67,7 @@ public sealed class WorkflowCoordinator(
     public async Task ProcessAsync(Guid id, CancellationToken ct, string? authorization = null)
     {
         var workflow = store.Get(id) ?? throw new InvalidOperationException("Queued workflow was not found.");
+        using var authorizationScope = authorizationContext.Push(authorization);
         try
         {
             workflow = store.Save(await collector.CollectAsync(workflow, ct, authorization), "evidence_collected");

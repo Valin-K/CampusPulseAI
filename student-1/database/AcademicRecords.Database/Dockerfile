@@ -3,6 +3,7 @@ ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 
 COPY ["Directory.Packages.props", "."]
+COPY ["shared/backend/CampusPulse.Shared.Security/CampusPulse.Shared.Security.csproj", "shared/backend/CampusPulse.Shared.Security/"]
 COPY ["student-1/database/AcademicRecords.Database/AcademicRecords.Database.csproj", "student-1/database/AcademicRecords.Database/"]
 RUN dotnet restore "./student-1/database/AcademicRecords.Database/AcademicRecords.Database.csproj"
 
@@ -13,6 +14,7 @@ RUN dotnet publish "./AcademicRecords.Database.csproj" -c $BUILD_CONFIGURATION -
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
 EXPOSE 8080
+EXPOSE 8081
 RUN apt-get update \
 	&& apt-get install -y --no-install-recommends curl \
 	&& rm -rf /var/lib/apt/lists/*

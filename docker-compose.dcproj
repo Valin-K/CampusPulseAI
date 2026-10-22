@@ -38,7 +38,11 @@
     <None Include="scripts\pre-commit\Write-PreCommitSecurityReport.ps1" />
     <None Include="scripts\test\validate-ai-authorization.ps1" />
     <None Include="scripts\test\validate-ai-containers.ps1" />
+    <None Include="shared\backend\CampusPulse.Shared.Security\CampusPulse.Shared.Security.csproj" />
+    <None Include="shared\backend\CampusPulse.Shared.Security\CampusPulseSecurityExtensions.cs" />
     <None Include="shared\frontend\assets\campus-pulse-logo.svg" />
+    <None Include="shared\frontend\campus-config.json" />
+    <None Include="shared\frontend\campus-config.json.template" />
     <None Include="shared\frontend\CampusPulse.Shared.Components\CampusMetricCard.razor" />
     <None Include="shared\frontend\CampusPulse.Shared.Components\CampusMetricCard.razor.css" />
     <None Include="shared\frontend\CampusPulse.Shared.Components\CampusNavBar.razor" />
@@ -53,6 +57,7 @@
     <None Include="shared\frontend\css\university-theme.css" />
     <None Include="shared\frontend\js\campus-nav-bar.js" />
     <None Include="shared\frontend\js\university-ui.js" />
+    <None Include="shared\frontend\tests\campus-nav-bar.test.cjs" />
     <None Include="student-1\database\AcademicRecords.Database\AcademicRecords.Database.csproj" />
     <None Include="student-1\database\AcademicRecords.Database\Dockerfile" />
     <None Include="student-2\database\CourseManagement.Database\CourseManagement.Database.csproj" />

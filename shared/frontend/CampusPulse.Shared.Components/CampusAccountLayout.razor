@@ -1,7 +1,8 @@
 @inherits LayoutComponentBase
 @implements IDisposable
-@inject CampusAccountService Account
+@inject AccountService Account
 @inject NavigationManager Navigation
+@inject CampusEndpoints Endpoints
 
 <CampusShell PageName="CampusPulse Account"
              SectionLabel="Account access"
@@ -26,9 +27,9 @@
             var requestedReturnUrl = GetQueryParameter(
                 Navigation.ToAbsoluteUri(Navigation.Uri).Query,
                 "returnUrl");
-            return IsAllowedReturnUrl(requestedReturnUrl)
+            return Endpoints.IsAllowedReturnUrl(requestedReturnUrl)
                 ? requestedReturnUrl!
-                : "http://localhost:8080/index.html";
+                : Endpoints.Portal;
         }
     }
 
@@ -62,12 +63,6 @@
     }
 
     private bool ShowAccountActions => !IsLoginPage;
-
-    private static bool IsAllowedReturnUrl(string? returnUrl) =>
-        Uri.TryCreate(returnUrl, UriKind.Absolute, out var destination)
-        && destination.Scheme == Uri.UriSchemeHttp
-        && string.Equals(destination.Host, "localhost", StringComparison.OrdinalIgnoreCase)
-        && destination.Port is >= 8080 and <= 8085;
 
     protected override void OnInitialized()
     {

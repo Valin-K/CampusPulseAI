@@ -34,6 +34,9 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Create ephemeral JWT signing key
+        run: echo "CAMPUSPULSE_SIGNING_KEY=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+
       - name: Detect changed paths
         id: filter
         uses: dorny/paths-filter@v3

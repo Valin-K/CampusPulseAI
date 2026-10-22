@@ -80,6 +80,7 @@ public sealed class CampusAccountServiceTests
         Assert.That(service.IsAuthenticated, Is.False);
         var registration = new CampusStudentRegistration(
             "Riley", "Jones", "riley@example.edu", new DateOnly(2004, 5, 6),
+            "StrongPassword!2026", "StrongPassword!2026",
             "1 Campus Way", "Jordan Jones", "0400000000", "0400000001", "Bachelor", "Science");
 
         var created = await service.CreateStudentAsync(registration);
@@ -90,6 +91,8 @@ public sealed class CampusAccountServiceTests
         using var body = JsonDocument.Parse(captured.Body);
         Assert.That(body.RootElement.GetProperty("firstName").GetString(), Is.EqualTo("Riley"));
         Assert.That(body.RootElement.GetProperty("mailingAddress").GetString(), Is.EqualTo("1 Campus Way"));
+        Assert.That(body.RootElement.GetProperty("password").GetString(), Is.EqualTo("StrongPassword!2026"));
+        Assert.That(body.RootElement.GetProperty("confirmPassword").GetString(), Is.EqualTo("StrongPassword!2026"));
     }
 
     [Test]
@@ -111,11 +114,40 @@ public sealed class CampusAccountServiceTests
         Assert.That(service.IsAuthenticated, Is.False);
 
         var created = await service.CreateStaffAsync(new CampusStaffRegistration(
-            "Jamie", "Lee", "jamie@example.edu", new DateOnly(1985, 7, 8), "0400000002"));
+            "Jamie", "Lee", "jamie@example.edu", new DateOnly(1985, 7, 8),
+            "StrongPassword!2026", "StrongPassword!2026", "0400000002"));
 
         Assert.That(created, Is.EqualTo(new CampusCreatedStaff("STF102", 102)));
         Assert.That(captured!.Method, Is.EqualTo(HttpMethod.Post));
         Assert.That(captured.Path, Is.EqualTo("/api/staff/enroll"));
+    }
+
+    [Test]
+    public async Task PasswordSignInSendsThePasswordToTheTokenEndpoint()
+    {
+        CapturedRequest? captured = null;
+        var handler = new TestHttpMessageHandler(async (request, cancellationToken) =>
+        {
+            captured = await CaptureAsync(request, cancellationToken);
+            return JsonResponse(HttpStatusCode.OK, new
+            {
+                accessToken = "token",
+                tokenType = "Bearer",
+                expiresAt = DateTime.UtcNow.AddMinutes(10),
+                user = DirectoryUsers[0]
+            });
+        });
+        var javaScript = new TestJsRuntime();
+        var provider = new CampusPulse.Shared.Components.Services.AuthenticationStateProvider(
+            new HttpClient(handler) { BaseAddress = new Uri("https://academic-records.test/") }, javaScript);
+
+        await provider.SignInAsync("STU012", "Student", "StrongPassword!2026");
+
+        Assert.That(captured!.Path, Is.EqualTo("/api/auth/token"));
+        using var body = JsonDocument.Parse(captured.Body);
+        Assert.That(body.RootElement.GetProperty("accountId").GetString(), Is.EqualTo("STU012"));
+        Assert.That(body.RootElement.GetProperty("role").GetString(), Is.EqualTo("Student"));
+        Assert.That(body.RootElement.GetProperty("password").GetString(), Is.EqualTo("StrongPassword!2026"));
     }
 
     [Test]
@@ -253,7 +285,7 @@ public sealed class CampusAccountServiceTests
                 : null;
             return Task.FromResult(JsonResponse(HttpStatusCode.OK, new { userIdHeader }));
         });
-        var userIdHandler = new CampusUserIdHeaderHandler(javaScript) { InnerHandler = handler };
+        var userIdHandler = new UserIdHeaderHandler(javaScript) { InnerHandler = handler };
         using var client = new HttpClient(userIdHandler) { BaseAddress = new Uri("https://service.test/") };
 
         using var response = await client.GetAsync("api/data");
@@ -276,7 +308,7 @@ public sealed class CampusAccountServiceTests
         Assert.That(service.IsInitialized, Is.True);
     }
 
-    private static CampusAccountService CreateService(HttpMessageHandler handler, string? email) =>
+    private static AccountService CreateService(HttpMessageHandler handler, string? email) =>
         new(
             new HttpClient(handler) { BaseAddress = new Uri("https://academic-records.test/") },
             new TestAuthenticationStateProvider(email));
@@ -300,7 +332,7 @@ public sealed class CampusAccountServiceTests
 
     private sealed record HeaderResponse(string? UserIdHeader);
 
-    private sealed class TestAuthenticationStateProvider(string? email) : AuthenticationStateProvider
+    private sealed class TestAuthenticationStateProvider(string? email) : Microsoft.AspNetCore.Components.Authorization.AuthenticationStateProvider
     {
         public override Task<AuthenticationState> GetAuthenticationStateAsync()
         {

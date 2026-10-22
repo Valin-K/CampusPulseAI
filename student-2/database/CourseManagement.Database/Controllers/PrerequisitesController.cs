@@ -2,6 +2,8 @@ using CourseManagement.Backend.BusinessRules;
 using CourseManagement.Backend.Contracts.Prerequisites;
 using CourseManagement.Database.Data;
 using CourseManagement.Database.Models;
+using CampusPulse.Shared.Security;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -41,6 +43,7 @@ public sealed class PrerequisitesController(CourseManagementDbContext database) 
     }
 
     [HttpPost]
+    [Authorize(Policy = CampusPulseSecurityExtensions.StaffOnlyPolicy)]
     public async Task<ActionResult<PrerequisiteResponse>> Create(
         PrerequisiteRequest request,
         CancellationToken cancellationToken)
@@ -69,6 +72,7 @@ public sealed class PrerequisitesController(CourseManagementDbContext database) 
     }
 
     [HttpPut("{id:int}")]
+    [Authorize(Policy = CampusPulseSecurityExtensions.StaffOnlyPolicy)]
     public async Task<ActionResult<PrerequisiteResponse>> Update(
         int id,
         PrerequisiteRequest request,
@@ -97,6 +101,7 @@ public sealed class PrerequisitesController(CourseManagementDbContext database) 
     }
 
     [HttpDelete("{id:int}")]
+    [Authorize(Policy = CampusPulseSecurityExtensions.StaffOnlyPolicy)]
     public async Task<IActionResult> Delete(int id, CancellationToken cancellationToken)
     {
         var prerequisite = await database.Prerequisites.FindAsync([id], cancellationToken);

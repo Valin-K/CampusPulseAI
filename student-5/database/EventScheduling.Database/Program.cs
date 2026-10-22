@@ -1,6 +1,8 @@
 using EventScheduling.Database.Data;
 using EventScheduling.Database.Models;
+using CampusPulse.Shared.Security;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 
 var builder = WebApplication.CreateBuilder(args);
 var connectionString = builder.Configuration.GetConnectionString("EventScheduling")
@@ -8,8 +10,11 @@ var connectionString = builder.Configuration.GetConnectionString("EventSchedulin
 
 builder.Services.AddDbContext<EventSchedulingDbContext>(options => options.UseSqlite(connectionString));
 builder.Services.AddOpenApi();
+builder.Services.AddCampusPulseSecurity(builder.Configuration);
 
 var app = builder.Build();
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.MapOpenApi();
 
@@ -22,10 +27,10 @@ using (var scope = app.Services.CreateScope())
 
 var rooms = app.MapGroup("/api/rooms");
 
-rooms.MapGet("/", async (bool? includeInactive, EventSchedulingDbContext database, CancellationToken cancellationToken) =>
+rooms.MapGet("/", async (bool? includeInactive, EventSchedulingDbContext database, ClaimsPrincipal user, CancellationToken cancellationToken) =>
 {
     var query = database.Rooms.AsNoTracking();
-    if (includeInactive is not true)
+    if (includeInactive is not true || !user.IsInRole("Staff"))
     {
         query = query.Where(room => room.IsActive);
     }
@@ -36,10 +41,12 @@ rooms.MapGet("/", async (bool? includeInactive, EventSchedulingDbContext databas
         .ToListAsync(cancellationToken);
 });
 
-rooms.MapGet("/{id:int}", async (int id, EventSchedulingDbContext database, CancellationToken cancellationToken) =>
+rooms.MapGet("/{id:int}", async (int id, EventSchedulingDbContext database, ClaimsPrincipal user, CancellationToken cancellationToken) =>
 {
     var room = await database.Rooms.AsNoTracking().SingleOrDefaultAsync(item => item.Id == id, cancellationToken);
-    return room is null ? Results.NotFound() : Results.Ok(room.ToResponse());
+    if (room is null) return Results.NotFound();
+    if (!room.IsActive && !user.IsInRole("Staff")) return Results.Forbid();
+    return Results.Ok(room.ToResponse());
 });
 
 rooms.MapPost("/", async (RoomRequest request, EventSchedulingDbContext database, CancellationToken cancellationToken) =>
@@ -55,7 +62,7 @@ rooms.MapPost("/", async (RoomRequest request, EventSchedulingDbContext database
     await database.SaveChangesAsync(cancellationToken);
 
     return Results.Created($"/api/rooms/{room.Id}", room.ToResponse());
-});
+}).RequireAuthorization(CampusPulseSecurityExtensions.StaffOnlyPolicy);
 
 rooms.MapPut("/{id:int}", async (int id, RoomRequest request, EventSchedulingDbContext database, CancellationToken cancellationToken) =>
 {
@@ -75,7 +82,7 @@ rooms.MapPut("/{id:int}", async (int id, RoomRequest request, EventSchedulingDbC
     await database.SaveChangesAsync(cancellationToken);
 
     return Results.Ok(room.ToResponse());
-});
+}).RequireAuthorization(CampusPulseSecurityExtensions.StaffOnlyPolicy);
 
 rooms.MapDelete("/{id:int}", async (int id, EventSchedulingDbContext database, CancellationToken cancellationToken) =>
 {
@@ -89,7 +96,7 @@ rooms.MapDelete("/{id:int}", async (int id, EventSchedulingDbContext database, C
     await database.SaveChangesAsync(cancellationToken);
 
     return Results.NoContent();
-});
+}).RequireAuthorization(CampusPulseSecurityExtensions.StaffOnlyPolicy);
 
 static Task<int> AvailableCountAsync(EventSchedulingDbContext database, int refEquipmentId, CancellationToken cancellationToken) =>
     database.Equipment.CountAsync(
@@ -177,7 +184,7 @@ refEquipment.MapPost("/", async (RefEquipmentRequest request, EventSchedulingDbC
     await database.SaveChangesAsync(cancellationToken);
 
     return Results.Created($"/api/refequipment/{type.Id}", type.ToResponse(0));
-});
+}).RequireAuthorization(CampusPulseSecurityExtensions.StaffOnlyPolicy);
 
 refEquipment.MapPut("/{id:int}", async (int id, RefEquipmentRequest request, EventSchedulingDbContext database, CancellationToken cancellationToken) =>
 {
@@ -197,7 +204,7 @@ refEquipment.MapPut("/{id:int}", async (int id, RefEquipmentRequest request, Eve
     await database.SaveChangesAsync(cancellationToken);
 
     return Results.Ok(type.ToResponse(await AvailableCountAsync(database, id, cancellationToken)));
-});
+}).RequireAuthorization(CampusPulseSecurityExtensions.StaffOnlyPolicy);
 
 refEquipment.MapDelete("/{id:int}", async (int id, EventSchedulingDbContext database, CancellationToken cancellationToken) =>
 {
@@ -325,24 +332,36 @@ equipment.MapDelete("/{id:int}", async (int id, EventSchedulingDbContext databas
 
 var bookings = app.MapGroup("/api/bookings");
 
-bookings.MapGet("/", async (EventSchedulingDbContext database, CancellationToken cancellationToken) =>
+bookings.MapGet("/", async (EventSchedulingDbContext database, ClaimsPrincipal user, CancellationToken cancellationToken) =>
 {
-    var all = await database.Bookings
-        .AsNoTracking()
+    var query = database.Bookings.AsNoTracking();
+    if (user.IsInRole("Student"))
+    {
+        if (!user.TryGetUserId(out var userId)) return Results.Forbid();
+        query = query.Where(booking => booking.StudentId == userId);
+    }
+    var all = await query
         .OrderBy(booking => booking.StartUtc)
         .ToListAsync(cancellationToken);
 
-    return all.Select(booking => booking.ToResponse()).ToList();
+    return Results.Ok(all.Select(booking => booking.ToResponse()).ToList());
 });
 
-bookings.MapGet("/{id:int}", async (int id, EventSchedulingDbContext database, CancellationToken cancellationToken) =>
+bookings.MapGet("/{id:int}", async (int id, EventSchedulingDbContext database, ClaimsPrincipal user, CancellationToken cancellationToken) =>
 {
     var booking = await database.Bookings.AsNoTracking().SingleOrDefaultAsync(item => item.Id == id, cancellationToken);
-    return booking is null ? Results.NotFound() : Results.Ok(booking.ToResponse());
+    if (booking is null) return Results.NotFound();
+    return user.CanAccessUser(booking.StudentId)
+        ? Results.Ok(booking.ToResponse()) : Results.Forbid();
 });
 
-bookings.MapPost("/", async (BookingRequest request, EventSchedulingDbContext database, CancellationToken cancellationToken) =>
+bookings.MapPost("/", async (BookingRequest request, EventSchedulingDbContext database, ClaimsPrincipal user, CancellationToken cancellationToken) =>
 {
+    if (!user.TryGetUserId(out _) || !user.CanAccessUser(request.StudentId))
+    {
+        return Results.Forbid();
+    }
+    request = request with { IsStaff = user.IsInRole("Staff") };
     var error = request.Validate();
     if (error is not null)
     {
@@ -439,19 +458,20 @@ bookings.MapPost("/", async (BookingRequest request, EventSchedulingDbContext da
     return Results.Created($"/api/bookings/{booking.Id}", booking.ToResponse());
 });
 
-bookings.MapPut("/{id:int}", async (int id, BookingRequest request, EventSchedulingDbContext database, CancellationToken cancellationToken) =>
+bookings.MapPut("/{id:int}", async (int id, BookingRequest request, EventSchedulingDbContext database, ClaimsPrincipal user, CancellationToken cancellationToken) =>
 {
     var error = request.Validate();
     if (error is not null)
     {
         return BookingProblem(error, "RuleBreach");
     }
-
     var booking = await database.Bookings.SingleOrDefaultAsync(item => item.Id == id, cancellationToken);
     if (booking is null)
     {
         return Results.NotFound();
     }
+    if (!user.CanAccessUser(booking.StudentId) || !user.CanAccessUser(request.StudentId)) return Results.Forbid();
+    request = request with { IsStaff = user.IsInRole("Staff") };
 
     var wasActive = booking.Status is not (BookingStatus.Cancelled or BookingStatus.Completed or BookingStatus.Returned);
 
@@ -478,18 +498,18 @@ bookings.MapPut("/{id:int}", async (int id, BookingRequest request, EventSchedul
     return Results.Ok(booking.ToResponse());
 });
 
-bookings.MapPost("/{id:int}/return", async (int id, ReturnRequest? request, EventSchedulingDbContext database, CancellationToken cancellationToken) =>
+bookings.MapPost("/{id:int}/return", async (int id, ReturnRequest? request, EventSchedulingDbContext database, ClaimsPrincipal user, CancellationToken cancellationToken) =>
 {
     if (request?.Validate() is { } returnError)
     {
         return BookingProblem(returnError, "RuleBreach");
     }
-
     var booking = await database.Bookings.SingleOrDefaultAsync(item => item.Id == id, cancellationToken);
     if (booking is null)
     {
         return Results.NotFound();
     }
+    if (!user.CanAccessUser(booking.StudentId)) return Results.Forbid();
 
     if (booking.EquipmentId is null)
     {
@@ -504,13 +524,14 @@ bookings.MapPost("/{id:int}/return", async (int id, ReturnRequest? request, Even
     return Results.Ok(booking.ToResponse());
 });
 
-bookings.MapPost("/{id:int}/end", async (int id, EventSchedulingDbContext database, CancellationToken cancellationToken) =>
+bookings.MapPost("/{id:int}/end", async (int id, EventSchedulingDbContext database, ClaimsPrincipal user, CancellationToken cancellationToken) =>
 {
     var booking = await database.Bookings.SingleOrDefaultAsync(item => item.Id == id, cancellationToken);
     if (booking is null)
     {
         return Results.NotFound();
     }
+    if (!user.CanAccessUser(booking.StudentId)) return Results.Forbid();
 
     if (booking.RoomId is null)
     {
@@ -523,13 +544,14 @@ bookings.MapPost("/{id:int}/end", async (int id, EventSchedulingDbContext databa
     return Results.Ok(booking.ToResponse());
 });
 
-bookings.MapDelete("/{id:int}", async (int id, EventSchedulingDbContext database, CancellationToken cancellationToken) =>
+bookings.MapDelete("/{id:int}", async (int id, EventSchedulingDbContext database, ClaimsPrincipal user, CancellationToken cancellationToken) =>
 {
     var booking = await database.Bookings.SingleOrDefaultAsync(item => item.Id == id, cancellationToken);
     if (booking is null)
     {
         return Results.NotFound();
     }
+    if (!user.CanAccessUser(booking.StudentId)) return Results.Forbid();
 
     await ReleaseEquipmentUnitAsync(database, booking, cancellationToken);
     database.Bookings.Remove(booking);
@@ -538,7 +560,7 @@ bookings.MapDelete("/{id:int}", async (int id, EventSchedulingDbContext database
     return Results.NoContent();
 });
 
-app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
+app.MapGet("/health", () => Results.Ok(new { status = "healthy" })).AllowAnonymous();
 
 await app.RunAsync();
 

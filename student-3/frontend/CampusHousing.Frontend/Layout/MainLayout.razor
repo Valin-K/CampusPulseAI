@@ -1,14 +1,12 @@
 ﻿@inherits LayoutComponentBase
 @inject HousingUserContext UserContext
-@inject CampusAccountService Account
+@inject AccountService Account
 
 <CampusShell PageName="Campus Housing"
              SectionLabel="Housing services"
              UserName="@(Account.CurrentUser?.FullName ?? "Campus Housing")"
              UserDetails="@(Account.CurrentUser is null ? "Housing workspace" : $"{Account.CurrentUser.Role} · {Account.CurrentUser.ExternalId}")"
              UserInitials="@(Account.CurrentUser?.Initials ?? "CH")"
-             HomeHref="http://localhost:8080"
-             PortalHref="http://localhost:8080"
              RequireSignedInUser="true"
              ContextLabel="@ContextLabel">
     <ChildContent>

@@ -12,4 +12,8 @@
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
   </ItemGroup>
 
+  <ItemGroup>
+	<ProjectReference Include="..\..\..\shared\backend\CampusPulse.Shared.Security\CampusPulse.Shared.Security.csproj" />
+  </ItemGroup>
+
 </Project>

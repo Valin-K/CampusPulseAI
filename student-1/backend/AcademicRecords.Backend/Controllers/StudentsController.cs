@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using AcademicRecords.Backend.Services;
+using CampusPulse.Shared.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -13,38 +14,48 @@ public sealed class StudentsController(
 {
     [HttpGet("by-user/{userId:int}")]
     public Task<IActionResult> GetByUser(int userId, CancellationToken cancellationToken) =>
-        ForwardStudentResponseAsync($"/api/students/by-user/{userId}", cancellationToken);
+        User.CanAccessUser(userId)
+            ? ForwardStudentResponseAsync($"/api/students/by-user/{userId}", cancellationToken)
+            : Task.FromResult<IActionResult>(Forbid());
 
     [HttpGet]
+    [Authorize(Policy = CampusPulseSecurityExtensions.StaffOnlyPolicy)]
     public Task<IActionResult> GetAll(CancellationToken cancellationToken) =>
         ForwardStudentResponseAsync("/api/students", cancellationToken);
 
     [AllowAnonymous]
     [HttpPost("enroll")]
     public Task<IActionResult> Enroll(CancellationToken cancellationToken) =>
-        ForwardJsonRequestAsync(AcademicRecordsDatabase, HttpMethod.Post, "/api/students/enroll", cancellationToken);
+        ForwardJsonRequestAsync(AcademicRecordsCredentialsDatabase, HttpMethod.Post, "/api/students/enroll", cancellationToken);
 
     [HttpPost("{studentId}/enrollments")]
     public Task<IActionResult> AddEnrollment(string studentId, CancellationToken cancellationToken) =>
-        ForwardJsonRequestAsync(
+        User.CanAccessStudent(studentId)
+            ? ForwardJsonRequestAsync(
             AcademicRecordsDatabase,
             HttpMethod.Post,
             $"/api/students/{Uri.EscapeDataString(studentId)}/enrollments",
-            cancellationToken);
+            cancellationToken)
+            : Task.FromResult<IActionResult>(Forbid());
 
     [HttpGet("{studentId}")]
     public Task<IActionResult> GetByStudentId(string studentId, CancellationToken cancellationToken) =>
-        ForwardStudentResponseAsync($"/api/students/{Uri.EscapeDataString(studentId)}", cancellationToken);
+        User.CanAccessStudent(studentId)
+            ? ForwardStudentResponseAsync($"/api/students/{Uri.EscapeDataString(studentId)}", cancellationToken)
+            : Task.FromResult<IActionResult>(Forbid());
 
     [HttpPut("{studentId}")]
     public Task<IActionResult> Update(string studentId, CancellationToken cancellationToken) =>
-        ForwardJsonRequestAsync(
+        User.CanAccessStudent(studentId)
+            ? ForwardJsonRequestAsync(
             AcademicRecordsDatabase,
             HttpMethod.Put,
             $"/api/students/{Uri.EscapeDataString(studentId)}",
-            cancellationToken);
+            cancellationToken)
+            : Task.FromResult<IActionResult>(Forbid());
 
     [HttpPut("{studentId}/graduation")]
+    [Authorize(Policy = CampusPulseSecurityExtensions.StaffOnlyPolicy)]
     public Task<IActionResult> UpdateGraduation(string studentId, CancellationToken cancellationToken) =>
         ForwardJsonRequestAsync(
             AcademicRecordsDatabase,
@@ -90,4 +101,5 @@ public sealed class StudentsController(
             StatusCode = (int)response.StatusCode
         };
     }
+
 }

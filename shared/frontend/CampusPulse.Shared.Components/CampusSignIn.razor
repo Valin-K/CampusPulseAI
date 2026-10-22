@@ -4,8 +4,9 @@
 @implements IDisposable
 @using System.ComponentModel.DataAnnotations
 @using System.Text.Json
-@inject CampusAccountService Account
+@inject AccountService Account
 @inject NavigationManager Navigation
+@inject CampusEndpoints Endpoints
 
 <PageTitle>Sign in | CampusPulse</PageTitle>
 
@@ -72,6 +73,8 @@
                             <label class="field"><span>Mailing address</span><InputText @bind-Value="studentRegistration.MailingAddress" /></label>
                             <label class="field"><span>Emergency contact name</span><InputText @bind-Value="studentRegistration.EmergencyContactName" /></label>
                             <label class="field"><span>Emergency contact phone</span><InputText @bind-Value="studentRegistration.EmergencyContactPhone" /></label>
+                            <label class="field"><span>Password</span><InputText type="password" autocomplete="new-password" @bind-Value="studentRegistration.Password" /></label>
+                            <label class="field"><span>Confirm password</span><InputText type="password" autocomplete="new-password" @bind-Value="studentRegistration.ConfirmPassword" /></label>
                             <label class="field"><span>Degree</span><InputText @bind-Value="studentRegistration.Degree" /></label>
                             <label class="field"><span>Major</span><InputText @bind-Value="studentRegistration.Major" /></label>
                         </div>
@@ -91,6 +94,8 @@
                             <label class="field"><span>Email</span><InputText type="email" @bind-Value="staffRegistration.Email" /></label>
                             <label class="field"><span>Date of birth</span><InputDate @bind-Value="staffRegistration.DateOfBirth" /></label>
                             <label class="field"><span>Phone number</span><InputText @bind-Value="staffRegistration.PhoneNumber" /></label>
+                            <label class="field"><span>Password</span><InputText type="password" autocomplete="new-password" @bind-Value="staffRegistration.Password" /></label>
+                            <label class="field"><span>Confirm password</span><InputText type="password" autocomplete="new-password" @bind-Value="staffRegistration.ConfirmPassword" /></label>
                         </div>
                         <div class="button-row" style="margin-top: 1rem;">
                             <button type="submit" class="button button-primary" disabled="@submitting">@(submitting ? "Creating account..." : "Create staff account")</button>
@@ -150,34 +155,21 @@
                 {
                     <div class="notice notice-success" role="status">@accountCreatedMessage</div>
                 }
-                @if (usersLoading)
-                {
-                    <p class="muted" role="status">Loading accounts...</p>
-                }
-                else if (accounts.Count == 0)
-                {
-                    <p class="muted">No accounts found yet. Create an account to get started.</p>
-                }
-                else
-                {
-                    <EditForm class="account-login-form" Model="selection" OnValidSubmit="SignInAsync">
-                        <DataAnnotationsValidator />
-                        <label class="field">
-                            <span>@NormalizedRole account</span>
-                            <InputSelect @bind-Value="selection.UserId">
-                                <option value="0">Select an account</option>
-                                @foreach (var account in accounts)
-                                {
-                                    <option value="@account.UserId">@account.FullName (@account.Email)</option>
-                                }
-                            </InputSelect>
-                        </label>
-                        <button type="submit" class="button button-primary" disabled="@(submitting || selection.UserId <= 0)">
-                            @(submitting ? "Signing in..." : $"Continue as {NormalizedRole}")
-                        </button>
-                    </EditForm>
-                }
-                <button type="button" class="button button-secondary" @onclick="BeginCreatingAccount">Create @NormalizedRole.ToLowerInvariant() account</button>
+                <EditForm class="account-login-form" Model="selection" OnValidSubmit="SignInAsync">
+                    <DataAnnotationsValidator />
+                    <label class="field">
+                        <span>@(IsStudentRole ? "Student ID" : "Staff ID")</span>
+                        <InputText autocomplete="username" @bind-Value="selection.AccountId" />
+                    </label>
+                    <label class="field">
+                        <span>Password</span>
+                        <InputText type="password" autocomplete="current-password" @bind-Value="selection.Password" />
+                    </label>
+                    <button type="submit" class="button button-primary" disabled="@submitting">
+                        @(submitting ? "Logging in..." : "Login")
+                    </button>
+                </EditForm>
+                <button type="button" class="button button-secondary account-login-create" @onclick="BeginCreatingAccount">Create @NormalizedRole.ToLowerInvariant() account</button>
             </section>
         }
 </div>
@@ -186,7 +178,7 @@
     [Parameter] public string? Role { get; set; }
     [SupplyParameterFromQuery(Name = "returnUrl")]
     public string? ReturnUrl { get; set; }
-    [Inject] private CampusDemoAuthenticationStateProvider DemoAuthentication { get; set; } = default!;
+    [Inject] private AuthenticationStateProvider Authentication { get; set; } = default!;
 
     private string NormalizedRole => string.Equals(Role, "staff", StringComparison.OrdinalIgnoreCase)
         ? "Staff"
@@ -197,22 +189,18 @@
     private string SignInDescription => string.IsNullOrWhiteSpace(Role)
         ? "Use your student or staff account to access CampusPulse services."
         : $"Sign in to access CampusPulse {NormalizedRole.ToLowerInvariant()} services.";
-    private string SafeReturnUrl => IsAllowedReturnUrl(ReturnUrl) ? ReturnUrl! : "/";
+    private string SafeReturnUrl => Endpoints.IsAllowedReturnUrl(ReturnUrl) ? ReturnUrl! : "/";
     private string SignInUrl => RoleSignInUrl(null);
     private bool IsStudentRole => string.Equals(NormalizedRole, "Student", StringComparison.Ordinal);
 
     private bool creatingAccount;
     private bool submitting;
-    private bool usersLoading;
     private string? loginErrorMessage;
     private string? registrationError;
     private string? accountCreatedMessage;
-    private List<CampusAccountUser> accounts = [];
     private AccountSelection selection = new();
     private StudentRegistrationModel studentRegistration = new();
     private StaffRegistrationModel staffRegistration = new();
-    private string? accountsLoadedForRole;
-    private int accountLoadVersion;
 
     protected override async Task OnInitializedAsync()
     {
@@ -220,25 +208,11 @@
         await Account.InitializeAsync();
     }
 
-    protected override async Task OnParametersSetAsync()
+    protected override void OnParametersSet()
     {
-        var role = string.IsNullOrWhiteSpace(Role) ? null : NormalizedRole;
-        if (string.Equals(role, accountsLoadedForRole, StringComparison.OrdinalIgnoreCase))
-        {
-            return;
-        }
-
-        accountsLoadedForRole = role;
-        var loadVersion = ++accountLoadVersion;
-        accounts = [];
-        selection.UserId = 0;
+        selection.AccountId = string.Empty;
         loginErrorMessage = null;
-        usersLoading = false;
-
-        if (role is not null && !Account.IsAuthenticated)
-        {
-            await LoadAccountsAsync(role, loadVersion);
-        }
+        selection.Password = string.Empty;
     }
 
     private void AccountChanged() => _ = InvokeAsync(StateHasChanged);
@@ -250,44 +224,13 @@
         creatingAccount = true;
     }
 
-    private async Task LoadAccountsAsync(string role, int loadVersion)
-    {
-        usersLoading = true;
-        loginErrorMessage = null;
-        try
-        {
-            var loadedAccounts = await DemoAuthentication.GetUsersAsync(role);
-            if (loadVersion == accountLoadVersion)
-            {
-                accounts = loadedAccounts
-                .OrderBy(user => user.LastName)
-                .ThenBy(user => user.FirstName)
-                .ToList();
-            }
-        }
-        catch (Exception exception) when (exception is HttpRequestException or JsonException)
-        {
-            if (loadVersion == accountLoadVersion)
-            {
-                loginErrorMessage = $"Accounts are unavailable: {exception.Message}";
-            }
-        }
-        finally
-        {
-            if (loadVersion == accountLoadVersion)
-            {
-                usersLoading = false;
-            }
-        }
-    }
-
     private async Task SignInAsync()
     {
         submitting = true;
         loginErrorMessage = null;
         try
         {
-            await DemoAuthentication.SignInAsync(selection.UserId, NormalizedRole);
+            await Authentication.SignInAsync(selection.AccountId, NormalizedRole, selection.Password);
             await Account.InitializeAsync(forceRefresh: true);
             Navigation.NavigateTo(BuildReturnUrl());
         }
@@ -297,34 +240,16 @@
         }
         finally
         {
+            selection.Password = string.Empty;
             submitting = false;
         }
-    }
-
-    private static bool IsAllowedReturnUrl(string? returnUrl)
-    {
-        if (string.IsNullOrWhiteSpace(returnUrl))
-        {
-            return false;
-        }
-
-        if (returnUrl.StartsWith("/", StringComparison.Ordinal))
-        {
-            return !returnUrl.StartsWith("//", StringComparison.Ordinal)
-                && !returnUrl.StartsWith("/\\", StringComparison.Ordinal);
-        }
-
-        return Uri.TryCreate(returnUrl, UriKind.Absolute, out var destination)
-            && destination.Scheme == Uri.UriSchemeHttp
-            && string.Equals(destination.Host, "localhost", StringComparison.OrdinalIgnoreCase)
-            && destination.Port is >= 8080 and <= 8085;
     }
 
     private string BuildReturnUrl()
     {
         if (!Uri.TryCreate(SafeReturnUrl, UriKind.Absolute, out var destination)
             || !Uri.TryCreate(Navigation.BaseUri, UriKind.Absolute, out var current)
-            || destination.Authority.Equals(current.Authority, StringComparison.OrdinalIgnoreCase))
+            || destination.GetLeftPart(UriPartial.Authority).Equals(current.GetLeftPart(UriPartial.Authority), StringComparison.OrdinalIgnoreCase))
         {
             return SafeReturnUrl;
         }
@@ -332,7 +257,7 @@
         var builder = new UriBuilder(destination)
         {
             Fragment = $"campuspulse_session={Uri.EscapeDataString(JsonSerializer.Serialize(
-                DemoAuthentication.CurrentSession,
+                Authentication.CurrentSession,
                 new JsonSerializerOptions(JsonSerializerDefaults.Web)))}"
         };
         return builder.Uri.ToString();
@@ -341,10 +266,7 @@
     private string RoleSignInUrl(string? role)
     {
         var path = string.IsNullOrWhiteSpace(role) ? "/login" : $"/login/{role}";
-        var query = IsAllowedReturnUrl(ReturnUrl)
-            ? $"?returnUrl={Uri.EscapeDataString(ReturnUrl!)}"
-            : string.Empty;
-        return $"http://localhost:8081{path}{query}";
+        return Endpoints.AccountUrl(path, Endpoints.IsAllowedReturnUrl(ReturnUrl) ? ReturnUrl : null);
     }
 
     private async Task CreateStudentAsync()
@@ -358,6 +280,8 @@
                 studentRegistration.LastName,
                 studentRegistration.Email,
                 studentRegistration.DateOfBirth,
+                studentRegistration.Password,
+                studentRegistration.ConfirmPassword,
                 studentRegistration.MailingAddress,
                 studentRegistration.EmergencyContactName,
                 studentRegistration.EmergencyContactPhone,
@@ -365,9 +289,10 @@
                 studentRegistration.Degree,
                 studentRegistration.Major));
             creatingAccount = false;
-            selection.UserId = created.UserId;
+            selection.AccountId = created.StudentId;
+            studentRegistration.Password = string.Empty;
+            studentRegistration.ConfirmPassword = string.Empty;
             accountCreatedMessage = "Account created. Continue to sign in.";
-            await LoadAccountsAsync(NormalizedRole, accountLoadVersion);
         }
         catch (Exception exception) when (exception is HttpRequestException or JsonException or InvalidOperationException)
         {
@@ -390,11 +315,14 @@
                 staffRegistration.LastName,
                 staffRegistration.Email,
                 staffRegistration.DateOfBirth,
+                staffRegistration.Password,
+                staffRegistration.ConfirmPassword,
                 staffRegistration.PhoneNumber));
             creatingAccount = false;
-            selection.UserId = created.UserId;
+            selection.AccountId = created.StaffId;
+            staffRegistration.Password = string.Empty;
+            staffRegistration.ConfirmPassword = string.Empty;
             accountCreatedMessage = "Account created. Continue to sign in.";
-            await LoadAccountsAsync(NormalizedRole, accountLoadVersion);
         }
         catch (Exception exception) when (exception is HttpRequestException or JsonException or InvalidOperationException)
         {
@@ -408,8 +336,10 @@
 
     private sealed class AccountSelection
     {
-        [Range(1, int.MaxValue)]
-        public int UserId { get; set; }
+        [Required]
+        public string AccountId { get; set; } = string.Empty;
+        [Required]
+        public string Password { get; set; } = string.Empty;
     }
 
     public void Dispose() => Account.Changed -= AccountChanged;
@@ -424,6 +354,10 @@
         public string Email { get; set; } = string.Empty;
         [Required]
         public DateOnly? DateOfBirth { get; set; }
+        [Required, MinLength(12), MaxLength(128)]
+        public string Password { get; set; } = string.Empty;
+        [Required, Compare(nameof(Password)), MaxLength(128)]
+        public string ConfirmPassword { get; set; } = string.Empty;
         [Required]
         public string MailingAddress { get; set; } = string.Empty;
         [Required]
@@ -445,6 +379,10 @@
         public string Email { get; set; } = string.Empty;
         [Required]
         public DateOnly? DateOfBirth { get; set; }
+        [Required, MinLength(12), MaxLength(128)]
+        public string Password { get; set; } = string.Empty;
+        [Required, Compare(nameof(Password)), MaxLength(128)]
+        public string ConfirmPassword { get; set; } = string.Empty;
         public string? PhoneNumber { get; set; }
     }
 }

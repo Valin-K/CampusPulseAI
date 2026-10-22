@@ -1,7 +1,8 @@
 @implements IDisposable
-@inject CampusAccountService Account
+@inject AccountService Account
 @inject NavigationManager Navigation
-@inject CampusDemoAuthenticationStateProvider DemoAuthentication
+@inject CampusEndpoints Endpoints
+@inject AuthenticationStateProvider Authentication
 @inject IJSRuntime JavaScript
 
 <div class="campus-account-menu" aria-label="Account">
@@ -27,9 +28,9 @@
 </div>
 
 @code {
-    private string ProfileUrl => $"http://localhost:8081/profile?returnUrl={Uri.EscapeDataString(Navigation.Uri)}";
+    private string ProfileUrl => Endpoints.AccountUrl("profile", Navigation.Uri);
 
-    private string SignInUrl => $"http://localhost:8081/login?returnUrl={Uri.EscapeDataString(Navigation.Uri)}";
+    private string SignInUrl => Endpoints.AccountUrl("login", Navigation.Uri);
 
     protected override async Task OnInitializedAsync()
     {
@@ -41,7 +42,7 @@
 
     private async Task SignOutAsync()
     {
-        await DemoAuthentication.SignOutAsync();
+        await Authentication.SignOutAsync();
         await Account.InitializeAsync(forceRefresh: true);
         await JavaScript.InvokeVoidAsync("campusPulseNavigation.signOutEverywhere");
     }

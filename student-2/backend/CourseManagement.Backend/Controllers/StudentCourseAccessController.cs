@@ -1,6 +1,9 @@
 using CourseManagement.Backend.Clients;
 using CourseManagement.Backend.Configuration;
 using CourseManagement.Backend.Contracts.CourseAccess;
+using System.Security.Claims;
+using CampusPulse.Shared.Security;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 
@@ -8,6 +11,7 @@ namespace CourseManagement.Backend.Controllers;
 
 [ApiController]
 [Route("api/course-access/student")]
+[Authorize(Policy = CampusPulseSecurityExtensions.StudentOnlyPolicy)]
 public sealed class StudentCourseAccessController(
     IAcademicRecordsClient academicRecords,
     ICourseCatalogueClient courseCatalogue,
@@ -20,13 +24,17 @@ public sealed class StudentCourseAccessController(
     {
         try
         {
+            var studentId = User.FindFirst("student_id")?.Value;
+            if (string.IsNullOrWhiteSpace(studentId)) return Forbid();
             var student = await academicRecords.GetStudentAsync(
-                options.Value.DemoStudentId,
+                studentId,
                 cancellationToken);
             return Ok(ToSummary(student));
         }
         catch (HttpRequestException exception)
         {
+        var studentId = User.FindFirst("student_id")?.Value;
+        if (string.IsNullOrWhiteSpace(studentId)) return Forbid();
             return AcademicRecordsUnavailable(exception);
         }
         catch (TaskCanceledException exception) when (!cancellationToken.IsCancellationRequested)
@@ -44,6 +52,8 @@ public sealed class StudentCourseAccessController(
         CreateCourseEnrollmentRequest request,
         CancellationToken cancellationToken)
     {
+        var studentId = User.FindFirst("student_id")?.Value;
+        if (string.IsNullOrWhiteSpace(studentId)) return Forbid();
         var courseCode = request.CourseCode?.Trim();
         if (string.IsNullOrWhiteSpace(courseCode) || courseCode.Length > 20)
         {
@@ -162,7 +172,7 @@ public sealed class StudentCourseAccessController(
         try
         {
             var student = await academicRecords.GetStudentAsync(
-                options.Value.DemoStudentId,
+                studentId,
                 cancellationToken);
             if (student.Enrollments.Any(enrollment =>
                     string.Equals(
@@ -181,7 +191,7 @@ public sealed class StudentCourseAccessController(
             }
 
             await academicRecords.CreateEnrollmentAsync(
-                options.Value.DemoStudentId,
+                studentId,
                 new AcademicRecordsEnrollmentRequest(
                     course.Code,
                     options.Value.DemoEnrollmentTermId,
@@ -189,7 +199,7 @@ public sealed class StudentCourseAccessController(
                 cancellationToken);
 
             var updatedStudent = await academicRecords.GetStudentAsync(
-                options.Value.DemoStudentId,
+                studentId,
                 cancellationToken);
             return CreatedAtAction(
                 nameof(GetSummary),

@@ -111,6 +111,10 @@ Done, on the Azure side:
 - Granted **Contributor, scoped only to `rg-campuspulse`** (confirmed via `az role assignment list`)
 - Federated credential trusting `repo:Valin-K/CampusPulseAI:environment:production`
 
+Required for the current Key Vault deployment flow: grant this identity the **Key Vault Secrets User**
+role on Key Vault `kv-campuspulse`. Contributor on the resource group does not by itself grant
+Key Vault secret-read access; verify this data-plane role assignment before running the cloud workflow.
+
 Still needed, on the GitHub side — **requires repo admin access** (this account gets a 404; confirmed
 blocked). Valin-K needs to run:
 ```bash

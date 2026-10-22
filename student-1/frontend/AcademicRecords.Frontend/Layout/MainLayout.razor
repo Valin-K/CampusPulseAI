@@ -1,15 +1,13 @@
 ﻿@inherits LayoutComponentBase
 @implements IDisposable
 @inject NavigationManager Navigation
-@inject CampusAccountService Account
+@inject AccountService Account
 
 <CampusShell PageName="Academic Records"
              SectionLabel="Registrar services"
              UserName="@(Account.CurrentUser?.FullName ?? "Academic Records")"
              UserDetails="@(Account.CurrentUser is null ? "Enrollment and graduation workspace" : $"{Account.CurrentUser.Role} · {Account.CurrentUser.ExternalId}")"
              UserInitials="@(Account.CurrentUser?.Initials ?? "AR")"
-             HomeHref="http://localhost:8080"
-             PortalHref="http://localhost:8080"
              RequireSignedInUser="true"
              ContextLabel="@(Account.CurrentUser is null ? "Academic records workspace" : $"{Account.CurrentUser.Role} account")">
     <ChildContent>
@@ -26,7 +24,7 @@
         {
             var user = Account.CurrentUser;
             return user is not null
-                && CampusAccountService.IsStudent(user)
+                && AccountService.IsStudent(user)
                 && user.UserId > 0
                     ? user.UserId
                     : null;

@@ -22,6 +22,17 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v4
 
+      - name: Set up Node.js for navigation tests
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Test local and Azure navigation
+        run: node --test shared/frontend/tests/campus-nav-bar.test.cjs
+
+      - name: Create ephemeral JWT signing key
+        run: echo "CAMPUSPULSE_SIGNING_KEY=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+
       - name: Restore solution
         run: dotnet restore CampusPulseAI.slnx
 

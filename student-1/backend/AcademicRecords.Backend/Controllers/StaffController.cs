@@ -1,3 +1,4 @@
+using CampusPulse.Shared.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -8,6 +9,7 @@ namespace AcademicRecords.Backend.Controllers;
 public sealed class StaffController(IHttpClientFactory clients) : AcademicRecordsControllerBase(clients)
 {
     [HttpGet("by-user/{userId:int}")]
+    [Authorize(Policy = CampusPulseSecurityExtensions.StaffOnlyPolicy)]
     public async Task<IActionResult> GetByUser(int userId, CancellationToken cancellationToken)
     {
         var response = await AcademicRecordsDatabase.GetAsync($"/api/staff/by-user/{userId}", cancellationToken);
@@ -15,6 +17,7 @@ public sealed class StaffController(IHttpClientFactory clients) : AcademicRecord
     }
 
     [HttpGet]
+    [Authorize(Policy = CampusPulseSecurityExtensions.StaffOnlyPolicy)]
     public async Task<IActionResult> GetAll(CancellationToken cancellationToken)
     {
         var response = await AcademicRecordsDatabase.GetAsync("/api/staff", cancellationToken);
@@ -24,9 +27,10 @@ public sealed class StaffController(IHttpClientFactory clients) : AcademicRecord
     [AllowAnonymous]
     [HttpPost("enroll")]
     public Task<IActionResult> Enroll(CancellationToken cancellationToken) =>
-        ForwardJsonRequestAsync(AcademicRecordsDatabase, HttpMethod.Post, "/api/staff/enroll", cancellationToken);
+        ForwardJsonRequestAsync(AcademicRecordsCredentialsDatabase, HttpMethod.Post, "/api/staff/enroll", cancellationToken);
 
     [HttpPut("{staffId}")]
+    [Authorize(Policy = CampusPulseSecurityExtensions.StaffOnlyPolicy)]
     public Task<IActionResult> Update(string staffId, CancellationToken cancellationToken) =>
         ForwardJsonRequestAsync(
             AcademicRecordsDatabase,

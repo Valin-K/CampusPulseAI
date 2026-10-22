@@ -28,8 +28,8 @@ param env array = []
 param geminiApiKey string = ''
 
 @secure()
-@description('Optional JWT signing key for universal sign-in, referenced via secretRef. Every backend needs the same value to validate tokens Academic Records issues.')
-param authSigningKey string = ''
+@description('CampusPulse JWT signing key, referenced via secretRef by secured services.')
+param campusPulseSigningKey string = ''
 
 @description('0 normally (scale-to-zero); 1 during the showcase/marking window (Deploy-Apps.ps1 -WarmUp).')
 param minReplicas int = 0
@@ -56,8 +56,7 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
     configuration: {
       secrets: concat(
         empty(geminiApiKey) ? [] : [{ name: 'gemini-api-key', value: geminiApiKey }],
-        empty(authSigningKey) ? [] : [{ name: 'auth-signing-key', value: authSigningKey }]
-      )
+        empty(campusPulseSigningKey) ? [] : [{ name: 'campuspulse-signing-key', value: campusPulseSigningKey }])
       ingress: {
         external: external
         targetPort: targetPort
@@ -96,7 +95,7 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
               }
               initialDelaySeconds: 5
               periodSeconds: 5
-              failureThreshold: 20
+              failureThreshold: 60
             }
           ]
         }

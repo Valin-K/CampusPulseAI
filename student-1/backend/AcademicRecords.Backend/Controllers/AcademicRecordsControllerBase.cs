@@ -6,6 +6,7 @@ namespace AcademicRecords.Backend.Controllers;
 public abstract class AcademicRecordsControllerBase(IHttpClientFactory clients) : ControllerBase
 {
     protected HttpClient AcademicRecordsDatabase => clients.CreateClient("academicRecordsDatabase");
+    protected HttpClient AcademicRecordsCredentialsDatabase => clients.CreateClient("academicRecordsCredentials");
     protected HttpClient CourseManagementDatabase => clients.CreateClient("courseManagementDatabase");
 
     protected async Task<IActionResult> ForwardResponseAsync(

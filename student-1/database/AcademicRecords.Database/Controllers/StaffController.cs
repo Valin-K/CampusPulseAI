@@ -1,6 +1,9 @@
 using AcademicRecords.Database.Contracts;
 using AcademicRecords.Database.Data;
 using AcademicRecords.Database.Models;
+using AcademicRecords.Database.Services;
+using CampusPulse.Shared.Security;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -11,6 +14,7 @@ namespace AcademicRecords.Database.Controllers;
 public sealed class StaffController(AcademicRecordsDbContext database) : ControllerBase
 {
     [HttpGet("by-user/{userId:int}")]
+    [Authorize(Policy = CampusPulseSecurityExtensions.StaffOnlyPolicy)]
     public async Task<ActionResult<StaffProfileResponse>> GetByUser(
         int userId,
         CancellationToken cancellationToken)
@@ -25,6 +29,7 @@ public sealed class StaffController(AcademicRecordsDbContext database) : Control
     }
 
     [HttpGet]
+    [Authorize(Policy = CampusPulseSecurityExtensions.StaffOnlyPolicy)]
     public async Task<ActionResult<IReadOnlyList<StaffProfileResponse>>> GetAll(
         CancellationToken cancellationToken)
     {
@@ -39,10 +44,16 @@ public sealed class StaffController(AcademicRecordsDbContext database) : Control
     }
 
     [HttpPost("enroll")]
+    [AllowAnonymous]
     public async Task<IActionResult> Enroll(
         EnrollStaffRequest request,
         CancellationToken cancellationToken)
     {
+        if (!UserPasswordSecurity.IsValidNewPassword(request.Password, request.ConfirmPassword))
+        {
+            return BadRequest("Password must be 12 to 128 characters and match the confirmation.");
+        }
+
         if (string.IsNullOrWhiteSpace(request.FirstName) || string.IsNullOrWhiteSpace(request.LastName) ||
             string.IsNullOrWhiteSpace(request.Email) || request.DateOfBirth is null)
         {
@@ -69,6 +80,7 @@ public sealed class StaffController(AcademicRecordsDbContext database) : Control
             Status = "ACT",
             PhoneNumber = request.PhoneNumber?.Trim()
         };
+        staff.PasswordHash = UserPasswordSecurity.HashPassword(staff, request.Password);
         database.Add(staff);
 
         await database.SaveChangesAsync(cancellationToken);
@@ -76,6 +88,7 @@ public sealed class StaffController(AcademicRecordsDbContext database) : Control
     }
 
     [HttpPut("{staffId}")]
+    [Authorize(Policy = CampusPulseSecurityExtensions.StaffOnlyPolicy)]
     public async Task<IActionResult> Update(
         string staffId,
         UpdateStaffRequest request,

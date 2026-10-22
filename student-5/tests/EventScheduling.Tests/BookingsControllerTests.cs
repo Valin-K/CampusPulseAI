@@ -3,6 +3,8 @@ using System.Text;
 using EventScheduling.Backend.Clients;
 using EventScheduling.Backend.Controllers;
 using EventScheduling.Backend.Models;
+using System.Security.Claims;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
 namespace EventScheduling.Tests;
@@ -11,11 +13,11 @@ public sealed class BookingsControllerTests
 {
     private static readonly IReadOnlyList<AcademicRecordsUser> Users =
     [
-        new(4, "Ryan", "Takayasu", "ryan@example.edu", "Student", "STU004", null),
+        new(5, "Ryan", "Takayasu", "ryan.takayasu@example.edu", "Student", "STU005", null),
         new(14, "Marcus", "Lee", "marcus@example.edu", "Staff", null, "STF004")
     ];
 
-    private static BookingRequest Request(int studentId = 4) => new(
+    private static BookingRequest Request(int studentId = 5) => new(
         studentId, RoomId: 1, RefEquipmentId: null, "Study Room 101",
         new DateTime(2030, 6, 1, 10, 0, 0, DateTimeKind.Utc),
         new DateTime(2030, 6, 1, 12, 0, 0, DateTimeKind.Utc),
@@ -31,7 +33,7 @@ public sealed class BookingsControllerTests
 
         Assert.Multiple(() =>
         {
-            Assert.That((result as ObjectResult)?.StatusCode, Is.EqualTo(400));
+            Assert.That(result, Is.TypeOf<ForbidResult>());
             Assert.That(database.CallCount, Is.Zero, "an unverified booking should never reach the database tier");
         });
     }
@@ -42,7 +44,7 @@ public sealed class BookingsControllerTests
         var database = new RecordingHttpMessageHandler(Created());
         var controller = Controller(database, new StubAcademicRecordsClient(Users));
 
-        var result = await controller.Create(Request(studentId: 4), CancellationToken.None);
+        var result = await controller.Create(Request(studentId: 5), CancellationToken.None);
 
         Assert.Multiple(() =>
         {
@@ -57,7 +59,7 @@ public sealed class BookingsControllerTests
         var database = new RecordingHttpMessageHandler(Created());
         var controller = Controller(database, new UnavailableAcademicRecordsClient());
 
-        var result = await controller.Create(Request(studentId: 4), CancellationToken.None);
+        var result = await controller.Create(Request(studentId: 5), CancellationToken.None);
 
         Assert.Multiple(() =>
         {
@@ -67,13 +69,21 @@ public sealed class BookingsControllerTests
         });
     }
 
-    private static BookingsController Controller(HttpMessageHandler databaseHandler, IAcademicRecordsClient academicRecords) =>
-        new(new NamedHttpClientFactory(databaseHandler), academicRecords);
+    private static BookingsController Controller(HttpMessageHandler databaseHandler, IAcademicRecordsClient academicRecords)
+    {
+        var controller = new BookingsController(new NamedHttpClientFactory(databaseHandler), academicRecords);
+        var context = new DefaultHttpContext();
+        context.User = new ClaimsPrincipal(new ClaimsIdentity(
+            [new Claim(ClaimTypes.Role, "Student"), new Claim("user_id", "5")],
+            "test"));
+        controller.ControllerContext = new ControllerContext { HttpContext = context };
+        return controller;
+    }
 
     private static HttpResponseMessage Created() => new(HttpStatusCode.Created)
     {
         Content = new StringContent(
-            """{"id":1,"studentId":4,"roomId":1,"equipmentId":null,"refEquipmentId":null,"resourceType":0,"resourceName":"Study Room 101","startUtc":"2030-06-01T10:00:00","endUtc":"2030-06-01T12:00:00","status":1}""",
+            """{"id":1,"studentId":5,"roomId":1,"equipmentId":null,"refEquipmentId":null,"resourceType":0,"resourceName":"Study Room 101","startUtc":"2030-06-01T10:00:00","endUtc":"2030-06-01T12:00:00","status":1}""",
             Encoding.UTF8, "application/json")
     };
 

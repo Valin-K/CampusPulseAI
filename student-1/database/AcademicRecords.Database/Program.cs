@@ -1,4 +1,6 @@
 using AcademicRecords.Database.Data;
+using CampusPulse.Shared.Security;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -7,10 +9,13 @@ var connectionString = builder.Configuration.GetConnectionString("AcademicRecord
 
 builder.Services.AddDbContext<AcademicRecordsDbContext>(options => options.UseSqlite(connectionString));
 builder.Services.AddControllers();
+builder.Services.AddCampusPulseSecurity(builder.Configuration);
 
 var app = builder.Build();
+app.UseAuthentication();
+app.UseAuthorization();
 
-app.MapGet("/health", () => Results.Ok(new { service = "academic-records-database", status = "healthy" }));
+app.MapGet("/health", () => Results.Ok(new { service = "academic-records-database", status = "healthy" })).AllowAnonymous();
 
 using (var scope = app.Services.CreateScope())
 {
@@ -21,4 +26,3 @@ using (var scope = app.Services.CreateScope())
 
 app.MapControllers();
 app.Run();
-

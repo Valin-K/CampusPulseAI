@@ -18,8 +18,11 @@ brief's cloud baseline. A reusable set of scripts does the deployment, and a Git
 The AI services are containerised and included in local Compose. The required cloud baseline
 still does **not deploy** them. The cloud workflow builds and publishes their images alongside
 the other images; its `enable_ai` input (or `Deploy-Apps.ps1 -EnableAi`) deploys the bonus AI profile.
-Set the `GEMINI_API_KEY` GitHub Actions secret, or the environment variable for a local deploy.
-It is stored as a Container Apps secret on the gateway only, never in the images.
+`Deploy-Apps.ps1` reads `CAMPUSPULSE-SIGNING-KEY` and, when AI is enabled, `GEMINI-API-KEY`
+from Key Vault `kv-campuspulse`. The Azure OIDC identity needs the Key Vault Secrets User role
+on that vault. The Gemini key is stored as a Container Apps secret on the gateway only, never
+in the images. Local Compose continues to use `CAMPUSPULSE_SIGNING_KEY` and `GEMINI_API_KEY`
+from the repository-root `.env` file.
 
 ---
 
@@ -79,9 +82,28 @@ These are the cloud equivalents, used everywhere — Bicep, env vars, nginx `BAC
 | `rag.server` | `rag-server` | internal, AI profile only |
 | `multiagent.server` | `multi-agent-server` | internal, AI profile only |
 
-Apps reach each other inside the environment at `http://<app-name>` — Azure's equivalent of Compose's
-service-name DNS, confirmed working by hand-testing an internal-ingress app against a public one before
-writing any scripted infrastructure.
+Apps reach internal services at `https://<app-name>.internal.<environment-default-domain>`.
+The deployment resolves internal service settings to these HTTPS FQDNs; bare Compose-style
+hostnames and localhost addresses are not used for Azure service calls.
+
+### Browser URLs and local development
+
+All frontends and the portal use `campus-config.json` for Home, service, sign-in, profile,
+session handoff, and logout destinations. The shared source configuration supplies localhost
+ports for direct local development. Container startup renders the configuration from
+`PORTAL_WEB_URL`, `ACADEMICRECORDS_WEB_URL`, `COURSEMANAGEMENT_WEB_URL`,
+`CAMPUSHOUSING_WEB_URL`, `FINAID_WEB_URL`, and `EVENTSCHEDULING_WEB_URL`.
+Compose defaults remain localhost; Bicep supplies all six Azure public HTTPS URLs to every
+web container. Redeploy the updated images and infrastructure together to apply this change.
+
+Containers set `UseSameOriginApi` to true so browser API traffic uses nginx's `/api/`
+and `/academic-api/` proxies instead of local backend addresses. Direct local runs retain
+their existing appsettings backend URLs. Return links and token handoff are restricted to
+configured origins (plus the current origin); arbitrary external return URLs are rejected.
+
+Navigation regression tests run with `node --test shared\frontend\tests\campus-nav-bar.test.cjs`.
+The `CampusEndpointsTests` in `AcademicRecords.Tests` cover local/Azure account links and
+return URL validation.
 
 ---
 

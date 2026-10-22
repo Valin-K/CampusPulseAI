@@ -1,13 +1,17 @@
 using CampusHousing.Database.Data;
 using CampusHousing.Database.Models;
+using CampusPulse.Shared.Security;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 using System.Net.Http.Json;
+using System.Security.Claims;
 
 var builder = Microsoft.AspNetCore.Builder.WebApplication.CreateBuilder(args);
 var connectionString = builder.Configuration.GetConnectionString("CampusHousing")
     ?? "Data Source=/app/data/campus-housing.db";
 builder.Services.AddDbContext<CampusHousingDbContext>(options => options.UseSqlite(connectionString));
+builder.Services.AddCampusPulseSecurity(builder.Configuration);
 var academicRecordsUrl = builder.Configuration["Services:AcademicRecordsDatabase"] ?? "http://localhost:5021";
 builder.Services.AddHttpClient("AcademicRecords", client => client.BaseAddress = new Uri(academicRecordsUrl.TrimEnd('/') + "/"));
 builder.Services.AddCors(options => options.AddDefaultPolicy(policy => policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod()));
@@ -25,8 +29,10 @@ await using (var scope = app.Services.CreateAsyncScope())
     await CampusHousingSeedData.EnsureSeededAsync(db, users);
 }
 app.UseCors();
+app.UseAuthentication();
+app.UseAuthorization();
 
-app.MapGet("/health", () => Results.Ok(new { service = "campus-housing-database", status = " healthy".Trim() }));
+app.MapGet("/health", () => Results.Ok(new { service = "campus-housing-database", status = " healthy".Trim() })).AllowAnonymous();
 app.MapGet("/api/rooms", async (CampusHousingDbContext db) => Results.Ok(await db.DormRooms.AsNoTracking()
     .Select(room => new
     {
@@ -44,7 +50,7 @@ app.MapPost("/api/rooms", async (DormRoom room, CampusHousingDbContext db) =>
     db.DormRooms.Add(room);
     try { await db.SaveChangesAsync(); } catch (DbUpdateException) { return Results.Conflict(new { message = "That room already exists." }); }
     return Results.Created($"/api/rooms/{room.Id}", room);
-});
+}).RequireAuthorization(CampusPulseSecurityExtensions.StaffOnlyPolicy);
 app.MapPut("/api/rooms/{id:int}", async (int id, DormRoom input, CampusHousingDbContext db) =>
 {
     var room = await db.DormRooms.FindAsync(id);
@@ -56,16 +62,27 @@ app.MapPut("/api/rooms/{id:int}", async (int id, DormRoom input, CampusHousingDb
     room.Building = input.Building; room.RoomNumber = input.RoomNumber; room.Capacity = input.Capacity; room.IsAvailable = input.IsAvailable;
     try { await db.SaveChangesAsync(); } catch (DbUpdateException) { return Results.Conflict(new { message = "That room already exists." }); }
     return Results.Ok(room);
-});
+}).RequireAuthorization(CampusPulseSecurityExtensions.StaffOnlyPolicy);
 app.MapDelete("/api/rooms/{id:int}", async (int id, CampusHousingDbContext db) =>
 {
     var room = await db.DormRooms.FindAsync(id); if (room is null) return Results.NotFound();
     db.DormRooms.Remove(room); await db.SaveChangesAsync(); return Results.NoContent();
-});
+}).RequireAuthorization(CampusPulseSecurityExtensions.StaffOnlyPolicy);
 
-app.MapGet("/api/allocations", async (CampusHousingDbContext db) => Results.Ok(await db.HousingAllocations.AsNoTracking().ToListAsync()));
-app.MapPost("/api/allocations", async (HousingAllocation allocation, CampusHousingDbContext db) =>
+app.MapGet("/api/allocations", async (CampusHousingDbContext db, ClaimsPrincipal user) =>
 {
+    var allocations = db.HousingAllocations.AsNoTracking();
+    if (!user.IsInRole("Staff"))
+    {
+        var studentId = user.FindFirst("student_id")?.Value;
+        if (string.IsNullOrWhiteSpace(studentId)) return Results.Forbid();
+        allocations = allocations.Where(allocation => allocation.StudentId == studentId);
+    }
+    return Results.Ok(await allocations.ToListAsync());
+});
+app.MapPost("/api/allocations", async (HousingAllocation allocation, CampusHousingDbContext db, ClaimsPrincipal user) =>
+{
+    if (!user.CanAccessStudent(allocation.StudentId)) return Results.Forbid();
     var room = await db.DormRooms.FindAsync(allocation.DormRoomId);
     if (room is null) return Results.BadRequest(new { message = "Room does not exist." });
     if (string.IsNullOrWhiteSpace(allocation.StudentId) || string.IsNullOrWhiteSpace(allocation.StudentName))
@@ -80,12 +97,16 @@ app.MapPost("/api/allocations", async (HousingAllocation allocation, CampusHousi
     await db.SaveChangesAsync();
     return Results.Created($"/api/allocations/{allocation.Id}", allocation);
 });
-app.MapGet("/api/allocations/{id:int}", async (int id, CampusHousingDbContext db) =>
-    await db.HousingAllocations.FindAsync(id) is { } allocation ? Results.Ok(allocation) : Results.NotFound());
-app.MapPut("/api/allocations/{id:int}", async (int id, HousingAllocation input, CampusHousingDbContext db) =>
+app.MapGet("/api/allocations/{id:int}", async (int id, CampusHousingDbContext db, ClaimsPrincipal user) =>
+{
+    var allocation = await db.HousingAllocations.FindAsync(id);
+    return allocation is null ? Results.NotFound() : !user.CanAccessStudent(allocation.StudentId) ? Results.Forbid() : Results.Ok(allocation);
+});
+app.MapPut("/api/allocations/{id:int}", async (int id, HousingAllocation input, CampusHousingDbContext db, ClaimsPrincipal user) =>
 {
     var allocation = await db.HousingAllocations.FindAsync(id);
     if (allocation is null) return Results.NotFound();
+    if (!user.CanAccessStudent(allocation.StudentId) || !user.CanAccessStudent(input.StudentId)) return Results.Forbid();
     if (string.IsNullOrWhiteSpace(input.StudentId) || string.IsNullOrWhiteSpace(input.StudentName))
         return Results.BadRequest(new { message = "Student ID and student name are required." });
     var newRoom = await db.DormRooms.FindAsync(input.DormRoomId);
@@ -114,18 +135,32 @@ app.MapDelete("/api/allocations/{id:int}", async (int id, CampusHousingDbContext
     db.HousingAllocations.Remove(allocation); await db.SaveChangesAsync();
     if (room is not null) { room.IsAvailable = await db.HousingAllocations.AnyAsync(item => item.DormRoomId == room.Id) == false || await db.HousingAllocations.CountAsync(item => item.DormRoomId == room.Id) < room.Capacity; await db.SaveChangesAsync(); }
     return Results.NoContent();
-});
+}).RequireAuthorization(CampusPulseSecurityExtensions.StaffOnlyPolicy);
 
-app.MapGet("/api/tickets", async (CampusHousingDbContext db) => Results.Ok(await db.MaintenanceTickets.AsNoTracking().OrderByDescending(t => t.CreatedAt).ToListAsync()));
-app.MapPost("/api/tickets", async (MaintenanceTicket ticket, CampusHousingDbContext db) =>
+app.MapGet("/api/tickets", async (CampusHousingDbContext db, ClaimsPrincipal user) =>
 {
+    var tickets = db.MaintenanceTickets.AsNoTracking();
+    if (!user.IsInRole("Staff"))
+    {
+        var studentId = user.FindFirst("student_id")?.Value;
+        if (string.IsNullOrWhiteSpace(studentId)) return Results.Forbid();
+        tickets = tickets.Where(ticket => ticket.StudentId == studentId);
+    }
+    return Results.Ok(await tickets.OrderByDescending(ticket => ticket.CreatedAt).ToListAsync());
+});
+app.MapPost("/api/tickets", async (MaintenanceTicket ticket, CampusHousingDbContext db, ClaimsPrincipal user) =>
+{
+    if (!user.CanAccessStudent(ticket.StudentId)) return Results.Forbid();
     if (string.IsNullOrWhiteSpace(ticket.StudentId) || string.IsNullOrWhiteSpace(ticket.Description))
         return Results.BadRequest(new { message = "Student ID and description are required." });
     ticket.CreatedAt = DateTime.UtcNow; db.MaintenanceTickets.Add(ticket); await db.SaveChangesAsync();
     return Results.Created($"/api/tickets/{ticket.Id}", ticket);
 });
-app.MapGet("/api/tickets/{id:int}", async (int id, CampusHousingDbContext db) =>
-    await db.MaintenanceTickets.FindAsync(id) is { } ticket ? Results.Ok(ticket) : Results.NotFound());
+app.MapGet("/api/tickets/{id:int}", async (int id, CampusHousingDbContext db, ClaimsPrincipal user) =>
+{
+    var ticket = await db.MaintenanceTickets.FindAsync(id);
+    return ticket is null ? Results.NotFound() : !user.CanAccessStudent(ticket.StudentId) ? Results.Forbid() : Results.Ok(ticket);
+});
 app.MapPut("/api/tickets/{id:int}", async (int id, MaintenanceTicket input, CampusHousingDbContext db) =>
 {
     var ticket = await db.MaintenanceTickets.FindAsync(id); if (ticket is null) return Results.NotFound();
@@ -133,12 +168,12 @@ app.MapPut("/api/tickets/{id:int}", async (int id, MaintenanceTicket input, Camp
     ticket.Status = input.Status; ticket.Severity = string.IsNullOrWhiteSpace(input.Severity) ? ticket.Severity : input.Severity; ticket.RepairQueue = string.IsNullOrWhiteSpace(input.RepairQueue) ? ticket.RepairQueue : input.RepairQueue;
     ticket.ResolvedAt = ticket.Status.Equals("Resolved", StringComparison.OrdinalIgnoreCase) ? DateTime.UtcNow : null;
     await db.SaveChangesAsync(); return Results.Ok(ticket);
-});
+}).RequireAuthorization(CampusPulseSecurityExtensions.StaffOnlyPolicy);
 app.MapDelete("/api/tickets/{id:int}", async (int id, CampusHousingDbContext db) =>
 {
     var ticket = await db.MaintenanceTickets.FindAsync(id); if (ticket is null) return Results.NotFound();
     db.MaintenanceTickets.Remove(ticket); await db.SaveChangesAsync(); return Results.NoContent();
-});
+}).RequireAuthorization(CampusPulseSecurityExtensions.StaffOnlyPolicy);
 
 await app.RunAsync();
 
@@ -164,3 +199,4 @@ static async Task<List<AcademicRecordsUser>?> GetAcademicRecordsUsersAsync(HttpC
 
     throw new InvalidOperationException("Academic Records did not become available while Campus Housing was starting.");
 }
+

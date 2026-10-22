@@ -1,6 +1,6 @@
 @page "/students/{UserId:int}"
 @using System.Net.Http.Json
-@inject CampusAccountService Account
+@inject AccountService Account
 @inject NavigationManager Navigation
 
 <PageTitle>Student | Academic Records</PageTitle>
@@ -75,13 +75,13 @@ else if (student is not null)
             return;
         }
 
-        if (CampusAccountService.IsStaff(signedInUser))
+        if (AccountService.IsStaff(signedInUser))
         {
             Navigation.NavigateTo($"staff/{signedInUser.UserId}", replace: true);
             return;
         }
 
-        if (!CampusAccountService.IsStudent(signedInUser))
+        if (!AccountService.IsStudent(signedInUser))
         {
             loadError = "This account does not have access to the student view.";
             return;

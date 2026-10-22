@@ -63,12 +63,20 @@ jobs:
         if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.rag == 'true'
         run: dotnet build shared/backend/CampusPulse.Shared.Ai.Gateway/CampusPulse.Shared.Ai.Gateway.csproj --configuration Release --nologo
 
-      # The keyless gateway explicitly enables RAG's local hashed embeddings.
+      # The provider-keyless gateway explicitly enables RAG's local hashed embeddings.
       - name: Smoke test RAG endpoints
         if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.rag == 'true'
         shell: bash
         run: |
           set -euo pipefail
+          export CAMPUSPULSE_SIGNING_KEY="$(openssl rand -hex 32)"
+          export Authentication__SigningKey="$CAMPUSPULSE_SIGNING_KEY"
+          jwt_part() { openssl base64 -A | tr '/+' '_-' | tr -d '='; }
+          now="$(date +%s)"
+          header="$(printf '{"alg":"HS256","typ":"JWT"}' | jwt_part)"
+          payload="$(printf '{"iss":"CampusPulse","aud":"CampusPulse.Api","sub":"ci","user_id":"ci","role":"Student","scope":"CampusPulse.Access","nbf":%s,"exp":%s}' "$((now - 1))" "$((now + 600))" | jwt_part)"
+          signature="$(printf '%s.%s' "$header" "$payload" | openssl dgst -sha256 -hmac "$CAMPUSPULSE_SIGNING_KEY" -binary | jwt_part)"
+          token="$header.$payload.$signature"
           dotnet run --project shared/backend/CampusPulse.Shared.Ai.Gateway/CampusPulse.Shared.Ai.Gateway.csproj --configuration Release --no-build --no-launch-profile --urls http://localhost:5269 > ai-gateway.log 2>&1 &
           gateway_pid=$!
           trap 'kill $gateway_pid ${server_pid:-} 2>/dev/null || true' EXIT
@@ -79,7 +87,7 @@ jobs:
             sleep 1
           done
           curl --silent --fail http://localhost:5269/health | jq --exit-status '.service == "ai-gateway"'
-          curl --silent --fail http://localhost:5269/api/ai/status | jq --exit-status '.generationAvailable == false'
+          curl --silent --fail -H "Authorization: Bearer $token" http://localhost:5269/api/ai/status | jq --exit-status '.generationAvailable == false'
 
           dotnet run --project ai-services/rag-server/RagServer/RagServer.csproj --configuration Release --no-build --no-launch-profile --urls http://localhost:5267 > rag-server.log 2>&1 &
           server_pid=$!
@@ -92,9 +100,10 @@ jobs:
           done
 
           curl --silent --fail http://localhost:5267/health
-          curl --silent --fail http://localhost:5267/api/rag/collections
+          curl --silent --fail -H "Authorization: Bearer $token" http://localhost:5267/api/rag/collections
 
           ingest=$(curl --silent --fail \
+            -H "Authorization: Bearer $token" \
             -H "Content-Type: application/json" \
             -d '{"documents":[{"id":"ci-doc","text":"Course enrolment closes on 14 March each year. Late enrolment requires approval from the faculty office.","metadata":{"source":"ci"}}]}' \
             http://localhost:5267/api/rag/coursemanagement/documents)
@@ -103,6 +112,7 @@ jobs:
           test "$(printf '%s' "$ingest" | jq --raw-output '.embedder')" = "hashed-bag-of-words"
 
           answer=$(curl --silent --fail \
+            -H "Authorization: Bearer $token" \
             -H "Content-Type: application/json" \
             -d '{"question":"When does course enrolment close?","topK":2,"minimumConfidence":0}' \
             http://localhost:5267/api/rag/coursemanagement/answer)
@@ -112,12 +122,13 @@ jobs:
           test "$(printf '%s' "$answer" | jq --raw-output '.sources[0].documentId')" = "ci-doc"
 
           status=$(curl --silent --output /dev/null --write-out '%{http_code}' \
+            -H "Authorization: Bearer $token" \
             -H "Content-Type: application/json" \
             -d '{"question":"anything"}' \
             http://localhost:5267/api/rag/not-a-collection/answer)
           test "$status" = "404"
 
-          curl --silent --fail -X DELETE http://localhost:5267/api/rag/coursemanagement
+          curl --silent --fail -H "Authorization: Bearer $token" -X DELETE http://localhost:5267/api/rag/coursemanagement
 
       - name: Show server log on failure
         if: failure() && (github.event_name == 'workflow_dispatch' || steps.filter.outputs.rag == 'true')

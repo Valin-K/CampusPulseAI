@@ -3,22 +3,22 @@ using Microsoft.AspNetCore.Components.Authorization;
 
 namespace CampusPulse.Shared.Components.Services;
 
-public static class CampusAccountServiceCollectionExtensions
+public static class AccountServiceCollectionExtensions
 {
     public static IServiceCollection AddCampusAccountServices(
         this IServiceCollection services,
         string academicRecordsBackendUrl)
     {
-        services.AddScoped<CampusAccountService>(serviceProvider =>
+        services.AddScoped<AccountService>(serviceProvider =>
         {
-            var handler = CampusDemoAuthenticationServiceCollectionExtensions.CreateCampusDemoTokenHandler(serviceProvider);
+            var handler = AuthenticationServiceCollectionExtensions.CreateTokenHandler(serviceProvider);
             var http = new HttpClient(handler)
             {
                 BaseAddress = new Uri(EnsureTrailingSlash(academicRecordsBackendUrl))
             };
-            return new CampusAccountService(
+            return new AccountService(
                 http,
-                serviceProvider.GetRequiredService<AuthenticationStateProvider>());
+                serviceProvider.GetRequiredService<Microsoft.AspNetCore.Components.Authorization.AuthenticationStateProvider>());
         });
 
         return services;

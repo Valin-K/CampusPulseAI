@@ -6,6 +6,7 @@ using CampusHousing.Backend.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using CampusPulse.Shared.Ai;
+using System.Security.Claims;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace CampusHousing.Tests;
@@ -321,8 +322,18 @@ public sealed class HousingControllerTests
                 new TestHttpClientFactory(client),
                 NullLogger<MaintenanceClassifier>.Instance));
         var context = new DefaultHttpContext();
-        if (administrator) context.Request.Headers["X-Housing-Role"] = "Administrator";
-        if (studentId is not null) context.Request.Headers["X-Housing-User"] = studentId;
+        var claims = new List<Claim>();
+        if (administrator) claims.Add(new Claim(ClaimTypes.Role, "Staff"));
+        if (studentId is not null)
+        {
+            claims.Add(new Claim(ClaimTypes.Role, "Student"));
+            claims.Add(new Claim("student_id", studentId));
+        }
+        else if (!administrator)
+        {
+            claims.Add(new Claim(ClaimTypes.Role, "Student"));
+        }
+        context.User = new ClaimsPrincipal(new ClaimsIdentity(claims, "test"));
         controller.ControllerContext = new ControllerContext { HttpContext = context };
         return controller;
     }
