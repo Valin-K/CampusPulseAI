@@ -1,0 +1,282 @@
+{
+  "schemaVersion": 1,
+  "runId": "20261022T023620362607Z",
+  "timestampUtc": "2026-10-22T02:36:20.363356+00:00",
+  "completedAtUtc": "2026-10-22T02:36:39.418842+00:00",
+  "mode": "cloud-deployment-review",
+  "sourceEvidencePaths": [
+    "C:\\Users\\jackz\\source\\repos\\CampusPulseAI\\.artifacts\\cloud-deployment-evidence\\run-39611514822\\20261021-135602\\report.md",
+    "C:\\Users\\jackz\\source\\repos\\CampusPulseAI\\.artifacts\\cloud-deployment-evidence\\run-39611514822\\20261021-135602\\evidence.json"
+  ],
+  "deterministicChecks": [
+    {
+      "name": "smoke-test report availability",
+      "status": "PASS",
+      "details": "report.md is readable."
+    },
+    {
+      "name": "smoke-test evidence structure",
+      "status": "PASS",
+      "details": "Loaded 8 smoke-test records."
+    },
+    {
+      "name": "smoke check 1: portal",
+      "status": "PASS",
+      "details": "Reported HTTP/status value: 200; Passed=True."
+    },
+    {
+      "name": "smoke check 2: other smoke check",
+      "status": "PASS",
+      "details": "Reported HTTP/status value: 200; Passed=True."
+    },
+    {
+      "name": "smoke check 3: frontend-to-api-to-database CRUD read",
+      "status": "PASS",
+      "details": "Reported HTTP/status value: 200; Passed=True."
+    },
+    {
+      "name": "smoke check 4: frontend-to-api-to-database CRUD read",
+      "status": "PASS",
+      "details": "Reported HTTP/status value: 200; Passed=True."
+    },
+    {
+      "name": "smoke check 5: frontend-to-api-to-database CRUD read",
+      "status": "PASS",
+      "details": "Reported HTTP/status value: 200; Passed=True."
+    },
+    {
+      "name": "smoke check 6: frontend-to-api-to-database CRUD read",
+      "status": "PASS",
+      "details": "Reported HTTP/status value: 200; Passed=True."
+    },
+    {
+      "name": "smoke check 7: frontend-to-api-to-database CRUD read",
+      "status": "PASS",
+      "details": "Reported HTTP/status value: 200; Passed=True."
+    },
+    {
+      "name": "smoke check 8: AI profile gate",
+      "status": "PASS",
+      "details": "Reported HTTP/status value: 200; Passed=True."
+    },
+    {
+      "name": "report/evidence consistency",
+      "status": "PASS",
+      "details": "Both files contain 8 check records."
+    },
+    {
+      "name": "internal-only API/database coverage",
+      "status": "INCOMPLETE",
+      "details": "Not independently probed by the external smoke-test script; it documents that API/database apps are internal-only."
+    },
+    {
+      "name": "broader deployment verification",
+      "status": "INCOMPLETE",
+      "details": "Smoke evidence does not establish untested flows, authorization for other identities, data integrity, or full release readiness."
+    }
+  ],
+  "collectedEvidence": {
+    "sourceDirectory": "C:\\Users\\jackz\\source\\repos\\CampusPulseAI\\.artifacts\\cloud-deployment-evidence\\run-39611514822\\20261021-135602",
+    "sourceFiles": [
+      "C:\\Users\\jackz\\source\\repos\\CampusPulseAI\\.artifacts\\cloud-deployment-evidence\\run-39611514822\\20261021-135602\\report.md",
+      "C:\\Users\\jackz\\source\\repos\\CampusPulseAI\\.artifacts\\cloud-deployment-evidence\\run-39611514822\\20261021-135602\\evidence.json"
+    ],
+    "smokeChecks": [
+      {
+        "index": 1,
+        "category": "portal",
+        "status": 200,
+        "passed": true
+      },
+      {
+        "index": 2,
+        "category": "other smoke check",
+        "status": 200,
+        "passed": true
+      },
+      {
+        "index": 3,
+        "category": "frontend-to-api-to-database CRUD read",
+        "status": 200,
+        "passed": true
+      },
+      {
+        "index": 4,
+        "category": "frontend-to-api-to-database CRUD read",
+        "status": 200,
+        "passed": true
+      },
+      {
+        "index": 5,
+        "category": "frontend-to-api-to-database CRUD read",
+        "status": 200,
+        "passed": true
+      },
+      {
+        "index": 6,
+        "category": "frontend-to-api-to-database CRUD read",
+        "status": 200,
+        "passed": true
+      },
+      {
+        "index": 7,
+        "category": "frontend-to-api-to-database CRUD read",
+        "status": 200,
+        "passed": true
+      },
+      {
+        "index": 8,
+        "category": "AI profile gate",
+        "status": 200,
+        "passed": true
+      }
+    ],
+    "checks": [
+      {
+        "name": "smoke-test report availability",
+        "status": "PASS",
+        "details": "report.md is readable."
+      },
+      {
+        "name": "smoke-test evidence structure",
+        "status": "PASS",
+        "details": "Loaded 8 smoke-test records."
+      },
+      {
+        "name": "smoke check 1: portal",
+        "status": "PASS",
+        "details": "Reported HTTP/status value: 200; Passed=True."
+      },
+      {
+        "name": "smoke check 2: other smoke check",
+        "status": "PASS",
+        "details": "Reported HTTP/status value: 200; Passed=True."
+      },
+      {
+        "name": "smoke check 3: frontend-to-api-to-database CRUD read",
+        "status": "PASS",
+        "details": "Reported HTTP/status value: 200; Passed=True."
+      },
+      {
+        "name": "smoke check 4: frontend-to-api-to-database CRUD read",
+        "status": "PASS",
+        "details": "Reported HTTP/status value: 200; Passed=True."
+      },
+      {
+        "name": "smoke check 5: frontend-to-api-to-database CRUD read",
+        "status": "PASS",
+        "details": "Reported HTTP/status value: 200; Passed=True."
+      },
+      {
+        "name": "smoke check 6: frontend-to-api-to-database CRUD read",
+        "status": "PASS",
+        "details": "Reported HTTP/status value: 200; Passed=True."
+      },
+      {
+        "name": "smoke check 7: frontend-to-api-to-database CRUD read",
+        "status": "PASS",
+        "details": "Reported HTTP/status value: 200; Passed=True."
+      },
+      {
+        "name": "smoke check 8: AI profile gate",
+        "status": "PASS",
+        "details": "Reported HTTP/status value: 200; Passed=True."
+      },
+      {
+        "name": "report/evidence consistency",
+        "status": "PASS",
+        "details": "Both files contain 8 check records."
+      },
+      {
+        "name": "internal-only API/database coverage",
+        "status": "INCOMPLETE",
+        "details": "Not independently probed by the external smoke-test script; it documents that API/database apps are internal-only."
+      },
+      {
+        "name": "broader deployment verification",
+        "status": "INCOMPLETE",
+        "details": "Smoke evidence does not establish untested flows, authorization for other identities, data integrity, or full release readiness."
+      }
+    ],
+    "status": "INCOMPLETE",
+    "scope": "External smoke checks cover the public portal, public frontend routes/proxy CRUD reads, and configured Financial Aid AI profile gates only. The script does not separately probe internal-only API/database apps.",
+    "reportRows": [
+      {
+        "index": 1,
+        "name": "portal root",
+        "status": 200,
+        "passed": true
+      },
+      {
+        "index": 2,
+        "name": "authentication (STU001 sign-in)",
+        "status": 200,
+        "passed": true
+      },
+      {
+        "index": 3,
+        "name": "academicrecords-web CRUD read (web -> api -> db)",
+        "status": 200,
+        "passed": true
+      },
+      {
+        "index": 4,
+        "name": "coursemgmt-web CRUD read (web -> api -> db)",
+        "status": 200,
+        "passed": true
+      },
+      {
+        "index": 5,
+        "name": "campushousing-web CRUD read (web -> api -> db)",
+        "status": 200,
+        "passed": true
+      },
+      {
+        "index": 6,
+        "name": "finaid-web CRUD read (web -> api -> db)",
+        "status": 200,
+        "passed": true
+      },
+      {
+        "index": 7,
+        "name": "eventscheduling-web CRUD read (web -> api -> db)",
+        "status": 200,
+        "passed": true
+      },
+      {
+        "index": 8,
+        "name": "AI profile: /api/assistant/mcp/integration returns 200",
+        "status": 200,
+        "passed": true
+      }
+    ]
+  },
+  "models": [
+    {
+      "stage": "implementation-assessment",
+      "requestedProvider": "openrouter",
+      "requestedModel": "qwen/qwen3.8-27b",
+      "usedProvider": "gemini (fallback)",
+      "usedModel": "gemini-3.5-flash",
+      "systemPrompt": "Assess only the supplied evidence. Separate verified facts, failures, gaps, and limitations. Do not approve a release.",
+      "userPrompt": "Review the supplied cloud deployment smoke evidence. Distinguish passed checks, failed checks, and untested scope. Do not claim internal-only API/database apps were independently probed.\n\n{\n  \"smokeChecks\": [\n    {\n      \"index\": 1,\n      \"category\": \"portal\",\n      \"status\": 200,\n      \"passed\": true\n    },\n    {\n      \"index\": 2,\n      \"category\": \"other smoke check\",\n      \"status\": 200,\n      \"passed\": true\n    },\n    {\n      \"index\": 3,\n      \"category\": \"frontend-to-api-to-database CRUD read\",\n      \"status\": 200,\n      \"passed\": true\n    },\n    {\n      \"index\": 4,\n      \"category\": \"frontend-to-api-to-database CRUD read\",\n      \"status\": 200,\n      \"passed\": true\n    },\n    {\n      \"index\": 5,\n      \"category\": \"frontend-to-api-to-database CRUD read\",\n      \"status\": 200,\n      \"passed\": true\n    },\n    {\n      \"index\": 6,\n      \"category\": \"frontend-to-api-to-database CRUD read\",\n      \"status\": 200,\n      \"passed\": true\n    },\n    {\n      \"index\": 7,\n      \"category\": \"frontend-to-api-to-database CRUD read\",\n      \"status\": 200,\n      \"passed\": true\n    },\n    {\n      \"index\": 8,\n      \"category\": \"AI profile gate\",\n      \"status\": 200,\n      \"passed\": true\n    }\n  ],\n  \"deterministicChecks\": [\n    {\n      \"name\": \"smoke-test report availability\",\n      \"status\": \"PASS\"\n    },\n    {\n      \"name\": \"smoke-test evidence structure\",\n      \"status\": \"PASS\"\n    },\n    {\n      \"name\": \"smoke check 1: portal\",\n      \"status\": \"PASS\"\n    },\n    {\n      \"name\": \"smoke check 2: other smoke check\",\n      \"status\": \"PASS\"\n    },\n    {\n      \"name\": \"smoke check 3: frontend-to-api-to-database CRUD read\",\n      \"status\": \"PASS\"\n    },\n    {\n      \"name\": \"smoke check 4: frontend-to-api-to-database CRUD read\",\n      \"status\": \"PASS\"\n    },\n    {\n      \"name\": \"smoke check 5: frontend-to-api-to-database CRUD read\",\n      \"status\": \"PASS\"\n    },\n    {\n      \"name\": \"smoke check 6: frontend-to-api-to-database CRUD read\",\n      \"status\": \"PASS\"\n    },\n    {\n      \"name\": \"smoke check 7: frontend-to-api-to-database CRUD read\",\n      \"status\": \"PASS\"\n    },\n    {\n      \"name\": \"smoke check 8: AI profile gate\",\n      \"status\": \"PASS\"\n    },\n    {\n      \"name\": \"report/evidence consistency\",\n      \"status\": \"PASS\"\n    },\n    {\n      \"name\": \"internal-only API/database coverage\",\n      \"status\": \"INCOMPLETE\"\n    },\n    {\n      \"name\": \"broader deployment verification\",\n      \"status\": \"INCOMPLETE\"\n    }\n  ],\n  \"scope\": \"The external smoke test does not independently probe the internal-only API/database apps. It verifies only the public endpoints and configured checks represented by the supplied smoke-test evidence.\"\n}",
+      "output": "Based on the supplied cloud deployment smoke evidence, here is the breakdown of passed checks, failed checks, and untested scope:\n\n---\n\n### 1. Verified Facts (Passed Checks)\n\nAll 8 executed smoke checks returned a status code of `200` and `passed: true`:\n* **Portal Check:** Index 1 passed.\n* **Other Smoke Check:** Index 2 passed.\n* **Frontend-to-API-to-Database CRUD Read:** Indexes 3, 4, 5, 6, and 7 passed.\n* **AI Profile Gate:** Index 8 passed.\n\nDeterministic structure and report checks that **PASSED**:\n* `smoke-test report availability`\n* `smoke-test evidence structure`\n* `smoke check 1` through `smoke check 8` verification\n* `report/evidence consistency`\n\n---\n\n### 2. Failed Checks\n\n* **None.** There are no recorded failed checks in the supplied JSON data.\n\n---\n\n### 3. Gaps, Limitations, and Untested Scope\n\n* **Internal-Only API/Database Apps:** The external smoke test **did not independently probe** internal-only API or database applications. Deterministic check `internal-only API/database coverage` is marked as `INCOMPLETE`.\n* **Broader Deployment Verification:** Deterministic check `broader deployment verification` is marked as `INCOMPLETE`.\n* **Non-Read CRUD Operations:** Evidence only covers `CRUD read` checks; Create, Update, and Delete operations were not tested in this suite.\n* **Endpoint Coverage:** Testing was restricted strictly to the configured public endpoints and checks defined in the report scope.\n\n---\n\n### Release Status\n**Release Approval Notice:** A release cannot be approved based on this evidence alone due to incomplete coverage of internal-only API/database apps and broader deployment verification scope.",
+      "error": null
+    },
+    {
+      "stage": "independent-review",
+      "requestedProvider": "openrouter",
+      "requestedModel": "qwen/qwen3.8-27b",
+      "usedProvider": "gemini (fallback)",
+      "usedModel": "gemini-3.5-flash",
+      "systemPrompt": "Independently verify the assessment against the deterministic evidence. Identify unsupported claims and missing checks. This is not human release approval.",
+      "userPrompt": "Independently verify the cloud deployment assessment against the actual smoke-test result booleans. Call out any overclaim about coverage, particularly internal-only API/database apps. This is not release approval.\n\nEvidence:\n{\n  \"smokeChecks\": [\n    {\n      \"index\": 1,\n      \"category\": \"portal\",\n      \"status\": 200,\n      \"passed\": true\n    },\n    {\n      \"index\": 2,\n      \"category\": \"other smoke check\",\n      \"status\": 200,\n      \"passed\": true\n    },\n    {\n      \"index\": 3,\n      \"category\": \"frontend-to-api-to-database CRUD read\",\n      \"status\": 200,\n      \"passed\": true\n    },\n    {\n      \"index\": 4,\n      \"category\": \"frontend-to-api-to-database CRUD read\",\n      \"status\": 200,\n      \"passed\": true\n    },\n    {\n      \"index\": 5,\n      \"category\": \"frontend-to-api-to-database CRUD read\",\n      \"status\": 200,\n      \"passed\": true\n    },\n    {\n      \"index\": 6,\n      \"category\": \"frontend-to-api-to-database CRUD read\",\n      \"status\": 200,\n      \"passed\": true\n    },\n    {\n      \"index\": 7,\n      \"category\": \"frontend-to-api-to-database CRUD read\",\n      \"status\": 200,\n      \"passed\": true\n    },\n    {\n      \"index\": 8,\n      \"category\": \"AI profile gate\",\n      \"status\": 200,\n      \"passed\": true\n    }\n  ],\n  \"deterministicChecks\": [\n    {\n      \"name\": \"smoke-test report availability\",\n      \"status\": \"PASS\"\n    },\n    {\n      \"name\": \"smoke-test evidence structure\",\n      \"status\": \"PASS\"\n    },\n    {\n      \"name\": \"smoke check 1: portal\",\n      \"status\": \"PASS\"\n    },\n    {\n      \"name\": \"smoke check 2: other smoke check\",\n      \"status\": \"PASS\"\n    },\n    {\n      \"name\": \"smoke check 3: frontend-to-api-to-database CRUD read\",\n      \"status\": \"PASS\"\n    },\n    {\n      \"name\": \"smoke check 4: frontend-to-api-to-database CRUD read\",\n      \"status\": \"PASS\"\n    },\n    {\n      \"name\": \"smoke check 5: frontend-to-api-to-database CRUD read\",\n      \"status\": \"PASS\"\n    },\n    {\n      \"name\": \"smoke check 6: frontend-to-api-to-database CRUD read\",\n      \"status\": \"PASS\"\n    },\n    {\n      \"name\": \"smoke check 7: frontend-to-api-to-database CRUD read\",\n      \"status\": \"PASS\"\n    },\n    {\n      \"name\": \"smoke check 8: AI profile gate\",\n      \"status\": \"PASS\"\n    },\n    {\n      \"name\": \"report/evidence consistency\",\n      \"status\": \"PASS\"\n    },\n    {\n      \"name\": \"internal-only API/database coverage\",\n      \"status\": \"INCOMPLETE\"\n    },\n    {\n      \"name\": \"broader deployment verification\",\n      \"status\": \"INCOMPLETE\"\n    }\n  ],\n  \"scope\": \"The external smoke test does not independently probe the internal-only API/database apps. It verifies only the public endpoints and configured checks represented by the supplied smoke-test evidence.\"\n}\n\nImplementation assessment (untrusted model output):\nBased on the supplied cloud deployment smoke evidence, here is the breakdown of passed checks, failed checks, and untested scope:\n\n---\n\n### 1. Verified Facts (Passed Checks)\n\nAll 8 executed smoke checks returned a status code of `200` and `passed: true`:\n* **Portal Check:** Index 1 passed.\n* **Other Smoke Check:** Index 2 passed.\n* **Frontend-to-API-to-Database CRUD Read:** Indexes 3, 4, 5, 6, and 7 passed.\n* **AI Profile Gate:** Index 8 passed.\n\nDeterministic structure and report checks that **PASSED**:\n* `smoke-test report availability`\n* `smoke-test evidence structure`\n* `smoke check 1` through `smoke check 8` verification\n* `report/evidence consistency`\n\n---\n\n### 2. Failed Checks\n\n* **None.** There are no recorded failed checks in the supplied JSON data.\n\n---\n\n### 3. Gaps, Limitations, and Untested Scope\n\n* **Internal-Only API/Database Apps:** The external smoke test **did not independently probe** internal-only API or database applications. Deterministic check `internal-only API/database coverage` is marked as `INCOMPLETE`.\n* **Broader Deployment Verification:** Deterministic check `broader deployment verification` is marked as `INCOMPLETE`.\n* **Non-Read CRUD Operations:** Evidence only covers `CRUD read` checks; Create, Update, and Delete operations were not tested in this suite.\n* **Endpoint Coverage:** Testing was restricted strictly to the configured public endpoints and checks defined in the report scope.\n\n---\n\n### Release Status\n**Release Approval Notice:** A release cannot be approved based on this evidence alone due to incomplete coverage of internal-only API/database apps and broader deployment verification scope.",
+      "output": "### Verification Summary\n\nThe cloud deployment assessment accurately reflects the provided deterministic evidence and smoke-test results. The assessment correctly highlights coverage gaps and refrains from making overclaims regarding internal components or overall release readiness.\n\n---\n\n### Key Evidence Verification\n\n#### 1. Smoke Checks (Passed: 8 / 8)\nAll 8 smoke checks in the JSON evidence show `\"passed\": true` with a status code of `200`:\n* **Index 1 (`portal`):** Status 200 | `passed: true`\n* **Index 2 (`other smoke check`):** Status 200 | `passed: true`\n* **Indices 3–7 (`frontend-to-api-to-database CRUD read`):** Status 200 | `passed: true` (5 checks total)\n* **Index 8 (`AI profile gate`):** Status 200 | `passed: true`\n\n#### 2. Deterministic Checks\n* **PASSED (11 checks):**\n  * `smoke-test report availability`\n  * `smoke-test evidence structure`\n  * `smoke check 1` through `smoke check 8`\n  * `report/evidence consistency`\n* **INCOMPLETE (2 checks):**\n  * `internal-only API/database coverage`\n  * `broader deployment verification`\n\n---\n\n### Coverage Analysis & Limitations\n\n* **Internal-Only API/Database Apps:** The scope explicitly states that the external smoke test does not independently probe internal-only API/database apps. The deterministic check `internal-only API/database coverage` is marked as **INCOMPLETE**. The assessment accurately captured this limitation without overclaiming internal coverage.\n* **CRUD Scope:** Tested CRUD operations were strictly limited to `read` actions across checks 3–7. Write operations (Create, Update, Delete) remain unverified by this test suite.\n* **Broader Deployment Verification:** The check `broader deployment verification` is marked as **INCOMPLETE**, meaning full environment verification was not achieved.\n\n---\n\n### Conclusion\nThe assessment provided in the untrusted model output is verified as factual and accurate against the deterministic evidence. It correctly identifies passed checks and explicitly highlights missing coverage without overclaiming.\n\n*Disclaimer: This response is an independent evidence verification and does not constitute release approval.*",
+      "error": null
+    }
+  ],
+  "errors": [],
+  "status": "INCOMPLETE",
+  "humanReleaseDecision": "pending",
+  "releaseApproval": false
+}

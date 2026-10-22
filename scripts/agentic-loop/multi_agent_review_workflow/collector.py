@@ -12,6 +12,12 @@ AGENT_ROLES = ("planner", "worker", "reviewer")
 FEATURES = {"academicrecords", "coursemanagement", "campushousing", "financialaidbilling", "eventscheduling"}
 DECISIONS = {"approve", "approved", "accept", "accepted", "reject", "rejected", "correct"}
 DEPENDENCY_STATUSES = {"available", "unavailable", "skipped", "not_requested", "healthy", "failed", "error", "disabled", "fallback"}
+REQUIRED_EXPORT_FILES = ("workflow.json", "workflow_history.jsonl", "coordination_audit.jsonl")
+
+
+def missing_multi_agent_export_files(export_directory: Path) -> list[str]:
+    directory = export_directory.expanduser().resolve()
+    return [name for name in REQUIRED_EXPORT_FILES if not (directory / name).is_file()]
 
 
 def _digest(value: Any) -> str:

@@ -112,12 +112,21 @@ replica while enabled (its queue is in-process) and an Azure Files share for his
 ## Terminal demonstration
 
 The default caller is Financial Aid and Billing at `http://localhost:8089`.
-Use `-BackendUrl` for another backend. Start and wait for the human-review draft:
+The backend requires a valid CampusPulse Bearer token; the PowerShell caller obtains
+one from the Academic Records `/api/auth/token` endpoint (`http://localhost:5020`
+by default). Supply `-AccountId` and `-Role` if desired; the password is always
+entered through a hidden prompt and is not stored or printed. Use `-SignInUrl` when
+the token endpoint has a different address, and `-BackendUrl` for another caller.
+Start and wait for the human-review draft:
 
 ```powershell
 .\scripts\invoke-multi-agent.ps1 -Mode Start -Task "Summarise the current scholarship catalogue. Do not infer student eligibility." -Wait
 .\scripts\invoke-multi-agent.ps1 -Mode List
 ```
+
+Each invocation signs in again. HTTP 401 on the sign-in URL means the credential
+exchange failed; HTTP 401 on the workflow URL means the resulting token was not
+accepted by that backend (check issuer, audience, signing key, and expiry).
 
 Copy the returned workflow ID and version. Read the draft before deciding:
 
@@ -127,11 +136,13 @@ $id = "<workflow-guid>"
 .\scripts\invoke-multi-agent.ps1 -Mode Review -WorkflowId $id -Decision correct -Reviewer "Tutor" -Comments "Separate published criteria from unverified eligibility." -ExpectedVersion 9 -Wait
 ```
 
-Use the **new returned version** for the next decision; the example version is not
-fixed. Approve or reject:
+Use the **new returned version** for the next decision; the version changes as the
+workflow advances. Fetch the current workflow and pass its version as a PowerShell
+variable (do not type angle-bracket placeholders, which PowerShell parses as operators):
 
 ```powershell
-.\scripts\invoke-multi-agent.ps1 -Mode Review -WorkflowId $id -Decision approve -Reviewer "Tutor" -Comments "Checked the evidence and limitations." -ExpectedVersion <current-version>
+$current = .\scripts\invoke-multi-agent.ps1 -Mode Get -WorkflowId $id | ConvertFrom-Json
+.\scripts\invoke-multi-agent.ps1 -Mode Review -WorkflowId $id -Decision approve -Reviewer "Tutor" -Comments "Checked the evidence and limitations." -ExpectedVersion $current.version
 .\scripts\invoke-multi-agent.ps1 -Mode Export -WorkflowId $id
 ```
 

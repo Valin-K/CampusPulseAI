@@ -12,7 +12,7 @@ sys.path.insert(0, str(SCRIPT_DIRECTORY))
 
 from cloud_deployment_review_workflow.collector import collect_cloud_deployment_evidence
 from cloud_deployment_review_workflow.orchestrator import run_cloud_deployment_review_workflow
-from multi_agent_review_workflow.collector import collect_multi_agent_evidence
+from multi_agent_review_workflow.collector import collect_multi_agent_evidence, missing_multi_agent_export_files
 from multi_agent_review_workflow.orchestrator import run_multi_agent_review_workflow
 from testing_review_workflow.collector import collect_testing_evidence
 from testing_review_workflow.orchestrator import run_testing_review_workflow
@@ -105,11 +105,16 @@ class MultiAgentReviewTests(unittest.TestCase):
             root = Path(temp)
             missing = collect_multi_agent_evidence(root / "missing")
             self.assertEqual("INCOMPLETE", missing["status"])
+            self.assertEqual(
+                ["workflow.json", "workflow_history.jsonl", "coordination_audit.jsonl"],
+                missing_multi_agent_export_files(root / "missing"),
+            )
             malformed = root / "malformed"
             workflow_export(malformed)
             (malformed / "workflow.json").write_text("{", encoding="utf-8")
             (malformed / "workflow_history.jsonl").write_text("not-json\n", encoding="utf-8")
             self.assertEqual("FAIL", collect_multi_agent_evidence(malformed)["status"])
+            self.assertEqual([], missing_multi_agent_export_files(malformed))
 
     def test_failed_workflow_is_preserved(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

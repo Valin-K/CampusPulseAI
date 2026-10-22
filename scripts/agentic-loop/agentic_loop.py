@@ -56,6 +56,7 @@ from mcp_workflow.collector import McpCollector
 from rag_workflow import run_rag_workflow
 from rag_workflow.collector import RagCollector
 from multi_agent_review_workflow import run_multi_agent_review_workflow
+from multi_agent_review_workflow.collector import missing_multi_agent_export_files
 from testing_review_workflow import run_testing_review_workflow
 from cloud_deployment_review_workflow import run_cloud_deployment_review_workflow
 
@@ -1117,8 +1118,20 @@ def main() -> int:
         if not args.multi_agent_evidence_dir:
             print("ERROR: --multi-agent-evidence-dir is required for multi-agent-review.", file=sys.stderr)
             return 2
+        export_directory = args.multi_agent_evidence_dir.expanduser().resolve()
+        missing_files = missing_multi_agent_export_files(export_directory)
+        if missing_files:
+            print(
+                "ERROR: Multi-Agent review source export is incomplete.\n"
+                f"Directory: {export_directory}\n"
+                f"Missing required files: {', '.join(missing_files)}\n"
+                "Export the intended workflow first with .\\scripts\\invoke-multi-agent.ps1 "
+                "-Mode Export -WorkflowId $id, then rerun review with that export directory.",
+                file=sys.stderr,
+            )
+            return 2
         return run_multi_agent_review_workflow(
-            export_directory=args.multi_agent_evidence_dir,
+            export_directory=export_directory,
             evidence_dir=args.review_evidence_dir,
             ai_call=call_ai,
             provider=AGENTIC_PROVIDER,
