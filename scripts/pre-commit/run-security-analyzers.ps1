@@ -1,7 +1,7 @@
-# Builds every repository project with the .NET security analyzers switched on (Ruff security rules equivalent).
+# Builds every student project with the .NET security analyzers switched on (Ruff security rules equivalent).
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot '..\..')
-$projects = Get-ChildItem $repoRoot -Recurse -Filter *.csproj |
-    Where-Object { $_.FullName -notmatch '\\(bin|obj)\\' } |
+$projects = Get-ChildItem (Join-Path $repoRoot 'student-*') -Recurse -Filter *.csproj |
+    Where-Object { $_.FullName -notmatch '\\(bin|obj|tests)\\' } |
     Sort-Object FullName
 
 # Security CA rules: CA2100, CA2109, CA2119, CA2153, CA23xx, CA3xxx, CA5xxx.

@@ -1,6 +1,6 @@
-# Lists vulnerable NuGet packages for every repository project.
+# Lists vulnerable NuGet packages for every student project (pip-audit equivalent).
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot '..\..')
-$projects = Get-ChildItem $repoRoot -Recurse -Filter *.csproj |
+$projects = Get-ChildItem (Join-Path $repoRoot 'student-*') -Recurse -Filter *.csproj |
     Where-Object { $_.FullName -notmatch '\\(bin|obj)\\' } |
     Sort-Object FullName
 
