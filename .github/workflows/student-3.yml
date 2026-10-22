@@ -130,7 +130,7 @@ jobs:
             fi
           done
 
-      - name: Post-commit CI/CD tests (two endpoints) - Student 3
+      - name: Post-commit CI/CD lifecycle tests - Student 3
         if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.student3 == 'true'
         run: python3 .github/scripts/run-post-commit-endpoint-tests.py --student 3 --base-url http://localhost:5083
 
