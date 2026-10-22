@@ -46,6 +46,7 @@ jobs:
               - 'docker-compose.yml'
               - '.github/docker-compose.student-5.ci.yml'
               - '.github/workflows/student-5-ci.yml'
+              - '.github/scripts/**'
 
       - name: No Student 5 changes
         if: github.event_name != 'workflow_dispatch' && steps.filter.outputs.student5 != 'true'
@@ -79,14 +80,6 @@ jobs:
         if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.student5 == 'true'
         run: dotnet test student-5/tests/EventScheduling.Tests/EventScheduling.Tests.csproj --configuration Release --no-build --no-restore --logger "trx;LogFileName=event-scheduling-tests.trx" --results-directory TestResults
 
-      - name: Upload NUnit test results
-        if: always() && (github.event_name == 'workflow_dispatch' || steps.filter.outputs.student5 == 'true')
-        uses: actions/upload-artifact@v4
-        with:
-          name: student-5-test-results
-          path: TestResults/*.trx
-          if-no-files-found: ignore
-
       - name: Build and start Student 5 containers
         if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.student5 == 'true'
         shell: bash
@@ -94,18 +87,17 @@ jobs:
           docker compose -p student-5-ci -f docker-compose.yml -f .github/docker-compose.student-5.ci.yml build --with-dependencies ai.gateway academicrecords.database academicrecords.backend eventscheduling.database eventscheduling.backend eventscheduling.frontend
           docker compose -p student-5-ci -f docker-compose.yml -f .github/docker-compose.student-5.ci.yml up --detach --no-build ai.gateway academicrecords.database academicrecords.backend eventscheduling.database eventscheduling.backend eventscheduling.frontend
 
-      - name: Smoke test Student 5 containers
+      # Smoke tests confirm container readiness; business endpoint assertions are a separate CI/CD step below.
+      - name: Smoke test Student 5 container health
         if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.student5 == 'true'
         shell: bash
         run: |
           set -euo pipefail
-          authorization_header="Authorization: Bearer $(python3 .github/scripts/create-ci-auth-token.py --account-id STU005 --role Student)"
-          staff_authorization_header="Authorization: Bearer $(python3 .github/scripts/create-ci-auth-token.py --account-id STF004 --role Staff)"
-          endpoints=("http://localhost:5269/health" "http://localhost:5020/health" "http://localhost:15521/health" "http://localhost:18085/health" "http://localhost:18085/api/rooms" "http://localhost:18085/api/refequipment" "http://localhost:18085/api/equipment" "http://localhost:18085/api/bookings" "http://localhost:18085/api/users" "http://localhost:18085/api/users/5" "http://localhost:18086/")
+          endpoints=("http://localhost:5269/health" "http://localhost:5020/health" "http://localhost:15521/health" "http://localhost:18085/health" "http://localhost:18086/")
           for endpoint in "${endpoints[@]}"; do
             reachable=false
             for attempt in {1..30}; do
-              if curl -s -f -m 5 --header "$authorization_header" "$endpoint" > /dev/null; then
+              if curl --silent --show-error --fail --max-time 5 "$endpoint" > /dev/null; then
                 reachable=true
                 break
               fi
@@ -118,14 +110,22 @@ jobs:
               exit 1
             fi
           done
-          curl -s -f -X POST http://localhost:18085/api/bookings -H "$authorization_header" -H 'Content-Type: application/json' -d '{"studentId":5,"roomId":2,"refEquipmentId":null,"resourceName":"CI smoke booking","startUtc":"2027-06-15T10:00:00Z","endUtc":"2027-06-15T11:00:00Z","status":1}' > /dev/null
-          curl -s -f -X POST http://localhost:18085/api/bookings -H "$staff_authorization_header" -H 'Content-Type: application/json' -d '{"studentId":14,"roomId":9,"refEquipmentId":null,"resourceName":"CI smoke staff booking","startUtc":"2027-06-16T13:00:00Z","endUtc":"2027-06-16T15:00:00Z","status":1,"isStaff":true}' > /dev/null
-          curl -s -f -X PUT http://localhost:18085/api/bookings/1 -H "$authorization_header" -H 'Content-Type: application/json' -d '{"studentId":5,"roomId":1,"refEquipmentId":null,"resourceName":"CI smoke booking (updated)","startUtc":"2027-07-01T09:00:00Z","endUtc":"2027-07-01T10:00:00Z","status":1}' > /dev/null
-          curl -s -f -X POST http://localhost:18085/api/bookings/1/end -H "$authorization_header" > /dev/null
-          curl -s -f -X POST http://localhost:18085/api/bookings/10/return -H "$authorization_header" > /dev/null
-          curl -s -f -X DELETE http://localhost:18085/api/bookings/2 -H "$authorization_header" > /dev/null
+      - name: Post-commit CI/CD tests (two endpoints) - Student 5
+        if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.student5 == 'true'
+        run: python3 .github/scripts/run-post-commit-endpoint-tests.py --student 5 --base-url http://localhost:18085
 
       - name: Remove Student 5 containers
         if: always() && (github.event_name == 'workflow_dispatch' || steps.filter.outputs.student5 == 'true')
         shell: bash
         run: docker compose -p student-5-ci -f docker-compose.yml -f .github/docker-compose.student-5.ci.yml down --volumes --remove-orphans
+
+      - name: Upload Student 5 post-commit CI/CD evidence
+        if: always() && (github.event_name == 'workflow_dispatch' || steps.filter.outputs.student5 == 'true')
+        uses: actions/upload-artifact@v4
+        with:
+          name: student-5-post-commit-evidence
+          path: |
+            TestResults/*.trx
+            reports/post-commit/student-5-*
+          if-no-files-found: warn
+          retention-days: 14

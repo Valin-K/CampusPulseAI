@@ -46,6 +46,7 @@ jobs:
               - 'docker-compose.yml'
               - '.github/docker-compose.student-4.ci.yml'
               - '.github/workflows/student-4-ci.yml'
+              - '.github/scripts/**'
 
       - name: No Student 4 changes
         if: github.event_name != 'workflow_dispatch' && steps.filter.outputs.student4 != 'true'
@@ -73,7 +74,7 @@ jobs:
 
       - name: Run NUnit tests
         if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.student4 == 'true'
-        run: dotnet test student-4/tests/FinancialAidBilling.Tests/FinancialAidBilling.Tests.csproj --configuration Release --no-restore
+        run: dotnet test student-4/tests/FinancialAidBilling.Tests/FinancialAidBilling.Tests.csproj --configuration Release --no-restore --logger "trx;LogFileName=financial-aid-billing-tests.trx" --results-directory TestResults
 
       - name: Build and start Student 4 containers
         if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.student4 == 'true'
@@ -82,18 +83,17 @@ jobs:
           docker compose -p student-4-ci -f docker-compose.yml -f .github/docker-compose.student-4.ci.yml build --with-dependencies ai.gateway academicrecords.database academicrecords.backend financialaidbilling.database financialaidbilling.backend financialaidbilling.frontend
           docker compose -p student-4-ci -f docker-compose.yml -f .github/docker-compose.student-4.ci.yml up --detach --no-build ai.gateway academicrecords.database academicrecords.backend financialaidbilling.database financialaidbilling.backend financialaidbilling.frontend
 
-      - name: Smoke test Student 4 containers
+      # Smoke tests confirm container readiness; business endpoint assertions are a separate CI/CD step below.
+      - name: Smoke test Student 4 container health
         if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.student4 == 'true'
         shell: bash
         run: |
           set -euo pipefail
-          authorization_header="Authorization: Bearer $(python3 .github/scripts/create-ci-auth-token.py --account-id STU001 --role Student)"
-          staff_authorization_header="Authorization: Bearer $(python3 .github/scripts/create-ci-auth-token.py --account-id STF001 --role Staff)"
-          endpoints=("http://localhost:5269/health" "http://localhost:5020/health" "http://localhost:5021/health" "http://localhost:18080/health" "http://localhost:18080/api/invoices" "http://localhost:18084/")
+          endpoints=("http://localhost:5269/health" "http://localhost:5020/health" "http://localhost:5021/health" "http://localhost:18080/health" "http://localhost:18084/")
           for endpoint in "${endpoints[@]}"; do
             reachable=false
             for attempt in {1..30}; do
-              if curl -s -f -m 5 --header "$authorization_header" "$endpoint" > /dev/null; then
+              if curl --silent --show-error --fail --max-time 5 "$endpoint" > /dev/null; then
                 reachable=true
                 break
               fi
@@ -106,11 +106,23 @@ jobs:
               exit 1
             fi
           done
-          curl -s -f -X POST http://localhost:18080/api/invoices -H "$staff_authorization_header" -H 'Content-Type: application/json' -d '{"studentId":4,"description":"CI tuition fee","amount":1250.00,"issueDate":"2026-07-01","dueDate":"2026-08-01","status":0}' > /dev/null
-          curl -s -f -X PUT http://localhost:18080/api/invoices/1 -H "$staff_authorization_header" -H 'Content-Type: application/json' -d '{"studentId":4,"description":"Updated CI tuition fee","amount":4500.00,"issueDate":"2026-07-01","dueDate":"2026-08-15","status":1}' > /dev/null
-          curl -s -f -X DELETE http://localhost:18080/api/invoices/2 -H "$staff_authorization_header" > /dev/null
+
+      - name: Post-commit CI/CD tests (two endpoints) - Student 4
+        if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.student4 == 'true'
+        run: python3 .github/scripts/run-post-commit-endpoint-tests.py --student 4 --base-url http://localhost:18080
 
       - name: Remove Student 4 containers
         if: always() && (github.event_name == 'workflow_dispatch' || steps.filter.outputs.student4 == 'true')
         shell: bash
         run: docker compose -p student-4-ci -f docker-compose.yml -f .github/docker-compose.student-4.ci.yml down --volumes --remove-orphans
+
+      - name: Upload Student 4 post-commit CI/CD evidence
+        if: always() && (github.event_name == 'workflow_dispatch' || steps.filter.outputs.student4 == 'true')
+        uses: actions/upload-artifact@v4
+        with:
+          name: student-4-post-commit-evidence
+          path: |
+            TestResults/*.trx
+            reports/post-commit/student-4-*
+          if-no-files-found: warn
+          retention-days: 14
