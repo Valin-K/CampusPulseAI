@@ -9,10 +9,24 @@ from pathlib import Path
 from typing import Any, Callable
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
+from urllib.parse import urlsplit
 
 
 class EndpointTestRunner:
     def __init__(self, student: int, base_url: str, report_dir: Path) -> None:
+        parsed_url = urlsplit(base_url)
+        is_local_http = parsed_url.scheme == "http" and parsed_url.hostname in {
+            "localhost",
+            "127.0.0.1",
+            "::1",
+        }
+        if (
+            not parsed_url.hostname
+            or parsed_url.username
+            or parsed_url.password
+            or (parsed_url.scheme != "https" and not is_local_http)
+        ):
+            raise ValueError("The service URL must use HTTPS or loopback HTTP.")
         self.student = student
         self.base_url = base_url.rstrip("/")
         self.report_dir = report_dir
@@ -33,7 +47,7 @@ class EndpointTestRunner:
         environment = os.environ.copy()
         environment.setdefault("CAMPUSPULSE_AUTH_URL", "http://localhost:5020/api/auth/token")
         try:
-            result = subprocess.run(
+            result = subprocess.run(  # noqa: S603 - fixed in-repository helper, argv list, shell disabled
                 [
                     sys.executable,
                     str(auth_script),
@@ -74,14 +88,14 @@ class EndpointTestRunner:
         if token:
             headers["Authorization"] = f"Bearer {token}"
 
-        request = Request(
+        request = Request(  # noqa: S310 - base URL scheme is restricted in the constructor
             f"{self.base_url}{path}",
             data=data,
             headers=headers,
             method=method,
         )
         try:
-            with urlopen(request, timeout=15) as response:
+            with urlopen(request, timeout=15) as response:  # noqa: S310 - base URL scheme is restricted in the constructor
                 status = response.status
                 raw_body = response.read()
         except HTTPError as error:

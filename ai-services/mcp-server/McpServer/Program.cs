@@ -61,7 +61,7 @@ app.MapGet("/api/mcp/tools", (
         tool.InputSchema,
         tool.Owner
     }));
-});
+}).RequireAuthorization();
 app.MapPost("/api/mcp/tools/call", async Task<IResult> (
     McpCallRequest request,
     IConfiguration configuration,
@@ -94,7 +94,7 @@ app.MapPost("/api/mcp/tools/call", async Task<IResult> (
             .ToArray()
     };
     return await tool.ExecuteAsync(executionRequest, cancellationToken);
-});
+}).RequireAuthorization();
 
 app.Run();
 

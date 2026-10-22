@@ -199,20 +199,35 @@ Criterion 5 ("reusable deployment scripts") as distinct from Criterion 6 (the wo
 | Area | Status |
 |---|---|
 | CI workflow triggers fixed (`main`/`master`, `workflow_call`) | ✅ Done, all 9 workflows |
-| nginx `/api/` proxy + deferred-DNS fix | ✅ Done for Event Scheduling (student-5); validated against a real backend |
-| `Program.cs` `BackendUrl` fallback + `appsettings.Production.json` | ✅ Done for Event Scheduling |
-| Same frontend/proxy changes for the other 4 students | 🔲 Not started |
-| AI kill-switch audit (`Mcp:Enabled`/`Rag:Enabled` per backend) | 🔲 In progress — gap confirmed in Event Scheduling; student-1/student-3 already handle it correctly and are the reference pattern |
-| `shared-ui` Dockerfile + configurable portal links | 🔲 Not started |
-| Bicep infrastructure + `scripts/deploy/*.ps1` | 🔲 Not started |
-| `cloud-deployment.yml` | 🔲 Not started |
-| Cloud CRUD smoke tests | 🔲 Not started |
+| Cloud-ready frontend proxies and portal links | ✅ Implemented across all five services and portal |
+| Bicep infrastructure and reusable deployment scripts | ✅ Implemented |
+| GitHub Actions cloud deployment | ✅ Implemented; successful run #275 on `Ryan-cloud-smoke-test` |
+| Cloud smoke tests | ✅ Run #275 artifact records 8/8 checks passed, including authenticated CRUD across five services and the enabled AI/MCP integration |
+| MCP endpoint authorization | ✅ Shared JWT fallback policy, internal ingress, and explicit endpoint authorization; anonymous 401 checks added to MCP CI |
+| Cloud data/secret hardening | ⚠️ Baseline controls exist; see the hardening backlog below |
 
----
+## 5. Security posture and hardening backlog
 
-## 5. Explicitly out of scope for the required deployment
+### Configured controls
 
-- AI-Mode, MCP, RAG and Multi-Agent Server running in the cloud (bonus B1–B4 only)
-- Cloud endpoint/data security hardening beyond the basics needed to run (bonus B5/B6)
-- Anything related to which Azure subscription/account tier to use — that's an account-administration
-  detail, not an architecture decision, and is tracked separately from this document.
+- Public ingress is limited to the portal and web frontends; backend, database, and optional AI/MCP apps use internal ingress. Container App ingress disallows insecure transport.
+- APIs use the shared JWT authorization policy. MCP tool listing and execution require authorization; only `/health` is anonymous. The MCP app forwards the caller's authorization to downstream services.
+- The deployment workflow uses GitHub OIDC for Azure login. Signing and optional Gemini keys are read from Key Vault and supplied as Container Apps secrets, not baked into images.
+- Azure Storage is configured for TLS 1.2 and HTTPS-only access, with public blob access disabled. Each database has its own Azure Files share.
+- Run #275 completed OIDC login, infrastructure/app deployment, smoke tests, and evidence upload successfully. Its evidence artifact is linked from the cloud deployment handoff.
+
+### Recommended improvements before treating this as production-hardened
+
+1. **Stored data:** Azure Storage provides service-side encryption at rest by default, but the Bicep does not explicitly declare or validate an encryption policy. Add an infrastructure assertion/evidence check for encryption, restrict the storage account network path (private endpoint or firewall rules), and configure Azure Files backup/snapshots plus a tested restore procedure. Shares are separate, but currently share one storage account and its account key.
+2. **Storage credentials:** The Container Apps environment storage binding uses a storage account key. Prefer identity-based access where supported; otherwise isolate the account per environment, restrict who can read the key, rotate it, and capture the rotation procedure.
+3. **Deployment identity:** OIDC login and Key Vault reads have succeeded operationally, but a successful run does not prove that Azure RBAC is least-privilege. Verify the live role assignments, keep scope to the deployment resource group/vault, and replace broad Contributor permissions with a minimal custom role where practical. Configure production-environment reviewers and branch restrictions. Pre-register Azure resource providers administratively; master run #265 logged authorization failures for provider-registration actions, and the deploy identity should not need broad subscription registration permissions at runtime.
+4. **Images and supply chain:** GHCR images are currently public. Prefer a private registry with narrowly scoped pull identities. Add image vulnerability scanning, SBOM/provenance, signature or digest verification, and pin third-party GitHub Actions to immutable commit SHAs.
+5. **Security checks:** Pre-commit secret scanning covers repository files; Ruff security rules cover Python automation scripts; .NET analyzers and NuGet auditing cover all .NET projects. Python dependency auditing is intentionally omitted because Python is not a production application in this project. The first all-files secret scan surfaced 20 unreviewed candidates, so it is not yet a clean scan. Review candidates rather than baselining them blindly. Run these checks as required CI checks rather than relying only on developer-installed hooks.
+6. **Runtime evidence:** Keep positive authenticated CRUD tests and add negative checks for anonymous requests, role/ownership violations, and MCP calls. Save redacted Azure configuration/RBAC checks, test reports, commit SHA, and image digests with each deployment.
+
+The optional AI/MCP/RAG/Multi-Agent profile remains disabled by default, but Run #275 also exercised the enabled AI/MCP integration. Any later change that makes AI public or changes MCP authorization requires its own security review and negative authorization tests.
+
+### Scope notes
+
+- Running AI-Mode, MCP, RAG and Multi-Agent in the baseline remains optional (bonus B1–B4).
+- Azure subscription/account selection is an account-administration detail.

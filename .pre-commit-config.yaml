@@ -1,5 +1,5 @@
-# Pre-commit security testing for every student service (student-1 to student-5).
-# .NET equivalents: Ruff security rules -> .NET security analyzers, pip-audit -> NuGet vulnerable package audit.
+# Pre-commit security testing across the repository.
+# .NET security analyzers and NuGet auditing cover the production .NET application.
 # Setup once per clone: pip install pre-commit detect-secrets, then run pre-commit install.
 # Run every hook manually: pre-commit run --all-files
 repos:
@@ -8,24 +8,32 @@ repos:
     rev: v1.5.0
     hooks:
       - id: detect-secrets
-        name: detect-secrets (all students)
+        name: detect-secrets (all repository files)
         args: ["--baseline", ".secrets.baseline"]
-        files: ^student-[1-5]/
 
   - repo: local
     hooks:
-      # 2. Risky code patterns (Ruff security rules equivalent).
+      # 2. Python source security checks across repository scripts.
+      - id: python-security-rules
+        name: Ruff security rules (all Python)
+        entry: "ruff check --select S --per-file-ignores '*/tests/**/*.py:S101' ."
+        language: python
+        additional_dependencies: ["ruff==0.16.8"]
+        pass_filenames: false
+        files: \.py$
+
+      # 3. Risky code patterns in .NET (Ruff security rules equivalent).
       - id: dotnet-security-analyzers
-        name: .NET security analyzers (all students)
+        name: .NET security analyzers (all projects)
         entry: pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/pre-commit/run-security-analyzers.ps1
         language: system
         pass_filenames: false
-        files: ^student-[1-5]/.*\.(cs|razor|csproj)$
+        files: \.(cs|razor|csproj|props|targets)$
 
-      # 3. Known vulnerable dependencies (pip-audit equivalent).
+      # 4. Known vulnerable NuGet dependencies.
       - id: nuget-vulnerable-packages
-        name: NuGet vulnerable package audit (all students)
+        name: NuGet vulnerable package audit (all projects)
         entry: pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/pre-commit/check-vulnerable-packages.ps1
         language: system
         pass_filenames: false
-        files: ^student-[1-5]/.*\.csproj$
+        files: \.(csproj|props|targets)$

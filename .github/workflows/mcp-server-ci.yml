@@ -79,6 +79,19 @@ jobs:
             sleep 1
           done
           curl --silent --fail http://localhost:5268/health
+          anonymous_tools_status=$(curl --silent --output /dev/null --write-out '%{http_code}' http://localhost:5268/api/mcp/tools)
+          if [ "$anonymous_tools_status" != "401" ]; then
+            printf 'Expected anonymous tool listing to return 401, got %s\n' "$anonymous_tools_status"
+            exit 1
+          fi
+          anonymous_call_status=$(curl --silent --output /dev/null --write-out '%{http_code}' \
+            -H "Content-Type: application/json" \
+            -d '{"tool":"get_feature_capabilities","arguments":{"feature":"student-1"}}' \
+            http://localhost:5268/api/mcp/tools/call)
+          if [ "$anonymous_call_status" != "401" ]; then
+            printf 'Expected anonymous tool call to return 401, got %s\n' "$anonymous_call_status"
+            exit 1
+          fi
           tools=$(curl --silent --show-error --fail --header "$authorization_header" http://localhost:5268/api/mcp/tools)
           printf '%s' "$tools"
           printf '%s' "$tools" | grep --quiet 'calculate_student_academic_statistics'
