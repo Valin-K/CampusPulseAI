@@ -38,6 +38,8 @@ $ErrorActionPreference = 'Stop'
 # One known, real GET endpoint per frontend - the exact ones manually verified in Phase 1.
 $services = @(
     @{ App = 'academicrecords-web'; Path = '/api/users' }
+    # Not /api/course-access/users - that route is [Authorize(Policy = StaffOnlyPolicy)], and
+    # this script signs in as a seeded Student, so it would always get a correct 403 there.
     @{ App = 'coursemgmt-web'; Path = '/api/courses' }
     @{ App = 'campushousing-web'; Path = '/api/housing/rooms' }
     @{ App = 'finaid-web'; Path = '/api/invoices' }
@@ -67,71 +69,99 @@ catch {
 Write-Host "Signing in as the seeded test student (STU001) to authenticate the checks below..." -ForegroundColor Cyan
 $academicRecordsFqdn = Get-AppFqdn -AppName 'academicrecords-web'
 $tokenBody = @{ AccountId = 'STU001'; Role = 'Student'; Password = 'test' } | ConvertTo-Json
-$tokenResponse = Invoke-WebRequest -Uri "https://$academicRecordsFqdn/api/auth/token" -Method Post -Body $tokenBody -ContentType 'application/json' -UseBasicParsing -TimeoutSec 60
-$accessToken = ($tokenResponse.Content | ConvertFrom-Json).accessToken
-if ([string]::IsNullOrWhiteSpace($accessToken)) {
-    throw 'Signing in as the seeded test student did not return an access token.'
-}
-$authHeaders = @{ Authorization = "Bearer $accessToken" }
-
-foreach ($service in $services) {
-    $fqdn = Get-AppFqdn -AppName $service.App
-    $url = "https://$fqdn$($service.Path)"
-    Write-Host "Checking $($service.App)$($service.Path)..." -ForegroundColor Cyan
-    try {
-        $response = Invoke-WebRequest -Uri $url -Headers $authHeaders -UseBasicParsing -TimeoutSec 60
-        $results += [pscustomobject]@{ Check = "$($service.App) CRUD read (web -> api -> db)"; Url = $url; Status = $response.StatusCode; Passed = ($response.StatusCode -eq 200) }
-    }
-    catch {
-        $statusCode = 'error'
-        if ($_.Exception.Response) { $statusCode = [int]$_.Exception.Response.StatusCode }
-        $results += [pscustomobject]@{ Check = "$($service.App) CRUD read (web -> api -> db)"; Url = $url; Status = $statusCode; Passed = $false }
-    }
-}
-
-Write-Host "Checking Course Management's staff-only users endpoint..." -ForegroundColor Cyan
-$courseManagementFqdn = Get-AppFqdn -AppName 'coursemgmt-web'
-$courseAccessUrl = "https://$courseManagementFqdn/api/course-access/users"
-$courseAccessStatus = 'error'
+$authHeaders = $null
+$authUrl = "https://$academicRecordsFqdn/api/auth/token"
 try {
-    $response = Invoke-WebRequest -Uri $courseAccessUrl -Headers $authHeaders -UseBasicParsing -TimeoutSec 60
-    $courseAccessStatus = $response.StatusCode
+    $tokenResponse = Invoke-WebRequest -Uri $authUrl -Method Post -Body $tokenBody -ContentType 'application/json' -UseBasicParsing -TimeoutSec 60
+    $accessToken = ($tokenResponse.Content | ConvertFrom-Json).accessToken
+    if ([string]::IsNullOrWhiteSpace($accessToken)) {
+        throw 'Sign-in returned 200 but no accessToken in the response body.'
+    }
+    $authHeaders = @{ Authorization = "Bearer $accessToken" }
+    $results += [pscustomobject]@{ Check = 'authentication (STU001 sign-in)'; Url = $authUrl; Status = $tokenResponse.StatusCode; Passed = $true }
 }
 catch {
-    if ($_.Exception.Response) { $courseAccessStatus = [int]$_.Exception.Response.StatusCode }
-}
-$results += [pscustomobject]@{
-    Check = 'Course Management staff-only users endpoint rejects Student'
-    Url = $courseAccessUrl
-    Status = $courseAccessStatus
-    Passed = ($courseAccessStatus -eq 403)
+    $statusCode = 'error'
+    if ($_.Exception.Response) { $statusCode = [int]$_.Exception.Response.StatusCode }
+    $results += [pscustomobject]@{ Check = 'authentication (STU001 sign-in)'; Url = $authUrl; Status = $statusCode; Passed = $false }
 }
 
-Write-Host "Checking Financial Aid's AI profile gates..." -ForegroundColor Cyan
-$finaidFqdn = Get-AppFqdn -AppName 'finaid-web'
-$aiChecks = @(
-    @{ Path = '/api/assistant/mcp/integration'; ExpectedStatus = 403 }
-    @{ Path = '/api/ai/knowledge'; ExpectedStatus = 403 }
-)
-if ($EnableAi) {
-    $aiChecks = @(@{ Path = '/api/assistant/mcp/integration'; ExpectedStatus = 200 })
+if ($authHeaders) {
+    foreach ($service in $services) {
+        $fqdn = Get-AppFqdn -AppName $service.App
+        $url = "https://$fqdn$($service.Path)"
+        Write-Host "Checking $($service.App)$($service.Path)..." -ForegroundColor Cyan
+        try {
+            $response = Invoke-WebRequest -Uri $url -Headers $authHeaders -UseBasicParsing -TimeoutSec 60
+            $results += [pscustomobject]@{ Check = "$($service.App) CRUD read (web -> api -> db)"; Url = $url; Status = $response.StatusCode; Passed = ($response.StatusCode -eq 200) }
+        }
+        catch {
+            $statusCode = 'error'
+            if ($_.Exception.Response) { $statusCode = [int]$_.Exception.Response.StatusCode }
+            $results += [pscustomobject]@{ Check = "$($service.App) CRUD read (web -> api -> db)"; Url = $url; Status = $statusCode; Passed = $false }
+        }
+    }
+} else {
+    Write-Host "Skipping all CRUD checks - sign-in failed, there's no token to send." -ForegroundColor Yellow
+    foreach ($service in $services) {
+        $results += [pscustomobject]@{ Check = "$($service.App) CRUD read (web -> api -> db)"; Url = ''; Status = 'skipped (auth failed)'; Passed = $false }
+    }
 }
-foreach ($check in $aiChecks) {
-    $url = "https://$finaidFqdn$($check.Path)"
-    # A 403 makes Invoke-WebRequest throw (it's not a 2xx), so the expected "disabled" response
-    # is read from the exception, not a successful return - this also works on Windows
-    # PowerShell 5.1, which has no -SkipHttpErrorCheck parameter (added in PS 7.4+).
+
+if ($authHeaders) {
+    Write-Host "Checking Course Management's staff-only users endpoint..." -ForegroundColor Cyan
+    $courseManagementFqdn = Get-AppFqdn -AppName 'coursemgmt-web'
+    $courseAccessUrl = "https://$courseManagementFqdn/api/course-access/users"
+    $courseAccessStatus = 'error'
     try {
-        $response = Invoke-WebRequest -Uri $url -Method Post -Headers $authHeaders -Body '{}' -ContentType 'application/json' -UseBasicParsing -TimeoutSec 60
-        $passed = $response.StatusCode -eq $check.ExpectedStatus
-        if ($EnableAi) { $passed = $passed -and (($response.Content | ConvertFrom-Json).isError -eq $false) }
-        $results += [pscustomobject]@{ Check = "AI profile: $($check.Path) returns $($check.ExpectedStatus)"; Url = $url; Status = $response.StatusCode; Passed = $passed }
+        $response = Invoke-WebRequest -Uri $courseAccessUrl -Headers $authHeaders -UseBasicParsing -TimeoutSec 60
+        $courseAccessStatus = $response.StatusCode
     }
     catch {
-        $statusCode = 'error'
-        if ($_.Exception.Response) { $statusCode = [int]$_.Exception.Response.StatusCode }
-        $results += [pscustomobject]@{ Check = "AI profile: $($check.Path) returns $($check.ExpectedStatus)"; Url = $url; Status = $statusCode; Passed = ($statusCode -eq $check.ExpectedStatus) }
+        if ($_.Exception.Response) { $courseAccessStatus = [int]$_.Exception.Response.StatusCode }
     }
+    $results += [pscustomobject]@{
+        Check = 'Course Management staff-only users endpoint rejects Student'
+        Url = $courseAccessUrl
+        Status = $courseAccessStatus
+        Passed = ($courseAccessStatus -eq 403)
+    }
+
+    Write-Host "Checking Financial Aid's AI profile gates..." -ForegroundColor Cyan
+    $finaidFqdn = Get-AppFqdn -AppName 'finaid-web'
+    $aiChecks = @(
+        @{ Path = '/api/assistant/mcp/integration'; ExpectedStatus = 403 }
+        @{ Path = '/api/ai/knowledge'; ExpectedStatus = 403 }
+    )
+    if ($EnableAi) {
+        $aiChecks = @(@{ Path = '/api/assistant/mcp/integration'; ExpectedStatus = 200 })
+    }
+    foreach ($check in $aiChecks) {
+        $url = "https://$finaidFqdn$($check.Path)"
+        # A 403 makes Invoke-WebRequest throw (it's not a 2xx), so the expected "disabled" response
+        # is read from the exception, not a successful return - this also works on Windows
+        # PowerShell 5.1, which has no -SkipHttpErrorCheck parameter (added in PS 7.4+).
+        try {
+            $response = Invoke-WebRequest -Uri $url -Method Post -Headers $authHeaders -Body '{}' -ContentType 'application/json' -UseBasicParsing -TimeoutSec 60
+            $passed = $response.StatusCode -eq $check.ExpectedStatus
+            if ($EnableAi) { $passed = $passed -and (($response.Content | ConvertFrom-Json).isError -eq $false) }
+            $results += [pscustomobject]@{ Check = "AI profile: $($check.Path) returns $($check.ExpectedStatus)"; Url = $url; Status = $response.StatusCode; Passed = $passed }
+        }
+        catch {
+            $statusCode = 'error'
+            if ($_.Exception.Response) { $statusCode = [int]$_.Exception.Response.StatusCode }
+            $results += [pscustomobject]@{ Check = "AI profile: $($check.Path) returns $($check.ExpectedStatus)"; Url = $url; Status = $statusCode; Passed = ($statusCode -eq $check.ExpectedStatus) }
+        }
+    }
+} else {
+    Write-Host "Skipping authorization and AI profile checks - sign-in failed, there's no token to send." -ForegroundColor Yellow
+    $results += [pscustomobject]@{
+        Check = 'Course Management staff-only users endpoint rejects Student'
+        Url = ''
+        Status = 'skipped (auth failed)'
+        Passed = $false
+    }
+    $results += [pscustomobject]@{ Check = 'AI profile gates'; Url = ''; Status = 'skipped (auth failed)'; Passed = $false }
 }
 
 $runId = Get-Date -Format 'yyyyMMdd-HHmmss'

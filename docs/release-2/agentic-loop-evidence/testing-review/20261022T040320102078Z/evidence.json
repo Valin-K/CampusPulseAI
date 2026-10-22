@@ -1,0 +1,242 @@
+{
+  "schemaVersion": 1,
+  "runId": "20261022T040320102078Z",
+  "timestampUtc": "2026-10-22T04:03:20.102869+00:00",
+  "completedAtUtc": "2026-10-22T04:03:27.768935+00:00",
+  "mode": "testing-review",
+  "sourceEvidencePaths": [
+    "C:\\Users\\jackz\\source\\repos\\CampusPulseAI\\docs\\release-2\\testing-evidence\\pre-commit-security-report.json",
+    "C:\\Users\\jackz\\source\\repos\\CampusPulseAI\\docs\\release-2\\testing-evidence\\ci-test-report.json"
+  ],
+  "deterministicChecks": [
+    {
+      "name": "pre-commit hook coverage",
+      "status": "PASS",
+      "details": "Missing hooks: none"
+    },
+    {
+      "name": "security hook detect-secrets",
+      "status": "PASS",
+      "details": "Reported status: PASS."
+    },
+    {
+      "name": "security hook dotnet-security-analyzers",
+      "status": "PASS",
+      "details": "Reported status: PASS."
+    },
+    {
+      "name": "security hook nuget-vulnerable-packages",
+      "status": "PASS",
+      "details": "Reported status: PASS."
+    },
+    {
+      "name": "CI test record 1",
+      "status": "PASS",
+      "details": "shared-backend-ci / shared-backend-test-results: 100 passed, 0 failed, 0 skipped."
+    },
+    {
+      "name": "CI test record 2",
+      "status": "PASS",
+      "details": "shared-backend-ci / shared-backend-test-results: 34 passed, 0 failed, 0 skipped."
+    },
+    {
+      "name": "CI test record 3",
+      "status": "PASS",
+      "details": "student-1-ci / student-1-test-results: 107 passed, 0 failed, 0 skipped."
+    },
+    {
+      "name": "CI test record 4",
+      "status": "PASS",
+      "details": "student-3 / student-3-test-results: 50 passed, 0 failed, 0 skipped."
+    },
+    {
+      "name": "CI test record 5",
+      "status": "PASS",
+      "details": "student-5-ci / student-5-test-results: 128 passed, 0 failed, 0 skipped."
+    },
+    {
+      "name": "CI aggregate totals",
+      "status": "PASS",
+      "details": "Aggregate: 419 passed, 0 failed, 0 skipped, 419 total."
+    }
+  ],
+  "collectedEvidence": {
+    "sourceFiles": [
+      "C:\\Users\\jackz\\source\\repos\\CampusPulseAI\\docs\\release-2\\testing-evidence\\pre-commit-security-report.json",
+      "C:\\Users\\jackz\\source\\repos\\CampusPulseAI\\docs\\release-2\\testing-evidence\\ci-test-report.json"
+    ],
+    "precommit": {
+      "available": true,
+      "status": "FAIL",
+      "commitSha": "0dc5c99e77b2ecbb60deb32993942f92dbf59c20",
+      "hooks": [
+        {
+          "id": "detect-secrets",
+          "status": "PASS",
+          "exitCode": 0
+        },
+        {
+          "id": "dotnet-security-analyzers",
+          "status": "PASS",
+          "exitCode": 0
+        },
+        {
+          "id": "nuget-vulnerable-packages",
+          "status": "PASS",
+          "exitCode": 0
+        }
+      ]
+    },
+    "ci": {
+      "available": true,
+      "status": "PASS",
+      "commitSha": "d664d2737314917e593751ee255e2d02c301b570",
+      "records": [
+        {
+          "workflow": "shared-backend-ci",
+          "artifact": "shared-backend-test-results",
+          "testProject": "shared-ai-tests",
+          "status": "PASS",
+          "passed": 100,
+          "failed": 0,
+          "skipped": 0,
+          "total": 100
+        },
+        {
+          "workflow": "shared-backend-ci",
+          "artifact": "shared-backend-test-results",
+          "testProject": "shared-rag-tests",
+          "status": "PASS",
+          "passed": 34,
+          "failed": 0,
+          "skipped": 0,
+          "total": 34
+        },
+        {
+          "workflow": "student-1-ci",
+          "artifact": "student-1-test-results",
+          "testProject": "academic-records-tests",
+          "status": "PASS",
+          "passed": 107,
+          "failed": 0,
+          "skipped": 0,
+          "total": 107
+        },
+        {
+          "workflow": "student-3",
+          "artifact": "student-3-test-results",
+          "testProject": "campus-housing-tests",
+          "status": "PASS",
+          "passed": 50,
+          "failed": 0,
+          "skipped": 0,
+          "total": 50
+        },
+        {
+          "workflow": "student-5-ci",
+          "artifact": "student-5-test-results",
+          "testProject": "event-scheduling-tests",
+          "status": "PASS",
+          "passed": 128,
+          "failed": 0,
+          "skipped": 0,
+          "total": 128
+        }
+      ],
+      "totals": {
+        "passed": 419,
+        "failed": 0,
+        "skipped": 0,
+        "total": 419
+      }
+    },
+    "checks": [
+      {
+        "name": "pre-commit hook coverage",
+        "status": "PASS",
+        "details": "Missing hooks: none"
+      },
+      {
+        "name": "security hook detect-secrets",
+        "status": "PASS",
+        "details": "Reported status: PASS."
+      },
+      {
+        "name": "security hook dotnet-security-analyzers",
+        "status": "PASS",
+        "details": "Reported status: PASS."
+      },
+      {
+        "name": "security hook nuget-vulnerable-packages",
+        "status": "PASS",
+        "details": "Reported status: PASS."
+      },
+      {
+        "name": "CI test record 1",
+        "status": "PASS",
+        "details": "shared-backend-ci / shared-backend-test-results: 100 passed, 0 failed, 0 skipped."
+      },
+      {
+        "name": "CI test record 2",
+        "status": "PASS",
+        "details": "shared-backend-ci / shared-backend-test-results: 34 passed, 0 failed, 0 skipped."
+      },
+      {
+        "name": "CI test record 3",
+        "status": "PASS",
+        "details": "student-1-ci / student-1-test-results: 107 passed, 0 failed, 0 skipped."
+      },
+      {
+        "name": "CI test record 4",
+        "status": "PASS",
+        "details": "student-3 / student-3-test-results: 50 passed, 0 failed, 0 skipped."
+      },
+      {
+        "name": "CI test record 5",
+        "status": "PASS",
+        "details": "student-5-ci / student-5-test-results: 128 passed, 0 failed, 0 skipped."
+      },
+      {
+        "name": "CI aggregate totals",
+        "status": "PASS",
+        "details": "Aggregate: 419 passed, 0 failed, 0 skipped, 419 total."
+      }
+    ],
+    "status": "PASS",
+    "unverified": [
+      "A passing model assessment does not replace deterministic hook/test results or human release approval.",
+      "Only supplied TRX artifacts are reviewed; workflows without downloaded artifacts remain unverified."
+    ]
+  },
+  "models": [
+    {
+      "stage": "implementation-assessment",
+      "requestedProvider": "openrouter",
+      "requestedModel": "qwen/qwen3.8-27b",
+      "usedProvider": "openrouter",
+      "usedModel": "qwen/qwen3.8-27b",
+      "systemPrompt": "Assess only the supplied evidence. Separate verified facts, failures, gaps, and limitations. Do not approve a release.",
+      "userPrompt": "Assess the supplied pre-commit and post-commit CI results. Report findings, failed checks, missing evidence, and unverified scope. Deterministic failure or incompleteness cannot be overridden by a positive opinion.\n\n{\n  \"precommit\": {\n    \"available\": true,\n    \"status\": \"FAIL\",\n    \"hooks\": [\n      {\n        \"id\": \"detect-secrets\",\n        \"status\": \"PASS\",\n        \"exitCode\": 0\n      },\n      {\n        \"id\": \"dotnet-security-analyzers\",\n        \"status\": \"PASS\",\n        \"exitCode\": 0\n      },\n      {\n        \"id\": \"nuget-vulnerable-packages\",\n        \"status\": \"PASS\",\n        \"exitCode\": 0\n      }\n    ]\n  },\n  \"ci\": {\n    \"available\": true,\n    \"status\": \"PASS\",\n    \"totals\": {\n      \"passed\": 419,\n      \"failed\": 0,\n      \"skipped\": 0,\n      \"total\": 419\n    },\n    \"records\": [\n      {\n        \"status\": \"PASS\",\n        \"passed\": 100,\n        \"failed\": 0,\n        \"skipped\": 0,\n        \"total\": 100\n      },\n      {\n        \"status\": \"PASS\",\n        \"passed\": 34,\n        \"failed\": 0,\n        \"skipped\": 0,\n        \"total\": 34\n      },\n      {\n        \"status\": \"PASS\",\n        \"passed\": 107,\n        \"failed\": 0,\n        \"skipped\": 0,\n        \"total\": 107\n      },\n      {\n        \"status\": \"PASS\",\n        \"passed\": 50,\n        \"failed\": 0,\n        \"skipped\": 0,\n        \"total\": 50\n      },\n      {\n        \"status\": \"PASS\",\n        \"passed\": 128,\n        \"failed\": 0,\n        \"skipped\": 0,\n        \"total\": 128\n      }\n    ]\n  },\n  \"deterministicChecks\": [\n    {\n      \"name\": \"pre-commit hook coverage\",\n      \"status\": \"PASS\"\n    },\n    {\n      \"name\": \"security hook detect-secrets\",\n      \"status\": \"PASS\"\n    },\n    {\n      \"name\": \"security hook dotnet-security-analyzers\",\n      \"status\": \"PASS\"\n    },\n    {\n      \"name\": \"security hook nuget-vulnerable-packages\",\n      \"status\": \"PASS\"\n    },\n    {\n      \"name\": \"CI test record 1\",\n      \"status\": \"PASS\"\n    },\n    {\n      \"name\": \"CI test record 2\",\n      \"status\": \"PASS\"\n    },\n    {\n      \"name\": \"CI test record 3\",\n      \"status\": \"PASS\"\n    },\n    {\n      \"name\": \"CI test record 4\",\n      \"status\": \"PASS\"\n    },\n    {\n      \"name\": \"CI test record 5\",\n      \"status\": \"PASS\"\n    },\n    {\n      \"name\": \"CI aggregate totals\",\n      \"status\": \"PASS\"\n    }\n  ],\n  \"unverified\": [\n    \"A passing model assessment does not replace deterministic hook/test results or human release approval.\",\n    \"Only supplied TRX artifacts are reviewed; workflows without downloaded artifacts remain unverified.\"\n  ]\n}",
+      "output": null,
+      "error": "OPENROUTER_API_KEY is not set."
+    },
+    {
+      "stage": "independent-review",
+      "requestedProvider": "openrouter",
+      "requestedModel": "qwen/qwen3.8-27b",
+      "usedProvider": "openrouter",
+      "usedModel": "qwen/qwen3.8-27b",
+      "systemPrompt": "Independently verify the assessment against the deterministic evidence. Identify unsupported claims and missing checks. This is not human release approval.",
+      "userPrompt": "Independently audit this Testing Review. Verify each claimed status against the deterministic summary, identify omitted failures or missing artifacts, and state what remains unverified. This is not human release approval.\n\nEvidence:\n{\n  \"precommit\": {\n    \"available\": true,\n    \"status\": \"FAIL\",\n    \"hooks\": [\n      {\n        \"id\": \"detect-secrets\",\n        \"status\": \"PASS\",\n        \"exitCode\": 0\n      },\n      {\n        \"id\": \"dotnet-security-analyzers\",\n        \"status\": \"PASS\",\n        \"exitCode\": 0\n      },\n      {\n        \"id\": \"nuget-vulnerable-packages\",\n        \"status\": \"PASS\",\n        \"exitCode\": 0\n      }\n    ]\n  },\n  \"ci\": {\n    \"available\": true,\n    \"status\": \"PASS\",\n    \"totals\": {\n      \"passed\": 419,\n      \"failed\": 0,\n      \"skipped\": 0,\n      \"total\": 419\n    },\n    \"records\": [\n      {\n        \"status\": \"PASS\",\n        \"passed\": 100,\n        \"failed\": 0,\n        \"skipped\": 0,\n        \"total\": 100\n      },\n      {\n        \"status\": \"PASS\",\n        \"passed\": 34,\n        \"failed\": 0,\n        \"skipped\": 0,\n        \"total\": 34\n      },\n      {\n        \"status\": \"PASS\",\n        \"passed\": 107,\n        \"failed\": 0,\n        \"skipped\": 0,\n        \"total\": 107\n      },\n      {\n        \"status\": \"PASS\",\n        \"passed\": 50,\n        \"failed\": 0,\n        \"skipped\": 0,\n        \"total\": 50\n      },\n      {\n        \"status\": \"PASS\",\n        \"passed\": 128,\n        \"failed\": 0,\n        \"skipped\": 0,\n        \"total\": 128\n      }\n    ]\n  },\n  \"deterministicChecks\": [\n    {\n      \"name\": \"pre-commit hook coverage\",\n      \"status\": \"PASS\"\n    },\n    {\n      \"name\": \"security hook detect-secrets\",\n      \"status\": \"PASS\"\n    },\n    {\n      \"name\": \"security hook dotnet-security-analyzers\",\n      \"status\": \"PASS\"\n    },\n    {\n      \"name\": \"security hook nuget-vulnerable-packages\",\n      \"status\": \"PASS\"\n    },\n    {\n      \"name\": \"CI test record 1\",\n      \"status\": \"PASS\"\n    },\n    {\n      \"name\": \"CI test record 2\",\n      \"status\": \"PASS\"\n    },\n    {\n      \"name\": \"CI test record 3\",\n      \"status\": \"PASS\"\n    },\n    {\n      \"name\": \"CI test record 4\",\n      \"status\": \"PASS\"\n    },\n    {\n      \"name\": \"CI test record 5\",\n      \"status\": \"PASS\"\n    },\n    {\n      \"name\": \"CI aggregate totals\",\n      \"status\": \"PASS\"\n    }\n  ],\n  \"unverified\": [\n    \"A passing model assessment does not replace deterministic hook/test results or human release approval.\",\n    \"Only supplied TRX artifacts are reviewed; workflows without downloaded artifacts remain unverified.\"\n  ]\n}\n\nImplementation assessment (untrusted model output):\nUnavailable.",
+      "output": null,
+      "error": "OPENROUTER_API_KEY is not set."
+    }
+  ],
+  "errors": [
+    "OPENROUTER_API_KEY is not set.",
+    "OPENROUTER_API_KEY is not set."
+  ],
+  "status": "INCOMPLETE",
+  "humanReleaseDecision": "pending",
+  "releaseApproval": false
+}

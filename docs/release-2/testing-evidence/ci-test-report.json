@@ -1,0 +1,97 @@
+{
+  "schemaVersion": 1,
+  "mode": "ci-test-report",
+  "runId": "20261022T002237076754Z",
+  "generatedAtUtc": "2026-10-22T00:22:37.086888+00:00",
+  "status": "PASS",
+  "artifactDirectory": "C:\\Users\\jackz\\source\\repos\\CampusPulseAI\\.artifacts\\ci\\d664d2737314917e593751ee255e2d02c301b570",
+  "commitSha": "d664d2737314917e593751ee255e2d02c301b570",
+  "records": [
+    {
+      "file": "C:\\Users\\jackz\\source\\repos\\CampusPulseAI\\.artifacts\\ci\\d664d2737314917e593751ee255e2d02c301b570\\shared-backend-test-results\\shared-ai-tests.trx",
+      "workflow": "shared-backend-ci",
+      "artifact": "shared-backend-test-results",
+      "testProject": "shared-ai-tests",
+      "commitSha": "d664d2737314917e593751ee255e2d02c301b570",
+      "status": "PASS",
+      "total": 100,
+      "passed": 100,
+      "failed": 0,
+      "skipped": 0,
+      "outcomes": {
+        "passed": 100
+      },
+      "error": null
+    },
+    {
+      "file": "C:\\Users\\jackz\\source\\repos\\CampusPulseAI\\.artifacts\\ci\\d664d2737314917e593751ee255e2d02c301b570\\shared-backend-test-results\\shared-rag-tests.trx",
+      "workflow": "shared-backend-ci",
+      "artifact": "shared-backend-test-results",
+      "testProject": "shared-rag-tests",
+      "commitSha": "d664d2737314917e593751ee255e2d02c301b570",
+      "status": "PASS",
+      "total": 34,
+      "passed": 34,
+      "failed": 0,
+      "skipped": 0,
+      "outcomes": {
+        "passed": 34
+      },
+      "error": null
+    },
+    {
+      "file": "C:\\Users\\jackz\\source\\repos\\CampusPulseAI\\.artifacts\\ci\\d664d2737314917e593751ee255e2d02c301b570\\student-1-test-results\\academic-records-tests.trx",
+      "workflow": "student-1-ci",
+      "artifact": "student-1-test-results",
+      "testProject": "academic-records-tests",
+      "commitSha": "d664d2737314917e593751ee255e2d02c301b570",
+      "status": "PASS",
+      "total": 107,
+      "passed": 107,
+      "failed": 0,
+      "skipped": 0,
+      "outcomes": {
+        "passed": 107
+      },
+      "error": null
+    },
+    {
+      "file": "C:\\Users\\jackz\\source\\repos\\CampusPulseAI\\.artifacts\\ci\\d664d2737314917e593751ee255e2d02c301b570\\student-3-test-results\\campus-housing-tests.trx",
+      "workflow": "student-3",
+      "artifact": "student-3-test-results",
+      "testProject": "campus-housing-tests",
+      "commitSha": "d664d2737314917e593751ee255e2d02c301b570",
+      "status": "PASS",
+      "total": 50,
+      "passed": 50,
+      "failed": 0,
+      "skipped": 0,
+      "outcomes": {
+        "passed": 50
+      },
+      "error": null
+    },
+    {
+      "file": "C:\\Users\\jackz\\source\\repos\\CampusPulseAI\\.artifacts\\ci\\d664d2737314917e593751ee255e2d02c301b570\\student-5-test-results\\event-scheduling-tests.trx",
+      "workflow": "student-5-ci",
+      "artifact": "student-5-test-results",
+      "testProject": "event-scheduling-tests",
+      "commitSha": "d664d2737314917e593751ee255e2d02c301b570",
+      "status": "PASS",
+      "total": 128,
+      "passed": 128,
+      "failed": 0,
+      "skipped": 0,
+      "outcomes": {
+        "passed": 128
+      },
+      "error": null
+    }
+  ],
+  "totals": {
+    "passed": 419,
+    "failed": 0,
+    "skipped": 0,
+    "total": 419
+  }
+}

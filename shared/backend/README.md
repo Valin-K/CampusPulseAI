@@ -26,7 +26,7 @@ This folder holds the **shared backend library for Retrieval-Augmented Generatio
 > once; each feature only supplies **its own corpus** and a thin endpoint. Every service now exposes
 > `POST /api/ai/knowledge`.
 
----
+-----
 
 ## 1. What this is (and isn't)
 

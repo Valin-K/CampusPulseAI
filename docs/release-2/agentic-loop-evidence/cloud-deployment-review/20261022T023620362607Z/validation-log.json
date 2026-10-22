@@ -1,0 +1,96 @@
+{
+  "schemaVersion": 1,
+  "runId": "20261022T023620362607Z",
+  "timestampUtc": "2026-10-22T02:36:20.363356+00:00",
+  "completedAtUtc": "2026-10-22T02:36:39.418842+00:00",
+  "mode": "cloud-deployment-review",
+  "sourceEvidencePaths": [
+    "C:\\Users\\jackz\\source\\repos\\CampusPulseAI\\.artifacts\\cloud-deployment-evidence\\run-39611514822\\20261021-135602\\report.md",
+    "C:\\Users\\jackz\\source\\repos\\CampusPulseAI\\.artifacts\\cloud-deployment-evidence\\run-39611514822\\20261021-135602\\evidence.json"
+  ],
+  "checks": [
+    {
+      "name": "smoke-test report availability",
+      "status": "PASS",
+      "details": "report.md is readable."
+    },
+    {
+      "name": "smoke-test evidence structure",
+      "status": "PASS",
+      "details": "Loaded 8 smoke-test records."
+    },
+    {
+      "name": "smoke check 1: portal",
+      "status": "PASS",
+      "details": "Reported HTTP/status value: 200; Passed=True."
+    },
+    {
+      "name": "smoke check 2: other smoke check",
+      "status": "PASS",
+      "details": "Reported HTTP/status value: 200; Passed=True."
+    },
+    {
+      "name": "smoke check 3: frontend-to-api-to-database CRUD read",
+      "status": "PASS",
+      "details": "Reported HTTP/status value: 200; Passed=True."
+    },
+    {
+      "name": "smoke check 4: frontend-to-api-to-database CRUD read",
+      "status": "PASS",
+      "details": "Reported HTTP/status value: 200; Passed=True."
+    },
+    {
+      "name": "smoke check 5: frontend-to-api-to-database CRUD read",
+      "status": "PASS",
+      "details": "Reported HTTP/status value: 200; Passed=True."
+    },
+    {
+      "name": "smoke check 6: frontend-to-api-to-database CRUD read",
+      "status": "PASS",
+      "details": "Reported HTTP/status value: 200; Passed=True."
+    },
+    {
+      "name": "smoke check 7: frontend-to-api-to-database CRUD read",
+      "status": "PASS",
+      "details": "Reported HTTP/status value: 200; Passed=True."
+    },
+    {
+      "name": "smoke check 8: AI profile gate",
+      "status": "PASS",
+      "details": "Reported HTTP/status value: 200; Passed=True."
+    },
+    {
+      "name": "report/evidence consistency",
+      "status": "PASS",
+      "details": "Both files contain 8 check records."
+    },
+    {
+      "name": "internal-only API/database coverage",
+      "status": "INCOMPLETE",
+      "details": "Not independently probed by the external smoke-test script; it documents that API/database apps are internal-only."
+    },
+    {
+      "name": "broader deployment verification",
+      "status": "INCOMPLETE",
+      "details": "Smoke evidence does not establish untested flows, authorization for other identities, data integrity, or full release readiness."
+    }
+  ],
+  "modelCalls": [
+    {
+      "stage": "implementation-assessment",
+      "requestedModel": "qwen/qwen3.8-27b",
+      "usedModel": "gemini-3.5-flash",
+      "error": null
+    },
+    {
+      "stage": "independent-review",
+      "requestedModel": "qwen/qwen3.8-27b",
+      "usedModel": "gemini-3.5-flash",
+      "error": null
+    }
+  ],
+  "errors": [],
+  "status": "INCOMPLETE",
+  "humanReleaseDecision": "pending",
+  "releaseApproval": false
+}

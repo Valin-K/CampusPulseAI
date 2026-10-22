@@ -1,0 +1,75 @@
+{
+  "schemaVersion": 1,
+  "runId": "20261022T042239137604Z",
+  "timestampUtc": "2026-10-22T04:22:39.139110+00:00",
+  "completedAtUtc": "2026-10-22T04:22:40.516973+00:00",
+  "mode": "multi-agent-review",
+  "sourceEvidencePaths": [
+    "C:\\Users\\jackz\\source\\repos\\CampusPulseAI\\.artifacts\\multi-agent\\4aef88fe-9e61-4670-9c60-fdda03ca73f4\\workflow.json",
+    "C:\\Users\\jackz\\source\\repos\\CampusPulseAI\\.artifacts\\multi-agent\\4aef88fe-9e61-4670-9c60-fdda03ca73f4\\workflow_history.jsonl",
+    "C:\\Users\\jackz\\source\\repos\\CampusPulseAI\\.artifacts\\multi-agent\\4aef88fe-9e61-4670-9c60-fdda03ca73f4\\coordination_audit.jsonl"
+  ],
+  "checks": [
+    {
+      "name": "workflow.json structure",
+      "status": "PASS",
+      "details": "Workflow snapshot parsed."
+    },
+    {
+      "name": "workflow_history.jsonl",
+      "status": "PASS",
+      "details": "Parsed 1 records."
+    },
+    {
+      "name": "coordination_audit.jsonl",
+      "status": "PASS",
+      "details": "Parsed 10 records."
+    },
+    {
+      "name": "workflow status",
+      "status": "PASS",
+      "details": "Export status is approved."
+    },
+    {
+      "name": "agent stages and outputs",
+      "status": "PASS",
+      "details": "Missing or incomplete outputs: none"
+    },
+    {
+      "name": "agent evidence references",
+      "status": "PASS",
+      "details": "Unresolved or malformed evidence references: 0."
+    },
+    {
+      "name": "dependency outcomes",
+      "status": "PASS",
+      "details": "Recorded 2 dependency outcomes; 0 have no status."
+    },
+    {
+      "name": "human decision",
+      "status": "PASS",
+      "details": "Human decision is approve."
+    }
+  ],
+  "modelCalls": [
+    {
+      "stage": "implementation-assessment",
+      "requestedModel": "qwen/qwen3.8-27b",
+      "usedModel": "qwen/qwen3.8-27b",
+      "error": "OPENROUTER_API_KEY is not set."
+    },
+    {
+      "stage": "independent-review",
+      "requestedModel": "qwen/qwen3.8-27b",
+      "usedModel": "qwen/qwen3.8-27b",
+      "error": "OPENROUTER_API_KEY is not set."
+    }
+  ],
+  "errors": [
+    "OPENROUTER_API_KEY is not set.",
+    "OPENROUTER_API_KEY is not set."
+  ],
+  "status": "INCOMPLETE",
+  "humanReleaseDecision": "pending",
+  "releaseApproval": false
+}

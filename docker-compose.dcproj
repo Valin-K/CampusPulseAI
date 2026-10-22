@@ -17,7 +17,25 @@
     </None>
     <None Include="docker-compose.yml" />
     <None Include=".dockerignore" />
+    <None Include="docs\release-2\agentic-loop-review-technical-report.md" />
     <None Include="NuGet.Config" />
+    <None Include="scripts\agentic-loop\cloud_deployment_review_workflow\collector.py" />
+    <None Include="scripts\agentic-loop\cloud_deployment_review_workflow\orchestrator.py" />
+    <None Include="scripts\agentic-loop\cloud_deployment_review_workflow\pipeline.py" />
+    <None Include="scripts\agentic-loop\cloud_deployment_review_workflow\__init__.py" />
+    <None Include="scripts\agentic-loop\multi_agent_review_workflow\collector.py" />
+    <None Include="scripts\agentic-loop\multi_agent_review_workflow\orchestrator.py" />
+    <None Include="scripts\agentic-loop\multi_agent_review_workflow\pipeline.py" />
+    <None Include="scripts\agentic-loop\multi_agent_review_workflow\__init__.py" />
+    <None Include="scripts\agentic-loop\review_workflow_common.py" />
+    <None Include="scripts\agentic-loop\testing_review_workflow\collector.py" />
+    <None Include="scripts\agentic-loop\testing_review_workflow\orchestrator.py" />
+    <None Include="scripts\agentic-loop\testing_review_workflow\pipeline.py" />
+    <None Include="scripts\agentic-loop\testing_review_workflow\__init__.py" />
+    <None Include="scripts\agentic-loop\tests\test_ci_test_report_collector.py" />
+    <None Include="scripts\agentic-loop\tests\test_release2_review_workflows.py" />
+    <None Include="scripts\agentic-loop\tools\collect_ci_test_reports.py" />
+    <None Include="scripts\pre-commit\Write-PreCommitSecurityReport.ps1" />
     <None Include="scripts\test\validate-ai-authorization.ps1" />
     <None Include="scripts\test\validate-ai-containers.ps1" />
     <None Include="shared\backend\CampusPulse.Shared.Security\CampusPulse.Shared.Security.csproj" />

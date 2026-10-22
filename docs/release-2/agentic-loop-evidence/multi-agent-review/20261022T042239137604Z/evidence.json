@@ -1,0 +1,264 @@
+{
+  "schemaVersion": 1,
+  "runId": "20261022T042239137604Z",
+  "timestampUtc": "2026-10-22T04:22:39.139110+00:00",
+  "completedAtUtc": "2026-10-22T04:22:40.516973+00:00",
+  "mode": "multi-agent-review",
+  "sourceEvidencePaths": [
+    "C:\\Users\\jackz\\source\\repos\\CampusPulseAI\\.artifacts\\multi-agent\\4aef88fe-9e61-4670-9c60-fdda03ca73f4\\workflow.json",
+    "C:\\Users\\jackz\\source\\repos\\CampusPulseAI\\.artifacts\\multi-agent\\4aef88fe-9e61-4670-9c60-fdda03ca73f4\\workflow_history.jsonl",
+    "C:\\Users\\jackz\\source\\repos\\CampusPulseAI\\.artifacts\\multi-agent\\4aef88fe-9e61-4670-9c60-fdda03ca73f4\\coordination_audit.jsonl"
+  ],
+  "deterministicChecks": [
+    {
+      "name": "workflow.json structure",
+      "status": "PASS",
+      "details": "Workflow snapshot parsed."
+    },
+    {
+      "name": "workflow_history.jsonl",
+      "status": "PASS",
+      "details": "Parsed 1 records."
+    },
+    {
+      "name": "coordination_audit.jsonl",
+      "status": "PASS",
+      "details": "Parsed 10 records."
+    },
+    {
+      "name": "workflow status",
+      "status": "PASS",
+      "details": "Export status is approved."
+    },
+    {
+      "name": "agent stages and outputs",
+      "status": "PASS",
+      "details": "Missing or incomplete outputs: none"
+    },
+    {
+      "name": "agent evidence references",
+      "status": "PASS",
+      "details": "Unresolved or malformed evidence references: 0."
+    },
+    {
+      "name": "dependency outcomes",
+      "status": "PASS",
+      "details": "Recorded 2 dependency outcomes; 0 have no status."
+    },
+    {
+      "name": "human decision",
+      "status": "PASS",
+      "details": "Human decision is approve."
+    }
+  ],
+  "collectedEvidence": {
+    "sourceDirectory": "C:\\Users\\jackz\\source\\repos\\CampusPulseAI\\.artifacts\\multi-agent\\4aef88fe-9e61-4670-9c60-fdda03ca73f4",
+    "sourceFiles": [
+      "C:\\Users\\jackz\\source\\repos\\CampusPulseAI\\.artifacts\\multi-agent\\4aef88fe-9e61-4670-9c60-fdda03ca73f4\\workflow.json",
+      "C:\\Users\\jackz\\source\\repos\\CampusPulseAI\\.artifacts\\multi-agent\\4aef88fe-9e61-4670-9c60-fdda03ca73f4\\workflow_history.jsonl",
+      "C:\\Users\\jackz\\source\\repos\\CampusPulseAI\\.artifacts\\multi-agent\\4aef88fe-9e61-4670-9c60-fdda03ca73f4\\coordination_audit.jsonl"
+    ],
+    "workflow": {
+      "idSha256": "480f67290ba9f450accc9798f762ca3bdc74ac82066d8f2e4bf672f5031d0e27",
+      "feature": "financialaidbilling",
+      "status": "approved",
+      "round": 1,
+      "version": 10,
+      "taskCharacters": 78,
+      "taskSha256": "ee49b7a4d374106eba4c845bea3a4d9cc951a0b4df21b13f2d67b8dcf5331166",
+      "evidenceCount": 2,
+      "evidenceReferences": "IDs and content withheld; only reference integrity was checked.",
+      "agentOutputs": {
+        "planner": {
+          "present": true,
+          "valid": true,
+          "outputCharacters": 575,
+          "outputSha256": "95262da40dbb42dab35963efc1aaf7e21949d7ea236309d2d05a16942c307b63",
+          "evidenceReferenceCount": 0
+        },
+        "worker": {
+          "present": true,
+          "valid": true,
+          "outputCharacters": 3081,
+          "outputSha256": "0f5fd57e78b8fc01bdc618977d0018f3dae9e0bddb84ae63ce892cde3fde2adb",
+          "evidenceReferenceCount": 1
+        },
+        "reviewer": {
+          "present": true,
+          "valid": true,
+          "outputCharacters": 121,
+          "outputSha256": "0a557cfb80c8e73d3ca370d5957e5da92473ee07f7900d69a6211bed5123d46f",
+          "evidenceReferenceCount": 1
+        }
+      },
+      "dependencies": [
+        {
+          "service": "redacted",
+          "status": "available"
+        },
+        {
+          "service": "redacted",
+          "status": "fallback"
+        }
+      ],
+      "humanDecision": "approve",
+      "humanCommentCharacters": 37,
+      "errorPresent": false
+    },
+    "history": [
+      {
+        "status": "approved",
+        "round": 1,
+        "version": 10,
+        "agents": 3
+      }
+    ],
+    "coordinationAudit": [
+      {
+        "sequence": 10,
+        "event": "workflow_created",
+        "status": "running",
+        "version": 1,
+        "round": 1
+      },
+      {
+        "sequence": 11,
+        "event": "evidence_collected",
+        "status": "running",
+        "version": 2,
+        "round": 1
+      },
+      {
+        "sequence": 12,
+        "event": "planner_started",
+        "status": "running",
+        "version": 3,
+        "round": 1
+      },
+      {
+        "sequence": 13,
+        "event": "planner_completed",
+        "status": "running",
+        "version": 4,
+        "round": 1
+      },
+      {
+        "sequence": 14,
+        "event": "worker_started",
+        "status": "running",
+        "version": 5,
+        "round": 1
+      },
+      {
+        "sequence": 15,
+        "event": "worker_completed",
+        "status": "running",
+        "version": 6,
+        "round": 1
+      },
+      {
+        "sequence": 16,
+        "event": "reviewer_started",
+        "status": "running",
+        "version": 7,
+        "round": 1
+      },
+      {
+        "sequence": 17,
+        "event": "reviewer_completed",
+        "status": "running",
+        "version": 8,
+        "round": 1
+      },
+      {
+        "sequence": 18,
+        "event": "human_review_required",
+        "status": "awaiting_human_review",
+        "version": 9,
+        "round": 1
+      },
+      {
+        "sequence": 46,
+        "event": "human_approve",
+        "status": "approved",
+        "version": 10,
+        "round": 1
+      }
+    ],
+    "checks": [
+      {
+        "name": "workflow.json structure",
+        "status": "PASS",
+        "details": "Workflow snapshot parsed."
+      },
+      {
+        "name": "workflow_history.jsonl",
+        "status": "PASS",
+        "details": "Parsed 1 records."
+      },
+      {
+        "name": "coordination_audit.jsonl",
+        "status": "PASS",
+        "details": "Parsed 10 records."
+      },
+      {
+        "name": "workflow status",
+        "status": "PASS",
+        "details": "Export status is approved."
+      },
+      {
+        "name": "agent stages and outputs",
+        "status": "PASS",
+        "details": "Missing or incomplete outputs: none"
+      },
+      {
+        "name": "agent evidence references",
+        "status": "PASS",
+        "details": "Unresolved or malformed evidence references: 0."
+      },
+      {
+        "name": "dependency outcomes",
+        "status": "PASS",
+        "details": "Recorded 2 dependency outcomes; 0 have no status."
+      },
+      {
+        "name": "human decision",
+        "status": "PASS",
+        "details": "Human decision is approve."
+      }
+    ],
+    "status": "PASS",
+    "privacy": "Free text, evidence content/IDs, agent outputs, comments, dependency details, and errors are withheld. Models receive structural metadata and hashes only."
+  },
+  "models": [
+    {
+      "stage": "implementation-assessment",
+      "requestedProvider": "openrouter",
+      "requestedModel": "qwen/qwen3.8-27b",
+      "usedProvider": "openrouter",
+      "usedModel": "qwen/qwen3.8-27b",
+      "systemPrompt": "Assess only the supplied evidence. Separate verified facts, failures, gaps, and limitations. Do not approve a release.",
+      "userPrompt": "Assess this Multi-Agent Server workflow export using only validated structural evidence. Preserve failed and incomplete states; do not infer approval from an agent recommendation.\n\n{\n  \"workflow\": {\n    \"feature\": \"financialaidbilling\",\n    \"status\": \"approved\",\n    \"round\": 1,\n    \"version\": 10,\n    \"taskCharacters\": 78,\n    \"taskSha256\": \"ee49b7a4d374106eba4c845bea3a4d9cc951a0b4df21b13f2d67b8dcf5331166\",\n    \"evidenceCount\": 2,\n    \"agentOutputs\": {\n      \"planner\": {\n        \"present\": true,\n        \"valid\": true,\n        \"outputCharacters\": 575,\n        \"outputSha256\": \"95262da40dbb42dab35963efc1aaf7e21949d7ea236309d2d05a16942c307b63\",\n        \"evidenceReferenceCount\": 0\n      },\n      \"worker\": {\n        \"present\": true,\n        \"valid\": true,\n        \"outputCharacters\": 3081,\n        \"outputSha256\": \"0f5fd57e78b8fc01bdc618977d0018f3dae9e0bddb84ae63ce892cde3fde2adb\",\n        \"evidenceReferenceCount\": 1\n      },\n      \"reviewer\": {\n        \"present\": true,\n        \"valid\": true,\n        \"outputCharacters\": 121,\n        \"outputSha256\": \"0a557cfb80c8e73d3ca370d5957e5da92473ee07f7900d69a6211bed5123d46f\",\n        \"evidenceReferenceCount\": 1\n      }\n    },\n    \"dependencies\": [\n      {\n        \"service\": \"redacted\",\n        \"status\": \"available\"\n      },\n      {\n        \"service\": \"redacted\",\n        \"status\": \"fallback\"\n      }\n    ],\n    \"humanDecision\": \"approve\",\n    \"errorPresent\": false\n  },\n  \"history\": [\n    {\n      \"status\": \"approved\",\n      \"round\": 1,\n      \"version\": 10,\n      \"agents\": 3\n    }\n  ],\n  \"coordinationAudit\": [\n    {\n      \"sequence\": 10,\n      \"event\": \"workflow_created\",\n      \"status\": \"running\",\n      \"version\": 1,\n      \"round\": 1\n    },\n    {\n      \"sequence\": 11,\n      \"event\": \"evidence_collected\",\n      \"status\": \"running\",\n      \"version\": 2,\n      \"round\": 1\n    },\n    {\n      \"sequence\": 12,\n      \"event\": \"planner_started\",\n      \"status\": \"running\",\n      \"version\": 3,\n      \"round\": 1\n    },\n    {\n      \"sequence\": 13,\n      \"event\": \"planner_completed\",\n      \"status\": \"running\",\n      \"version\": 4,\n      \"round\": 1\n    },\n    {\n      \"sequence\": 14,\n      \"event\": \"worker_started\",\n      \"status\": \"running\",\n      \"version\": 5,\n      \"round\": 1\n    },\n    {\n      \"sequence\": 15,\n      \"event\": \"worker_completed\",\n      \"status\": \"running\",\n      \"version\": 6,\n      \"round\": 1\n    },\n    {\n      \"sequence\": 16,\n      \"event\": \"reviewer_started\",\n      \"status\": \"running\",\n      \"version\": 7,\n      \"round\": 1\n    },\n    {\n      \"sequence\": 17,\n      \"event\": \"reviewer_completed\",\n      \"status\": \"running\",\n      \"version\": 8,\n      \"round\": 1\n    },\n    {\n      \"sequence\": 18,\n      \"event\": \"human_review_required\",\n      \"status\": \"awaiting_human_review\",\n      \"version\": 9,\n      \"round\": 1\n    },\n    {\n      \"sequence\": 46,\n      \"event\": \"human_approve\",\n      \"status\": \"approved\",\n      \"version\": 10,\n      \"round\": 1\n    }\n  ],\n  \"checks\": [\n    {\n      \"name\": \"workflow.json structure\",\n      \"status\": \"PASS\"\n    },\n    {\n      \"name\": \"workflow_history.jsonl\",\n      \"status\": \"PASS\"\n    },\n    {\n      \"name\": \"coordination_audit.jsonl\",\n      \"status\": \"PASS\"\n    },\n    {\n      \"name\": \"workflow status\",\n      \"status\": \"PASS\"\n    },\n    {\n      \"name\": \"agent stages and outputs\",\n      \"status\": \"PASS\"\n    },\n    {\n      \"name\": \"agent evidence references\",\n      \"status\": \"PASS\"\n    },\n    {\n      \"name\": \"dependency outcomes\",\n      \"status\": \"PASS\"\n    },\n    {\n      \"name\": \"human decision\",\n      \"status\": \"PASS\"\n    }\n  ],\n  \"privacy\": \"Free text, evidence content/IDs, agent outputs, comments, dependency details, and errors are withheld. Models receive structural metadata and hashes only.\"\n}",
+      "output": null,
+      "error": "OPENROUTER_API_KEY is not set."
+    },
+    {
+      "stage": "independent-review",
+      "requestedProvider": "openrouter",
+      "requestedModel": "qwen/qwen3.8-27b",
+      "usedProvider": "openrouter",
+      "usedModel": "qwen/qwen3.8-27b",
+      "systemPrompt": "Independently verify the assessment against the deterministic evidence. Identify unsupported claims and missing checks. This is not human release approval.",
+      "userPrompt": "Independently review the implementation assessment against the deterministic export checks. Call out missing stages, unresolved evidence references, dependencies, and the recorded human decision. Do not treat model recommendations as a human decision.\n\nValidated evidence:\n{\n  \"workflow\": {\n    \"feature\": \"financialaidbilling\",\n    \"status\": \"approved\",\n    \"round\": 1,\n    \"version\": 10,\n    \"taskCharacters\": 78,\n    \"taskSha256\": \"ee49b7a4d374106eba4c845bea3a4d9cc951a0b4df21b13f2d67b8dcf5331166\",\n    \"evidenceCount\": 2,\n    \"agentOutputs\": {\n      \"planner\": {\n        \"present\": true,\n        \"valid\": true,\n        \"outputCharacters\": 575,\n        \"outputSha256\": \"95262da40dbb42dab35963efc1aaf7e21949d7ea236309d2d05a16942c307b63\",\n        \"evidenceReferenceCount\": 0\n      },\n      \"worker\": {\n        \"present\": true,\n        \"valid\": true,\n        \"outputCharacters\": 3081,\n        \"outputSha256\": \"0f5fd57e78b8fc01bdc618977d0018f3dae9e0bddb84ae63ce892cde3fde2adb\",\n        \"evidenceReferenceCount\": 1\n      },\n      \"reviewer\": {\n        \"present\": true,\n        \"valid\": true,\n        \"outputCharacters\": 121,\n        \"outputSha256\": \"0a557cfb80c8e73d3ca370d5957e5da92473ee07f7900d69a6211bed5123d46f\",\n        \"evidenceReferenceCount\": 1\n      }\n    },\n    \"dependencies\": [\n      {\n        \"service\": \"redacted\",\n        \"status\": \"available\"\n      },\n      {\n        \"service\": \"redacted\",\n        \"status\": \"fallback\"\n      }\n    ],\n    \"humanDecision\": \"approve\",\n    \"errorPresent\": false\n  },\n  \"history\": [\n    {\n      \"status\": \"approved\",\n      \"round\": 1,\n      \"version\": 10,\n      \"agents\": 3\n    }\n  ],\n  \"coordinationAudit\": [\n    {\n      \"sequence\": 10,\n      \"event\": \"workflow_created\",\n      \"status\": \"running\",\n      \"version\": 1,\n      \"round\": 1\n    },\n    {\n      \"sequence\": 11,\n      \"event\": \"evidence_collected\",\n      \"status\": \"running\",\n      \"version\": 2,\n      \"round\": 1\n    },\n    {\n      \"sequence\": 12,\n      \"event\": \"planner_started\",\n      \"status\": \"running\",\n      \"version\": 3,\n      \"round\": 1\n    },\n    {\n      \"sequence\": 13,\n      \"event\": \"planner_completed\",\n      \"status\": \"running\",\n      \"version\": 4,\n      \"round\": 1\n    },\n    {\n      \"sequence\": 14,\n      \"event\": \"worker_started\",\n      \"status\": \"running\",\n      \"version\": 5,\n      \"round\": 1\n    },\n    {\n      \"sequence\": 15,\n      \"event\": \"worker_completed\",\n      \"status\": \"running\",\n      \"version\": 6,\n      \"round\": 1\n    },\n    {\n      \"sequence\": 16,\n      \"event\": \"reviewer_started\",\n      \"status\": \"running\",\n      \"version\": 7,\n      \"round\": 1\n    },\n    {\n      \"sequence\": 17,\n      \"event\": \"reviewer_completed\",\n      \"status\": \"running\",\n      \"version\": 8,\n      \"round\": 1\n    },\n    {\n      \"sequence\": 18,\n      \"event\": \"human_review_required\",\n      \"status\": \"awaiting_human_review\",\n      \"version\": 9,\n      \"round\": 1\n    },\n    {\n      \"sequence\": 46,\n      \"event\": \"human_approve\",\n      \"status\": \"approved\",\n      \"version\": 10,\n      \"round\": 1\n    }\n  ],\n  \"checks\": [\n    {\n      \"name\": \"workflow.json structure\",\n      \"status\": \"PASS\"\n    },\n    {\n      \"name\": \"workflow_history.jsonl\",\n      \"status\": \"PASS\"\n    },\n    {\n      \"name\": \"coordination_audit.jsonl\",\n      \"status\": \"PASS\"\n    },\n    {\n      \"name\": \"workflow status\",\n      \"status\": \"PASS\"\n    },\n    {\n      \"name\": \"agent stages and outputs\",\n      \"status\": \"PASS\"\n    },\n    {\n      \"name\": \"agent evidence references\",\n      \"status\": \"PASS\"\n    },\n    {\n      \"name\": \"dependency outcomes\",\n      \"status\": \"PASS\"\n    },\n    {\n      \"name\": \"human decision\",\n      \"status\": \"PASS\"\n    }\n  ],\n  \"privacy\": \"Free text, evidence content/IDs, agent outputs, comments, dependency details, and errors are withheld. Models receive structural metadata and hashes only.\"\n}\n\nImplementation assessment (untrusted model output):\nUnavailable.",
+      "output": null,
+      "error": "OPENROUTER_API_KEY is not set."
+    }
+  ],
+  "errors": [
+    "OPENROUTER_API_KEY is not set.",
+    "OPENROUTER_API_KEY is not set."
+  ],
+  "status": "INCOMPLETE",
+  "humanReleaseDecision": "pending",
+  "releaseApproval": false
+}
