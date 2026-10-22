@@ -105,10 +105,13 @@ class EndpointTestRunner:
         expected_status: int,
         payload: dict[str, Any] | None = None,
         token: str | None = None,
+        requires_auth: bool = False,
         validate: Callable[[Any], str] | None = None,
     ) -> Any:
         status = 0
         try:
+            if requires_auth and not token:
+                raise RuntimeError("required authorization token is unavailable; see authentication diagnostics")
             status, body = self.request(method, path, payload, token)
             if status != expected_status:
                 raise AssertionError(f"expected HTTP {expected_status}, received HTTP {status}")
@@ -193,6 +196,7 @@ class EndpointTestRunner:
             f"/api/students/{student_id}",
             200,
             token=staff_token,
+            requires_auth=True,
             validate=validate_student_read,
         )
 
@@ -235,6 +239,7 @@ class EndpointTestRunner:
                 "isActive": True,
             },
             token=staff_token,
+            requires_auth=True,
             validate=validate_course,
         )
         self.case(
@@ -244,6 +249,7 @@ class EndpointTestRunner:
             201,
             {"courseCode": course_code, "completedCourses": []},
             token=student_token,
+            requires_auth=True,
             validate=validate_enrollment,
         )
 
@@ -267,6 +273,7 @@ class EndpointTestRunner:
             "/api/housing/rooms",
             200,
             token=student_token,
+            requires_auth=True,
             validate=validate_room_list,
         )
         self.case(
@@ -275,6 +282,7 @@ class EndpointTestRunner:
             "/api/housing/rooms/1",
             200,
             token=student_token,
+            requires_auth=True,
             validate=validate_room_detail,
         )
 
@@ -319,6 +327,7 @@ class EndpointTestRunner:
                 "status": 0,
             },
             token=staff_token,
+            requires_auth=True,
             validate=validate_invoice,
         )
         invoice_id = (
@@ -340,6 +349,7 @@ class EndpointTestRunner:
                 "status": 1,
             },
             token=staff_token,
+            requires_auth=True,
             validate=validate_invoice_update,
         )
 
@@ -381,6 +391,7 @@ class EndpointTestRunner:
                 "status": 1,
             },
             token=student_token,
+            requires_auth=True,
             validate=validate_booking,
         )
         booking_id = (
@@ -403,6 +414,7 @@ class EndpointTestRunner:
                 "status": 1,
             },
             token=student_token,
+            requires_auth=True,
             validate=validate_booking_update,
         )
 

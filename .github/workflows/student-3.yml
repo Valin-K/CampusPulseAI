@@ -97,8 +97,8 @@ jobs:
         shell: bash
         run: |
           docker compose -f docker-compose.yml -f .github/docker-compose.student-3-ci.yml -p student-3-ci config --quiet
-          docker compose -f docker-compose.yml -f .github/docker-compose.student-3-ci.yml -p student-3-ci build --with-dependencies ai.gateway academicrecords.database campushousing.database campushousing.backend campushousing.frontend
-          docker compose -f docker-compose.yml -f .github/docker-compose.student-3-ci.yml -p student-3-ci up --detach --wait --no-build ai.gateway academicrecords.database campushousing.database campushousing.backend campushousing.frontend
+          docker compose -f docker-compose.yml -f .github/docker-compose.student-3-ci.yml -p student-3-ci build --with-dependencies ai.gateway academicrecords.database academicrecords.backend campushousing.database campushousing.backend campushousing.frontend
+          docker compose -f docker-compose.yml -f .github/docker-compose.student-3-ci.yml -p student-3-ci up --detach --wait --no-build ai.gateway academicrecords.database academicrecords.backend campushousing.database campushousing.backend campushousing.frontend
 
       # Smoke tests confirm container readiness; business endpoint assertions are a separate CI/CD step below.
       - name: Smoke test Student 3 container health
@@ -109,6 +109,7 @@ jobs:
 
           endpoints=(
             "http://localhost:5269/health"
+            "http://localhost:5020/health"
             "http://localhost:5083/health"
             "http://localhost:8083/"
           )
@@ -138,7 +139,7 @@ jobs:
         shell: bash
         run: |
           docker compose -f docker-compose.yml -f .github/docker-compose.student-3-ci.yml -p student-3-ci ps
-          docker compose -f docker-compose.yml -f .github/docker-compose.student-3-ci.yml -p student-3-ci logs --no-color ai.gateway academicrecords.database campushousing.database campushousing.backend campushousing.frontend
+          docker compose -f docker-compose.yml -f .github/docker-compose.student-3-ci.yml -p student-3-ci logs --no-color ai.gateway academicrecords.database academicrecords.backend campushousing.database campushousing.backend campushousing.frontend
 
       - name: Remove Student 3 containers
         if: always() && (github.event_name == 'workflow_dispatch' || steps.filter.outputs.student3 == 'true')
