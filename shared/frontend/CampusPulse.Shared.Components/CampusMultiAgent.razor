@@ -102,7 +102,14 @@
                 <button type="button" @onclick='() => ReviewAsync("reject")'
                         disabled="@(busy || string.IsNullOrWhiteSpace(reviewer) || string.IsNullOrWhiteSpace(comments))">Reject</button>
             }
-            <a href="@EvidenceUrl" target="_blank" rel="noopener">Open workflow and coordination audit evidence (JSON)</a>
+            <button type="button" @onclick="LoadEvidenceAsync" disabled="@busy">View workflow and coordination audit evidence (JSON)</button>
+            @if (evidenceJson is not null)
+            {
+                <section aria-label="Workflow and coordination audit evidence">
+                    <button type="button" @onclick="() => evidenceJson = null">Close evidence</button>
+                    <pre>@evidenceJson</pre>
+                </section>
+            }
         </section>
     }
 </details>
@@ -112,9 +119,15 @@
     private Workflow? workflow;
     private IReadOnlyList<Workflow> history = [];
     private string task = "", additionalEvidence = "", reviewer = "", comments = "";
-    private string? error;
+    private string? error, evidenceJson;
     private bool useMcp = true, useRag = true, allowFallback = true, busy;
-    private string EvidenceUrl => new Uri(Http.BaseAddress!, $"/api/multi-agent/workflows/{workflow!.Id}/evidence").ToString();
+
+    private Task LoadEvidenceAsync() => ExecuteAsync(async () =>
+    {
+        using var response = await Http.GetAsync($"/api/multi-agent/workflows/{workflow!.Id}/evidence", lifetime.Token);
+        var evidence = await ReadAsync<JsonElement>(response);
+        evidenceJson = JsonSerializer.Serialize(evidence, new JsonSerializerOptions { WriteIndented = true });
+    });
 
     private Task StartAsync() => ExecuteAsync(async () =>
     {
@@ -176,6 +189,8 @@
 
     private async Task<T> ReadAsync<T>(HttpResponseMessage response)
     {
+        if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            throw new HttpRequestException("Your session has expired or you are not signed in. Sign in again to access workflows and evidence.");
         if (!response.IsSuccessStatusCode)
         {
             var text = await response.Content.ReadAsStringAsync(lifetime.Token);
@@ -194,6 +209,7 @@
         if (busy) return;
         busy = true;
         error = null;
+        evidenceJson = null;
         try { await action(); }
         catch (Exception exception) when (exception is HttpRequestException or JsonException or OperationCanceledException)
         {
