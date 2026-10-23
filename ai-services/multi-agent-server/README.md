@@ -107,7 +107,20 @@ replica while enabled (its queue is in-process) and an Azure Files share for his
    reach the agent outputs and human-review controls.
 7. Enter a human reviewer name and approve, correct, or reject. Comments are
    mandatory for correction/rejection. Correction reruns all agents with the feedback.
-8. Open the workflow/coordination evidence link or export it from the terminal.
+8. Select **View workflow and coordination audit evidence (JSON)** to load the
+   complete export inside the assistant panel, or export it from the terminal.
+   The viewer uses the app's authenticated HTTP client, not a new browser tab:
+   navigating directly to the protected API does not attach the session's bearer
+   token and returns 401. An expired/missing session prompts you to sign in again.
+   Evidence is cleared when you select, refresh, or review a workflow so an older
+   export is not shown as the current result.
+
+The evidence viewer works with direct local backend URLs and deployed same-origin
+`/api/` proxies, using the frontend's configured HTTP client. Cloud deployments
+must enable the optional AI profile (`Deploy-Apps.ps1 -EnableAi` or the workflow's
+`enable_ai` input); the default cloud baseline intentionally disables workflows.
+Keep the server internal and retain API authentication; no public evidence URL or
+token in a URL is required.
 
 ## Terminal demonstration
 
